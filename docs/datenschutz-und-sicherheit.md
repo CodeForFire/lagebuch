@@ -46,7 +46,7 @@ einzelne Datei gespeichert wird.
 | CO-Messprotokoll | **Name der Bewohnerin oder des Bewohners je Wohnung**, ppm-Wert, Status, Schlüssel vorhanden | Einsatzdatei |
 | Kräfte | Wache, Funkrufname, Stärke als Zahlen (ZF/GF/Mann, AGT), Status, Bemerkung – **keine Namen** | Einsatzdatei |
 | Aufgaben | Auftrag, Zuständiger (Freitext), „angelegt von“, „erledigt von“, Zeiten | Einsatzdatei |
-| Beteiligte | **Name, Telefonnummer und Notiz** von Personen außerhalb der Feuerwehr (z. B. Eigentümer, Fahrzeughalter, Polizei), „angelegt von“ | Einsatzdatei |
+| Beteiligte | **Name, Telefonnummer, Notiz und Aufenthaltsort** (z. B. „im RTW …“, mit Uhrzeit) von Personen außerhalb der Feuerwehr (z. B. Eigentümer, Fahrzeughalter, Polizei), die Wohnung, in der sie angetroffen wurden, „angelegt von“ | Einsatzdatei |
 | Dateien und Anhänge | Fotos und PDFs, deren Originaldateiname und „hinzugefügt von“ | Ordner neben der Einsatzdatei |
 | Änderungsprotokoll | wer wann welche Aktion ausgeführt hat | Einsatzdatei |
 

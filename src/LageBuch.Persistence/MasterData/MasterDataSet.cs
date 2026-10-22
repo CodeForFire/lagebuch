@@ -527,6 +527,8 @@ public static class AnonymizedExampleData
     public const string LinkName = "Wetterdienst";
     public const string LinkUrl = "https://dwd.de";
     public const string LinkGroup = "Gefahrgut";
+    public const string Whereabouts = "bei Nachbarin Frau Meier";
+    public const string RescueCallSign = "Rotkreuz Musterstadt 71/1";
 
     // Derived placeholder strings. Compile-time const concatenation, so the "z. B." prefix and
     // the underlying value can never drift apart from one another.
@@ -539,6 +541,7 @@ public static class AnonymizedExampleData
     public const string PhoneNumberPlaceholder = "z. B. " + PhoneNumber;
     public const string EmailPlaceholder = "z. B. " + EmailAddress;
     public const string PersonNotePlaceholder = "z. B. " + PersonNote;
+    public const string WhereaboutsPlaceholder = "z. B. " + Whereabouts + " oder im RTW " + RescueCallSign;
     public const string OperatorNamePlaceholder = "z. B. " + OperatorSurname;
     public const string OperatorNamePlaceholderAlt = "z. B. " + OperatorSurnameAlt;
     public const string OperatorNamePlaceholderThird = "z. B. " + OperatorSurnameThird;

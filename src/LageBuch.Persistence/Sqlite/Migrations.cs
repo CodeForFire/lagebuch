@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 27;
+    public const int CurrentVersion = 28;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -180,6 +180,15 @@ public static class Migrations
         if (version < 27)
         {
             ApplyV27(cn, tx);
+
+            // Stryker restore all
+        }
+
+        // Stryker disable all : V28 only adds nullable columns that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 28)
+        {
+            ApplyV28(cn, tx);
 
             // Stryker restore all
         }
@@ -833,6 +842,17 @@ public static class Migrations
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "dwelling_id", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "dwelling_label", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // Where a Beteiligte/r is now, after the evacuation, and since when. Both nullable: an older
+    // file reads as "Aufenthaltsort not known".
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV28(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "whereabouts", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "whereabouts_at", "TEXT");
 
         // Stryker restore all
     }

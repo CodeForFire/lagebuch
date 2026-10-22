@@ -1196,6 +1196,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId) => _inner.SetInvolvedPartyDwelling(partyId, dwellingId);
 
+    public void SetInvolvedPartyWhereabouts(Guid partyId, string? whereabouts) => _inner.SetInvolvedPartyWhereabouts(partyId, whereabouts);
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         _inner.UpdateTask(taskId, text, assignee, importance, urgency);
 

@@ -431,7 +431,7 @@ public sealed class IncidentRepository
             var party = incident.InvolvedParties[i];
             Run(
                 inserts,
-                "INSERT INTO involved_parties (id, ordinal, name, phone, notes, created_by, created_at, dwelling_id, dwelling_label) " + "VALUES ($id,$o,$name,$phone,$notes,$by,$cat,$dwelling,$dwellingLabel);",
+                "INSERT INTO involved_parties (id, ordinal, name, phone, notes, created_by, created_at, dwelling_id, dwelling_label, whereabouts, whereabouts_at) " + "VALUES ($id,$o,$name,$phone,$notes,$by,$cat,$dwelling,$dwellingLabel,$where,$whereAt);",
                 p =>
                 {
                     p("$id", party.Id.ToString());
@@ -443,6 +443,8 @@ public sealed class IncidentRepository
                     p("$cat", party.CreatedAt.ToString(Iso));
                     p("$dwelling", (object?)party.DwellingId?.ToString() ?? DBNull.Value);
                     p("$dwellingLabel", (object?)party.DwellingLabel ?? DBNull.Value);
+                    p("$where", (object?)party.Whereabouts ?? DBNull.Value);
+                    p("$whereAt", (object?)party.WhereaboutsAt?.ToString(Iso) ?? DBNull.Value);
                 });
         }
     }
@@ -792,7 +794,7 @@ public sealed class IncidentRepository
 
         var involvedParties = ReadAll(
             cn,
-            "SELECT id, name, phone, notes, created_by, created_at, dwelling_id, dwelling_label FROM involved_parties ORDER BY ordinal;",
+            "SELECT id, name, phone, notes, created_by, created_at, dwelling_id, dwelling_label, whereabouts, whereabouts_at FROM involved_parties ORDER BY ordinal;",
             r => Domain.Involved.InvolvedParty.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -801,7 +803,9 @@ public sealed class IncidentRepository
                 r.GetString(4),
                 ParseDate(r.GetString(5)),
                 Str(r, 6) is { } dwelling ? Guid.Parse(dwelling) : null,
-                Str(r, 7)));
+                Str(r, 7),
+                Str(r, 8),
+                Str(r, 9) is { } whereaboutsAt ? ParseDate(whereaboutsAt) : null));
 
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the

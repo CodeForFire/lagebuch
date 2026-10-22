@@ -154,6 +154,43 @@ public class InvolvedPartiesViewModelTests
         Assert.Equal("0171 0000001", Assert.Single(vm.Parties).Phone);
     }
 
+    // #701: where a Beteiligte/r is now, after the evacuation, with the time it was last changed.
+    [Fact]
+    public void Entering_an_aufenthaltsort_writes_through_and_shows_its_stand()
+    {
+        var session = NewSession();
+        session.AddInvolvedParty("Erika Beispiel", null, null);
+        var changes = 0;
+        var vm = new InvolvedPartiesViewModel(session, () => changes++);
+        Assert.Null(Assert.Single(vm.Parties).WhereaboutsStand);
+        var journalBefore = session.Incident.Journal.Count;
+
+        vm.Parties[0].Whereabouts = "im RTW Rotkreuz Musterstadt 71/1";
+
+        var party = Assert.Single(session.Incident.InvolvedParties);
+        Assert.Equal("im RTW Rotkreuz Musterstadt 71/1", party.Whereabouts);
+        Assert.Equal(T0, party.WhereaboutsAt);
+        var row = Assert.Single(vm.Parties);
+        Assert.Equal("im RTW Rotkreuz Musterstadt 71/1", row.Whereabouts);
+        Assert.Equal("Stand 14:00", row.WhereaboutsStand);
+        Assert.Equal(1, changes);
+        Assert.Equal(journalBefore, session.Incident.Journal.Count);
+    }
+
+    [Fact]
+    public void An_oversized_aufenthaltsort_is_explained_and_not_sent()
+    {
+        var session = NewSession();
+        session.AddInvolvedParty("Erika Beispiel", null, null);
+        var vm = new InvolvedPartiesViewModel(session, () => { });
+        var row = vm.Parties[0];
+
+        row.Whereabouts = new string('x', InvolvedParty.MaxWhereaboutsLength + 1);
+
+        Assert.Equal($"Aufenthaltsort ist zu lang (höchstens {InvolvedParty.MaxWhereaboutsLength} Zeichen)", row.Error);
+        Assert.Null(Assert.Single(session.Incident.InvolvedParties).Whereabouts);
+    }
+
     [Fact]
     public void Blanking_a_rows_name_is_refused_with_a_message_and_keeps_the_stored_name()
     {
@@ -227,7 +264,9 @@ public class InvolvedPartiesViewModelTests
         Assert.False(row.RemoveCommand.CanExecute(null));
         row.RemoveCommand.Execute(null); // inert, not throwing
         row.Notes = "nachträglich"; // inert, not throwing
+        row.Whereabouts = "bei Nachbarin Frau Meier"; // inert, not throwing
         Assert.Null(Assert.Single(ro.Incident.InvolvedParties).Notes);
+        Assert.Null(Assert.Single(ro.Incident.InvolvedParties).Whereabouts);
     }
 
     [Fact]

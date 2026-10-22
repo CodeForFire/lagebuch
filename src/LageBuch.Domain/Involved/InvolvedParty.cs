@@ -17,6 +17,8 @@ public sealed record InvolvedParty
 
     public const int MaxNotesLength = 2000;
 
+    public const int MaxWhereaboutsLength = 200;
+
     private InvolvedParty()
     {
     }
@@ -42,6 +44,15 @@ public sealed record InvolvedParty
     /// </summary>
     public string? DwellingLabel { get; private init; }
 
+    /// <summary>
+    /// Where this person is now, after the evacuation, as the Lagebuchführer typed it: "bei
+    /// Nachbarin Frau Meier", "im RTW 1/83-1". Null when not known.
+    /// </summary>
+    public string? Whereabouts { get; private init; }
+
+    /// <summary>When <see cref="Whereabouts"/> was last changed; null exactly when it is null.</summary>
+    public DateTimeOffset? WhereaboutsAt { get; private init; }
+
     public static InvolvedParty Create(
         DateTimeOffset createdAt, string name, string? phone, string? notes, SessionOperator @operator)
     {
@@ -66,7 +77,9 @@ public sealed record InvolvedParty
         string createdBy,
         DateTimeOffset createdAt,
         Guid? dwellingId = null,
-        string? dwellingLabel = null)
+        string? dwellingLabel = null,
+        string? whereabouts = null,
+        DateTimeOffset? whereaboutsAt = null)
         => new()
         {
             Id = id,
@@ -77,6 +90,8 @@ public sealed record InvolvedParty
             CreatedAt = createdAt,
             DwellingId = dwellingId,
             DwellingLabel = dwellingLabel,
+            Whereabouts = whereabouts,
+            WhereaboutsAt = whereaboutsAt,
         };
 
     /// <summary>Returns a copy with corrected details, validated and normalised the same way
@@ -90,6 +105,26 @@ public sealed record InvolvedParty
     /// <summary>Returns a copy found in <paramref name="dwellingId"/>, described as <paramref name="label"/>; both null clears it.</summary>
     public InvolvedParty WithDwelling(Guid? dwellingId, string? label) =>
         this with { DwellingId = dwellingId, DwellingLabel = label };
+
+    /// <summary>
+    /// Returns a copy that is at <paramref name="whereabouts"/> since <paramref name="at"/>. Blank
+    /// clears both; the same text again keeps the copy as it is, so a re-save does not move the time.
+    /// </summary>
+    public InvolvedParty WithWhereabouts(string? whereabouts, DateTimeOffset at)
+    {
+        var trimmed = Trimmed(whereabouts);
+        if (trimmed is { Length: > MaxWhereaboutsLength })
+        {
+            throw new ArgumentException($"Aufenthaltsort ist länger als das Limit von {MaxWhereaboutsLength} Zeichen.", nameof(whereabouts));
+        }
+
+        if (string.Equals(trimmed, Whereabouts, StringComparison.Ordinal))
+        {
+            return this;
+        }
+
+        return this with { Whereabouts = trimmed, WhereaboutsAt = trimmed is null ? null : at };
+    }
 
     private static (string Name, string? Phone, string? Notes) Validate(string name, string? phone, string? notes)
     {

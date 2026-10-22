@@ -1,13 +1,14 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.Domain;
 using LageBuch.Domain.Involved;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// One Beteiligte/r in the list. Name, Telefon and Notiz stay editable for the whole Einsatz — a
+/// One Beteiligte/r in the list. Name, Telefon, Notiz and Aufenthaltsort stay editable for the whole Einsatz — a
 /// phone number is often only known later — and write straight through to the domain, following
 /// <see cref="ForceRow"/>. The view pushes on LostFocus, so a correction is one write, not one per
 /// keystroke. A closed incident is a historical record: the setters are inert instead of throwing.
@@ -16,6 +17,7 @@ public sealed partial class InvolvedPartyRow : ObservableObject
 {
     private readonly Action<string, string?, string?> _onEdited;
     private readonly Action _onRemoved;
+    private readonly Action<string?>? _onWhereaboutsEdited;
 
     public InvolvedPartyRow(
         InvolvedParty party,
@@ -23,7 +25,8 @@ public sealed partial class InvolvedPartyRow : ObservableObject
         Action<string, string?, string?> onEdited,
         Action onRemoved,
         IReadOnlyList<DwellingChoice>? dwellingChoices = null,
-        string? dwellingLocation = null)
+        string? dwellingLocation = null,
+        Action<string?>? onWhereaboutsEdited = null)
     {
         ArgumentNullException.ThrowIfNull(party);
         ArgumentNullException.ThrowIfNull(onEdited);
@@ -36,6 +39,9 @@ public sealed partial class InvolvedPartyRow : ObservableObject
         _name = party.Name;
         _phone = party.Phone;
         _notes = party.Notes;
+        _whereabouts = party.Whereabouts;
+        _onWhereaboutsEdited = onWhereaboutsEdited;
+        WhereaboutsStand = party.WhereaboutsAt is { } at ? $"Stand {Formatting.TimeOfDay(at)}" : null;
         DwellingChoices = dwellingChoices ?? [];
         DwellingButtonText = dwellingLocation ?? DwellingChoice.NoneDisplay;
     }
@@ -67,6 +73,13 @@ public sealed partial class InvolvedPartyRow : ObservableObject
     [ObservableProperty]
     private string? _notes;
 
+    /// <summary>Where this person is now, after the evacuation: "bei Nachbarin Frau Meier".</summary>
+    [ObservableProperty]
+    private string? _whereabouts;
+
+    /// <summary>"Stand 14:32", when the Aufenthaltsort was last changed, or null while there is none.</summary>
+    public string? WhereaboutsStand { get; }
+
     /// <summary>Why the last correction was not taken, or null. Cleared by the rebuild that
     /// follows the next accepted write.</summary>
     [ObservableProperty]
@@ -77,6 +90,22 @@ public sealed partial class InvolvedPartyRow : ObservableObject
     partial void OnPhoneChanged(string? value) => Push();
 
     partial void OnNotesChanged(string? value) => Push();
+
+    // Its own write, not part of Push: the Aufenthaltsort carries its own time, which a name correction
+    // must not move.
+    partial void OnWhereaboutsChanged(string? value)
+    {
+        if (IsReadOnly || _onWhereaboutsEdited is null)
+        {
+            return;
+        }
+
+        Error = InvolvedPartiesViewModel.ValidateWhereabouts(value);
+        if (Error is null)
+        {
+            _onWhereaboutsEdited(value);
+        }
+    }
 
     private void Push()
     {
@@ -157,6 +186,8 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
 
     public static int MaxNotesLength => InvolvedParty.MaxNotesLength;
 
+    public static int MaxWhereaboutsLength => InvolvedParty.MaxWhereaboutsLength;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewNameError))]
     private string _newName = string.Empty;
@@ -215,6 +246,12 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
             ? TooLong("Notiz", InvolvedParty.MaxNotesLength)
             : null;
     }
+
+    /// <summary>Why this Aufenthaltsort would be refused, in German, or null when it is fine.</summary>
+    public static string? ValidateWhereabouts(string? whereabouts) =>
+        whereabouts is not null && whereabouts.Trim().Length > InvolvedParty.MaxWhereaboutsLength
+            ? TooLong("Aufenthaltsort", InvolvedParty.MaxWhereaboutsLength)
+            : null;
 
     private static string TooLong(string field, int max) =>
         $"{field} ist zu lang (höchstens {max} Zeichen)";
@@ -289,7 +326,12 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
                     _onChanged();
                 }),
             DwellingChoicesFor(party),
-            _session.Incident.DwellingLocationOf(party));
+            _session.Incident.DwellingLocationOf(party),
+            whereabouts =>
+            {
+                _session.SetInvolvedPartyWhereabouts(party.Id, whereabouts); // Changed → Refresh shows the new Stand
+                _onChanged();
+            });
 
     // "keine", then every Wohnung in the order the CO-Messung lists them: by Haus, then floor from
     // the top down as the building is drawn, then Wohnung.

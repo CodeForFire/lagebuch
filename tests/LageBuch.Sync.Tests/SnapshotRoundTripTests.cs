@@ -172,6 +172,23 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void Round_trip_preserves_the_aufenthaltsort_of_a_beteiligte_and_its_time()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var party = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        var set = incident.SetInvolvedPartyWhereabouts(clock, party.Id, "bei Nachbarin Frau Meier");
+
+        var r = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        var back = r.InvolvedParties.Single();
+        Assert.Equal("bei Nachbarin Frau Meier", back.Whereabouts);
+        Assert.Equal(set.WhereaboutsAt, back.WhereaboutsAt);
+    }
+
+    [Fact]
     public void Round_trip_preserves_the_sicherheitstrupp_link()
     {
         var clock = new FixedClock();

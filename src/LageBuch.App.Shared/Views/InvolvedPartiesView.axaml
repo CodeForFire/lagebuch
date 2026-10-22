@@ -137,7 +137,7 @@
                   <!-- Each field pushes on LostFocus: the row rebuilds after every accepted write,
                        so a per-keystroke push would rewrite the Einsatzdatei on every character
                        and throw focus out of the box (#33, same as ForcesView's Bemerkung). -->
-                  <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                  <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
                       <ColumnDefinition Width="*" />
@@ -196,7 +196,24 @@
                         </Flyout>
                       </Button.Flyout>
                     </Button>
-                    <TextBlock Grid.Row="4" Grid.Column="1" Classes="field-error"
+                    <!-- Where this person is now, after the evacuation, with the time it was last
+                         changed: the first thing asked when someone comes looking for them. -->
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="AUFENTHALTSORT" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <Grid Grid.Row="4" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                      <TextBox Grid.Column="0" x:Name="WhereaboutsBox"
+                               AutomationProperties.Name="Aufenthaltsort"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.WhereaboutsPlaceholder}"
+                               MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxWhereaboutsLength}"
+                               Text="{Binding Whereabouts, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                               IsEnabled="{Binding !IsReadOnly}" />
+                      <TextBlock Grid.Column="1" x:Name="WhereaboutsStand" Classes="mono" FontSize="11"
+                                 VerticalAlignment="Center"
+                                 Foreground="{StaticResource TextMutedBrush}"
+                                 Text="{Binding WhereaboutsStand}"
+                                 IsVisible="{Binding WhereaboutsStand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    </Grid>
+                    <TextBlock Grid.Row="5" Grid.Column="1" Classes="field-error"
                                Text="{Binding Error}"
                                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   </Grid>

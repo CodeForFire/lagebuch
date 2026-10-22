@@ -71,6 +71,23 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void SetInvolvedPartyWhereabouts_over_the_wire_is_stamped_with_the_hosts_clock()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Host", "FFB 1");
+        var party = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+
+        ApplyOverWire(new SetInvolvedPartyWhereaboutsCommand(party.Id, "bei Nachbarin Frau Meier"), incident, clock);
+        var placed = incident.InvolvedParties.Single();
+        Assert.Equal("bei Nachbarin Frau Meier", placed.Whereabouts);
+        Assert.Equal(clock.Now, placed.WhereaboutsAt);
+
+        ApplyOverWire(new SetInvolvedPartyWhereaboutsCommand(party.Id, null), incident, clock);
+        Assert.Null(incident.InvolvedParties.Single().Whereabouts);
+    }
+
+    [Fact]
     public void Applying_a_non_file_command_returns_null()
     {
         var clock = new FixedClock();

@@ -56,6 +56,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(UpdateInvolvedPartyCommand), "updateInvolvedParty")]
 [JsonDerivedType(typeof(RemoveInvolvedPartyCommand), "removeInvolvedParty")]
 [JsonDerivedType(typeof(SetInvolvedPartyDwellingCommand), "setInvolvedPartyDwelling")]
+[JsonDerivedType(typeof(SetInvolvedPartyWhereaboutsCommand), "setInvolvedPartyWhereabouts")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -172,6 +173,10 @@ public sealed record RemoveInvolvedPartyCommand(Guid PartyId) : SyncCommand;
 /// <summary>The Wohnung a Beteiligte/r was found in (#702); a null DwellingId clears it. Ids only:
 /// the host copies the Wohnung's location itself, so no peer can put a label of its own there.</summary>
 public sealed record SetInvolvedPartyDwellingCommand(Guid PartyId, Guid? DwellingId) : SyncCommand;
+
+/// <summary>Where a Beteiligte/r is now; a null or blank Whereabouts clears it. No time on the
+/// wire: the host stamps it with its own clock, as it does an ETB entry.</summary>
+public sealed record SetInvolvedPartyWhereaboutsCommand(Guid PartyId, string? Whereabouts) : SyncCommand;
 
 // No operator on the wire: a task correction is a silent edit (no ETB entry), like RenameFileCommand.
 public sealed record UpdateTaskCommand(

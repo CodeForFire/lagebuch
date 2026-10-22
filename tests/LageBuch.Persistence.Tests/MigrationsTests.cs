@@ -255,4 +255,33 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(1));
         Assert.True(r.IsDBNull(2));
     }
+
+    [Fact]
+    public void V27_database_upgrades_to_v28_with_no_beteiligte_aufenthaltsort_known()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (27);" +
+                "CREATE TABLE involved_parties (id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, name TEXT NOT NULL, phone TEXT, " +
+                "notes TEXT, created_by TEXT NOT NULL, created_at TEXT NOT NULL, dwelling_id TEXT, dwelling_label TEXT);" +
+                "INSERT INTO involved_parties (id, ordinal, name, created_by, created_at) VALUES ('p', 0, 'Erika Beispiel', 'Muster', '2026-09-27T14:00:00+02:00');";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT name, whereabouts, whereabouts_at FROM involved_parties;";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.Equal("Erika Beispiel", r.GetString(0));
+        Assert.True(r.IsDBNull(1));
+        Assert.True(r.IsDBNull(2));
+    }
 }

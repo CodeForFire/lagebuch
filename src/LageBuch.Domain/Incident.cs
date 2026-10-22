@@ -1104,6 +1104,21 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Records where a Beteiligte/r is now, after the evacuation, stamped with the current time;
+    /// blank clears it. Silent, like <see cref="SetInvolvedPartyDwelling"/>: a third party's
+    /// whereabouts stay out of the ETB.
+    /// </summary>
+    public InvolvedParty SetInvolvedPartyWhereabouts(IClock clock, Guid partyId, string? whereabouts)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        EnsureOpen();
+        var index = FindInvolvedPartyIndex(partyId);
+        var updated = _involvedParties[index].WithWhereabouts(whereabouts, clock.Now);
+        _involvedParties[index] = updated;
+        return updated;
+    }
+
+    /// <summary>
     /// Where <paramref name="party"/> was found: the Wohnung as it is now while it still exists, so
     /// a renamed Haus or Wohnung reads current, otherwise the copy taken when it was linked.
     /// </summary>
