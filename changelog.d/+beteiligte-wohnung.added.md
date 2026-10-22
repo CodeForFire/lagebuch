@@ -1,1 +1,1 @@
-Beteiligte: a Beteiligte/r records the Wohnung of the CO-Messung they were found in, picked on their card and listed in that Wohnung's editor and in the PDF, and the location still reads once the Wohnung is gone (#702).
+Beteiligte: a Beteiligte/r records the Wohnung of the CO-Messung they were found in, picked on their card and listed in that Wohnung's editor, the PDF prints it in the Beteiligte table and names them under each affected Wohnung of the CO-Messprotokoll, and the location still reads once the Wohnung is gone (#702).

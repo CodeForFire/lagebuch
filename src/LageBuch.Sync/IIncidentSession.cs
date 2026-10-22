@@ -67,9 +67,6 @@ public interface IIncidentSession
     /// <summary>Corrects a role assignment's phone number. Logs to the ETB only on a real change.</summary>
     void EditRolePhone(Guid assignmentId, string? phone);
 
-    /// <summary>Who a Funktion reports to (#703); null clears it.</summary>
-    void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId);
-
     void AddForceUnit(
         string brigade,
         int personnelCount,

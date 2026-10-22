@@ -57,9 +57,6 @@ public static class CommandApplier
             case EditRolePhoneCommand c:
                 incident.EditRolePhone(clock, Operator(c.Operator), c.AssignmentId, c.Phone);
                 break;
-            case SetRoleReportsToCommand c:
-                incident.SetRoleReportsTo(clock, Operator(c.Operator), c.AssignmentId, c.ReportsToId);
-                break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(
                     clock,

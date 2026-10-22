@@ -90,10 +90,7 @@ public sealed record RoleAssignmentDto(
     DateTimeOffset? From,
     DateTimeOffset? To,
     string? Section,
-    string? Phone,
-
-    // Defaulted like DwellingDto.Readings: a snapshot without the key reads as "no hierarchy".
-    Guid? ReportsToId = null);
+    string? Phone);
 
 public sealed record ForceUnitDto(
     Guid Id,

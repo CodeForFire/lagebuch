@@ -8,11 +8,7 @@ public sealed record RoleAssignment(
     DateTimeOffset? From,
     DateTimeOffset? To,
     string? Section,
-    string? Phone,
-
-    // The assignment this Funktion reports to (#703); null when it reports to no one recorded here.
-    // Trails and defaults so every older file and snapshot reads as "no hierarchy".
-    Guid? ReportsToId = null)
+    string? Phone)
 {
     public static RoleAssignment Create(
         string role,
@@ -65,9 +61,6 @@ public sealed record RoleAssignment(
 
     /// <summary>Returns a copy with a corrected phone number, normalised the same way <see cref="Create"/> does.</summary>
     public RoleAssignment WithPhone(string? phone) => this with { Phone = Trimmed(phone) };
-
-    /// <summary>The assignment as "EL (Huber)": the Funktion first, the way it is said on the radio.</summary>
-    public string Label => $"{Role} ({PersonName})";
 
     private static string? Trimmed(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

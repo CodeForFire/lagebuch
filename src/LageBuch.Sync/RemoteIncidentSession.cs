@@ -417,9 +417,6 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Send(new EditRolePhoneCommand(Op(), assignmentId, phone));
 
-    public void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId) =>
-        Send(new SetRoleReportsToCommand(Op(), assignmentId, reportsToId));
-
     public void AddForceUnit(
         string brigade,
         int personnelCount,

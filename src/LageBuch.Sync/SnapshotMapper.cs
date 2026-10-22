@@ -46,7 +46,7 @@ public static class SnapshotMapper
                 e.From,
                 e.To,
                 e.Edits.Select(x => new EtbEntryEditDto(x.PreviousText, x.EditedBy, x.EditedAt)).ToList())).ToList(),
-            incident.Roles.Select(r => new RoleAssignmentDto(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone, r.ReportsToId)).ToList(),
+            incident.Roles.Select(r => new RoleAssignmentDto(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)).ToList(),
             incident.Forces.Select(f => new ForceUnitDto(
                 f.Id,
                 f.Brigade,
@@ -126,7 +126,7 @@ public static class SnapshotMapper
                 e.From,
                 e.To,
                 e.Edits.Select(x => new EtbEntryEdit(x.PreviousText, x.EditedBy, x.EditedAt)))),
-            snapshot.Roles.Select(r => new RoleAssignment(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone, r.ReportsToId)),
+            snapshot.Roles.Select(r => new RoleAssignment(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)),
             snapshot.Forces.Select(f => ForceUnit.Rehydrate(
                 f.Id,
                 f.Brigade,
