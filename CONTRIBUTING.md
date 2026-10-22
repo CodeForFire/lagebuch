@@ -274,6 +274,12 @@ A PR template with a short checklist will guide you:
   (see [Changelog entries](#changelog-entries))
 - No real master data committed (see below)
 
+**Trying a pull request on Windows:** add the `build-msi` label. Every push to
+the pull request then builds an MSI, and a comment on it links the download —
+one comment, updated with each build. Remove the label to stop. The MSI is
+kept for 14 days and installs over the latest release. Not done by default,
+because most pull requests never need it and Windows minutes cost double.
+
 ## Changelog entries
 
 `CHANGELOG.md` is assembled, not edited. Each pull request brings its own file
