@@ -230,6 +230,40 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void A_hostile_snapshot_is_repaired_when_it_is_mapped_into_an_incident()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", nodeId: nord.Id, slot: RoleSlot.Leiter);
+        var wire = SnapshotMapper.ToSnapshot(incident);
+        var self = Guid.NewGuid();
+        var withParent = Guid.NewGuid();
+        var hostile = wire with
+        {
+            Fuehrungsstufe = (Fuehrungsstufe)7,
+            Roles = wire.Roles.Select(r => r with { Slot = (RoleSlot)42 }).ToList(),
+            CommandNodes =
+            [
+                new CommandNodeDto(nord.Id, (CommandNodeKind)99, "Nord", null, null, null, null, null, null, null),
+                new CommandNodeDto(self, CommandNodeKind.Unterabschnitt, "Selbst", self, null, null, null, null, null, null),
+                new CommandNodeDto(withParent, CommandNodeKind.Abschnitt, "Mit Eltern", nord.Id, null, null, null, null, null, null),
+            ],
+        };
+
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(hostile)));
+
+        Assert.Null(r.Fuehrungsstufe);
+        Assert.Equal(RoleSlot.None, r.Roles.Single().Slot);
+        Assert.Equal(CommandNodeKind.Abschnitt, r.FindCommandNode(nord.Id)?.Kind);
+        Assert.Equal(CommandNodeKind.Abschnitt, r.FindCommandNode(self)?.Kind);
+        Assert.Null(r.FindCommandNode(self)?.ParentId);
+        Assert.Equal(CommandNodeKind.Abschnitt, r.FindCommandNode(withParent)?.Kind);
+        Assert.Null(r.FindCommandNode(withParent)?.ParentId);
+    }
+
+    [Fact]
     public void A_snapshot_without_the_placement_members_reads_as_unplaced()
     {
         var clock = new FixedClock();

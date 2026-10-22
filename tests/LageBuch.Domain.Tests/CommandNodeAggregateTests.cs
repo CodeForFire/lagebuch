@@ -528,4 +528,68 @@ public class CommandNodeAggregateTests
         Assert.Empty(incident.CommandNodes);
         Assert.Equal(entries, incident.Journal.Count);
     }
+
+    [Fact]
+    public void Rehydrating_hostile_nodes_stufe_and_slots_repairs_them_and_never_throws()
+    {
+        var (source, _, _) = NewIncident();
+        var abschnitt = Guid.NewGuid();
+        var selfParented = Guid.NewGuid();
+        var orphan = Guid.NewGuid();
+        var nested = Guid.NewGuid();
+        var withParent = Guid.NewGuid();
+        var unknownKind = Guid.NewGuid();
+        var good = Guid.NewGuid();
+        CommandNode Node(Guid id, CommandNodeKind kind, Guid? parent) =>
+            CommandNode.Rehydrate(id, kind, id.ToString(), parent, null, null, null, null, null, null);
+        var hostileRole = new RoleAssignment(Guid.NewGuid(), "AL", "Huber", null, null, null, null, null, Slot: (RoleSlot)42);
+
+        var incident = Incident.Rehydrate(
+            source.Id,
+            source.StartedAt,
+            source.State,
+            incidentNumber: null,
+            keyword: null,
+            street: null,
+            district: null,
+            status: null,
+            closedAt: null,
+            closedBy: null,
+            checklists: [],
+            journal: [],
+            roles: [hostileRole],
+            forces: [],
+            scbaTrupps: [],
+            audit: [],
+            timers: [],
+            files: [],
+            tasks: [],
+            buildings: [],
+            dwellings: [],
+            involvedParties: [],
+            commandNodes:
+            [
+                Node(abschnitt, CommandNodeKind.Abschnitt, null),
+                Node(selfParented, CommandNodeKind.Unterabschnitt, selfParented),
+                Node(orphan, CommandNodeKind.Unterabschnitt, Guid.NewGuid()),
+                Node(nested, CommandNodeKind.Unterabschnitt, selfParented),
+                Node(withParent, CommandNodeKind.Partner, abschnitt),
+                Node(unknownKind, (CommandNodeKind)99, abschnitt),
+                Node(good, CommandNodeKind.Unterabschnitt, abschnitt),
+            ],
+            fuehrungsstufe: (Fuehrungsstufe)7);
+
+        Assert.Null(incident.Fuehrungsstufe);
+        Assert.Equal(RoleSlot.None, incident.Roles.Single().Slot);
+        foreach (var id in new[] { selfParented, orphan, nested, unknownKind })
+        {
+            Assert.Equal(CommandNodeKind.Abschnitt, incident.FindCommandNode(id)?.Kind);
+            Assert.Null(incident.FindCommandNode(id)?.ParentId);
+        }
+
+        Assert.Equal(CommandNodeKind.Partner, incident.FindCommandNode(withParent)?.Kind);
+        Assert.Null(incident.FindCommandNode(withParent)?.ParentId);
+        Assert.Equal(abschnitt, incident.FindCommandNode(good)?.ParentId);
+        Assert.Equal(CommandNodeKind.Unterabschnitt, incident.FindCommandNode(good)?.Kind);
+    }
 }

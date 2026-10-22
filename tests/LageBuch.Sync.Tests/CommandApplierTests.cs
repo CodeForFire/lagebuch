@@ -633,25 +633,39 @@ public class CommandApplierTests
         var incident = NewIncident(clock);
         var host = new SessionOperator("Host", "FFB 1");
         var unit = incident.AddForceUnit(clock, host, "Aich", 9, "Aich 42/1", null, null, 4);
-        var client = new OperatorDto("Maier", "FFB 2");
+        var adder = new OperatorDto("Maier", "FFB 2");
+        var editor = new OperatorDto("Bauer", "FFB 3");
+        var mover = new OperatorDto("Schuster", "FFB 4");
+        var dissolver = new OperatorDto("Lang", "FFB 5");
 
-        ApplyOverWire(new AddCommandNodeCommand(client, CommandNodeKind.Abschnitt, "Nord", null), incident, clock);
+        ApplyOverWire(new AddCommandNodeCommand(adder, CommandNodeKind.Abschnitt, "Nord", null), incident, clock);
         var node = Assert.Single(incident.CommandNodes);
         Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
 
-        ApplyOverWire(new UpdateCommandNodeCommand(client, node.Id, "Nord", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"), incident, clock);
+        var entries = incident.Journal.Count;
+        ApplyOverWire(new UpdateCommandNodeCommand(editor, node.Id, "Nordseite", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"), incident, clock);
         var updated = incident.CommandNodes.Single();
+        Assert.Equal("Nordseite", updated.Name);
         Assert.Equal("Brandbekämpfung", updated.Auftrag);
         Assert.Equal("TG 2", updated.Funkgruppe);
-        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
 
-        ApplyOverWire(new MoveForceUnitCommand(client, unit.Id, node.Id), incident, clock);
+        // Rename, Auftrag and Funkgruppe each write a line; all three belong to the sender.
+        Assert.Equal(entries + 3, incident.Journal.Count);
+        Assert.All(incident.Journal.Skip(entries), e => Assert.Equal("Bauer (FFB 3)", e.EnteredBy));
+
+        entries = incident.Journal.Count;
+        ApplyOverWire(new MoveForceUnitCommand(mover, unit.Id, node.Id), incident, clock);
         Assert.Equal(node.Id, incident.Forces.Single().NodeId);
+        Assert.Equal(entries + 1, incident.Journal.Count);
+        Assert.Equal("Schuster (FFB 4)", incident.Journal[^1].EnteredBy);
 
-        ApplyOverWire(new MoveForceUnitCommand(client, unit.Id, null), incident, clock);
+        entries = incident.Journal.Count;
+        ApplyOverWire(new MoveForceUnitCommand(dissolver, unit.Id, null), incident, clock);
         Assert.Null(incident.Forces.Single().NodeId);
+        Assert.Equal(entries + 1, incident.Journal.Count);
+        Assert.Equal("Lang (FFB 5)", incident.Journal[^1].EnteredBy);
 
-        ApplyOverWire(new DissolveCommandNodeCommand(client, node.Id), incident, clock);
+        ApplyOverWire(new DissolveCommandNodeCommand(adder, node.Id), incident, clock);
         Assert.False(incident.CommandNodes.Single().IsLive);
         Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
     }
@@ -689,6 +703,7 @@ public class CommandApplierTests
             clock);
 
         var role = Assert.Single(incident.Roles);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
         Assert.Equal(node.Id, role.NodeId);
         Assert.Equal(RoleSlot.Leiter, role.Slot);
         Assert.Equal("Nord", role.Section);

@@ -185,12 +185,12 @@ public sealed class Incident
             Status = status,
             ClosedAt = closedAt,
             ClosedBy = closedBy,
-            Fuehrungsstufe = fuehrungsstufe,
+            Fuehrungsstufe = fuehrungsstufe is { } stufe && Enum.IsDefined(stufe) ? stufe : null,
             LeadershipPost = leadershipPost ?? LeadershipPost.Empty,
         };
         incident._checklists.AddRange(checklists);
         incident._journal.AddRange(journal);
-        incident._roles.AddRange(roles);
+        incident._roles.AddRange(roles.Select(r => Enum.IsDefined(r.Slot) ? r : r with { Slot = RoleSlot.None }));
         incident._forces.AddRange(forces);
         incident._scbaTrupps.AddRange(scbaTrupps);
         incident._audit.AddRange(audit);
@@ -200,7 +200,7 @@ public sealed class Incident
         incident._buildings.AddRange(buildings);
         incident._dwellings.AddRange(dwellings);
         incident._involvedParties.AddRange(involvedParties);
-        incident._commandNodes.AddRange(commandNodes ?? Enumerable.Empty<CommandNode>());
+        incident._commandNodes.AddRange(CommandNodeRepair.Resolve(commandNodes ?? Enumerable.Empty<CommandNode>()));
         return incident;
     }
 

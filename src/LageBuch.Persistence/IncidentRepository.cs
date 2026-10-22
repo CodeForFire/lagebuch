@@ -847,7 +847,7 @@ public sealed class IncidentRepository
                 Str(r, 8),
                 Str(r, 9) is { } whereaboutsAt ? ParseDate(whereaboutsAt) : null));
 
-        var commandNodes = ResolveCommandNodes(ReadAll(
+        var commandNodes = ReadAll(
             cn,
             "SELECT id, kind, name, parent_id, auftrag, standort, funkgruppe, rufname, telefon, dissolved_at FROM command_nodes ORDER BY ordinal;",
             r => Domain.Leadership.CommandNode.Rehydrate(
@@ -860,7 +860,7 @@ public sealed class IncidentRepository
                 Str(r, 6),
                 Str(r, 7),
                 Str(r, 8),
-                NullableDate(r, 9))));
+                NullableDate(r, 9)));
 
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
@@ -899,33 +899,6 @@ public sealed class IncidentRepository
             commandNodes,
             LeadershipKeys.StufeFrom(meta[14] as string),
             new Domain.Leadership.LeadershipPost(meta[15] as string, meta[16] as string, meta[17] as string, meta[18] as string));
-    }
-
-    // A file is hostile input: the parent link is repaired here, after every row is read, rather than
-    // trusted. Only an Unterabschnitt keeps a parent, and only when it names an Abschnitt in the
-    // file; any other Unterabschnitt reads as a top-level Abschnitt. Nothing here throws.
-    private static List<Domain.Leadership.CommandNode> ResolveCommandNodes(List<Domain.Leadership.CommandNode> nodes)
-    {
-        var abschnittIds = nodes
-            .Where(n => n.Kind == Domain.Leadership.CommandNodeKind.Abschnitt)
-            .Select(n => n.Id)
-            .ToHashSet();
-
-        return nodes.ConvertAll(n =>
-        {
-            if (n.Kind != Domain.Leadership.CommandNodeKind.Unterabschnitt)
-            {
-                return n.ParentId is null ? n : Rebuild(n, n.Kind, null);
-            }
-
-            return n.ParentId is { } parent && abschnittIds.Contains(parent)
-                ? n
-                : Rebuild(n, Domain.Leadership.CommandNodeKind.Abschnitt, null);
-        });
-
-        static Domain.Leadership.CommandNode Rebuild(Domain.Leadership.CommandNode n, Domain.Leadership.CommandNodeKind kind, Guid? parentId) =>
-            Domain.Leadership.CommandNode.Rehydrate(
-                n.Id, kind, n.Name, parentId, n.Auftrag, n.Standort, n.Funkgruppe, n.Rufname, n.Telefon, n.DissolvedAt);
     }
 
     private static DateTimeOffset ParseDate(string s) =>
