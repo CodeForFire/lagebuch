@@ -284,4 +284,33 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(1));
         Assert.True(r.IsDBNull(2));
     }
+
+    [Fact]
+    public void V28_database_upgrades_to_v29_with_every_funktion_reporting_to_no_one()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (28);" +
+                "CREATE TABLE role_assignments (id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, role TEXT NOT NULL, person_name TEXT NOT NULL, " +
+                "call_sign TEXT, from_time TEXT, to_time TEXT, section TEXT, phone TEXT);" +
+                "INSERT INTO role_assignments (id, ordinal, role, person_name) VALUES ('r', 0, 'EL', 'Huber');";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT role, person_name, reports_to_id FROM role_assignments;";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.Equal("EL", r.GetString(0));
+        Assert.Equal("Huber", r.GetString(1));
+        Assert.True(r.IsDBNull(2));
+    }
 }

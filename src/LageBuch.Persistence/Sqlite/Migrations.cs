@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 28;
+    public const int CurrentVersion = 29;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -189,6 +189,15 @@ public static class Migrations
         if (version < 28)
         {
             ApplyV28(cn, tx);
+
+            // Stryker restore all
+        }
+
+        // Stryker disable all : V29 only adds a nullable column that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 29)
+        {
+            ApplyV29(cn, tx);
 
             // Stryker restore all
         }
@@ -853,6 +862,17 @@ public static class Migrations
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "whereabouts", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "whereabouts_at", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // Who a Funktion reports to (#703): the id of another role_assignments row. Nullable and with
+    // no foreign key, as V22's safety_trupp_id: an older file reads as "no hierarchy", and a link a
+    // foreign build left dangling is shown as unknown rather than refused.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV29(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "role_assignments", "reports_to_id", "TEXT");
 
         // Stryker restore all
     }

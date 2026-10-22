@@ -537,7 +537,9 @@ public sealed class Incident
         var ended = previous.EndedAt(clock.Now);
         _roles[index] = ended;
 
-        var next = RoleAssignment.Create(
+        // The incoming holder reports where the outgoing one did, and whoever still reports to the
+        // outgoing one now reports to the incoming one (#703). The ended record keeps its own link.
+        var created = RoleAssignment.Create(
             ended.Role,
             newPersonName,
             newCallSign,
@@ -545,10 +547,78 @@ public sealed class Incident
             to: null,
             section: ended.Section,
             phone: newPhone);
+        var next = created with { ReportsToId = ended.ReportsToId };
+        for (var i = 0; i < _roles.Count; i++)
+        {
+            if (_roles[i].ReportsToId == ended.Id && _roles[i].To is null)
+            {
+                _roles[i] = _roles[i] with { ReportsToId = next.Id };
+            }
+        }
+
         _roles.Add(next);
 
         AppendSystemEntry(clock, op, $"Funktion {ended.Role} übergeben: {ended.PersonName} → {next.PersonName}");
         return next;
+    }
+
+    /// <summary>
+    /// Records who a Funktion reports to (#703), or clears it with null. Refuses only what can only
+    /// be a bug: a Funktion reporting to itself, an assignment this incident does not have, and a
+    /// loop. Only a real change reaches the ETB, like <see cref="EditRolePhone"/>.
+    /// </summary>
+    public RoleAssignment SetRoleReportsTo(IClock clock, SessionOperator op, Guid assignmentId, Guid? reportsToId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+        {
+            throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        }
+
+        var previous = _roles[index];
+        var superior = reportsToId is { } superiorId ? SuperiorFor(previous, superiorId) : null;
+        if (previous.ReportsToId == reportsToId)
+        {
+            return previous;
+        }
+
+        var updated = previous with { ReportsToId = reportsToId };
+        _roles[index] = updated;
+        var text = superior is null
+            ? $"Funktion {updated.Label} meldet an: —"
+            : $"Funktion {updated.Label} meldet an {superior.Label}";
+        AppendSystemEntry(clock, op, text);
+        return updated;
+    }
+
+    // The assignment `subordinate` may report to, or why not. Walking up from it, meeting the
+    // subordinate means a loop; the visited set ends the walk on a loop a foreign build already wrote.
+    private RoleAssignment SuperiorFor(RoleAssignment subordinate, Guid superiorId)
+    {
+        if (superiorId == subordinate.Id)
+        {
+            throw new ArgumentException("Eine Funktion kann nicht an sich selbst melden.", nameof(superiorId));
+        }
+
+        var superior = _roles.Find(r => r.Id == superiorId)
+            ?? throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(superiorId));
+
+        var visited = new HashSet<Guid>();
+        for (var current = superior; current is not null && visited.Add(current.Id);
+             current = current.ReportsToId is { } up ? _roles.Find(r => r.Id == up) : null)
+        {
+            if (current.Id == subordinate.Id)
+            {
+                throw new InvalidOperationException(
+                    $"{subordinate.Label} kann nicht an {superior.Label} melden: das ergäbe einen Kreis.");
+            }
+        }
+
+        return superior;
     }
 
     /// <summary>

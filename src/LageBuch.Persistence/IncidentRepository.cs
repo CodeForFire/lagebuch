@@ -156,7 +156,7 @@ public sealed class IncidentRepository
             var r = incident.Roles[i];
             Run(
                 inserts,
-                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph);",
+                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone, reports_to_id) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph,$up);",
                 p =>
                 {
                     p("$id", r.Id.ToString());
@@ -168,6 +168,7 @@ public sealed class IncidentRepository
                     p("$to", (object?)r.To?.ToString(Iso) ?? DBNull.Value);
                     p("$sec", (object?)r.Section ?? DBNull.Value);
                     p("$ph", (object?)r.Phone ?? DBNull.Value);
+                    p("$up", (object?)r.ReportsToId?.ToString() ?? DBNull.Value);
                 });
         }
     }
@@ -608,7 +609,7 @@ public sealed class IncidentRepository
 
         var roles = ReadAll(
             cn,
-            "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone FROM role_assignments ORDER BY ordinal;",
+            "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone, reports_to_id FROM role_assignments ORDER BY ordinal;",
             r => new Domain.RoleAssignment(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -617,7 +618,8 @@ public sealed class IncidentRepository
                 NullableDate(r, 4),
                 NullableDate(r, 5),
                 Str(r, 6),
-                Str(r, 7)));
+                Str(r, 7),
+                Str(r, 8) is { } up ? Guid.Parse(up) : null));
 
         var strengthEditsByUnit = ReadAll(
             cn,

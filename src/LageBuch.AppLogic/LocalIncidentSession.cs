@@ -171,6 +171,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
 
+    public void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId) =>
+        Mutate(() => Incident.SetRoleReportsTo(_clock, RequireOperator(), assignmentId, reportsToId));
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,

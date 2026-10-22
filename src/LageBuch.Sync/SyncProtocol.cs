@@ -75,15 +75,19 @@ public static class SyncProtocol
     /// <c>whereabouts</c> and <c>whereaboutsAt</c>, the Aufenthaltsort (#701). A host at 11 would
     /// reject the command, so the floor rises to 12.
     /// </para>
+    /// <para>
+    /// 13: a client may send <c>setRoleReportsTo</c>, and a snapshot's Funktionen carry
+    /// <c>reportsToId</c> (#703). A host at 12 would reject the command, so the floor rises to 13.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 12;
+    public const int ProtocolVersion = 13;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 12;
+    public const int MinimumProtocolVersion = 13;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

@@ -189,6 +189,23 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void Round_trip_preserves_who_reports_to_whom()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var el = incident.AssignRole(clock, op, "EL", "Huber", from: clock.Now);
+        var gf = incident.AssignRole(clock, op, "GF", "Schmidt", from: clock.Now);
+        incident.SetRoleReportsTo(clock, op, gf.Id, el.Id);
+
+        var r = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(el.Id, r.Roles.Single(x => x.Id == gf.Id).ReportsToId);
+        Assert.Null(r.Roles.Single(x => x.Id == el.Id).ReportsToId);
+    }
+
+    [Fact]
     public void Round_trip_preserves_the_sicherheitstrupp_link()
     {
         var clock = new FixedClock();

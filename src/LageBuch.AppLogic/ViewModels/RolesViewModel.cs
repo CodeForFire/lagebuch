@@ -127,6 +127,30 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
     [RelayCommand(CanExecute = nameof(CanBeginTransfer))]
     private void BeginTransfer() => _onTransfer(this);
+
+    /// <summary>The MELDET AN flyout's entries (#703); set by <c>RolesViewModel</c> once every row exists.</summary>
+    public IReadOnlyList<ReportsToChoice> ReportsToChoices { get; private set; } = [];
+
+    /// <summary>What the MELDET AN button reads: the superior, "— niemand —", or "unbekannt".</summary>
+    public string ReportsToButtonText { get; private set; } = ReportsToChoice.NoneDisplay;
+
+    /// <summary>Only a running Funktion takes a new superior; an ended one keeps the record it has.</summary>
+    public bool CanSetReportsTo => !IsReadOnly && IsRunning;
+
+    /// <summary>
+    /// Brings the picker in line with the incident. A second pass after every row is built, for the
+    /// reason <c>MarkDuplicates</c> gives: the choices depend on all the other rows.
+    /// </summary>
+    public void SetReportsTo(IReadOnlyList<ReportsToChoice> choices, string buttonText)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+        ArgumentNullException.ThrowIfNull(buttonText);
+        ReportsToChoices = choices;
+        ReportsToButtonText = buttonText;
+        OnPropertyChanged(nameof(ReportsToChoices));
+        OnPropertyChanged(nameof(ReportsToButtonText));
+        OnPropertyChanged(nameof(CanSetReportsTo));
+    }
 }
 
 public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
@@ -200,6 +224,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         }
 
         MarkDuplicates(); // after every row exists — see the comment on it
+        RefreshReportsTo();
         ApplyFilter();
 
         // A handover changes who holds what without touching the form, so a conflict computed from
@@ -636,6 +661,54 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         public string? Phone { get; set; }
 
         public string? CallSign { get; set; }
+    }
+
+    // The MELDET AN picker of every row (#703). It offers exactly the links the domain accepts:
+    // running Funktionen other than the row itself and anyone below it, so a pick is never refused.
+    private void RefreshReportsTo()
+    {
+        var roles = _session.Incident.Roles;
+        var byId = roles.ToDictionary(r => r.Id);
+        foreach (var row in _all)
+        {
+            var assignment = byId[row.Id];
+            void Select(Guid? reportsToId) => SetReportsTo(row.Id, reportsToId);
+
+            var choices = new List<ReportsToChoice> { new(null, ReportsToChoice.NoneDisplay, null, assignment.ReportsToId is null, Select) };
+            choices.AddRange(roles
+                .Where(r => r.To is null && r.Id != row.Id && !ReportsUpTo(r, row.Id, byId))
+                .Select(r => new ReportsToChoice(r.Id, r.Label, r.Section, r.Id == assignment.ReportsToId, Select)));
+
+            var buttonText = assignment.ReportsToId switch
+            {
+                null => ReportsToChoice.NoneDisplay,
+                { } id when byId.TryGetValue(id, out var superior) => superior.Label,
+                _ => ReportsToChoice.UnknownDisplay,
+            };
+            row.SetReportsTo(choices, buttonText);
+        }
+    }
+
+    // Whether `assignment` reports, directly or further up, to `superiorId`. The visited set ends the
+    // walk on a loop a foreign build may have written.
+    private static bool ReportsUpTo(Domain.RoleAssignment assignment, Guid superiorId, Dictionary<Guid, Domain.RoleAssignment> byId)
+    {
+        var visited = new HashSet<Guid>();
+        for (var up = assignment.ReportsToId; up is { } id && visited.Add(id); up = byId.TryGetValue(id, out var next) ? next.ReportsToId : null)
+        {
+            if (id == superiorId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void SetReportsTo(Guid assignmentId, Guid? reportsToId)
+    {
+        _session.SetRoleReportsTo(assignmentId, reportsToId); // Changed → RefreshRoles updates the rows
+        _onChanged();
     }
 
     private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>
