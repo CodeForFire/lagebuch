@@ -32,6 +32,7 @@ on:
           - Documents
           - Persistence
           - AppLogic
+          - Osm
 
 permissions:
   contents: read
@@ -54,7 +55,7 @@ jobs:
         # A scheduled run has no inputs and mutates everything; a manual run
         # can pick one project. Keep this list in step with MUTATE_PROJECTS in
         # the Makefile.
-        project: ${{ fromJSON((inputs.project == '' || inputs.project == 'all') && '["Domain","Sync","Documents","Persistence","AppLogic"]' || format('["{0}"]', inputs.project)) }}
+        project: ${{ fromJSON((inputs.project == '' || inputs.project == 'all') && '["Domain","Sync","Documents","Persistence","AppLogic","Osm"]' || format('["{0}"]', inputs.project)) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -104,7 +105,7 @@ jobs:
         # Sync is left out: most of its code is exercised only by
         # Sync.Hosting.Tests, which Stryker does not run, so a changed Sync
         # file scores near zero however well it is tested.
-        project: [Domain, Documents, Persistence, AppLogic]
+        project: [Domain, Documents, Persistence, AppLogic, Osm]
     env:
       PROJECT: ${{ matrix.project }}
       BASE: origin/${{ github.base_ref }}

@@ -131,7 +131,7 @@ statement, returns `false` — and re-runs the tests. A *killed* mutant made a
 test fail; a *survived* one is a change the suite let through.
 
 ```bash
-make mutate PROJECT=Domain   # or Sync, Documents, Persistence, AppLogic
+make mutate PROJECT=Domain   # or Sync, Documents, Persistence, AppLogic, Osm
 ```
 
 The HTML report lands in `StrykerOutput/<project>/reports/`. Sync.Hosting and
@@ -155,7 +155,7 @@ Stryker refuses a `break` above `low`, so set `low` to the same number; both
 `low` and `high` (90) only colour the report.
 
 A pull request is gated, but only on the lines it changes. For each of Domain,
-Documents, Persistence and AppLogic whose `.cs` files the PR touches,
+Documents, Persistence, AppLogic and Osm whose `.cs` files the PR touches,
 `mutate-diff` mutates those files, keeps the mutants on lines the PR added or
 changed, and fails when fewer than 80% of them are caught. The job summary
 lists each survivor on a changed line with its file and line number. Older

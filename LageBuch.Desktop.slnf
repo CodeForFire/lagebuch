@@ -7,6 +7,7 @@
       "src/LageBuch.AppLogic/LageBuch.AppLogic.csproj",
       "src/LageBuch.Documents/LageBuch.Documents.csproj",
       "src/LageBuch.Domain/LageBuch.Domain.csproj",
+      "src/LageBuch.Osm/LageBuch.Osm.csproj",
       "src/LageBuch.Persistence/LageBuch.Persistence.csproj",
       "src/LageBuch.Sync.Hosting/LageBuch.Sync.Hosting.csproj",
       "src/LageBuch.Sync/LageBuch.Sync.csproj",
@@ -15,9 +16,11 @@
       "tests/LageBuch.AppLogic.Tests/LageBuch.AppLogic.Tests.csproj",
       "tests/LageBuch.Documents.Tests/LageBuch.Documents.Tests.csproj",
       "tests/LageBuch.Domain.Tests/LageBuch.Domain.Tests.csproj",
+      "tests/LageBuch.Osm.Tests/LageBuch.Osm.Tests.csproj",
       "tests/LageBuch.Persistence.Tests/LageBuch.Persistence.Tests.csproj",
       "tests/LageBuch.Sync.Hosting.Tests/LageBuch.Sync.Hosting.Tests.csproj",
-      "tests/LageBuch.Sync.Tests/LageBuch.Sync.Tests.csproj"
+      "tests/LageBuch.Sync.Tests/LageBuch.Sync.Tests.csproj",
+      "tools/LageBuch.OsmImport/LageBuch.OsmImport.csproj"
     ]
   }
 }

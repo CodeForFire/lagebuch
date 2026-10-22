@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Builds the Stammdaten's Straßen and Ortsteile from OpenStreetMap (#461). Today only
+       tools/LageBuch.OsmImport uses it; it references nothing above Persistence and nothing of
+       Avalonia, so the app can call it the day it offers the import itself. -->
+  <ItemGroup>
+    <ProjectReference Include="..\LageBuch.Persistence\LageBuch.Persistence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LageBuch.Osm.Tests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
