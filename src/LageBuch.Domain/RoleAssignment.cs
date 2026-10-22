@@ -1,3 +1,5 @@
+using LageBuch.Domain.Leadership;
+
 namespace LageBuch.Domain;
 
 public sealed record RoleAssignment(
@@ -8,7 +10,12 @@ public sealed record RoleAssignment(
     DateTimeOffset? From,
     DateTimeOffset? To,
     string? Section,
-    string? Phone)
+    string? Phone,
+
+    // The command node this Funktion sits in and the post it holds there; null / None for every
+    // older file. While NodeId is set, Section mirrors the node's name (the rename propagates).
+    Guid? NodeId = null,
+    RoleSlot Slot = RoleSlot.None)
 {
     public static RoleAssignment Create(
         string role,
@@ -17,7 +24,9 @@ public sealed record RoleAssignment(
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? section = null,
-        string? phone = null)
+        string? phone = null,
+        Guid? nodeId = null,
+        RoleSlot slot = RoleSlot.None)
     {
         if (string.IsNullOrWhiteSpace(role))
         {
@@ -42,7 +51,9 @@ public sealed record RoleAssignment(
             from,
             to,
             Trimmed(section),
-            Trimmed(phone));
+            Trimmed(phone),
+            NodeId: nodeId,
+            Slot: slot);
     }
 
     /// <summary>
