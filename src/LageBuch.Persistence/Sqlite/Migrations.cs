@@ -165,9 +165,14 @@ public static class Migrations
             ApplyV25(cn, tx);
         }
 
+        // Stryker disable all : V26 only adds nullable columns that SchemaGuard.Reconcile below adds
+        // identically on every open, so skipping it is unobservable; the step stays for the version
+        // history and as the place a later backfill would go.
         if (version < 26)
         {
             ApplyV26(cn, tx);
+
+            // Stryker restore all
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -800,11 +805,15 @@ public static class Migrations
 
     // Hausnummer, PLZ and Ort next to Straße and Ortsteil (#401), for an Einsatz outside the home
     // Gemeinde. All nullable: an older file opens with them blank and reads exactly as before.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open, so no
+    // mutant here can change the file's final shape (see the call site).
     private static void ApplyV26(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "house_number", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "postal_code", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "place", "TEXT");
+
+        // Stryker restore all
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
