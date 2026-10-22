@@ -962,7 +962,7 @@ public class MasterDataStoreTests : IDisposable
             Roles = new[] { new Role("EL", RoleUniqueness.UniquePerIncident, RoleSlot.Leiter), new Role("ZF") },
             TalkGroups = new[]
             {
-                new TalkGroup("FW_MUSTER 1000", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
                 new TalkGroup("301_F", null, TalkGroupKind.Dmo),
             },
         };

@@ -460,11 +460,14 @@ public enum TalkGroupKind
 }
 
 /// <summary>
-/// One Funkgruppe from the Stammdaten, e.g. "TMO FW_MUSTER 1000" or "DMO 301_F". Number is the
+/// One Funkgruppe from the Stammdaten, e.g. "TMO FW_MUSTER 1000" (name FW_MUSTER, number 1000) or "DMO 301_F" (named by its number, no separate one). Number is the
 /// optional channel or group number and Note free text; both are null or blank when not given.
 /// </summary>
 public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, string? Note = null)
 {
+    /// <summary>The longest name a Funkgruppe may carry; the JSON import and the editor both enforce it.</summary>
+    public const int MaxNameLength = 200;
+
     /// <summary>The kind upper-case, then the name, then the number when present.</summary>
     public string Display =>
         string.IsNullOrWhiteSpace(Number)
@@ -898,7 +901,6 @@ public static class MasterDataJson
     // would be lost so the user can add a vehicle for it before saving.
     private const string LegacyBrigadesKey = "brigades";
     private const string LegacyCallSignsKey = "radioCallSigns";
-    private const int MaxTalkGroupNameLength = 200;
 
     private static readonly JsonSerializerOptions ExportOptions = new()
     {
@@ -1013,9 +1015,9 @@ public static class MasterDataJson
         foreach (var x in arr.EnumerateArray())
         {
             var name = RequiredName(x, "Funkgruppe").Trim();
-            if (name.Length > MaxTalkGroupNameLength)
+            if (name.Length > TalkGroup.MaxNameLength)
             {
-                throw new JsonException($"Funkgruppe: \"name\" darf höchstens {MaxTalkGroupNameLength} Zeichen lang sein.");
+                throw new JsonException($"Funkgruppe: \"name\" darf höchstens {TalkGroup.MaxNameLength} Zeichen lang sein.");
             }
 
             result.Add(new TalkGroup(

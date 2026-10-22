@@ -1149,4 +1149,37 @@ public class MasterDataEditorViewModelTests
             new[] { "—", "Leiter", "Melder", "Führungsassistent", "Fachberater" },
             row.SlotOptions.Select(o => o.Label));
     }
+
+    [Fact]
+    public void A_funkgruppe_name_over_the_cap_is_cut_to_it_on_save()
+    {
+        var groups = new TalkGroupsSection("Funkgruppen", Array.Empty<TalkGroup>(), () => { });
+        groups.AddCommand.Execute(null);
+        groups.Rows[^1].Name = new string('x', TalkGroup.MaxNameLength + 50);
+
+        Assert.Equal(TalkGroup.MaxNameLength, Assert.Single(groups.ToValues()).Name.Length);
+    }
+
+    [Fact]
+    public void Funkgruppen_dedupe_on_kind_name_and_number_and_drop_blank_names()
+    {
+        var groups = new TalkGroupsSection(
+            "Funkgruppen",
+            new[]
+            {
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "erste"),
+                new TalkGroup("fw_muster", "1000", TalkGroupKind.Tmo, "doppelt"),
+                new TalkGroup("FW_MUSTER", "1001", TalkGroupKind.Tmo, "andere Nummer"),
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Dmo),
+                new TalkGroup("  ", "5", TalkGroupKind.Tmo),
+            },
+            () => { });
+
+        var values = groups.ToValues();
+
+        Assert.Equal(3, values.Count);
+        Assert.Equal("erste", values[0].Note);
+        Assert.Equal("1001", values[1].Number);
+        Assert.Equal(TalkGroupKind.Dmo, values[2].Kind);
+    }
 }
