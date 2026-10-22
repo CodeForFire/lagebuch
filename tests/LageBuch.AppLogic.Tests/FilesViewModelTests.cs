@@ -360,6 +360,93 @@ public class FilesViewModelTests
         Assert.Equal("Max. 25 MB pro Datei", FilesViewModel.MaxFileSizeHint);
     }
 
+    private static LocalIncidentSession PasteSession(FixedClock clock) => TestSession.StartNew(
+        new FakeStore(),
+        clock,
+        new SessionOperator("Müller"),
+        "/x.fwincident",
+        Array.Empty<(string, bool)>(),
+        Array.Empty<(string, bool)>());
+
+    // #421: a pasted image has no path and no name, so it is named after the moment it arrived.
+    [Fact]
+    public async Task A_pasted_image_is_added_as_a_png_named_after_the_moment()
+    {
+        var clock = new FixedClock(T0.AddMinutes(32).AddSeconds(7));
+        var session = PasteSession(clock);
+        var changes = 0;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => changes++, clock: clock);
+
+        await vm.PasteImageAsync([1, 2, 3]);
+
+        var file = Assert.Single(session.Incident.Files);
+        Assert.Equal("Zwischenablage-20260622-093207.png", file.FileName);
+        Assert.Equal("image/png", file.ContentType);
+        Assert.Single(vm.Files);
+        Assert.Equal(1, changes);
+        Assert.Null(vm.ErrorMessage);
+        Assert.False(vm.IsUploading);
+    }
+
+    [Fact]
+    public async Task A_pasted_image_over_the_size_cap_is_refused_with_the_cap_message()
+    {
+        var clock = new FixedClock(T0);
+        var session = PasteSession(clock);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, clock: clock);
+
+        await vm.PasteImageAsync(new byte[IncidentFile.MaxSizeBytes + 1]);
+
+        Assert.Empty(session.Incident.Files);
+        Assert.Equal(IncidentFile.TooLargeMessage, vm.ErrorMessage);
+        Assert.False(vm.IsUploading);
+    }
+
+    [Fact]
+    public async Task A_pasted_image_of_exactly_the_size_cap_is_accepted()
+    {
+        var clock = new FixedClock(T0);
+        var session = PasteSession(clock);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, clock: clock);
+
+        await vm.PasteImageAsync(new byte[IncidentFile.MaxSizeBytes]);
+
+        Assert.Single(session.Incident.Files);
+        Assert.Null(vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Pasting_is_a_noop_on_a_readonly_session_and_while_uploading()
+    {
+        var clock = new FixedClock(T0);
+        var closed = PasteSession(clock);
+        closed.Close();
+        var readOnly = new FilesViewModel(closed, new FakeDialogs(), () => { }, clock: clock);
+        var open = PasteSession(clock);
+        var busy = new FilesViewModel(open, new FakeDialogs(), () => { }, clock: clock) { IsUploading = true };
+
+        await readOnly.PasteImageAsync([1, 2, 3]);
+        await busy.PasteImageAsync([1, 2, 3]);
+
+        Assert.Empty(closed.Incident.Files);
+        Assert.Empty(open.Incident.Files);
+    }
+
+    [Fact]
+    public void Paste_hints_say_what_to_do_instead()
+    {
+        var vm = new FilesViewModel(PasteSession(new FixedClock(T0)), new FakeDialogs(), () => { });
+
+        vm.ReportNothingToPaste();
+        Assert.Equal("In der Zwischenablage ist kein Bild.", vm.ErrorMessage);
+
+        vm.ReportLinkDropped();
+        Assert.Equal("Aus dem Browser: Rechtsklick aufs Bild → „Bild kopieren“, dann hier Strg+V.", vm.ErrorMessage);
+
+        vm.ReportPasteFailed("Zugriff verweigert");
+        Assert.Equal("Bild nicht übernommen: Zugriff verweigert", vm.ErrorMessage);
+    }
+
     [Fact]
     public void ReadOnly_session_disables_add()
     {
