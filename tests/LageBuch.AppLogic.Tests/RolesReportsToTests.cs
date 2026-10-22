@@ -179,6 +179,9 @@ public class RolesReportsToTests
 
         var vm = new RolesViewModel(session, clock, MasterDataSet.Empty, () => { });
 
-        Assert.Equal(ReportsToChoice.UnknownDisplay, Assert.Single(vm.Roles).ReportsToButtonText);
+        var row = Assert.Single(vm.Roles);
+        Assert.Equal(ReportsToChoice.UnknownDisplay, row.ReportsToButtonText);
+        Assert.Equal(0, row.Depth); // the tree has nothing to hang it under, so it stands at the top
+        Assert.Equal(string.Empty, row.TreeGuide);
     }
 }

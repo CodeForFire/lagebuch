@@ -10,7 +10,7 @@
        controls: a local value in XAML outranks a Style setter, so the narrow styles could never
        widen them. One dock serves both layouts. -->
   <UserControl.Resources>
-    <!-- One entry of the MELDET AN flyout (#703), shared by the grid column and the phone card.
+    <!-- One entry of the Unterstellen menu (#703), shared by the grid row and the phone card.
          A Button and a Flyout, not a ComboBox, for the reason ScbaView's Sicherheitstrupp picker
          gives: the pick writes to the incident and rebuilds these entries mid-selection. -->
     <DataTemplate x:Key="ReportsToChoiceTemplate" x:DataType="vm:ReportsToChoice">
@@ -36,6 +36,18 @@
     </Style>
     <Style Selector="StackPanel#TransferFields">
       <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <!-- The row a dragged Funktion would land under (#703), set by the code-behind during a drag. -->
+    <Style Selector="DataGridRow.drop-target">
+      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
+    </Style>
+    <!-- The guide lines run the cell's full height, so they join from one row to the next. -->
+    <Style Selector="DataGridCell.tree">
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border#TopLevelDropZone.drag-over">
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
     </Style>
     <Style Selector="AutoCompleteBox#RoleBox">
       <Setter Property="Width" Value="120" />
@@ -291,9 +303,48 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="RolesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="RolesGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid x:Name="RolesGrid" DragDrop.AllowDrop="{Binding !IsReadOnly}" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
-          <DataGridTextColumn Header="FUNKTION" Binding="{Binding Role}" />
+          <!-- The Führungsstruktur (#703): each Funktion under the one it reports to, behind guide
+               lines. The grip starts a drag; dropping on another row puts the Funktion under that one. -->
+          <DataGridTemplateColumn Header="FUNKTION" CellStyleClasses="tree">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:RoleAssignmentRow">
+                <Grid ColumnDefinitions="Auto,Auto,*" Margin="6,0,12,0">
+                  <Border Grid.Column="0" x:Name="RoleDragHandle" Background="Transparent" Padding="2,4,6,4" Cursor="SizeAll"
+                          VerticalAlignment="Center"
+                          IsVisible="{Binding CanSetReportsTo}"
+                          ToolTip.Tip="Ziehen, um die Funktion unterzustellen"
+                          AutomationProperties.Name="Funktion ziehen">
+                    <PathIcon Width="10" Height="14" Foreground="{StaticResource TextSecondaryBrush}"
+                              Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
+                  </Border>
+                  <!-- One 18px cell per level above the row: a line down the left of the cell, and a
+                       branch out to the Funktion on the row's own level. -->
+                  <ItemsControl Grid.Column="1" x:Name="RoleTreeGuide" ItemsSource="{Binding TreeSegments}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:TreeGuideSegment">
+                        <Grid Width="18" RowDefinitions="*,*" ColumnDefinitions="7,*">
+                          <Border Grid.Row="0" Grid.Column="0" BorderBrush="{StaticResource TextSecondaryBrush}" BorderThickness="0,0,1,0"
+                                  IsVisible="{Binding LineAbove}" />
+                          <Border Grid.Row="1" Grid.Column="0" BorderBrush="{StaticResource TextSecondaryBrush}" BorderThickness="0,0,1,0"
+                                  IsVisible="{Binding LineBelow}" />
+                          <Border Grid.Row="0" Grid.Column="1" BorderBrush="{StaticResource TextSecondaryBrush}" BorderThickness="0,0,0,1"
+                                  Margin="0,0,4,0" IsVisible="{Binding Branch}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Grid.Column="2" Text="{Binding Role}" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="ABSCHNITT" Binding="{Binding Section}" />
           <DataGridTextColumn Header="NAME" Binding="{Binding PersonName}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
@@ -314,28 +365,9 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <!-- Who this Funktion reports to (#703), after the #696 reading line and before the times. -->
-          <DataGridTemplateColumn Header="MELDET AN" Width="190">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate x:DataType="vm:RoleAssignmentRow">
-                <Button x:Name="ReportsToButton" Margin="6,4" Padding="8,4" FontSize="12"
-                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                        Content="{Binding ReportsToButtonText}"
-                        IsEnabled="{Binding CanSetReportsTo}"
-                        AutomationProperties.Name="Meldet an wählen">
-                  <Button.Flyout>
-                    <Flyout Placement="BottomEdgeAlignedLeft">
-                      <ItemsControl ItemsSource="{Binding ReportsToChoices}" MinWidth="200"
-                                    ItemTemplate="{StaticResource ReportsToChoiceTemplate}" />
-                    </Flyout>
-                  </Button.Flyout>
-                </Button>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
           <DataGridTextColumn Header="VON" Binding="{Binding FromDisplay}" />
           <DataGridTextColumn Header="BIS" Binding="{Binding ToDisplay}" />
-          <DataGridTemplateColumn Header="AKTION" Width="140">
+          <DataGridTemplateColumn Header="AKTION" Width="180">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:RoleAssignmentRow">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -348,6 +380,23 @@
                             IsVisible="{Binding IsDuplicate}"
                             ToolTip.Tip="Doppelt vergeben – Funktion übertragen"
                             AutomationProperties.Name="Funktion doppelt vergeben" />
+                  <!-- The drag's keyboard and touch twin (#703): the same links, as a menu. -->
+                  <Button x:Name="ReportsToButton" Classes="ghost" Margin="0,2" Padding="6,4"
+                          IsVisible="{Binding CanSetReportsTo}"
+                          ToolTip.Tip="{Binding ReportsToButtonText, StringFormat='Unterstellen unter … (meldet an: {0})'}"
+                          AutomationProperties.Name="Unterstellen unter">
+                    <PathIcon Width="13" Height="13"
+                              Data="M19,15L13,21L11.58,19.58L15.17,16H4V4H6V14H15.17L11.58,10.42L13,9L19,15Z" />
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedRight">
+                        <StackPanel MinWidth="220" Spacing="4">
+                          <TextBlock Text="UNTERSTELLEN UNTER" Classes="overline" Margin="8,2,8,2" />
+                          <ItemsControl ItemsSource="{Binding ReportsToChoices}"
+                                        ItemTemplate="{StaticResource ReportsToChoiceTemplate}" />
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
                   <Button x:Name="TransferRowButton" Content="ÜBERTRAGEN" Margin="4,2"
                           IsVisible="{Binding IsRunning}"
                           Command="{Binding BeginTransferCommand}"
@@ -358,6 +407,18 @@
           </DataGridTemplateColumn>
         </DataGrid.Columns>
       </DataGrid>
+    </Border>
+
+    <!-- Laid over the grid's header while a Funktion is dragged (#703): a drop here takes it out from
+         under its superior. Over the header rather than above the grid, so the rows do not move
+         under the pointer when it appears. -->
+    <Border x:Name="TopLevelDropZone" VerticalAlignment="Top" Height="34" Margin="1"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}"
+            IsVisible="{Binding IsDraggingRole}"
+            DragDrop.AllowDrop="{Binding !IsReadOnly}">
+      <TextBlock Text="HIER ABLEGEN: OBERSTE EBENE" Classes="overline"
+                 HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Border>
 
     <!-- The narrow layout: one card per assignment, in the grid's order (#696). The Funktion leads —
@@ -371,7 +432,11 @@
         <ItemsControl x:Name="RolesCards" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Roles}" Margin="8">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:RoleAssignmentRow">
-              <Border Classes="row-card">
+              <!-- Indented by its depth in the Führungsstruktur (#703), with a line down the indent. -->
+              <Grid ColumnDefinitions="Auto,*">
+              <Border Grid.Column="0" x:Name="RoleCardIndent" Width="{Binding IndentWidth}"
+                      BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,1,0" Margin="0,0,0,8" />
+              <Border Grid.Column="1" Classes="row-card">
                 <StackPanel Spacing="5">
                   <TextBlock Text="{Binding Role}" FontWeight="SemiBold"
                              Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
@@ -393,8 +458,11 @@
                             AutomationProperties.Name="Meldet an wählen">
                       <Button.Flyout>
                         <Flyout Placement="BottomEdgeAlignedLeft">
-                          <ItemsControl ItemsSource="{Binding ReportsToChoices}" MinWidth="200"
-                                        ItemTemplate="{StaticResource ReportsToChoiceTemplate}" />
+                          <StackPanel MinWidth="220" Spacing="4">
+                            <TextBlock Text="UNTERSTELLEN UNTER" Classes="overline" Margin="8,2,8,2" />
+                            <ItemsControl ItemsSource="{Binding ReportsToChoices}"
+                                          ItemTemplate="{StaticResource ReportsToChoiceTemplate}" />
+                          </StackPanel>
                         </Flyout>
                       </Button.Flyout>
                     </Button>
@@ -419,6 +487,7 @@
                           b:RowKeys.Role="Primary" ToolTip.Tip="Funktion übertragen (Enter)" />
                 </StackPanel>
               </Border>
+              </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
