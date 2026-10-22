@@ -1153,6 +1153,46 @@ public sealed class Incident
         _involvedParties.RemoveAt(FindInvolvedPartyIndex(partyId));
     }
 
+    /// <summary>
+    /// Records the Wohnung a Beteiligte/r was found in (#702), or clears it with null. The Wohnung's
+    /// location is copied at this moment, so the entry keeps saying where once the Wohnung is gone.
+    /// Silent, like <see cref="AddInvolvedParty"/>: a third party's whereabouts stay out of the ETB.
+    /// </summary>
+    public InvolvedParty SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId)
+    {
+        EnsureOpen();
+        var index = FindInvolvedPartyIndex(partyId);
+        string? label = null;
+        if (dwellingId is { } id)
+        {
+            label = DwellingLocation(id) ?? throw new KeyNotFoundException($"Wohnung {id} nicht gefunden.");
+        }
+
+        var updated = _involvedParties[index].WithDwelling(dwellingId, label);
+        _involvedParties[index] = updated;
+        return updated;
+    }
+
+    /// <summary>
+    /// Where <paramref name="party"/> was found: the Wohnung as it is now while it still exists, so
+    /// a renamed Haus or Wohnung reads current, otherwise the copy taken when it was linked.
+    /// </summary>
+    public string? DwellingLocationOf(InvolvedParty party)
+    {
+        ArgumentNullException.ThrowIfNull(party);
+        return party.DwellingId is { } id && DwellingLocation(id) is { } live ? live : party.DwellingLabel;
+    }
+
+    /// <summary>"Hauptstr. 12, 1. OG, Whg. 2" for a Wohnung of this incident, or null when it has none by that id.</summary>
+    public string? DwellingLocation(Guid dwellingId) =>
+        _dwellings.Find(d => d.Id == dwellingId) is { } dwelling && _buildings.Find(b => b.Id == dwelling.BuildingId) is { } building
+            ? CoMeasurementLabels.DwellingLocation(building, dwelling.FloorOrdinal, dwelling.ApartmentNumber)
+            : null;
+
+    /// <summary>The Beteiligten found in <paramref name="dwellingId"/>, in the order they were recorded.</summary>
+    public IReadOnlyList<InvolvedParty> InvolvedPartiesIn(Guid dwellingId) =>
+        _involvedParties.Where(p => p.DwellingId == dwellingId).ToList();
+
     private int FindInvolvedPartyIndex(Guid partyId)
     {
         var index = _involvedParties.FindIndex(p => p.Id == partyId);

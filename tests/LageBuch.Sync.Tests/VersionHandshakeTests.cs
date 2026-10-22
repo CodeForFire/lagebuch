@@ -103,7 +103,16 @@ public class VersionHandshakeTests
     {
         // 10 lets a client send setRoleReportsTo (#703). A host at 9 has no such command in its
         // allowlist and would reject the link, so a 9 and a 10 must not connect.
-        Assert.Equal(10, SyncProtocol.ProtocolVersion);
-        Assert.Equal(10, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 10, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 10, int.MaxValue);
+    }
+
+    [Fact]
+    public void Beteiligte_in_a_wohnung_raise_the_floor_to_protocol_eleven()
+    {
+        // 11 lets a client send setInvolvedPartyDwelling (#702). A host at 10 has no such command in
+        // its allowlist and would reject the link, so a 10 and an 11 must not connect.
+        Assert.Equal(11, SyncProtocol.ProtocolVersion);
+        Assert.Equal(11, SyncProtocol.MinimumProtocolVersion);
     }
 }

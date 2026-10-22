@@ -161,6 +161,9 @@ public static class CommandApplier
             case RemoveInvolvedPartyCommand c:
                 incident.RemoveInvolvedParty(c.PartyId);
                 break;
+            case SetInvolvedPartyDwellingCommand c:
+                incident.SetInvolvedPartyDwelling(c.PartyId, c.DwellingId);
+                break;
             case UpdateTaskCommand c:
                 incident.UpdateTask(c.TaskId, c.Text, c.Assignee, c.Importance, c.Urgency);
                 break;

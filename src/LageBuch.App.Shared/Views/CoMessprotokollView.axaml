@@ -426,6 +426,19 @@
                        PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}" />
             </StackPanel>
 
+            <!-- #702: who the Beteiligte list records as found here. Read-only; the link is set on
+                 the Beteiligte card, next to the person's phone number and note. -->
+            <StackPanel x:Name="DwellingInvolvedParties" Spacing="2" IsVisible="{Binding Editor.HasInvolvedParties, FallbackValue=False}">
+              <TextBlock Text="BETEILIGTE IN DIESER WOHNUNG" Classes="overline" FontSize="10" />
+              <ItemsControl ItemsSource="{Binding Editor.InvolvedPartyNames}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
             <!-- Key Available: three radios, not a CheckBox. A two-state CheckBox over the old bool?
                  could never return to "unbekannt" once clicked, and unchecked looked the same as
                  "kein Schlüssel". Same TwoWay radio pattern as TasksView's filter. Stacked, not in a

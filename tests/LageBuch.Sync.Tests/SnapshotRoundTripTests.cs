@@ -153,6 +153,25 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void Round_trip_preserves_the_wohnung_a_beteiligte_was_found_in()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Hauptstr. 12", floorCount: 1, apartmentsPerFloor: 2);
+        var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 1 && d.ApartmentNumber == 2);
+        var party = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        incident.SetInvolvedPartyDwelling(party.Id, dwelling.Id);
+
+        var r = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        var back = r.InvolvedParties.Single();
+        Assert.Equal(dwelling.Id, back.DwellingId);
+        Assert.Equal("Hauptstr. 12, 1. OG, Whg. 2", back.DwellingLabel);
+    }
+
+    [Fact]
     public void Round_trip_preserves_who_reports_to_whom()
     {
         var clock = new FixedClock();

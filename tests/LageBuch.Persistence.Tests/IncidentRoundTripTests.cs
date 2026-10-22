@@ -171,6 +171,30 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(el.Id, loaded.Roles.Single(r => r.Id == gf.Id).ReportsToId);
     }
 
+    // #702: the Wohnung a Beteiligte/r was found in, by id and with the copied location.
+    [Fact]
+    public void The_wohnung_of_a_beteiligte_survives_a_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Hauptstr. 12", floorCount: 1, apartmentsPerFloor: 2);
+        var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 1 && d.ApartmentNumber == 2);
+        var linked = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        incident.AddInvolvedParty(clock, op, "POK Mustermann", null, null);
+        incident.SetInvolvedPartyDwelling(linked.Id, dwelling.Id);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var back = loaded.InvolvedParties.Single(p => p.Id == linked.Id);
+        Assert.Equal(dwelling.Id, back.DwellingId);
+        Assert.Equal("Hauptstr. 12, 1. OG, Whg. 2", back.DwellingLabel);
+        var unlinked = loaded.InvolvedParties.Single(p => p.Id != linked.Id);
+        Assert.Null(unlinked.DwellingId);
+        Assert.Null(unlinked.DwellingLabel);
+    }
+
     [Fact]
     public void An_edited_status_and_bemerkung_survive_a_round_trip()
     {

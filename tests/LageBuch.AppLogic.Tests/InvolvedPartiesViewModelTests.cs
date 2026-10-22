@@ -17,6 +17,68 @@ public class InvolvedPartiesViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
+    // #702: an Einsatz without CO-Messung keeps the card as it was.
+    [Fact]
+    public void Without_a_haus_in_the_co_messung_the_card_offers_no_wohnung()
+    {
+        var session = NewSession();
+        session.AddInvolvedParty("Erika Beispiel", null, null);
+
+        var row = Assert.Single(new InvolvedPartiesViewModel(session, () => { }).Parties);
+
+        Assert.False(row.HasDwellingPicker);
+        Assert.Equal(DwellingChoice.NoneDisplay, row.DwellingButtonText);
+    }
+
+    [Fact]
+    public void The_wohnung_picker_lists_every_wohnung_top_down_and_records_the_pick()
+    {
+        var session = NewSession();
+        session.AddCoBuilding("Hauptstr. 12", 1, 2);
+        session.AddInvolvedParty("Erika Beispiel", null, null);
+        var changes = 0;
+        var vm = new InvolvedPartiesViewModel(session, () => changes++);
+        var row = Assert.Single(vm.Parties);
+
+        Assert.True(row.HasDwellingPicker);
+        Assert.Equal(
+            [DwellingChoice.NoneDisplay, "Hauptstr. 12, 1. OG, Whg. 1", "Hauptstr. 12, 1. OG, Whg. 2", "Hauptstr. 12, EG, Whg. 1", "Hauptstr. 12, EG, Whg. 2"],
+            row.DwellingChoices.Select(c => c.Display));
+        Assert.True(row.DwellingChoices[0].IsCurrent);
+
+        row.DwellingChoices.Single(c => c.Display == "Hauptstr. 12, 1. OG, Whg. 2").SelectCommand.Execute(null);
+
+        var linked = Assert.Single(vm.Parties);
+        Assert.Equal("Hauptstr. 12, 1. OG, Whg. 2", linked.DwellingButtonText);
+        Assert.True(linked.DwellingChoices.Single(c => c.Display == "Hauptstr. 12, 1. OG, Whg. 2").IsCurrent);
+        Assert.False(linked.DwellingChoices[0].IsCurrent);
+        Assert.Equal(1, changes);
+
+        linked.DwellingChoices[0].SelectCommand.Execute(null);
+
+        Assert.Null(session.Incident.InvolvedParties.Single().DwellingId);
+        Assert.Equal(2, changes);
+    }
+
+    // Once the Haus is gone the picker has nothing to offer, but the card still says where the
+    // person was found, from the copy the link took.
+    [Fact]
+    public void A_link_to_a_removed_wohnung_still_shows_where()
+    {
+        var session = NewSession();
+        session.AddCoBuilding("Hauptstr. 12", 1, 2);
+        session.AddInvolvedParty("Erika Beispiel", null, null);
+        var dwelling = session.Incident.Dwellings.Single(d => d.FloorOrdinal == 1 && d.ApartmentNumber == 2);
+        session.SetInvolvedPartyDwelling(session.Incident.InvolvedParties[0].Id, dwelling.Id);
+        session.RemoveCoBuilding(dwelling.BuildingId);
+
+        var row = Assert.Single(new InvolvedPartiesViewModel(session, () => { }).Parties);
+
+        Assert.True(row.HasDwellingPicker);
+        Assert.Equal("Hauptstr. 12, 1. OG, Whg. 2", row.DwellingButtonText);
+        Assert.Equal([DwellingChoice.NoneDisplay], row.DwellingChoices.Select(c => c.Display));
+    }
+
     [Fact]
     public void Add_records_the_entry_clears_the_form_and_writes_no_etb_line()
     {

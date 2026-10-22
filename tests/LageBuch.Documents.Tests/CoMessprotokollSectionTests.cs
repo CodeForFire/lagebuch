@@ -93,6 +93,29 @@ public class CoMessprotokollSectionTests
         Assert.Equal(2, PdfText.Count(text, "Bewohner:"));
     }
 
+    // #702: an affected Wohnung names the Beteiligten found in it, in the order they were recorded.
+    [Fact]
+    public void An_affected_wohnung_names_the_beteiligte_found_there()
+    {
+        var incident = TwoBuildings();
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Huber");
+        var dwelling = incident.Dwellings.Single(d => d.BuildingId == incident.Buildings[0].Id && d.FloorOrdinal == 1 && d.ApartmentNumber == 2);
+        var erika = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        var max = incident.AddInvolvedParty(clock, op, "Max Beispiel", null, null);
+        incident.SetInvolvedPartyDwelling(max.Id, dwelling.Id);
+        incident.SetInvolvedPartyDwelling(erika.Id, dwelling.Id);
+
+        var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
+
+        Assert.Contains(
+            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja, CO: 40 ppm, Beteiligte: Erika Beispiel, Max Beispiel",
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains("• Haus B, EG, Whg. 1, Bewohner: —, Schlüssel: —, CO: —", text, StringComparison.Ordinal);
+        Assert.Equal(1, PdfText.Count(text, "Beteiligte:"));
+    }
+
     [Fact]
     public void Without_an_affected_unit_there_is_no_Betroffene_Wohnungen_list()
     {

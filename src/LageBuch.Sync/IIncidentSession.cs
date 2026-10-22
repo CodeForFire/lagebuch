@@ -106,6 +106,9 @@ public interface IIncidentSession
     /// <summary>Takes a Beteiligte/n back completely. No ETB line.</summary>
     void RemoveInvolvedParty(Guid partyId);
 
+    /// <summary>The Wohnung a Beteiligte/r was found in (#702); null clears it. No ETB line.</summary>
+    void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId);
+
     /// <summary>Corrects a task's fields (#246): typo fixes, reassignment, re-prioritizing.</summary>
     void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency);
 

@@ -21,7 +21,9 @@ public sealed partial class InvolvedPartyRow : ObservableObject
         InvolvedParty party,
         bool isReadOnly,
         Action<string, string?, string?> onEdited,
-        Action onRemoved)
+        Action onRemoved,
+        IReadOnlyList<DwellingChoice>? dwellingChoices = null,
+        string? dwellingLocation = null)
     {
         ArgumentNullException.ThrowIfNull(party);
         ArgumentNullException.ThrowIfNull(onEdited);
@@ -34,6 +36,8 @@ public sealed partial class InvolvedPartyRow : ObservableObject
         _name = party.Name;
         _phone = party.Phone;
         _notes = party.Notes;
+        DwellingChoices = dwellingChoices ?? [];
+        DwellingButtonText = dwellingLocation ?? DwellingChoice.NoneDisplay;
     }
 
     public Guid Id { get; }
@@ -41,6 +45,18 @@ public sealed partial class InvolvedPartyRow : ObservableObject
     public string CreatedBy { get; }
 
     public bool IsReadOnly { get; }
+
+    /// <summary>The WOHNUNG flyout's entries (#702): "keine", then every Wohnung of the CO-Messung.</summary>
+    public IReadOnlyList<DwellingChoice> DwellingChoices { get; }
+
+    /// <summary>Where this person was found, or "— keine —".</summary>
+    public string DwellingButtonText { get; }
+
+    /// <summary>
+    /// The WOHNUNG row shows once there is a Wohnung to pick, or a link to show: an Einsatz without
+    /// CO-Messung keeps the card as it was.
+    /// </summary>
+    public bool HasDwellingPicker => DwellingChoices.Count > 1 || DwellingButtonText != DwellingChoice.NoneDisplay;
 
     [ObservableProperty]
     private string _name;
@@ -271,5 +287,37 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
                 {
                     _session.RemoveInvolvedParty(party.Id); // Changed → Refresh drops the row
                     _onChanged();
-                }));
+                }),
+            DwellingChoicesFor(party),
+            _session.Incident.DwellingLocationOf(party));
+
+    // "keine", then every Wohnung in the order the CO-Messung lists them: by Haus, then floor from
+    // the top down as the building is drawn, then Wohnung.
+    private List<DwellingChoice> DwellingChoicesFor(InvolvedParty party)
+    {
+        void Select(Guid? dwellingId)
+        {
+            _session.SetInvolvedPartyDwelling(party.Id, dwellingId); // Changed → Refresh rebuilds the rows
+            _onChanged();
+        }
+
+        var incident = _session.Incident;
+        var choices = new List<DwellingChoice> { new(null, DwellingChoice.NoneDisplay, party.DwellingId is null, Select) };
+        foreach (var building in incident.Buildings)
+        {
+            var dwellings = incident.Dwellings
+                .Where(d => d.BuildingId == building.Id)
+                .OrderByDescending(d => d.FloorOrdinal)
+                .ThenBy(d => d.ApartmentNumber);
+            foreach (var dwelling in dwellings)
+            {
+                if (incident.DwellingLocation(dwelling.Id) is { } label)
+                {
+                    choices.Add(new DwellingChoice(dwelling.Id, label, dwelling.Id == party.DwellingId, Select));
+                }
+            }
+        }
+
+        return choices;
+    }
 }

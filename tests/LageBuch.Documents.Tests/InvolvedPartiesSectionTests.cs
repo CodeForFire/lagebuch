@@ -17,14 +17,31 @@ public class InvolvedPartiesSectionTests
         PdfText.AssertInOrder(
             text,
             "Beteiligte",
-            "Name Telefon Notiz",
-            "Erika Beispiel 0171 0000001 Schlüssel übergeben",
-            "POK Mustermann — —");
+            "Name Telefon Wohnung Notiz",
+            "Erika Beispiel 0171 0000001 — Schlüssel übergeben",
+            "POK Mustermann — — —");
 
-        // All three cells on one line: a missing column definition would wrap the row.
+        // All four cells on one line: a missing column definition would wrap the row.
         Assert.Contains(
-            "Erika Beispiel 0171 0000001 Schlüssel übergeben",
+            "Erika Beispiel 0171 0000001 — Schlüssel übergeben",
             PdfText.LinesOf(incident, Started, IncidentPdfSections.InvolvedParties));
+    }
+
+    // #702: the Wohnung a Beteiligte/r was found in, in its own column.
+    [Fact]
+    public void A_beteiligte_found_in_a_wohnung_prints_where()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "CO");
+        incident.AddCoBuilding(clock, op, "Hauptstr. 12", 1, 2);
+        var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 1 && d.ApartmentNumber == 2);
+        var party = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        incident.SetInvolvedPartyDwelling(party.Id, dwelling.Id);
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.InvolvedParties);
+
+        Assert.Contains("Erika Beispiel — Hauptstr. 12, 1. OG, Whg. 2 —", text, StringComparison.Ordinal);
     }
 
     // #700: the Bericht prints the number the way the app shows it; the file keeps what was typed.

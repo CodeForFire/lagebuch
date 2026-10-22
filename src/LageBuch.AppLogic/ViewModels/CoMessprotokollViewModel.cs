@@ -228,10 +228,11 @@ public sealed record CoReadingRow(
 
 public sealed partial class DwellingEditorViewModel : ObservableObject
 {
-    public DwellingEditorViewModel(Dwelling dwelling, Building building)
+    public DwellingEditorViewModel(Dwelling dwelling, Building building, IReadOnlyList<string>? involvedPartyNames = null)
     {
         ArgumentNullException.ThrowIfNull(dwelling);
         ArgumentNullException.ThrowIfNull(building);
+        InvolvedPartyNames = involvedPartyNames ?? [];
         BuildingId = dwelling.BuildingId;
         FloorOrdinal = dwelling.FloorOrdinal;
         ApartmentNumber = dwelling.ApartmentNumber;
@@ -254,6 +255,14 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
     }
 
     public Guid BuildingId { get; }
+
+    /// <summary>
+    /// The Beteiligten recorded as found here (#702), read-only: the link is made on the Beteiligte
+    /// card, where the person's details are, and shown here so the Wohnung tells who was in it.
+    /// </summary>
+    public IReadOnlyList<string> InvolvedPartyNames { get; }
+
+    public bool HasInvolvedParties => InvolvedPartyNames.Count > 0;
 
     public int FloorOrdinal { get; }
 
@@ -1165,7 +1174,8 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
             d.BuildingId == buildingId && d.FloorOrdinal == floorOrdinal && d.ApartmentNumber == apartmentNumber);
 
         Editor = building is not null && dwelling is not null
-            ? new DwellingEditorViewModel(dwelling, building)
+            ? new DwellingEditorViewModel(
+                dwelling, building, _session.Incident.InvolvedPartiesIn(dwelling.Id).Select(p => p.Name).ToList())
             : null;
     }
 

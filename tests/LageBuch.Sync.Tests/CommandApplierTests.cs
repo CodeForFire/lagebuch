@@ -72,6 +72,23 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void SetInvolvedPartyDwelling_over_the_wire_links_with_the_hosts_own_label()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Host", "FFB 1");
+        incident.AddCoBuilding(clock, op, "Hauptstr. 12", floorCount: 1, apartmentsPerFloor: 2);
+        var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 1 && d.ApartmentNumber == 1);
+        var party = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+
+        ApplyOverWire(new SetInvolvedPartyDwellingCommand(party.Id, dwelling.Id), incident, clock);
+        Assert.Equal("Hauptstr. 12, 1. OG, Whg. 1", incident.InvolvedParties.Single().DwellingLabel);
+
+        ApplyOverWire(new SetInvolvedPartyDwellingCommand(party.Id, null), incident, clock);
+        Assert.Null(incident.InvolvedParties.Single().DwellingId);
+    }
+
+    [Fact]
     public void Applying_a_non_file_command_returns_null()
     {
         var clock = new FixedClock();

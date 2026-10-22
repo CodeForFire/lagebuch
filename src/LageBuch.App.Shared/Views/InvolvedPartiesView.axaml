@@ -137,7 +137,7 @@
                   <!-- Each field pushes on LostFocus: the row rebuilds after every accepted write,
                        so a per-keystroke push would rewrite the Einsatzdatei on every character
                        and throw focus out of the box (#33, same as ForcesView's Bemerkung). -->
-                  <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+                  <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
                       <ColumnDefinition Width="*" />
@@ -163,7 +163,40 @@
                              MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNotesLength}"
                              Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                              IsEnabled="{Binding !IsReadOnly}" />
-                    <TextBlock Grid.Row="3" Grid.Column="1" Classes="field-error"
+                    <!-- #702: the CO-Messung's Wohnung this person was found in. A Button and a
+                         Flyout, not a ComboBox, for the reason ScbaView's Sicherheitstrupp picker
+                         gives. Only shown once there is a Wohnung to pick or a link to show. -->
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="WOHNUNG" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0"
+                               IsVisible="{Binding HasDwellingPicker}" />
+                    <Button Grid.Row="3" Grid.Column="1" x:Name="DwellingButton"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Content="{Binding DwellingButtonText}"
+                            IsVisible="{Binding HasDwellingPicker}"
+                            IsEnabled="{Binding !IsReadOnly}"
+                            AutomationProperties.Name="Wohnung wählen">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding DwellingChoices}" MinWidth="240">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DwellingChoice">
+                                  <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                          HorizontalContentAlignment="Left" Padding="8,5"
+                                          Command="{Binding SelectCommand}">
+                                    <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                                      <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
+                                      <TextBlock Grid.Column="1" Text="{Binding Display}" />
+                                    </Grid>
+                                  </Button>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </ScrollViewer>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Classes="field-error"
                                Text="{Binding Error}"
                                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   </Grid>

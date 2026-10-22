@@ -96,6 +96,8 @@ internal static class SchemaGuard
         new("incident_tasks", "completed_by", "TEXT", false, null),
         new("involved_parties", "phone", "TEXT", false, null),
         new("involved_parties", "notes", "TEXT", false, null),
+        new("involved_parties", "dwelling_id", "TEXT", false, null),
+        new("involved_parties", "dwelling_label", "TEXT", false, null),
         new("role_assignments", "call_sign", "TEXT", false, null),
         new("role_assignments", "from_time", "TEXT", false, null),
         new("role_assignments", "to_time", "TEXT", false, null),

@@ -105,7 +105,11 @@ public static class CoMessprotokollSection
                     var resident = d.ResidentName ?? "—";
                     var key = KeyText(d.KeyAvailable);
                     var co = d.CoValue is { } v ? $"{v} ppm" : "—";
-                    column.Item().Text($"• {location}, Bewohner: {resident}, Schlüssel: {key}, CO: {co}");
+
+                    // #702: who the Beteiligte list records as found here, after what was measured.
+                    var parties = incident.InvolvedPartiesIn(d.Id);
+                    var found = parties.Count > 0 ? $", Beteiligte: {string.Join(", ", parties.Select(p => p.Name))}" : string.Empty;
+                    column.Item().Text($"• {location}, Bewohner: {resident}, Schlüssel: {key}, CO: {co}{found}");
                 }
             }
 

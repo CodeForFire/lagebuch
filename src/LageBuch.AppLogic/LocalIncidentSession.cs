@@ -209,6 +209,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void RemoveInvolvedParty(Guid partyId) =>
         Mutate(() => Incident.RemoveInvolvedParty(partyId));
 
+    public void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId) =>
+        Mutate(() => Incident.SetInvolvedPartyDwelling(partyId, dwellingId));
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Mutate(() => Incident.UpdateTask(taskId, text, assignee, importance, urgency));
 
