@@ -1,0 +1,1 @@
+Abschnitte, Bereitstellung and partner Einsatzleitungen can be recorded with their Auftrag and Funkgruppe, units and Funktionen placed in them, and the Führungsstufe set; the Stammdaten gain Funkgruppen, and the Bericht's Kräfte table names each unit's Abschnitt.
