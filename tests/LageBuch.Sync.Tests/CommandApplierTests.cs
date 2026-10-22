@@ -48,9 +48,9 @@ public class CommandApplierTests
         var clock = new FixedClock();
         var incident = NewIncident(clock);
 
-        ApplyOverWire(new SetAddressCommand("Hauptstraße", "Puch", "1", "85238", "Petershausen"), incident, clock);
+        ApplyOverWire(new SetAddressCommand("Hauptstraße", "Puch", "1", "82256", "Fürstenfeldbruck"), incident, clock);
 
-        Assert.Equal("Hauptstraße 1, Puch, 85238 Petershausen", Formatting.Address(incident));
+        Assert.Equal("Hauptstraße 1, Puch, 82256 Fürstenfeldbruck", Formatting.Address(incident));
     }
 
     [Fact]

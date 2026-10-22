@@ -70,16 +70,16 @@ public class IncidentDataDialogViewModelTests
 
         vm.Street = "Hauptstr.";
         vm.HouseNumber = " 12 ";
-        vm.PostalCode = "85238";
-        vm.Place = "Petershausen";
+        vm.PostalCode = "82256";
+        vm.Place = "Fürstenfeldbruck";
         vm.District = "Puch";
         vm.SaveCommand.Execute(null);
 
         var saved = store.Load("/x.fwincident");
         Assert.Equal("12", saved.HouseNumber);
-        Assert.Equal("85238", saved.PostalCode);
-        Assert.Equal("Petershausen", saved.Place);
-        Assert.Equal("Hauptstr. 12, Puch, 85238 Petershausen", Formatting.Address(saved));
+        Assert.Equal("82256", saved.PostalCode);
+        Assert.Equal("Fürstenfeldbruck", saved.Place);
+        Assert.Equal("Hauptstr. 12, Puch, 82256 Fürstenfeldbruck", Formatting.Address(saved));
     }
 
     [Fact]
@@ -87,14 +87,14 @@ public class IncidentDataDialogViewModelTests
     {
         var store = new FakeStore();
         var session = NewSession(store);
-        session.SetAddress("Hauptstr.", "Puch", houseNumber: "12", place: "Petershausen");
+        session.SetAddress("Hauptstr.", "Puch", houseNumber: "12", place: "Fürstenfeldbruck");
         var vm = new IncidentDataDialogViewModel(session, () => { });
 
-        vm.PostalCode = "85238";
+        vm.PostalCode = "82256";
 
         Assert.True(vm.HasChanges);
         vm.SaveCommand.Execute(null);
-        Assert.Equal("Hauptstr. 12, Puch, 85238 Petershausen", Formatting.Address(store.Load("/x.fwincident")));
+        Assert.Equal("Hauptstr. 12, Puch, 82256 Fürstenfeldbruck", Formatting.Address(store.Load("/x.fwincident")));
     }
 
     [Fact]

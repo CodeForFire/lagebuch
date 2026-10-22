@@ -22,7 +22,7 @@ public class SnapshotRoundTripTests
         incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Aufstellort ELW?", true), ("Funk auf 0?", false) },
             new[] { ("Fahrzeug abgerüstet?", false) }));
-        incident.SetAddress("Hauptstraße", "Bezirk 2", houseNumber: "1", postalCode: "85238", place: "Petershausen");
+        incident.SetAddress("Hauptstraße", "Puch", houseNumber: "1", postalCode: "82256", place: "Fürstenfeldbruck");
         incident.SetStatus("Im Einsatz");
         incident.SetKeyword("Brand 2 – Wohnhaus");
 
@@ -114,9 +114,9 @@ public class SnapshotRoundTripTests
         Assert.Equal("Brand 2 – Wohnhaus", r.Keyword);
         Assert.Equal("Hauptstraße", r.Street);
         Assert.Equal("1", r.HouseNumber);
-        Assert.Equal("85238", r.PostalCode);
-        Assert.Equal("Petershausen", r.Place);
-        Assert.Equal("Bezirk 2", r.District);
+        Assert.Equal("82256", r.PostalCode);
+        Assert.Equal("Fürstenfeldbruck", r.Place);
+        Assert.Equal("Puch", r.District);
         Assert.Equal(original.ClosedAt, r.ClosedAt);
         Assert.Equal(original.ClosedBy, r.ClosedBy);
         Assert.Equal(original.Checklists[0].Items.Count, r.Checklists[0].Items.Count);

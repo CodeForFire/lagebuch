@@ -47,9 +47,9 @@ public class FormattingTests
     }
 
     [Theory]
-    [InlineData("Hauptstr.", "12", "85238", "Petershausen", "Puch", "Hauptstr. 12, Puch, 85238 Petershausen")]
-    [InlineData("Hauptstr.", "12", null, "Petershausen", null, "Hauptstr. 12, Petershausen")]
-    [InlineData(null, null, "85238", null, null, "85238")]
+    [InlineData("Hauptstr.", "12", "82256", "Fürstenfeldbruck", "Puch", "Hauptstr. 12, Puch, 82256 Fürstenfeldbruck")]
+    [InlineData("Hauptstr.", "12", null, "Fürstenfeldbruck", null, "Hauptstr. 12, Fürstenfeldbruck")]
+    [InlineData(null, null, "82256", null, null, "82256")]
     [InlineData(null, "12", null, null, null, "12")]
     [InlineData(" Hauptstr. ", " ", " ", " Dachau ", null, "Hauptstr., Dachau")]
     [InlineData(null, null, null, null, null, null)]

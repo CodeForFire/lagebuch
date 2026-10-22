@@ -28,7 +28,7 @@ public class IncidentDataDialogRenderTests
             Array.Empty<(string, bool)>(),
             new IncidentNumber("B 1.2 260715 123"),
             keyword: "B3P");
-        session.SetAddress("Hauptstr. 12", "FFB", postalCode: "82256", place: "Fürstenfeldbruck");
+        session.SetAddress("Hauptstr.", "Puch", houseNumber: "12", postalCode: "82256", place: "Fürstenfeldbruck");
         return session;
     }
 
@@ -48,9 +48,9 @@ public class IncidentDataDialogRenderTests
 
         Assert.Equal("B3P", Find<TextBox>(window, "IncidentDataKeywordBox").Text);
         Assert.Equal("B 1.2 260715 123", Find<TextBox>(window, "IncidentDataNumberBox").Text);
-        Assert.Equal("Hauptstr. 12", Find<TextBox>(window, "IncidentDataStreetBox").Text);
-        Assert.Equal("FFB", Find<TextBox>(window, "IncidentDataDistrictBox").Text);
-        Assert.Equal(string.Empty, Find<TextBox>(window, "IncidentDataHouseNumberBox").Text ?? string.Empty);
+        Assert.Equal("Hauptstr.", Find<TextBox>(window, "IncidentDataStreetBox").Text);
+        Assert.Equal("Puch", Find<TextBox>(window, "IncidentDataDistrictBox").Text);
+        Assert.Equal("12", Find<TextBox>(window, "IncidentDataHouseNumberBox").Text);
         Assert.Equal("82256", Find<TextBox>(window, "IncidentDataPostalCodeBox").Text);
         Assert.Equal("Fürstenfeldbruck", Find<TextBox>(window, "IncidentDataPlaceBox").Text);
         Assert.True(Find<Button>(window, "IncidentDataSaveButton").IsEnabled);
@@ -88,10 +88,10 @@ public class IncidentDataDialogRenderTests
         window.Press(PhysicalKey.Escape); // nothing typed: closes in one key
         Assert.Equal(1, closed);
 
-        street.Text = "Nebenstr. 1";
+        street.Text = "Nebenstr.";
         window.Press(PhysicalKey.Enter);
         Assert.Equal(2, closed);
-        Assert.Equal("Nebenstr. 1", session.Incident.Street);
+        Assert.Equal("Nebenstr.", session.Incident.Street);
     }
 
     // #652: Esc with typed Einsatzdaten asks first, focus on ABBRECHEN, so a reflex Enter keeps
@@ -108,7 +108,7 @@ public class IncidentDataDialogRenderTests
         Dispatcher.UIThread.RunJobs();
         var street = Find<TextBox>(window, "IncidentDataStreetBox");
         street.Focus();
-        street.Text = "Nebenstr. 1";
+        street.Text = "Nebenstr.";
 
         window.Press(PhysicalKey.Escape);
         Dispatcher.UIThread.RunJobs();
@@ -122,14 +122,14 @@ public class IncidentDataDialogRenderTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(0, closed);
         Assert.False(Find<Border>(window, "IncidentDataDiscardPanel").IsEffectivelyVisible);
-        Assert.Equal("Nebenstr. 1", street.Text);
+        Assert.Equal("Nebenstr.", street.Text);
 
         window.Press(PhysicalKey.Escape);
         Dispatcher.UIThread.RunJobs();
         Find<Button>(window, "IncidentDataDiscardButton").Command!.Execute(null);
 
         Assert.Equal(1, closed);
-        Assert.Equal("Hauptstr. 12", session.Incident.Street);
+        Assert.Equal("Hauptstr.", session.Incident.Street);
     }
 
     // Opt-in PNG capture for the PR's before/after pair; a plain test run writes nothing.

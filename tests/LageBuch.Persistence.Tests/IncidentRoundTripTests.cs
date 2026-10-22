@@ -34,7 +34,7 @@ public class IncidentRoundTripTests : IDisposable
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, "Brand");
         incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
-        incident.SetAddress("Hauptstr.", "FFB", houseNumber: "12", postalCode: "82256", place: "Fürstenfeldbruck");
+        incident.SetAddress("Hauptstr.", "Puch", houseNumber: "12", postalCode: "82256", place: "Fürstenfeldbruck");
         incident.SetStatus("aufgenommen");
 
         // Item 0 stays mandatory-and-unchecked deliberately: toggling it would complete Aufbau and
@@ -93,7 +93,7 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("12", loaded.HouseNumber);
         Assert.Equal("82256", loaded.PostalCode);
         Assert.Equal("Fürstenfeldbruck", loaded.Place);
-        Assert.Equal("FFB", loaded.District);
+        Assert.Equal("Puch", loaded.District);
         Assert.Equal("aufgenommen", loaded.Status);
         Assert.Equal(2, loaded.Checklists[0].Items.Count);
         Assert.False(loaded.Checklists[0].Items[0].IsDone);

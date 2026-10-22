@@ -72,7 +72,7 @@ public class IncidentCreationTests
     public void SetAddress_trims_every_part_and_clears_blank_ones()
     {
         var incident = Incident.Start(new FixedClock(T0), new SessionOperator("Müller"));
-        incident.SetAddress("Hauptstr.", "Puch", houseNumber: "12", postalCode: "85238", place: "Petershausen");
+        incident.SetAddress("Hauptstr.", "Puch", houseNumber: "12", postalCode: "82256", place: "Fürstenfeldbruck");
 
         incident.SetAddress(" Bahnhofstr. ", " ", houseNumber: " 3a ", postalCode: string.Empty, place: " Dachau ");
 

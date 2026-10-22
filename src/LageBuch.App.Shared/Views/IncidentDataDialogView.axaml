@@ -46,10 +46,10 @@
           </Grid>
           <Grid ColumnDefinitions="2*,3*,3*" ColumnSpacing="12">
             <HeaderedContentControl Grid.Column="0" Classes="field" Header="PLZ">
-              <TextBox x:Name="IncidentDataPostalCodeBox" Text="{Binding PostalCode}" PlaceholderText="85238" />
+              <TextBox x:Name="IncidentDataPostalCodeBox" Text="{Binding PostalCode}" PlaceholderText="82256" />
             </HeaderedContentControl>
             <HeaderedContentControl Grid.Column="1" Classes="field" Header="ORT">
-              <TextBox x:Name="IncidentDataPlaceBox" Text="{Binding Place}" PlaceholderText="z. B. Petershausen" />
+              <TextBox x:Name="IncidentDataPlaceBox" Text="{Binding Place}" PlaceholderText="z. B. Fürstenfeldbruck" />
             </HeaderedContentControl>
             <HeaderedContentControl Grid.Column="2" Classes="field" Header="ORTSTEIL">
               <TextBox x:Name="IncidentDataDistrictBox" Text="{Binding District}" PlaceholderText="z. B. Puch" />
