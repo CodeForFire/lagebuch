@@ -939,7 +939,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnHeaderSourceChanged;
 
-        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
+        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm, _clock);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
         Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs);

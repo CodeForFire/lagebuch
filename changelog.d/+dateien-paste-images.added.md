@@ -1,0 +1,1 @@
+Dateien: an image is pasted with Strg+V or dropped as image data, such as a screenshot or a picture copied in a browser, and is added as a PNG named after the moment it arrived, while a dropped browser link now explains how to paste the picture instead of being silently ignored (#421).

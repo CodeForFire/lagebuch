@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -154,6 +156,88 @@ public class FilesTabRenderTests
         {
             File.Delete(path);
         }
+    }
+
+    private static WriteableBitmap SmallBitmap() =>
+        new(new PixelSize(4, 4), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+
+    // #421: Strg+V on DATEIEN adds the clipboard image as a PNG, even with the focus still on the
+    // nav rail that opened the tab -- which is where a click leaves it.
+    [AvaloniaFact]
+    public async Task Strg_v_on_dateien_adds_the_clipboard_image_as_a_png()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
+        using var bitmap = SmallBitmap();
+        var clipboard = new DataTransfer();
+        clipboard.Add(DataTransferItem.Create(DataFormat.Bitmap, (Bitmap)bitmap));
+        await window.Clipboard!.SetDataAsync(clipboard);
+
+        window.Press(PhysicalKey.V, RawInputModifiers.Control);
+        await WaitUntilAsync(() => vm.Files.Files.Count == 1);
+
+        var file = Assert.Single(session.Incident.Files);
+        Assert.StartsWith("Zwischenablage-", file.FileName, StringComparison.Ordinal);
+        Assert.Equal("image/png", file.ContentType);
+        Assert.Null(vm.Files.ErrorMessage);
+        Capture(window, "files-paste-after.png");
+    }
+
+    [AvaloniaFact]
+    public async Task Strg_v_in_a_text_field_pastes_text_and_adds_no_file()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        await session.AddFileAsync("einsatzstelle.jpg", "image/jpeg", [1, 2, 3]);
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
+        using var bitmap = SmallBitmap();
+        var clipboard = new DataTransfer();
+        clipboard.Add(DataTransferItem.Create(DataFormat.Bitmap, (Bitmap)bitmap));
+        await window.Clipboard!.SetDataAsync(clipboard);
+
+        var rename = window.GetVisualDescendants().OfType<FilesView>().Single()
+            .GetVisualDescendants().OfType<TextBox>().First();
+        rename.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.V, RawInputModifiers.Control);
+        await WaitUntilAsync(() => session.Incident.Files.Count > 1);
+
+        Assert.Single(session.Incident.Files);
+        Assert.Null(vm.Files.ErrorMessage);
+    }
+
+    [AvaloniaFact]
+    public async Task Dropping_image_data_on_dateien_adds_it_as_a_png()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
+        var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
+        using var bitmap = SmallBitmap();
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.Create(DataFormat.Bitmap, (Bitmap)bitmap));
+
+        dropZone.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, transfer, dropZone, new Point(10, 10), KeyModifiers.None));
+        await WaitUntilAsync(() => vm.Files.Files.Count == 1);
+
+        Assert.Equal("image/png", Assert.Single(session.Incident.Files).ContentType);
+    }
+
+    // A browser drags an image as a link; the link is never fetched, and the drop says what works
+    // instead of being ignored as it used to be.
+    [AvaloniaFact]
+    public void Dropping_a_link_on_dateien_explains_how_to_paste_the_image_instead()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
+        var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.CreateText("https://example.org/brand.jpg"));
+
+        dropZone.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, transfer, dropZone, new Point(10, 10), KeyModifiers.None));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(session.Incident.Files);
+        Assert.Equal("Aus dem Browser: Rechtsklick aufs Bild → „Bild kopieren“, dann hier Strg+V.", vm.Files.ErrorMessage);
+        Capture(window, "files-link-drop-hint.png");
     }
 
     [AvaloniaFact]

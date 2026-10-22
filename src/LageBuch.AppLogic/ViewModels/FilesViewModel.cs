@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Time;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -87,6 +89,7 @@ public sealed partial class IncidentFileRow : ObservableObject
 
 public sealed partial class FilesViewModel : ObservableObject, IDisposable
 {
+    private readonly IClock _clock;
     private readonly IIncidentSession _session;
     private readonly IFileDialogService _dialogs;
     private readonly Action _onChanged;
@@ -102,12 +105,14 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         IIncidentSession session,
         IFileDialogService dialogs,
         Action onChanged,
-        Action<string, string, Action>? requestConfirm = null)
+        Action<string, string, Action>? requestConfirm = null,
+        IClock? clock = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _dialogs = dialogs;
         _onChanged = onChanged;
+        _clock = clock ?? new SystemClock();
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         IsReadOnly = session.IsReadOnly;
         Files = new ObservableCollection<IncidentFileRow>();
@@ -198,10 +203,6 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
     /// into. The body guard also covers a programmatic call, which bypasses AddFileCommand's
     /// CanExecute — mirrors IncidentFileRow.Remove.
     /// </summary>
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Domain guards, IO and network failures are heterogeneous; all surface as one error line.")]
     public async Task AddFilesAsync(IReadOnlyList<string> paths)
     {
         ArgumentNullException.ThrowIfNull(paths);
@@ -210,33 +211,55 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
             return;
         }
 
+        await UploadAsync(paths.Count, async failures =>
+        {
+            foreach (var path in paths)
+            {
+                await TryAddAsync(failures, Path.GetFileName(path), ContentTypeFor(path), new FileInfo(path).Length, () => File.ReadAllBytesAsync(path));
+            }
+        });
+    }
+
+    /// <summary>
+    /// Adds an image pasted from the clipboard or dropped as image data (#421). It arrives with
+    /// neither a path nor a name, so it is named after the moment it arrived, e.g.
+    /// <c>Zwischenablage-20260920-143207.png</c>; the view hands it over already encoded as PNG.
+    /// </summary>
+    public async Task PasteImageAsync(byte[] png)
+    {
+        ArgumentNullException.ThrowIfNull(png);
+        if (!CanAddFile)
+        {
+            return;
+        }
+
+        var name = $"Zwischenablage-{_clock.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}.png";
+        await UploadAsync(1, failures => TryAddAsync(failures, name, "image/png", png.LongLength, () => Task.FromResult(png)));
+    }
+
+    /// <summary>Strg+V found no image on the clipboard: say so rather than do nothing.</summary>
+    public void ReportNothingToPaste() => ErrorMessage = "In der Zwischenablage ist kein Bild.";
+
+    /// <summary>The platform clipboard itself failed; worded like a failed pick (#602).</summary>
+    public void ReportPasteFailed(string reason) => ErrorMessage = $"Bild nicht übernommen: {reason}";
+
+    /// <summary>
+    /// A browser drop that carries only a link, no image (#421). The link is deliberately never
+    /// fetched — nothing from a drop reaches the network — so point at the way that works.
+    /// </summary>
+    public void ReportLinkDropped() =>
+        ErrorMessage = "Aus dem Browser: Rechtsklick aufs Bild → „Bild kopieren“, dann hier Strg+V.";
+
+    // The shared frame of every upload batch: one IsUploading span, one Changed refresh, one
+    // composed error line for whatever the batch's items reported.
+    private async Task UploadAsync(int total, Func<List<(string FileName, string Reason)>, Task> addAll)
+    {
         ErrorMessage = null;
         IsUploading = true;
         var failures = new List<(string FileName, string Reason)>();
         try
         {
-            foreach (var path in paths)
-            {
-                var sizeBytes = new FileInfo(path).Length;
-                if (sizeBytes > IncidentFile.MaxSizeBytes)
-                {
-                    failures.Add((Path.GetFileName(path), IncidentFile.TooLargeMessage));
-                    continue;
-                }
-
-                try
-                {
-                    var bytes = await File.ReadAllBytesAsync(path);
-                    await _session.AddFileAsync(Path.GetFileName(path), ContentTypeFor(path), bytes);
-                }
-                catch (Exception ex)
-                {
-                    // Domain guards (closed incident, unsupported type, over the size cap) and — once
-                    // joined-client upload lands — network failures all surface here rather than crashing.
-                    failures.Add((Path.GetFileName(path), ex.Message));
-                }
-            }
-
+            await addAll(failures);
             _onChanged(); // Changed already ran Sync(); this only refreshes LastSavedAt et al.
         }
         finally
@@ -244,7 +267,32 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
             IsUploading = false;
         }
 
-        ErrorMessage = ComposeErrorMessage(paths.Count, failures);
+        ErrorMessage = ComposeErrorMessage(total, failures);
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Domain guards, IO and network failures are heterogeneous; all surface as one error line.")]
+    private async Task TryAddAsync(
+        List<(string FileName, string Reason)> failures, string fileName, string contentType, long sizeBytes, Func<Task<byte[]>> readBytes)
+    {
+        if (sizeBytes > IncidentFile.MaxSizeBytes)
+        {
+            failures.Add((fileName, IncidentFile.TooLargeMessage));
+            return;
+        }
+
+        try
+        {
+            await _session.AddFileAsync(fileName, contentType, await readBytes());
+        }
+        catch (Exception ex)
+        {
+            // Domain guards (closed incident, unsupported type, over the size cap) and network
+            // failures on a joined client all surface here rather than crashing.
+            failures.Add((fileName, ex.Message));
+        }
     }
 
     // A single dropped/picked file keeps the plain historical wording; the "„name“: reason" framing
