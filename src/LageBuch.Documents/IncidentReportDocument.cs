@@ -21,7 +21,7 @@ public sealed class IncidentReportDocument : IDocument
     /// are additionally rendered inline (see <see cref="Sections.FilesSection"/>).
     /// </param>
     /// <param name="sections">
-    /// Which of the 8 body sections to render (#262); defaults to all of them. The header and
+    /// Which of the body sections to render (#262); defaults to all of them. The header and
     /// footer are always rendered regardless of this selection.
     /// </param>
     /// <param name="asOf">
@@ -78,6 +78,12 @@ public sealed class IncidentReportDocument : IDocument
                 if (_sections.HasFlag(IncidentPdfSections.Roles))
                 {
                     column.Item().Element(c => RolesSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.Fuehrungsorganisation)
+                    && FuehrungsorganisationSection.HasContent(_incident))
+                {
+                    column.Item().Element(c => FuehrungsorganisationSection.Compose(c, _incident));
                 }
 
                 if (_sections.HasFlag(IncidentPdfSections.Forces))
