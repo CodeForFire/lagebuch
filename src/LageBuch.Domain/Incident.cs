@@ -819,6 +819,26 @@ public sealed class Incident
     public CommandNode? FindCommandNode(Guid id) => _commandNodes.Find(n => n.Id == id);
 
     /// <summary>
+    /// What <paramref name="nodeId"/> is called wherever it is shown: the node's name, and for an
+    /// Unterabschnitt "Abschnitt / Name", since names are only unique among siblings. Null for no id
+    /// or one this incident does not hold; a dissolved node keeps its label (the record is the
+    /// record) and a missing parent leaves the bare name.
+    /// </summary>
+    public string? NodeLabel(Guid? nodeId)
+    {
+        if (nodeId is not { } id || FindCommandNode(id) is not { } node)
+        {
+            return null;
+        }
+
+        return node.Kind == CommandNodeKind.Unterabschnitt
+            && node.ParentId is { } parentId
+            && FindCommandNode(parentId) is { } parent
+                ? $"{parent.Name} / {node.Name}"
+                : node.Name;
+    }
+
+    /// <summary>
     /// Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung. An Unterabschnitt
     /// must lie in a live Abschnitt of this incident; live siblings (same parent) have unique names.
     /// </summary>
