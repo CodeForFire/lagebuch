@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
@@ -19,6 +20,12 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
 [JsonDerivedType(typeof(TransferRoleCommand), "transferRole")]
 [JsonDerivedType(typeof(EditRolePhoneCommand), "editRolePhone")]
+[JsonDerivedType(typeof(AddCommandNodeCommand), "addCommandNode")]
+[JsonDerivedType(typeof(UpdateCommandNodeCommand), "updateCommandNode")]
+[JsonDerivedType(typeof(DissolveCommandNodeCommand), "dissolveCommandNode")]
+[JsonDerivedType(typeof(MoveForceUnitCommand), "moveForceUnit")]
+[JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
+[JsonDerivedType(typeof(UpdateLeadershipPostCommand), "updateLeadershipPost")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
 [JsonDerivedType(typeof(UpdateForceStrengthCommand), "updateForceStrength")]
@@ -86,7 +93,11 @@ public sealed record ToggleChecklistItemCommand(OperatorDto Operator, Guid ItemI
 
 public sealed record AssignRoleCommand(
     OperatorDto Operator, string Role, string PersonName, string? CallSign,
-    DateTimeOffset? From, DateTimeOffset? To, string? Section, string? Phone) : SyncCommand;
+    DateTimeOffset? From, DateTimeOffset? To, string? Section, string? Phone,
+
+    // Appended with defaults: a command from a client that predates the Führungsorganisation
+    // reads as an unplaced Funktion.
+    Guid? NodeId = null, RoleSlot Slot = RoleSlot.None) : SyncCommand;
 
 // No end-time on the wire: the host stamps it with its own (authoritative) clock, so devices with
 // slightly different clocks can't disagree on when a handover happened.
@@ -94,6 +105,25 @@ public sealed record TransferRoleCommand(
     OperatorDto Operator, Guid AssignmentId, string NewPersonName, string? NewCallSign, string? NewPhone) : SyncCommand;
 
 public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentId, string? Phone) : SyncCommand;
+
+/// <summary>Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung.</summary>
+public sealed record AddCommandNodeCommand(
+    OperatorDto Operator, CommandNodeKind Kind, string Name, Guid? ParentId) : SyncCommand;
+
+public sealed record UpdateCommandNodeCommand(
+    OperatorDto Operator, Guid NodeId, string Name, string? Auftrag, string? Standort,
+    string? Funkgruppe, string? Rufname, string? Telefon) : SyncCommand;
+
+public sealed record DissolveCommandNodeCommand(OperatorDto Operator, Guid NodeId) : SyncCommand;
+
+/// <summary>Places a unit in a node, or back to "nicht zugeordnet" when NodeId is null.</summary>
+public sealed record MoveForceUnitCommand(OperatorDto Operator, Guid UnitId, Guid? NodeId) : SyncCommand;
+
+/// <summary>Sets the Führungsstufe; a null Stufe clears it.</summary>
+public sealed record SetFuehrungsstufeCommand(OperatorDto Operator, Fuehrungsstufe? Stufe) : SyncCommand;
+
+public sealed record UpdateLeadershipPostCommand(
+    OperatorDto Operator, string? Standort, string? Rufname, string? Telefon, string? Funkgruppe) : SyncCommand;
 
 // OfficerCount/ZugfuehrerCount default to 0 so a pre-#76/#216 payload (no such property on the
 // wire) deserializes as "keine Führungskraft/kein ZF erfasst" instead of failing the contract.

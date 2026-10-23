@@ -514,4 +514,18 @@ public class CommandNodeAggregateTests
 
         Assert.Null(unit.NodeId);
     }
+
+    [Fact]
+    public void Adding_a_node_of_an_undefined_kind_is_refused_and_changes_nothing()
+    {
+        // JsonStringEnumConverter also accepts a raw integer, so a sync peer can send "kind": 99.
+        var (incident, clock, op) = NewIncident();
+        var entries = incident.Journal.Count;
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => incident.AddCommandNode(clock, op, (CommandNodeKind)99, "Nord"));
+
+        Assert.Empty(incident.CommandNodes);
+        Assert.Equal(entries, incident.Journal.Count);
+    }
 }

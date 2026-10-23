@@ -202,7 +202,17 @@ public class VersionHandshakeTests
     {
         // 21 adds email to the Stammdaten payload's vehicles. A peer at 20 skips the key and offers
         // no mail to the vehicle, so it stays joinable.
-        Assert.Equal(21, SyncProtocol.ProtocolVersion);
-        Assert.Equal(20, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 21, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 20, int.MaxValue);
+    }
+
+    [Fact]
+    public void Placement_commands_raise_the_floor_to_protocol_twenty_two()
+    {
+        // 22 lets a client send addCommandNode, updateCommandNode, dissolveCommandNode,
+        // moveForceUnit, setFuehrungsstufe and updateLeadershipPost. A host at 21 has none of them
+        // in its allowlist and would reject them, so a 21 and a 22 must not connect.
+        Assert.Equal(22, SyncProtocol.ProtocolVersion);
+        Assert.Equal(22, SyncProtocol.MinimumProtocolVersion);
     }
 }
