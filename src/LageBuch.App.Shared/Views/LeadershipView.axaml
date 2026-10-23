@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.LeadershipView"
+             x:DataType="vm:LeadershipViewModel">
+  <!-- Placeholder until the Führungsorganisation board replaces it. -->
+  <StackPanel>
+    <TextBlock x:Name="LeadershipTitle" Text="FÜHRUNG" Classes="overline" Margin="0,0,0,14" />
+    <TextBlock x:Name="LeadershipPlaceholder" Text="Die Führungsorganisation erscheint hier."
+               Foreground="{StaticResource TextMutedBrush}" />
+  </StackPanel>
+</UserControl>

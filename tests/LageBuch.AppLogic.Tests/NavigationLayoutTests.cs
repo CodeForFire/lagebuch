@@ -35,22 +35,104 @@ public class NavigationLayoutTests
             new[]
             {
                 "checklist:Aufbau", "etb", "tasks", "roles", "forces", "involved",
-                "scba", "co", "files", "links", "contacts", "checklist:Abbau",
+                "scba", "leadership", "co", "files", "links", "contacts", "checklist:Abbau",
             },
             Keys(specs));
     }
 
     [Fact]
-    public void A_layout_saved_before_beteiligte_existed_still_shows_it_at_the_end()
+    public void A_layout_saved_before_beteiligte_existed_still_shows_it_after_kraefte()
     {
         var saved = NavModules.All
             .Where(k => !string.Equals(k, NavModules.InvolvedParties, StringComparison.Ordinal))
             .Select(k => Module(k))
             .ToArray();
 
-        var specs = NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>());
+        var keys = Keys(NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>()));
 
-        Assert.Equal(NavModules.InvolvedParties, Keys(specs)[^1]);
+        Assert.Equal(keys.IndexOf(NavModules.Forces) + 1, keys.IndexOf(NavModules.InvolvedParties));
+    }
+
+    [Fact]
+    public void An_older_layout_without_leadership_gets_it_right_after_atemschutz()
+    {
+        var saved = NavModules.All
+            .Where(k => !string.Equals(k, NavModules.Leadership, StringComparison.Ordinal))
+            .Select(k => Module(k))
+            .ToArray();
+
+        var keys = Keys(NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>()));
+
+        Assert.Equal(keys.IndexOf(NavModules.Scba) + 1, keys.IndexOf(NavModules.Leadership));
+        Assert.Equal(NavModules.All.Count, keys.Count);
+    }
+
+    [Fact]
+    public void Leadership_follows_atemschutz_to_wherever_the_layout_moved_it()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[]
+            {
+                Module(NavModules.Etb), Module(NavModules.Files), Module(NavModules.Scba),
+                Module(NavModules.Links),
+            },
+            Array.Empty<ChecklistList>()));
+
+        Assert.Equal(keys.IndexOf(NavModules.Scba) + 1, keys.IndexOf(NavModules.Leadership));
+        Assert.True(keys.IndexOf(NavModules.Files) < keys.IndexOf(NavModules.Scba));
+    }
+
+    // A switched-off Atemschutz still holds its place in the layout, so Führung does not jump
+    // somewhere else just because a toggle is off.
+    [Fact]
+    public void Leadership_keeps_atemschutzs_place_when_atemschutz_is_switched_off()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[]
+            {
+                Module(NavModules.Etb), Module(NavModules.Scba, visible: false),
+                Module(NavModules.Files), Module(NavModules.Links),
+            },
+            Array.Empty<ChecklistList>()));
+
+        Assert.DoesNotContain(NavModules.Scba, keys);
+        Assert.Equal(
+            new[]
+            {
+                "etb", "tasks", "roles", "forces", "involved", "leadership", "co", "files", "links",
+                "contacts",
+            },
+            keys);
+    }
+
+    [Fact]
+    public void A_layout_lacking_every_predecessor_appends_the_missing_module_at_the_end()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[] { Module(NavModules.Co), Module(NavModules.Files) },
+            Array.Empty<ChecklistList>()));
+
+        // The ETB is the first default module, so it has no predecessor at all and is appended
+        // after what the layout lists; the modules after it then find it as theirs.
+        Assert.True(keys.IndexOf(NavModules.Etb) > keys.IndexOf(NavModules.Co));
+        Assert.True(keys.IndexOf(NavModules.Etb) > keys.IndexOf(NavModules.Files));
+        Assert.Equal(keys.IndexOf(NavModules.Etb) + 1, keys.IndexOf(NavModules.Tasks));
+    }
+
+    [Fact]
+    public void Several_missing_modules_keep_their_default_relative_order()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[] { Module(NavModules.Etb), Module(NavModules.Files) },
+            Array.Empty<ChecklistList>()));
+
+        Assert.Equal(
+            new[]
+            {
+                "etb", "tasks", "roles", "forces", "involved", "scba", "leadership", "co", "files",
+                "links", "contacts",
+            },
+            keys);
     }
 
     [Fact]
@@ -60,7 +142,8 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Module(NavModules.Scba, visible: false), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal(new[] { "etb", "files" }, Keys(specs).Take(2));
+        Assert.Equal("etb", Keys(specs)[0]);
+        Assert.Contains("files", Keys(specs));
         Assert.DoesNotContain("scba", Keys(specs));
     }
 
@@ -74,7 +157,8 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb, visible: false), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal(new[] { "etb", "files" }, Keys(specs).Take(2));
+        Assert.Equal("etb", Keys(specs)[0]);
+        Assert.Contains("files", Keys(specs));
     }
 
     // Omitting an entry is not how a module is hidden -- `visible: false` is. Omission only
@@ -160,14 +244,15 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Module("zeitschiene"), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal(new[] { "etb", "files" }, Keys(specs).Take(2));
+        Assert.Equal("etb", Keys(specs)[0]);
+        Assert.Contains("files", Keys(specs));
         Assert.DoesNotContain("zeitschiene", Keys(specs));
     }
 
     // A layout saved by an older build cannot mention a module added since. Without this, that
     // module would be invisible forever to everyone who ever touched the Navigation list.
     [Fact]
-    public void A_module_the_layout_predates_is_appended_rather_than_lost()
+    public void A_module_the_layout_predates_is_added_rather_than_lost()
     {
         var specs = NavigationLayout.Resolve(
             new[] { Module(NavModules.Etb), Module(NavModules.Files) },
@@ -193,7 +278,11 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Checklist(Nachbereitung), Module(NavModules.Files) },
             new[] { List(Nachbereitung, "Nachbereitung") });
 
-        Assert.Equal(new[] { "etb", "checklist:Nachbereitung", "files" }, Keys(specs).Take(3));
+        // The modules the layout predates slot in behind their predecessors, so they land between
+        // the ETB and the list; the list keeps its place in front of Dateien.
+        var keys = Keys(specs);
+        Assert.Equal(keys.IndexOf("files") - 1, keys.IndexOf("checklist:Nachbereitung"));
+        Assert.True(keys.IndexOf("etb") < keys.IndexOf("checklist:Nachbereitung"));
     }
 
     [Fact]

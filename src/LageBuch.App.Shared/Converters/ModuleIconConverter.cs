@@ -49,6 +49,10 @@ public sealed class ModuleIconConverter : IValueConverter
     private const string ScbaPath =
         "M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z";
 
+    // Führung: an org chart — one box over a bar that branches into two.
+    private const string LeadershipPath =
+        "M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3z";
+
     // CO-Messung: a gauge.
     private const string CoPath =
         "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm1-13h-2v5.41l3.79 3.8 1.42-1.42L13 11.59V7z";
@@ -75,6 +79,7 @@ public sealed class ModuleIconConverter : IValueConverter
             NavModules.Forces => ForcesPath,
             NavModules.InvolvedParties => InvolvedPartiesPath,
             NavModules.Scba => ScbaPath,
+            NavModules.Leadership => LeadershipPath,
             NavModules.Co => CoPath,
             NavModules.Files => FilesPath,
             NavModules.Links => LinksPath,

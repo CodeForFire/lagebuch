@@ -74,12 +74,13 @@ public class WorkspaceShortcutTests
     [Fact]
     public void Ctrl_digit_opens_the_rail_entry_at_that_position()
     {
-        var navigation = new[]
-        {
-            new NavEntry(NavModules.Forces, null, true),
-            new NavEntry(NavModules.Etb, null, true),
-            new NavEntry(NavModules.Scba, null, true),
-        };
+        // Every module is named, so no missing one is slotted in behind its default predecessor
+        // and shifts the positions this test counts.
+        var leading = new[] { NavModules.Forces, NavModules.Etb, NavModules.Scba };
+        var navigation = leading
+            .Concat(NavModules.All.Except(leading))
+            .Select(key => new NavEntry(key, null, true))
+            .ToList();
         var (vm, _, _) = Workspace(navigation);
         var focusRequests = 0;
         vm.ModuleFocusRequested += (_, _) => focusRequests++;
@@ -93,23 +94,42 @@ public class WorkspaceShortcutTests
     }
 
     [Fact]
+    public void Ctrl_8_opens_Fuehrung_and_Ctrl_1_to_7_keep_their_modules()
+    {
+        var (vm, _, _) = Workspace();
+
+        string[] expected =
+        [
+            "AUFBAU", "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE", "BETEILIGTE", "ATEMSCHUTZ",
+            "FÜHRUNG", "CO-MESSUNG",
+        ];
+        for (var i = 0; i < expected.Length; i++)
+        {
+            Assert.True(vm.TryRunShortcut(Ctrl(Digits[i])));
+            Assert.Equal(expected[i], Selected(vm));
+        }
+    }
+
+    [Fact]
     public void Rail_hints_number_the_shown_entries_in_order_without_a_gap_for_a_hidden_one()
     {
-        var navigation = new[]
-        {
-            new NavEntry(NavModules.Forces, null, true),
-            new NavEntry(NavModules.Tasks, null, false),
-            new NavEntry(NavModules.Etb, null, true),
-        };
+        // Every module is named, so none is slotted in behind its default predecessor and shifts
+        // the positions this test counts.
+        var leading = new[] { NavModules.Forces, NavModules.Tasks, NavModules.Etb };
+        var navigation = leading
+            .Concat(NavModules.All.Except(leading))
+            .Select(key => new NavEntry(key, null, key != NavModules.Tasks))
+            .ToList();
         var (vm, _, _) = Workspace(navigation);
 
-        // The Einsatz's own Checklisten follow, then the modules the layout never mentioned.
+        // The Einsatz's own Checklisten follow the modules the layout names.
         Assert.Equal(
             Enumerable.Range(0, vm.NavItems.Count).Select(i => i < 10 ? $"Strg+{(i + 1) % 10}" : null),
             vm.NavItems.Select(item => item.ShortcutHint));
         Assert.Equal("Strg+2", vm.NavItems.Single(item => item.ModuleKey == NavModules.Etb).ShortcutHint);
-        Assert.True(vm.NavItems[2].IsChecklist);
-        Assert.Equal("Strg+3", vm.NavItems[2].ShortcutHint);
+        Assert.DoesNotContain(vm.NavItems, item => item.ModuleKey == NavModules.Tasks);
+        Assert.True(vm.NavItems[^1].IsChecklist);
+        Assert.True(vm.NavItems[^2].IsChecklist);
     }
 
     [Fact]

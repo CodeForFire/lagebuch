@@ -284,9 +284,68 @@ public class MasterDataChecklistEditingTests
 
         var rows = Nav(Vm(set)).Rows;
 
-        Assert.Equal(NavModules.Files, rows[0].ModuleKey);
-        Assert.Equal(NavModules.Etb, rows[1].ModuleKey);
+        // Links and Kontakte, which the layout predates, follow Dateien; the rest follow the ETB.
+        var keys = rows.Select(r => r.ModuleKey).ToList();
+        Assert.Equal(NavModules.Files, keys[0]);
+        Assert.Equal(
+            new[] { NavModules.Files, NavModules.Links, NavModules.Contacts, NavModules.Etb },
+            keys.Take(4));
         Assert.Equal(NavModules.All.Count, rows.Count);
+    }
+
+    [Fact]
+    public void A_layout_without_leadership_lists_it_right_after_atemschutz_and_visible()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Navigation = NavModules.All
+                .Where(k => !string.Equals(k, NavModules.Leadership, StringComparison.Ordinal))
+                .Select(k => new NavEntry(k, null, true))
+                .ToList(),
+        };
+
+        var rows = Nav(Vm(set)).Rows.ToList();
+
+        var scba = rows.FindIndex(r => r.ModuleKey == NavModules.Scba);
+        Assert.Equal(NavModules.Leadership, rows[scba + 1].ModuleKey);
+        Assert.True(rows[scba + 1].IsVisible);
+        Assert.Equal("Führung", rows[scba + 1].Label);
+    }
+
+    [Fact]
+    public void Leadership_follows_atemschutz_even_when_atemschutz_is_switched_off_in_the_editor()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Navigation = new[]
+            {
+                new NavEntry(NavModules.Etb, null, true),
+                new NavEntry(NavModules.Scba, null, false),
+                new NavEntry(NavModules.Files, null, true),
+            },
+        };
+
+        var rows = Nav(Vm(set)).Rows.ToList();
+
+        var scba = rows.FindIndex(r => r.ModuleKey == NavModules.Scba);
+        Assert.False(rows[scba].IsVisible);
+        Assert.Equal(NavModules.Leadership, rows[scba + 1].ModuleKey);
+        Assert.True(rows[scba + 1].IsVisible);
+    }
+
+    [Fact]
+    public void A_layout_lacking_every_predecessor_lists_the_missing_module_at_the_end()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Navigation = new[] { new NavEntry(NavModules.Co, null, true), new NavEntry(NavModules.Files, null, true) },
+        };
+
+        var rows = Nav(Vm(set)).Rows;
+
+        var keys = rows.Select(r => r.ModuleKey).ToList();
+        Assert.True(keys.IndexOf(NavModules.Etb) > keys.IndexOf(NavModules.Co));
+        Assert.True(keys.IndexOf(NavModules.Etb) > keys.IndexOf(NavModules.Files));
     }
 
     [Fact]

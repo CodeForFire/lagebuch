@@ -29,7 +29,10 @@ public static class NavigationLayout
         ArgumentNullException.ThrowIfNull(incidentLists);
 
         var effective = layout.Count == 0 ? NavLayout.Default : layout;
-        var result = new List<NavItemSpec>(effective.Count);
+
+        // Hidden modules keep a slot (Spec null) so a module the layout predates can still be placed
+        // after its predecessor when that predecessor was switched off.
+        var slots = new List<Slot>(effective.Count);
         var seenLists = new HashSet<Guid>();
         var seenModules = new HashSet<string>(StringComparer.Ordinal);
 
@@ -48,7 +51,7 @@ public static class NavigationLayout
                 var list = incidentLists.FirstOrDefault(l => l.Id == entry.ChecklistId!.Value);
                 if (list is not null && entry.IsVisible)
                 {
-                    result.Add(new NavItemSpec(NavModules.Checklist, list));
+                    slots.Add(new Slot(NavModules.Checklist, new NavItemSpec(NavModules.Checklist, list)));
                 }
 
                 continue;
@@ -63,10 +66,9 @@ public static class NavigationLayout
             // The ETB is the legal record and where every system entry lands, so its flag is
             // ignored rather than trusted -- the editor disables the toggle, but a hand-edited
             // JSON can still say false.
-            if (entry.IsVisible || IsEtb(entry.ModuleKey))
-            {
-                result.Add(new NavItemSpec(entry.ModuleKey, null));
-            }
+            slots.Add(new Slot(
+                entry.ModuleKey,
+                entry.IsVisible || IsEtb(entry.ModuleKey) ? new NavItemSpec(entry.ModuleKey, null) : null));
         }
 
         // Anything this Einsatz holds that the layout never mentioned goes at the end, in the
@@ -74,16 +76,16 @@ public static class NavigationLayout
         // including one created after it was closed, or deleted from Stammdaten since.
         foreach (var list in incidentLists.Where(l => !seenLists.Contains(l.Id)))
         {
-            result.Add(new NavItemSpec(NavModules.Checklist, list));
+            slots.Add(new Slot(NavModules.Checklist, new NavItemSpec(NavModules.Checklist, list)));
         }
 
         // Same idea for a module this build has but the stored layout predates: without it, a
         // module added in a later release would stay invisible to everyone who ever saved a
-        // layout.
-        foreach (var key in NavModules.All.Where(k => !seenModules.Contains(k)))
-        {
-            result.Add(new NavItemSpec(key, null));
-        }
+        // layout. It lands after its predecessor in the default rail, not at the end.
+        InsertMissingModules(
+            slots, s => s.Key, k => new Slot(k, new NavItemSpec(k, null)), seenModules);
+
+        var result = slots.Where(s => s.Spec is not null).Select(s => s.Spec!).ToList();
 
         // Unreachable while NavModules.All contains the ETB -- the pass above already appends it
         // when a layout omits it. Kept as the one place the "the ETB is always in the rail"
@@ -95,6 +97,53 @@ public static class NavigationLayout
 
         return result;
     }
+
+    /// <summary>
+    /// Inserts every built-in module <paramref name="seen"/> lacks after the nearest preceding
+    /// module of <see cref="NavLayout.Default"/> that <paramref name="items"/> holds — switched-off
+    /// ones included, so the position does not depend on a toggle — and appends it when none is
+    /// there. Several missing modules keep their default relative order. Shared with the Stammdaten
+    /// editor's Navigation list, so editor and rail cannot disagree.
+    /// </summary>
+    internal static void InsertMissingModules<T>(
+        List<T> items,
+        Func<T, string?> moduleKeyOf,
+        Func<string, T> create,
+        IReadOnlySet<string> seen)
+    {
+        var defaults = NavLayout.Default
+            .Where(e => !e.IsChecklist)
+            .Select(e => e.ModuleKey)
+            .Concat(NavModules.All)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        for (var i = 0; i < defaults.Count; i++)
+        {
+            var key = defaults[i];
+            if (seen.Contains(key))
+            {
+                continue;
+            }
+
+            var at = items.Count;
+            for (var p = i - 1; p >= 0; p--)
+            {
+                var predecessor = defaults[p];
+                var index = items.FindIndex(
+                    item => string.Equals(moduleKeyOf(item), predecessor, StringComparison.Ordinal));
+                if (index >= 0)
+                {
+                    at = index + 1;
+                    break;
+                }
+            }
+
+            items.Insert(at, create(key));
+        }
+    }
+
+    private sealed record Slot(string Key, NavItemSpec? Spec);
 
     private static bool IsEtb(string key) => string.Equals(key, NavModules.Etb, StringComparison.Ordinal);
 }

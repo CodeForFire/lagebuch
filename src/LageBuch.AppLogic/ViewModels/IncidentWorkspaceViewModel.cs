@@ -426,7 +426,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
+        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Leadership, CoMessprotokoll, Files, Links, Contacts];
         return modules.OfType<INarrowAware>();
     }
 
@@ -494,6 +494,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public ForcesViewModel Forces { get; private set; } = null!;
 
     public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
+
+    public LeadershipViewModel Leadership { get; private set; } = null!;
 
     public ScbaViewModel Scba { get; private set; } = null!;
 
@@ -881,6 +883,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Roles?.Dispose();
         Forces?.Dispose();
         InvolvedParties?.Dispose();
+        Leadership?.Dispose();
         if (Scba is not null)
         {
             // Not covered by Dispose: the workspace owns this subscription, and an outgoing
@@ -937,6 +940,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirm);
 
+        Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged);
+
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnHeaderSourceChanged;
@@ -985,6 +990,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(InvolvedParties));
+        OnPropertyChanged(nameof(Leadership));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
@@ -1015,6 +1021,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Forces] = Forces,
             [NavModules.InvolvedParties] = InvolvedParties,
             [NavModules.Scba] = Scba,
+            [NavModules.Leadership] = Leadership,
             [NavModules.Co] = CoMessprotokoll,
             [NavModules.Files] = Files,
             [NavModules.Links] = Links,
