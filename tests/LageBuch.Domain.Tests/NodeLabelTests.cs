@@ -38,11 +38,27 @@ public class NodeLabelTests
     }
 
     [Fact]
-    public void An_Unterabschnitt_with_a_missing_parent_keeps_its_bare_name()
+    public void A_dissolved_parent_Abschnitt_still_prefixes_its_Unterabschnitt()
+    {
+        var parent = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, T0);
+        var sub = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Unterabschnitt, "Dach", parent.Id, null, null, null, null, null, null);
+
+        Assert.Equal("Nord / Dach", Rehydrated(parent, sub).NodeLabel(sub.Id));
+    }
+
+    [Fact]
+    public void A_repaired_orphan_Unterabschnitt_is_labelled_as_an_Abschnitt()
     {
         var sub = CommandNode.Rehydrate(
             Guid.NewGuid(), CommandNodeKind.Unterabschnitt, "Dach", Guid.NewGuid(), null, null, null, null, null, null);
-        var incident = Incident.Rehydrate(
+
+        Assert.Equal("Dach", Rehydrated(sub).NodeLabel(sub.Id));
+    }
+
+    private static Incident Rehydrated(params CommandNode[] nodes)
+        => Incident.Rehydrate(
             Guid.NewGuid(),
             T0,
             IncidentState.Open,
@@ -65,10 +81,7 @@ public class NodeLabelTests
             Array.Empty<CoMeasurement.Building>(),
             Array.Empty<CoMeasurement.Dwelling>(),
             Array.Empty<Involved.InvolvedParty>(),
-            commandNodes: new[] { sub });
-
-        Assert.Equal("Dach", incident.NodeLabel(sub.Id));
-    }
+            commandNodes: nodes);
 
     [Fact]
     public void A_dissolved_node_is_still_labelled()

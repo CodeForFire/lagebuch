@@ -224,6 +224,25 @@ public class ReportingLineTests
     }
 
     [Fact]
+    public void A_live_Unterabschnitt_under_a_dissolved_Abschnitt_stands_alone_with_its_unit_and_Leiter()
+    {
+        var parent = Node(CommandNodeKind.Abschnitt, "Nord", T0);
+        var sub = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Unterabschnitt, "Dach", parent.Id, null, null, null, null, null, null);
+        var unit = ForceUnit.Rehydrate(Guid.NewGuid(), "Aich", null, 6, 0, null, null, 0, nodeId: sub.Id);
+        var leiter = RoleAssignment.Create("UAL", "Huber", nodeId: sub.Id, slot: RoleSlot.Leiter);
+        var incident = Rehydrated([parent, sub], roles: [leiter], forces: [unit]);
+
+        var entry = ReportingLine.Of(incident).Single(e => e.Node?.Id == sub.Id);
+
+        Assert.Equal(1, entry.Depth);
+        Assert.Equal(ReportingEntryKind.Unterabschnitt, entry.Kind);
+        Assert.Equal(leiter, entry.Leiter);
+        Assert.Equal(unit, Assert.Single(entry.Units));
+        Assert.Empty(ReportingLine.UnplacedUnits(incident));
+    }
+
+    [Fact]
     public void Free_text_sections_group_spellings_and_keep_first_appearance_order()
     {
         var incident = NewIncident();

@@ -197,6 +197,49 @@ public class FuehrungAdvisorTests
     }
 
     [Fact]
+    public void Partner_and_Unterabschnitt_nodes_raise_no_unit_hint()
+    {
+        var incident = WithShape(abschnitte: 1, partner: 1, units: 6);
+        var abschnitt = incident.CommandNodes[0];
+        var sub = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Dach", abschnitt.Id);
+        foreach (var unit in incident.Forces.ToList())
+        {
+            incident.MoveForceUnit(Clock, Op, unit.Id, sub.Id);
+        }
+
+        Assert.Empty(FuehrungsspanneHints.For(incident));
+
+        // A Partner cannot hold units through the aggregate; a foreign file can.
+        var partnerNode = incident.CommandNodes.Single(n => n.Kind == CommandNodeKind.Partner);
+        var foreign = Incident.Rehydrate(
+            Guid.NewGuid(),
+            T0,
+            IncidentState.Open,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Array.Empty<LageBuch.Domain.ChecklistList>(),
+            Array.Empty<LageBuch.Domain.Etb.EtbEntry>(),
+            Array.Empty<RoleAssignment>(),
+            Enumerable.Range(0, 6).Select(i => ForceUnit.Rehydrate(Guid.NewGuid(), $"FF {i}", null, 3, 0, null, null, 0, nodeId: partnerNode.Id)).ToList(),
+            Array.Empty<LageBuch.Domain.Atemschutz.AtemschutzTrupp>(),
+            Array.Empty<AuditEvent>(),
+            Array.Empty<LageBuch.Domain.Time.IncidentTimerState>(),
+            Array.Empty<LageBuch.Domain.Files.IncidentFile>(),
+            Array.Empty<LageBuch.Domain.Tasks.IncidentTask>(),
+            Array.Empty<LageBuch.Domain.CoMeasurement.Building>(),
+            Array.Empty<LageBuch.Domain.CoMeasurement.Dwelling>(),
+            Array.Empty<LageBuch.Domain.Involved.InvolvedParty>(),
+            commandNodes: [partnerNode]);
+
+        Assert.Empty(FuehrungsspanneHints.For(foreign));
+    }
+
+    [Fact]
     public void Fachberater_suggestions_follow_FwDV_100_Anlage_3()
     {
         Assert.Equal(15, FachberaterSuggestions.Roles.Count);

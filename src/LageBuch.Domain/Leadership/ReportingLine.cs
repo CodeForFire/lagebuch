@@ -36,6 +36,14 @@ public static class ReportingLine
             }
         }
 
+        // A live Unterabschnitt under a dissolved Abschnitt (the repair keeps it) would otherwise show
+        // nowhere, taking its units and Funktionen with it; it stands on its own one level down.
+        foreach (var orphan in live.Where(n => n.Kind == CommandNodeKind.Unterabschnitt
+            && !live.Exists(p => p.Kind == CommandNodeKind.Abschnitt && p.Id == n.ParentId)))
+        {
+            entries.Add(NodeEntry(1, orphan, running, incident));
+        }
+
         foreach (var partner in live.Where(n => n.Kind == CommandNodeKind.Partner))
         {
             entries.Add(NodeEntry(0, partner, running, incident));

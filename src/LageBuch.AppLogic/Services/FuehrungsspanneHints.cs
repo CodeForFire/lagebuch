@@ -19,7 +19,7 @@ public static class FuehrungsspanneHints
             hints.Add(new SpanHint(null, "FwDV 100: höchstens 5 Einsatzabschnitte"));
         }
 
-        foreach (var node in live)
+        foreach (var node in live.Where(n => n.Kind is CommandNodeKind.Abschnitt or CommandNodeKind.Bereitstellung))
         {
             if (incident.Forces.Count(u => u.NodeId == node.Id) > MaxSpan)
             {
