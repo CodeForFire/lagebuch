@@ -125,6 +125,21 @@ public class LeadershipBoardDialogTests
         Assert.False(vm.Sections.Single().AddUnterabschnittCommand.CanExecute(null));
         Assert.False(vm.Partners.Single().AddUnterabschnittCommand.CanExecute(null));
         Assert.True(vm.Sections.Single().EditCommand.CanExecute(null));
+        Assert.False(vm.Sections.Single().IsAbschnitt);
+        Assert.False(vm.Partners.Single().IsAbschnitt);
+    }
+
+    [Fact]
+    public void An_Abschnitt_card_says_it_is_one_so_the_board_offers_the_Unterabschnitt()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
+        AddNode(session, CommandNodeKind.Unterabschnitt, "Dach", nord);
+        using var vm = NewVmOpening(session, []);
+
+        var card = vm.Sections.Single();
+        Assert.True(card.IsAbschnitt);
+        Assert.False(card.Children.Single().IsAbschnitt);
     }
 
     [Fact]

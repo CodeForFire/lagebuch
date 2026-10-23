@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
@@ -42,6 +43,17 @@ public class RolesTabRenderTests
         Roles = new[] { new Role(AnonymizedExampleData.RoleExample), new Role("ZF") },
         Vehicles = AnonymizedExampleData.Vehicles,
     };
+
+    // Next to the FÜHRUNG tab, "FÜHRUNG & FUNKTIONEN" read as a second Führung board.
+    [AvaloniaFact]
+    public void The_funktionen_view_is_titled_funktionen_alone()
+    {
+        var (window, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "FUNKTIONEN");
+
+        var view = WorkspaceRenderHelper.SelectedTabContent(window).GetVisualDescendants().OfType<RolesView>().Single();
+        Assert.Equal("FUNKTIONEN", view.GetControl<TextBlock>("RolesTitle").Text);
+    }
 
     [AvaloniaFact]
     public void Funktionen_tab_shows_a_running_assignment()

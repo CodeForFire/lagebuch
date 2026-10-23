@@ -1,18 +1,546 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.LeadershipView"
              x:DataType="vm:LeadershipViewModel">
-  <!-- Placeholder until the Führungsorganisation board replaces it. -->
-  <StackPanel>
-    <TextBlock x:Name="LeadershipTitle" Text="FÜHRUNG" Classes="overline" Margin="0,0,0,14" />
-    <TextBlock x:Name="LeadershipPlaceholder" Text="Die Führungsorganisation erscheint hier."
-               Foreground="{StaticResource TextMutedBrush}" />
-    <!-- Until the board's own add buttons land, the one way to reach the Abschnitt dialog. -->
-    <Button x:Name="LeadershipAddAbschnittButton" Content="ABSCHNITT BILDEN" Classes="signal"
-            HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding AddAbschnittCommand}" />
-    <!-- Likewise for the person dialog, until the Einsatzleitung card carries its own. -->
-    <Button x:Name="LeadershipSetElButton" Content="EINSATZLEITER FESTLEGEN"
-            HorizontalAlignment="Left" Margin="0,10,0,0" Command="{Binding El.SetLeiterCommand}" />
-  </StackPanel>
+  <!-- The FÜHRUNG board: the A3 Führungs-sheet crews keep next to the laptop, live. The
+       Einsatzleitung on top with the partner Einsatzleitungen and Fachberater beside it, a card per
+       Bereitstellung and Abschnitt below (Unterabschnitte nested), then the units nobody has placed.
+       Every decision is the view model's; the code-behind only carries drag and drop. -->
+  <UserControl.Styles>
+    <!-- Panels and widths are Styles, never attributes: a local value outranks a Style setter, so the
+         narrow styles below could not turn the rows into one full-width column (#685). A plain
+         WrapPanel with an ItemWidth, not EqualWidthWrapPanel: that one gives every card the height
+         of the tallest and stretches a lone card across the row. -->
+    <Style Selector="ItemsControl.board-wrap">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <WrapPanel Orientation="Horizontal" ItemWidth="300" ItemSpacing="12" LineSpacing="12" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <!-- The top row holds cards of three kinds, so it wraps cards that size themselves. -->
+    <Style Selector="ItemsControl.board-top">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="12" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ItemsControl.board-row">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="12" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ItemsControl.board-chips">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <WrapPanel Orientation="Horizontal" ItemWidth="260" ItemSpacing="8" LineSpacing="8" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Border.top-card">
+      <Setter Property="Width" Value="300" />
+    </Style>
+    <Style Selector="Border#ElCard">
+      <Setter Property="Width" Value="340" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+    </Style>
+    <Style Selector="ItemsControl#PartnerCards ContentPresenter > Border.board-card">
+      <Setter Property="Width" Value="300" />
+    </Style>
+
+    <Style Selector="Border.board-card">
+      <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <!-- An Unterabschnitt sits inside its Abschnitt's card, set in a little and a shade lighter. -->
+    <Style Selector="Border.board-card Border.board-card">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="Margin" Value="8,0,0,0" />
+      <Setter Property="Padding" Value="10,8" />
+    </Style>
+    <!-- The card a dragged unit would land in, set by the code-behind during a drag. -->
+    <Style Selector="Border.board-card.drop-target">
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
+    </Style>
+    <Style Selector="Border#UnplacedStrip.drop-target">
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.card-name">
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.field-label">
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="1.5" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- What a card or a Funktion is, in the words it was recorded with: mixed case, so no tracking. -->
+    <Style Selector="TextBlock.card-kind">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.unit-title">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <!-- The picker's label at the size of the row around it, not the global TextBlock's 14. -->
+    <Style Selector="ctrl|NodeChoicePicker TextBlock">
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.field-value">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.board-hint">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <!-- The Vorschlag reads quiet while it matches the Stufe set, amber when it does not. -->
+    <Style Selector="TextBlock#StufeSuggestionText">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock#StufeSuggestionText.mismatch">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+
+    <Style Selector="Button.board-action">
+      <Setter Property="Height" Value="26" />
+      <Setter Property="Padding" Value="9,0" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="Border.unit-grip">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Cursor" Value="SizeAll" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- A closed Einsatz is a record: nothing to pick up. -->
+    <Style Selector="Border.unit-grip:disabled">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.unit-chip">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="Padding" Value="8,6" />
+    </Style>
+
+    <!-- The phone: one full-width column, no grips (a touch drag scrolls; the picker moves a unit),
+         and thumb-sized actions. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl.board-wrap">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="12" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl.board-top">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="12" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl.board-row">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="12" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl.board-chips">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="8" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border.top-card">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#ElCard">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl#PartnerCards ContentPresenter > Border.board-card">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border.unit-grip">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.board-action">
+      <Setter Property="Height" Value="36" />
+      <Setter Property="Padding" Value="12,0" />
+    </Style>
+  </UserControl.Styles>
+
+  <UserControl.Resources>
+    <!-- One unit: on a card a row of the units table, in the strip a chip. The grip starts a drag on
+         the desktop; the picker moves the unit anywhere, and is the phone's only way. -->
+    <DataTemplate x:Key="UnitRowTemplate" x:DataType="vm:BoardUnitRow">
+      <Grid RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="3">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" SharedSizeGroup="BoardStrength" />
+          <ColumnDefinition Width="Auto" SharedSizeGroup="BoardAgt" />
+        </Grid.ColumnDefinitions>
+        <Border Grid.Row="0" Grid.Column="0" Classes="unit-grip" x:Name="UnitGrip"
+                ToolTip.Tip="Ziehen, um die Einheit zu verschieben"
+                AutomationProperties.Name="Einheit verschieben">
+          <PathIcon Width="9" Height="14" Foreground="{StaticResource TextSecondaryBrush}"
+                    Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
+        </Border>
+        <TextBlock Grid.Row="0" Grid.Column="1" Classes="unit-title"
+                   Text="{Binding Title}" ToolTip.Tip="{Binding Brigade}" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
+                   Text="{Binding StrengthText}" ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt" />
+        <TextBlock Grid.Row="0" Grid.Column="3" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
+                   MinWidth="22" TextAlignment="Right"
+                   Text="{Binding ScbaCount}" ToolTip.Tip="davon Atemschutzgeräteträger" />
+        <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Classes="secondary" FontSize="11" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" Text="{Binding Brigade}"
+                     IsVisible="{Binding CallSign, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <ctrl:NodeChoicePicker Grid.Column="1" x:Name="UnitNodePicker" MinWidth="80" MaxWidth="150" Height="26"
+                                 Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}" />
+        </Grid>
+      </Grid>
+    </DataTemplate>
+
+    <!-- A Funktion on a card: what it is, then who holds it. -->
+    <DataTemplate x:Key="PersonRowTemplate" x:DataType="vm:BoardPersonRow">
+      <StackPanel Spacing="0">
+        <TextBlock Classes="card-kind" Text="{Binding Role}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Classes="field-value" Text="{Binding Text}" />
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <UserControl.DataTemplates>
+    <!-- A Bereitstellung, Abschnitt, Unterabschnitt or partner Einsatzleitung. Children use the same
+         template, so an Unterabschnitt card is drawn inside its Abschnitt's. -->
+    <DataTemplate DataType="vm:BoardNodeCard">
+      <Border Classes="board-card" x:Name="NodeCard">
+        <StackPanel Spacing="8">
+          <!-- Auflösen sits apart from the other actions, at the card's head: it ends the node. -->
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <StackPanel Grid.Column="0" Spacing="1">
+              <TextBlock Classes="card-kind" Text="{Binding KindLabel}" />
+              <TextBlock Classes="card-name" x:Name="NodeCardName" Text="{Binding Name}" />
+              <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap" Text="{Binding Auftrag}"
+                         IsVisible="{Binding Auftrag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                    IsVisible="{Binding Funkgruppe, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Grid.Column="0" Classes="field-label" Text="FUNKGRUPPE" />
+                <TextBlock Grid.Column="1" Classes="field-value" Text="{Binding Funkgruppe}" />
+              </Grid>
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                    IsVisible="{Binding Rufname, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Grid.Column="0" Classes="field-label" Text="RUFNAME" />
+                <TextBlock Grid.Column="1" Classes="field-value" Text="{Binding Rufname}" />
+              </Grid>
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                    IsVisible="{Binding Standort, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Grid.Column="0" Classes="field-label" Text="STANDORT" />
+                <TextBlock Grid.Column="1" Classes="field-value" Text="{Binding Standort}" />
+              </Grid>
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                    IsVisible="{Binding Telefon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Grid.Column="0" Classes="field-label" Text="TELEFON" />
+                <TextBlock Grid.Column="1" Classes="field-value" Text="{Binding Telefon}" />
+              </Grid>
+            </StackPanel>
+            <Button Grid.Column="1" Classes="board-action" Content="AUFLÖSEN" VerticalAlignment="Top"
+                    Command="{Binding DissolveCommand}"
+                    ToolTip.Tip="{Binding DissolveBlockedReason}" ToolTip.ShowOnDisabled="True" />
+          </Grid>
+
+
+          <Grid ColumnDefinitions="76,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="LEITER" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Classes="field-value"
+                       Text="{Binding Leiter.Text, FallbackValue='—', TargetNullValue='—'}" />
+            <Button Grid.Row="0" Grid.Column="2" Classes="board-action" Content="FESTLEGEN"
+                    ToolTip.Tip="Leiter festlegen" AutomationProperties.Name="Leiter festlegen"
+                    Command="{Binding SetLeiterCommand}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="field-label" Text="MELDER" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="field-value"
+                       Text="{Binding Melder.Text, FallbackValue='—', TargetNullValue='—'}" />
+            <Button Grid.Row="1" Grid.Column="2" Classes="board-action" Content="FESTLEGEN"
+                    ToolTip.Tip="Melder festlegen" AutomationProperties.Name="Melder festlegen"
+                    Command="{Binding SetMelderCommand}" />
+          </Grid>
+
+          <ItemsControl ItemsSource="{Binding Members}" ItemTemplate="{StaticResource PersonRowTemplate}"
+                        IsVisible="{Binding Members.Count}" />
+
+          <!-- The units table: the columns line up across rows only within one shared-size scope. -->
+          <StackPanel Spacing="5" Grid.IsSharedSizeScope="True" IsVisible="{Binding Units.Count}">
+            <Grid ColumnSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardStrength" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardAgt" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="1" Classes="field-label" Text="EINHEITEN" />
+              <TextBlock Grid.Column="2" Classes="field-label" Text="STÄRKE" HorizontalAlignment="Right"
+                         ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt" />
+              <TextBlock Grid.Column="3" Classes="field-label" Text="AGT" HorizontalAlignment="Right"
+                         ToolTip.Tip="Atemschutzgeräteträger" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Units}" ItemTemplate="{StaticResource UnitRowTemplate}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding Children}" IsVisible="{Binding Children.Count}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="8" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+
+          <TextBlock Classes="board-hint" Text="{Binding Hint}"
+                     IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+          <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
+            <Button Classes="board-action" Content="BEARBEITEN" Command="{Binding EditCommand}" />
+            <Button Classes="board-action" Content="+ UNTERABSCHNITT" IsVisible="{Binding IsAbschnitt}"
+                    ToolTip.Tip="Unterabschnitt bilden" Command="{Binding AddUnterabschnittCommand}" />
+            <Button Classes="board-action" Content="+ FUNKTION"
+                    ToolTip.Tip="Funktion hinzufügen" Command="{Binding AddMemberCommand}" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <ScrollViewer x:Name="BoardScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel x:Name="BoardRoot" Spacing="14" Background="Transparent"
+                IsEnabled="{Binding !IsReadOnly}" DragDrop.AllowDrop="{Binding !IsReadOnly}">
+      <TextBlock x:Name="LeadershipTitle" Text="FÜHRUNG" Classes="overline" />
+
+      <!-- Why the last board command was refused (a peer dissolved the node a moment ago). -->
+      <TextBlock x:Name="LeadershipActionError" Classes="field-error"
+                 Text="{Binding ActionError}"
+                 IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <!-- The Leitstelle the Einsatzleitung reports to, at the head of the sheet. -->
+      <Border x:Name="DispatchCentreBadge" HorizontalAlignment="Left" Background="{StaticResource SurfaceTopBrush}"
+              BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource RadiusSm}" Padding="12,4">
+        <TextBlock Classes="mono" Foreground="{StaticResource TextPrimaryBrush}" Text="{Binding DispatchCentreName}" />
+      </Border>
+
+      <ItemsControl Classes="board-top">
+        <!-- Einsatzleitung Feuerwehr. The Panel takes the card's DataContext, so the bindings inside
+             compile against ElCard. -->
+        <Panel DataContext="{Binding El}">
+        <Border x:Name="ElCard" Classes="board-card" x:DataType="vm:ElCard">
+          <StackPanel Spacing="9">
+            <StackPanel Spacing="1">
+              <TextBlock Classes="card-kind" Text="Einsatzleitung" />
+              <TextBlock Classes="card-name" Text="Feuerwehr" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
+              <TextBlock Grid.Column="0" Classes="field-label" Text="EINSATZLEITER" />
+              <TextBlock Grid.Column="1" Classes="field-value" x:Name="ElLeiterText"
+                         Text="{Binding Leiter.Text, FallbackValue='—', TargetNullValue='—'}" />
+              <Button Grid.Column="2" x:Name="LeadershipSetElButton" Classes="board-action" Content="FESTLEGEN"
+                      ToolTip.Tip="Einsatzleiter festlegen" AutomationProperties.Name="Einsatzleiter festlegen"
+                      Command="{Binding SetLeiterCommand}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
+              <TextBlock Grid.Column="0" Classes="field-label" Text="ASSISTENZ" VerticalAlignment="Top" Margin="0,4,0,0" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <TextBlock Classes="field-value" Text="—"
+                           IsVisible="{Binding !Assistants.Count}" />
+                <ItemsControl ItemsSource="{Binding Assistants}" ItemTemplate="{StaticResource PersonRowTemplate}" />
+              </StackPanel>
+              <Button Grid.Column="2" Classes="board-action" Content="+ ASSISTENZ" VerticalAlignment="Top"
+                      ToolTip.Tip="Führungsassistenz hinzufügen" Command="{Binding AddAssistantCommand}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2" ColumnSpacing="6">
+              <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="STANDORT" />
+              <TextBlock Grid.Row="0" Grid.Column="1" Classes="field-value" Text="{Binding Standort, TargetNullValue='—'}" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Classes="field-label" Text="RUFNAME" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Classes="field-value" Text="{Binding Rufname, TargetNullValue='—'}" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Classes="field-label" Text="TELEFON" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Classes="field-value" Text="{Binding Telefon, TargetNullValue='—'}" />
+              <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="FUNKGRUPPE" />
+              <TextBlock Grid.Row="3" Grid.Column="1" Classes="field-value" Text="{Binding Funkgruppe, TargetNullValue='—'}" />
+            </Grid>
+
+            <!-- The Führungsstufe: a flyout of commands, the NodeChoicePicker idiom, closed on select. -->
+            <StackPanel Spacing="4">
+              <Grid ColumnDefinitions="96,*" ColumnSpacing="6">
+                <TextBlock Grid.Column="0" Classes="field-label" Text="FÜHRUNGSSTUFE" />
+                <Button Grid.Column="1" x:Name="StufeButton" HorizontalAlignment="Left" Height="28" Padding="10,0"
+                        ToolTip.Tip="Führungsstufe wählen" AutomationProperties.Name="Führungsstufe wählen">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock x:Name="StufeText" Text="{Binding StufeText}" FontSize="13" VerticalAlignment="Center" />
+                    <PathIcon Width="9" Height="9" Foreground="{StaticResource TextSecondaryBrush}"
+                              Data="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" />
+                  </StackPanel>
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                      <ItemsControl ItemsSource="{Binding StufeChoices}" MinWidth="150">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:StufeChoice">
+                            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Padding="8,5" Command="{Binding SelectCommand}" Click="OnStufeChoiceClick">
+                              <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                                <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" />
+                              </Grid>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+              </Grid>
+              <TextBlock x:Name="StufeSuggestionText" Text="{Binding SuggestionText}"
+                         Classes.mismatch="{Binding !MatchesSuggestion}" />
+            </StackPanel>
+
+            <Button Classes="board-action" HorizontalAlignment="Left" Content="ERREICHBARKEIT BEARBEITEN"
+                    ToolTip.Tip="Standort, Rufname, Telefon und Funkgruppe bearbeiten"
+                    Command="{Binding EditPostCommand}" />
+          </StackPanel>
+        </Border>
+        </Panel>
+
+        <!-- The partner organisations' Einsatzleitungen -->
+        <ItemsControl x:Name="PartnerCards" Classes="board-row" ItemsSource="{Binding Partners}"
+                      IsVisible="{Binding HasPartners}" />
+
+        <Border x:Name="FachberaterCard" Classes="board-card top-card" IsVisible="{Binding HasFachberater}">
+          <StackPanel Spacing="8">
+            <StackPanel Spacing="1">
+              <TextBlock Classes="card-kind" Text="Beratung" />
+              <TextBlock Classes="card-name" Text="Fachberater" />
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding Fachberater}" ItemTemplate="{StaticResource PersonRowTemplate}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="6" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </ItemsControl>
+
+      <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+        <Button x:Name="AddRettungsdienstButton" Classes="board-action" Content="+ RETTUNGSDIENST"
+                ToolTip.Tip="Einsatzleitung Rettungsdienst bilden"
+                Command="{Binding AddPartnerCommand}" CommandParameter="Rettungsdienst" />
+        <Button x:Name="AddPolizeiButton" Classes="board-action" Content="+ POLIZEI"
+                ToolTip.Tip="Einsatzleitung Polizei bilden"
+                Command="{Binding AddPartnerCommand}" CommandParameter="Polizei" />
+        <Button x:Name="AddPartnerButton" Classes="board-action" Content="+ WEITERE"
+                ToolTip.Tip="Einsatzleitung einer weiteren Organisation bilden"
+                Command="{Binding AddPartnerCommand}" />
+        <Button x:Name="AddFachberaterButton" Classes="board-action" Content="+ FACHBERATER"
+                ToolTip.Tip="Fachberater hinzufügen" Command="{Binding AddFachberaterCommand}" />
+      </WrapPanel>
+
+      <ItemsControl x:Name="EinsatzleitungHints" ItemsSource="{Binding Hints}" IsVisible="{Binding Hints.Count}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Classes="board-hint" Text="{Binding}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <Border Height="1" Background="{StaticResource HairlineBrush}" Margin="0,2" />
+
+      <!-- Bereitstellungen and Abschnitte, Unterabschnitte inside their Abschnitt. -->
+      <ItemsControl x:Name="SectionCards" Classes="board-wrap" ItemsSource="{Binding Sections}"
+                    IsVisible="{Binding Sections.Count}" />
+
+      <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+        <Button x:Name="LeadershipAddAbschnittButton" Classes="signal board-action" Content="+ ABSCHNITT"
+                ToolTip.Tip="Abschnitt bilden" Command="{Binding AddAbschnittCommand}" />
+        <Button x:Name="AddBereitstellungButton" Classes="board-action" Content="+ BEREITSTELLUNG"
+                ToolTip.Tip="Bereitstellungsraum bilden" Command="{Binding AddBereitstellungCommand}" />
+      </WrapPanel>
+
+      <!-- The units nobody has placed; also where a dragged unit goes to be taken out of its Abschnitt. -->
+      <Border x:Name="UnplacedStrip" Classes="board-card">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.Or}">
+            <Binding Path="HasUnplacedUnits" />
+            <Binding Path="IsDraggingUnit" />
+          </MultiBinding>
+        </Border.IsVisible>
+        <StackPanel Spacing="8">
+          <TextBlock Classes="overline" FontSize="10" Text="NICHT ZUGEORDNET" />
+          <TextBlock Classes="secondary" FontSize="12" Text="Hier ablegen, um die Einheit aus ihrem Abschnitt zu nehmen."
+                     IsVisible="{Binding !HasUnplacedUnits}" />
+          <ItemsControl x:Name="UnplacedUnits" Classes="board-chips" ItemsSource="{Binding UnplacedUnits}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:BoardUnitRow">
+                <Border Classes="unit-chip" Grid.IsSharedSizeScope="True">
+                  <ContentControl Content="{Binding}" ContentTemplate="{StaticResource UnitRowTemplate}" />
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- Funktionen typed on FUNKTIONEN with a free-text Abschnitt: shown, so nobody disappears. -->
+      <ItemsControl x:Name="FreeTextSectionCards" Classes="board-wrap" ItemsSource="{Binding FreeTextSections}"
+                    IsVisible="{Binding HasFreeTextSections}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:FreeTextSectionCard">
+            <Border Classes="board-card">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="secondary" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Title}" />
+                <ItemsControl ItemsSource="{Binding People}" ItemTemplate="{StaticResource PersonRowTemplate}" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
 </UserControl>

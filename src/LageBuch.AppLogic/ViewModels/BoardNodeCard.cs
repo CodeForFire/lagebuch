@@ -60,6 +60,7 @@ public sealed partial class BoardNodeCard : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KindLabel))]
+    [NotifyPropertyChangedFor(nameof(IsAbschnitt))]
     private CommandNodeKind _kind;
 
     [ObservableProperty]
@@ -98,6 +99,9 @@ public sealed partial class BoardNodeCard : ObservableObject
     /// <summary>Why the node cannot be dissolved yet; null when it can, or on a read-only Einsatz.</summary>
     [ObservableProperty]
     private string? _dissolveBlockedReason;
+
+    /// <summary>Whether the card is an Abschnitt, the one kind that offers to form an Unterabschnitt.</summary>
+    public bool IsAbschnitt => Kind == CommandNodeKind.Abschnitt;
 
     /// <summary>What the card says the node is; a partner's node is an Einsatzleitung.</summary>
     public string KindLabel => LabelOf(Kind);

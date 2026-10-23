@@ -363,6 +363,33 @@ public class AutomationPropertiesTests
         Assert.Equal("Handynummer", Name(view.GetControl<TextBox>("PersonDialogPhoneBox")));
     }
 
+    // The Führung board: the drag grips and the pickers carry no text of their own.
+    [AvaloniaFact]
+    public void Every_textless_control_of_the_fuehrung_board_is_named_for_automation()
+    {
+        var session = DialogSession();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
+        var nord = session.Incident.CommandNodes[^1].Id;
+        session.AddCommandNode(CommandNodeKind.Unterabschnitt, "Dach", nord);
+        session.AddCommandNode(CommandNodeKind.Partner, "Polizei");
+        session.AddForceUnit("FF Emmering", 9, "Florian Emmering 40/1", officerCount: 1);
+        session.MoveForceUnit(session.Incident.Forces[^1].Id, nord);
+        session.AddForceUnit("FF Aich", 6, "Florian Aich 11/1");
+        session.AssignRole("Fachberater THW", "Peter Maier", slot: RoleSlot.Fachberater);
+        var vm = new LeadershipViewModel(session, new FixedClock(), MasterDataSet.Empty, () => { });
+        var view = new LeadershipView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1400, Height = 1000 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        AssertEveryTextlessControlIsNamed(view);
+        var grips = view.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("unit-grip")).ToList();
+        Assert.Equal(2, grips.Count);
+        Assert.All(grips, g => Assert.Equal("Einheit verschieben", Name(g)));
+        Assert.Equal("Führungsstufe wählen", Name(view.GetControl<Button>("StufeButton")));
+        Assert.Equal("Einsatzleiter festlegen", Name(view.GetControl<Button>("LeadershipSetElButton")));
+    }
+
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) Workspace(
         double width,
         double height,

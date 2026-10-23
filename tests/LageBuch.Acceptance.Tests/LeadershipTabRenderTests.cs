@@ -7,8 +7,8 @@ using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.Acceptance.Tests;
 
-// The FÜHRUNG tab sits behind ATEMSCHUTZ in the rail. Its board arrives later; until then the tab
-// renders a placeholder, and this pins that the module is wired into a live workspace.
+// The FÜHRUNG tab sits behind ATEMSCHUTZ in the rail; this pins that its board is wired into a live
+// workspace. The board itself is LeadershipBoardRenderTests'.
 public class LeadershipTabRenderTests
 {
     private static Window ShowWorkspace(double width = 1920, double height = 1032)
@@ -30,7 +30,7 @@ public class LeadershipTabRenderTests
     }
 
     [AvaloniaFact]
-    public void The_fuehrung_tab_renders_its_placeholder_for_the_open_incident()
+    public void The_fuehrung_tab_renders_the_board_for_the_open_incident()
     {
         var window = ShowWorkspace();
 
@@ -41,7 +41,8 @@ public class LeadershipTabRenderTests
         Assert.IsType<LeadershipViewModel>(view.DataContext);
         var texts = content.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("FÜHRUNG", texts);
-        Assert.Contains("Die Führungsorganisation erscheint hier.", texts);
+        Assert.Contains("Einsatzleitung", texts);
+        Assert.True(view.GetControl<Button>("LeadershipAddAbschnittButton").IsEffectivelyVisible);
     }
 
     [AvaloniaFact]
