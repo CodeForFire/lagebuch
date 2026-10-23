@@ -1167,7 +1167,16 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void EditRolePhone(Guid assignmentId, string? phone) => _inner.EditRolePhone(assignmentId, phone);
 
-    public void AddCommandNode(CommandNodeKind kind, string name, Guid? parentId = null) => _inner.AddCommandNode(kind, name, parentId);
+    public void AddCommandNode(
+        CommandNodeKind kind,
+        string name,
+        Guid? parentId = null,
+        string? auftrag = null,
+        string? standort = null,
+        string? funkgruppe = null,
+        string? rufname = null,
+        string? telefon = null) =>
+        _inner.AddCommandNode(kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon);
 
     public void UpdateCommandNode(
         Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>

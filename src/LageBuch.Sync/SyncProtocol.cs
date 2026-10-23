@@ -88,7 +88,9 @@ public static class SyncProtocol
     /// <c>nodeId</c> and <c>slot</c>. A snapshot carries <c>commandNodes</c>, <c>fuehrungsstufe</c>
     /// and the Einsatzleitung's post, its units and Funktionen carry <c>nodeId</c>, and the
     /// Stammdaten payload gains <c>talkGroups</c> and a role <c>slot</c>. A host at 13 would reject
-    /// the six commands, so the floor rises to 14.
+    /// the six commands, so the floor rises to 14. <c>addCommandNode</c> also carries the optional
+    /// <c>auftrag</c>, <c>standort</c>, <c>funkgruppe</c>, <c>rufname</c> and <c>telefon</c>, so an
+    /// Abschnitt is created with its details in one command.
     /// </para>
     /// </summary>
     public const int ProtocolVersion = 14;

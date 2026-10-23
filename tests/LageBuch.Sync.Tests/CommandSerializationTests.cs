@@ -261,6 +261,28 @@ public class CommandSerializationTests
     }
 
     [Fact]
+    public void Add_command_node_round_trips_its_details_and_reads_a_payload_without_them()
+    {
+        var json = SyncJson.Serialize<SyncCommand>(new AddCommandNodeCommand(
+            Op, CommandNodeKind.Abschnitt, "Nord", null, "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"));
+        var back = Assert.IsType<AddCommandNodeCommand>(SyncJson.Deserialize<SyncCommand>(json));
+        Assert.Equal("Brandbekämpfung", back.Auftrag);
+        Assert.Equal("Hauptstraße", back.Standort);
+        Assert.Equal("TG 2", back.Funkgruppe);
+        Assert.Equal("Florian Nord", back.Rufname);
+        Assert.Equal("0171", back.Telefon);
+
+        const string Old = "{\"$type\":\"addCommandNode\",\"operator\":{\"name\":\"Muster\",\"callSign\":\"FFB 1\"},\"kind\":\"Abschnitt\",\"name\":\"Nord\",\"parentId\":null}";
+        var old = Assert.IsType<AddCommandNodeCommand>(SyncJson.Deserialize<SyncCommand>(Old));
+        Assert.Equal("Nord", old.Name);
+        Assert.Null(old.Auftrag);
+        Assert.Null(old.Standort);
+        Assert.Null(old.Funkgruppe);
+        Assert.Null(old.Rufname);
+        Assert.Null(old.Telefon);
+    }
+
+    [Fact]
     public void Placement_commands_use_their_discriminators_and_enums_travel_by_name()
     {
         var json = SyncJson.Serialize<SyncCommand>(new AddCommandNodeCommand(Op, CommandNodeKind.Bereitstellung, "BR", null));

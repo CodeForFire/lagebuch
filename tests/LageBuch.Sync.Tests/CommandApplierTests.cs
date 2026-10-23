@@ -627,6 +627,29 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void Add_command_node_with_details_over_the_wire_creates_the_node_with_them_for_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var adder = new OperatorDto("Maier", "FFB 2");
+        var entries = incident.Journal.Count;
+
+        ApplyOverWire(
+            new AddCommandNodeCommand(adder, CommandNodeKind.Abschnitt, "Nord", null, "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"),
+            incident,
+            clock);
+
+        var node = Assert.Single(incident.CommandNodes);
+        Assert.Equal("Brandbekämpfung", node.Auftrag);
+        Assert.Equal("Hauptstraße", node.Standort);
+        Assert.Equal("TG 2", node.Funkgruppe);
+        Assert.Equal("Florian Nord", node.Rufname);
+        Assert.Equal("0171", node.Telefon);
+        Assert.Equal(entries + 3, incident.Journal.Count);
+        Assert.All(incident.Journal.Skip(entries), e => Assert.Equal("Maier (FFB 2)", e.EnteredBy));
+    }
+
+    [Fact]
     public void Abschnitt_commands_over_the_wire_form_update_move_and_dissolve_attributed_to_the_sender()
     {
         var clock = new FixedClock();

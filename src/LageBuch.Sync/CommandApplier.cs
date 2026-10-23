@@ -58,7 +58,17 @@ public static class CommandApplier
                 incident.EditRolePhone(clock, Operator(c.Operator), c.AssignmentId, c.Phone);
                 break;
             case AddCommandNodeCommand c:
-                incident.AddCommandNode(clock, Operator(c.Operator), c.Kind, c.Name, c.ParentId);
+                incident.AddCommandNode(
+                    clock,
+                    Operator(c.Operator),
+                    c.Kind,
+                    c.Name,
+                    c.ParentId,
+                    c.Auftrag,
+                    c.Standort,
+                    c.Funkgruppe,
+                    c.Rufname,
+                    c.Telefon);
                 break;
             case UpdateCommandNodeCommand c:
                 incident.UpdateCommandNode(clock, Operator(c.Operator), c.NodeId, c.Name, c.Auftrag, c.Standort, c.Funkgruppe, c.Rufname, c.Telefon);
