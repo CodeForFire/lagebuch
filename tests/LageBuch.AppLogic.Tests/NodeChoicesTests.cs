@@ -42,26 +42,18 @@ public class NodeChoicesTests
     public void Live_nodes_follow_in_reporting_order_with_their_labels()
     {
         var incident = NewIncident();
-        var abschnitt2 = Add(incident, CommandNodeKind.Abschnitt, "Abschnitt 2");
+        Add(incident, CommandNodeKind.Abschnitt, "Abschnitt 2");
         var abschnitt1 = Add(incident, CommandNodeKind.Abschnitt, "Abschnitt 1");
         var nord = Add(incident, CommandNodeKind.Unterabschnitt, "Nord", abschnitt1.Id);
-        var bereitstellung = Add(incident, CommandNodeKind.Bereitstellung, "Bereitstellung");
+        Add(incident, CommandNodeKind.Bereitstellung, "Bereitstellung");
 
         var choices = NodeChoices.Build(incident, nord.Id, _ => { });
 
-        var expectedOrder = ReportingLine.Of(incident)
-            .Where(e => e.Node is not null && e.Node.Kind != CommandNodeKind.Partner)
-            .Select(e => e.Node!.Id)
-            .ToList();
-        Assert.Equal(expectedOrder, choices.Skip(1).Select(c => c.NodeId!.Value));
         Assert.Equal(
-            new[] { NodeChoices.UnplacedLabel, "Bereitstellung", "Abschnitt 2", "Abschnitt 1", "Abschnitt 1 / Nord" }
-                .Order(StringComparer.Ordinal),
-            choices.Select(c => c.Label).Order(StringComparer.Ordinal));
+            new[] { NodeChoices.UnplacedLabel, "Abschnitt 2", "Abschnitt 1", "Abschnitt 1 / Nord", "Bereitstellung" },
+            choices.Select(c => c.Label));
         Assert.Equal("Abschnitt 1 / Nord", choices.Single(c => c.NodeId == nord.Id).Label);
         Assert.Equal(nord.Id, Assert.Single(choices, c => c.IsCurrent).NodeId);
-        Assert.Contains(choices, c => c.NodeId == abschnitt2.Id);
-        Assert.Contains(choices, c => c.NodeId == bereitstellung.Id);
     }
 
     [Fact]

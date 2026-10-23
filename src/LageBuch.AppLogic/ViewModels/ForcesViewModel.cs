@@ -57,6 +57,7 @@ public sealed partial class ForceRow : ObservableObject
         _onRemoved = onRemoved;
         _onMoved = onMoved;
         (NodeChoices, NodeLabel) = BuildNode(unit, incident);
+        _placedNodeId = PlacedNodeId(NodeChoices);
         Edits = unit.Edits;
         _syncedStrength = StrengthOf(unit);
         _zugfuehrerCount = unit.ZugfuehrerCount;
@@ -110,6 +111,7 @@ public sealed partial class ForceRow : ObservableObject
         if (!choices.Select(NodeKey).SequenceEqual(NodeChoices.Select(NodeKey)))
         {
             NodeChoices = choices;
+            _placedNodeId = PlacedNodeId(choices);
             OnPropertyChanged(nameof(NodeChoices));
         }
 
@@ -151,11 +153,12 @@ public sealed partial class ForceRow : ObservableObject
 
     private static (Guid? NodeId, string Label, bool IsCurrent) NodeKey(NodeChoice c) => (c.NodeId, c.Label, c.IsCurrent);
 
+    private static Guid? PlacedNodeId(IReadOnlyList<NodeChoice> choices) => choices.First(c => c.IsCurrent).NodeId;
+
     private (IReadOnlyList<NodeChoice> Choices, string Label) BuildNode(Domain.ForceUnit unit, Domain.Incident incident)
     {
         var choices = ViewModels.NodeChoices.Build(incident, unit.NodeId, MoveTo);
-        var placed = choices.First(c => c.IsCurrent).NodeId;
-        _placedNodeId = placed;
+        var placed = PlacedNodeId(choices);
         return (choices, Domain.Formatting.OrDash(incident.NodeLabel(placed)));
     }
 

@@ -3,6 +3,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -34,7 +35,7 @@ public class ForcesAbschnittPickerTests
         session.Incident.AddForceUnit(clock, op, "FF Aich", 7, "Florian Aich 42/1", "Auf Anfahrt");
         var abschnitt = session.Incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Abschnitt 1");
         var nord = session.Incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord", abschnitt.Id);
-        session.Incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "Marktplatz");
+        session.Incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz");
         session.MoveForceUnit(emmering.Id, nord.Id);
 
         var md = MasterDataSet.Empty with { UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" } };
@@ -80,7 +81,7 @@ public class ForcesAbschnittPickerTests
     [AvaloniaFact]
     public void The_flyout_lists_the_choices_marks_the_current_one_and_places_the_unit()
     {
-        var (window, view, vm) = Show(narrow: false);
+        var (_, view, vm) = Show(narrow: false);
         var picker = Pickers(view.GetControl<DataGrid>("ForcesGrid"))[1];
 
         picker.Flyout!.ShowAt(picker);
@@ -89,20 +90,28 @@ public class ForcesAbschnittPickerTests
         var content = (Control)((Flyout)picker.Flyout).Content!;
         var entries = content.GetVisualDescendants().OfType<Button>().ToList();
         Assert.Equal(
-            new[] { NodeChoices.UnplacedLabel, "Abschnitt 1", "Abschnitt 1 / Nord", "Marktplatz" }.Order(StringComparer.Ordinal),
-            entries.Select(b => b.GetVisualDescendants().OfType<TextBlock>().Last().Text!).Order(StringComparer.Ordinal));
+            new[] { NodeChoices.UnplacedLabel, "Abschnitt 1", "Abschnitt 1 / Nord", "Bereitstellung Marktplatz" },
+            entries.Select(b => b.GetVisualDescendants().OfType<TextBlock>().Last().Text!));
         var ticked = entries.Where(b => b.GetVisualDescendants().OfType<TextBlock>().First().IsEffectivelyVisible).ToList();
         Assert.Single(ticked);
         Assert.Contains(NodeChoices.UnplacedLabel, ticked[0].GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
         Capture(content, "kraefte-abschnitt-flyout.png");
 
-        var marktplatz = entries.Single(b => b.GetVisualDescendants().OfType<TextBlock>().Last().Text == "Marktplatz");
-        marktplatz.Command!.Execute(null);
+        var marktplatz = entries.Single(b => b.GetVisualDescendants().OfType<TextBlock>().Last().Text == "Bereitstellung Marktplatz");
+        Assert.True(picker.Flyout.IsOpen);
+
+        // A real press and release, in the popup's own top level.
+        var popup = TopLevel.GetTopLevel(marktplatz)!;
+        var centre = marktplatz.TranslatePoint(new Point(marktplatz.Bounds.Width / 2, marktplatz.Bounds.Height / 2), popup)!.Value;
+        popup.MouseDown(centre, MouseButton.Left);
+        popup.MouseUp(centre, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("Marktplatz", vm.Forces[1].NodeLabel);
-        Assert.Equal("Marktplatz", (string)((TextBlock)picker.Content!).Text!);
-        _ = window;
+        // A Button inside a Flyout does not dismiss it, and the kept row never rebuilds the popup.
+        Assert.False(picker.Flyout.IsOpen);
+
+        Assert.Equal("Bereitstellung Marktplatz", vm.Forces[1].NodeLabel);
+        Assert.Equal("Bereitstellung Marktplatz", (string)((TextBlock)picker.Content!).Text!);
     }
 
     [AvaloniaFact]
