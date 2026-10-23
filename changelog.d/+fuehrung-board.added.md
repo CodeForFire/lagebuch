@@ -1,0 +1,1 @@
+A new FÜHRUNG tab draws the Führungsorganisation as the familiar A3 sheet — Einsatzleitung, partner Einsatzleitungen, Fachberater, Bereitstellung and Abschnitte with their Leiter, Melder and units, which can be dragged between Abschnitte or placed from a picker that Kräfte now offers too — and the Bericht prints who reports to whom (#703).
