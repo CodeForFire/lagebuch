@@ -111,6 +111,22 @@ public class LeadershipPersonDialogRenderTests
     }
 
     [AvaloniaFact]
+    public void Naming_the_holder_locks_the_funkrufname_and_handynummer()
+    {
+        var session = Session();
+        var vm = LeiterFor(session, out var nodeId);
+        session.AssignRole("Abschnittsleiter", "Musterfrau, Erika", "Florian Emmering 40/1", from: Clock.Now, phone: "0151 8765432", nodeId: nodeId, slot: RoleSlot.Leiter);
+        vm.CallSign = "Florian Aich 9/1";
+        vm.PersonName = "Musterfrau, Erika";
+        var (window, _) = Show(vm, 560, 560);
+
+        Assert.False(Find<AutoCompleteBox>(window, "PersonDialogCallSignBox").IsEnabled);
+        Assert.True(Find<TextBox>(window, "PersonDialogPhoneBox").IsReadOnly);
+        Assert.Equal("Florian Emmering 40/1", Find<AutoCompleteBox>(window, "PersonDialogCallSignBox").Text);
+        Assert.Equal("0151 8765432", Find<TextBox>(window, "PersonDialogPhoneBox").Text);
+    }
+
+    [AvaloniaFact]
     public void A_handover_is_announced_above_the_buttons()
     {
         var session = Session();

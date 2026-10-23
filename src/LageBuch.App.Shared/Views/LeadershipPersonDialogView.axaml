@@ -47,10 +47,12 @@
                                  FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
                                  AutomationProperties.Name="Funkrufname"
                                  PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                 IsEnabled="{Binding IsContactEditable}"
                                  Text="{Binding CallSign}" />
               </HeaderedContentControl>
               <HeaderedContentControl Grid.Column="1" Classes="field" Header="HANDYNUMMER">
                 <TextBox x:Name="PersonDialogPhoneBox" Classes="mono" Text="{Binding Phone}" MaxLength="50"
+                         IsReadOnly="{Binding !IsContactEditable}"
                          AutomationProperties.Name="Handynummer" />
               </HeaderedContentControl>
             </Grid>

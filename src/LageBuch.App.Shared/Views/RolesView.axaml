@@ -278,7 +278,17 @@
       <DataGrid x:Name="RolesGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FUNKTION" Binding="{Binding Role}" />
-          <DataGridTextColumn Header="ABSCHNITT" Binding="{Binding Section}" />
+          <!-- A Funktion the Führungstafel placed reads as its node ("Abschnitt 1 / Nord") and is
+               changed there, so the cell only says so. -->
+          <DataGridTemplateColumn Header="ABSCHNITT">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:RoleAssignmentRow">
+                <TextBlock x:Name="RoleSectionText" Text="{Binding SectionLabel}"
+                           Margin="12,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding SectionToolTip}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="NAME" Binding="{Binding PersonName}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
           <!-- Handynummer is a live cell rather than printed text: a corrected number is edited in
@@ -340,8 +350,8 @@
                 <StackPanel Spacing="5">
                   <TextBlock Text="{Binding Role}" FontWeight="SemiBold"
                              Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
-                  <TextBlock Text="{Binding Section}" Classes="secondary" FontSize="13" TextWrapping="Wrap"
-                             IsVisible="{Binding Section, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <TextBlock Text="{Binding SectionLabel}" Classes="secondary" FontSize="13" TextWrapping="Wrap"
+                             IsVisible="{Binding SectionLabel, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   <TextBlock Text="{Binding PersonName}" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding CallSign}" Classes="mono" FontSize="12"
                              IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}" />

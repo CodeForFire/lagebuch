@@ -115,6 +115,14 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     /// </summary>
     public bool IsRoleEditable => PostHolder() is null;
 
+    /// <summary>
+    /// False while the person named already holds the Funktion: placing or leaving them is no
+    /// handover, so a Funkrufname or Handynummer typed now would be dropped. The fields then show the
+    /// holder's own values and are read-only (Ruling P10).
+    /// </summary>
+    [ObservableProperty]
+    private bool _isContactEditable = true;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HandoverText))]
     private string _role;
@@ -202,6 +210,34 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         }
 
         RefreshRoleError();
+        RefreshContactLock();
+    }
+
+    // Shows the holder's contact details and locks the fields while the holder is the person named,
+    // and gives the fields back, cleared and refilled from the roster, once someone else is named.
+    private void RefreshContactLock()
+    {
+        var holder = FindHolder(RoleToSave).Holder;
+        var locked = holder is not null && IsSamePerson(holder);
+        if (locked)
+        {
+            CallSign = holder?.CallSign;
+            Phone = holder?.Phone;
+            _prefilledCallSign = CallSign;
+            _prefilledPhone = Phone;
+        }
+        else if (!IsContactEditable)
+        {
+            CallSign = null;
+            Phone = null;
+            _prefilledCallSign = null;
+            _prefilledPhone = null;
+            var person = RosterLookup.Find(_personnel, PersonName);
+            _prefilledPhone = RosterLookup.Refill(Phone, _prefilledPhone, person?.Phone, v => Phone = v);
+            _prefilledCallSign = RosterLookup.Refill(CallSign, _prefilledCallSign, person?.CallSign, v => CallSign = v);
+        }
+
+        IsContactEditable = !locked;
     }
 
     private void RefreshRoleError()
@@ -222,6 +258,7 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         var person = RosterLookup.Find(_personnel, value);
         _prefilledPhone = RosterLookup.Refill(Phone, _prefilledPhone, person?.Phone, v => Phone = v);
         _prefilledCallSign = RosterLookup.Refill(CallSign, _prefilledCallSign, person?.CallSign, v => CallSign = v);
+        RefreshContactLock();
     }
 
     /// <summary>
@@ -244,6 +281,7 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRoleEditable));
         OnPropertyChanged(nameof(HandoverText));
         RefreshRoleError();
+        RefreshContactLock();
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]

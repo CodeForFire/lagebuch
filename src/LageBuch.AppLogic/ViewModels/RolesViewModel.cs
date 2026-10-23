@@ -29,6 +29,8 @@ public sealed partial class RoleAssignmentRow : ObservableObject
         string role,
         string personName,
         string? section,
+        Guid? nodeId,
+        string? nodeLabel,
         string? callSign,
         string? phone,
         DateTimeOffset? from,
@@ -40,7 +42,9 @@ public sealed partial class RoleAssignmentRow : ObservableObject
         Id = id;
         Role = role;
         PersonName = personName;
-        Section = section;
+        _section = section;
+        _nodeId = nodeId;
+        _sectionLabel = nodeLabel ?? section;
         CallSign = callSign;
         From = from;
         IsReadOnly = isReadOnly;
@@ -56,7 +60,29 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
     public string PersonName { get; }
 
-    public string? Section { get; }
+    /// <summary>The free-text Abschnitt; for a placed row the node's name, which the incident keeps in step.</summary>
+    [ObservableProperty]
+    private string? _section;
+
+    /// <summary>The node the Führungstafel placed this Funktion in; null for one that was only typed in.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPlaced))]
+    [NotifyPropertyChangedFor(nameof(SectionToolTip))]
+    private Guid? _nodeId;
+
+    /// <summary>
+    /// What the ABSCHNITT cell reads: the node's label ("Abschnitt 1 / Nord" for an Unterabschnitt)
+    /// when the Funktion is placed, else the free text. Names are only unique among siblings, so the
+    /// bare name would not say which Nord.
+    /// </summary>
+    [ObservableProperty]
+    private string? _sectionLabel;
+
+    /// <summary>True when the Führungstafel placed the Funktion; its place is then changed there, not here.</summary>
+    public bool IsPlaced => NodeId is not null;
+
+    /// <summary>Why the cell cannot be typed into, for a placed row; null for one that was typed in.</summary>
+    public string? SectionToolTip => IsPlaced ? "Auf der Führungstafel zugeordnet" : null;
 
     public string? CallSign { get; }
 
@@ -82,13 +108,17 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
     /// <summary>
     /// Brings a kept row in line with its assignment after a change anywhere in the incident (#294),
-    /// instead of the row being thrown away and rebuilt. Only Bis and the Handynummer can move on an
-    /// existing assignment -- a handover ends it and starts a new one -- so the rest stays as built.
+    /// instead of the row being thrown away and rebuilt. Bis and the Handynummer can move on an
+    /// existing assignment, and so can its place (the board placing it, a node renamed or dissolved);
+    /// a handover ends the assignment and starts a new one, so the rest stays as built.
     /// </summary>
-    public void Update(Domain.RoleAssignment assignment)
+    public void Update(Domain.RoleAssignment assignment, string? nodeLabel)
     {
         ArgumentNullException.ThrowIfNull(assignment);
         To = assignment.To;
+        NodeId = assignment.NodeId;
+        Section = assignment.Section;
+        SectionLabel = nodeLabel ?? assignment.Section;
         _pulling = true;
         try
         {
@@ -191,7 +221,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         {
             if (kept.TryGetValue(assignment.Id, out var row))
             {
-                row.Update(assignment);
+                row.Update(assignment, _session.Incident.NodeLabel(assignment.NodeId));
                 _all.Add(row);
             }
             else
@@ -248,7 +278,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
                 && other.IsRunning
                 && string.Equals(other.Role?.Trim(), row.Role?.Trim(), StringComparison.OrdinalIgnoreCase)
                 && (mode.Uniqueness != RoleUniqueness.UniquePerSection
-                    || SameSection(other.Section, row.Section)));
+                    || SamePlace(other, row)));
         }
     }
 
@@ -256,6 +286,27 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     // Incident.FindRunningRoleHolder, which is what the add form asks and which has to agree with
     // this: the domain keeps the normalisation in a private NormalizeSection, so the equality is
     // spelled here rather than a second implementation of "blank ≡ blank" living next to it.
+    //
+    // A Funktion the board placed is told apart by its node, because Unterabschnitte under different
+    // Abschnitte may share a name. Against one that was only typed in, the node's name is compared
+    // with the text: an old free-text "Nord" and a placed "Nord" are the same place to a reader.
+    private bool SamePlace(RoleAssignmentRow left, RoleAssignmentRow right)
+    {
+        if (left.NodeId is { } leftNode && right.NodeId is { } rightNode)
+        {
+            return leftNode == rightNode;
+        }
+
+        return SameSection(PlaceName(left), PlaceName(right));
+    }
+
+    // The text a row's place is compared by: its node's name when placed (the incident keeps Section
+    // equal to it, but a node this incident no longer holds falls back to the recorded text).
+    private string? PlaceName(RoleAssignmentRow row) =>
+        row.NodeId is { } id
+            ? _session.Incident.CommandNodes.FirstOrDefault(n => n.Id == id)?.Name ?? row.Section
+            : row.Section;
+
     private static bool SameSection(string? left, string? right) =>
         string.Equals(
             left?.Trim() ?? string.Empty,
@@ -355,6 +406,9 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     // either of them is typed into. Asking the section-scoped one for a per-Einsatz Funktion would
     // leave a second EL in another Abschnitt unflagged, so the duplicate marking the grid carries
     // (MarkDuplicates) has to branch the same way.
+    //
+    // The form has no node and creates free-text assignments only, so it stays keyed on the typed
+    // Section; the node-aware overload with a null node is the same call.
     private RoleAssignment? FindRunningHolder() =>
         NewRoleUniqueness == RoleUniqueness.UniquePerSection
             ? _session.Incident.FindRunningRoleHolder(NewRole, NewSection)
@@ -620,7 +674,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     }
 
     private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>
-        new(r.Id, r.Role, r.PersonName, r.Section, r.CallSign, r.Phone, r.From, r.To, IsReadOnly, BeginTransfer, EditPhone);
+        new(r.Id, r.Role, r.PersonName, r.Section, r.NodeId, _session.Incident.NodeLabel(r.NodeId), r.CallSign, r.Phone, r.From, r.To, IsReadOnly, BeginTransfer, EditPhone);
 
     private void EditPhone(RoleAssignmentRow row, string? phone)
     {

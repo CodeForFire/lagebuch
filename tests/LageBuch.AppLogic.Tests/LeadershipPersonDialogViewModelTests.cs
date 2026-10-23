@@ -699,4 +699,64 @@ public class LeadershipPersonDialogViewModelTests
 
         Assert.False(vm.SaveCommand.CanExecute(null));
     }
+
+    // Ruling P10: naming the holder skips the handover, which is the only thing that would carry a
+    // newly typed Funkrufname or Handynummer, so the fields show the holder's and lock instead of
+    // swallowing the input.
+    [Fact]
+    public void Naming_the_holder_locks_the_contact_fields_to_the_holders_values()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika", "Florian Emmering 1/1", phone: "0151 2222222");
+        var vm = Open(session, null, RoleSlot.Leiter);
+        Assert.True(vm.IsContactEditable);
+        vm.CallSign = "Florian Aich 9/1";
+        vm.Phone = "0170 0000000";
+
+        vm.PersonName = "Musterfrau, Erika";
+
+        Assert.False(vm.IsContactEditable);
+        Assert.Equal("Florian Emmering 1/1", vm.CallSign);
+        Assert.Equal("0151 2222222", vm.Phone);
+        vm.SaveCommand.Execute(null);
+        var only = Assert.Single(session.Incident.Roles);
+        Assert.Equal(("Florian Emmering 1/1", "0151 2222222"), (only.CallSign, only.Phone));
+    }
+
+    [Fact]
+    public void Naming_the_holder_of_the_post_again_locks_the_contact_fields_too()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika", "Florian Emmering 1/1", slot: RoleSlot.Leiter);
+        var vm = Open(session, null, RoleSlot.Leiter);
+        vm.CallSign = "Florian Aich 9/1";
+
+        vm.PersonName = "Musterfrau, Erika";
+
+        Assert.False(vm.IsContactEditable);
+        Assert.Equal("Florian Emmering 1/1", vm.CallSign);
+    }
+
+    [Fact]
+    public void A_real_handover_keeps_the_contact_fields_editable_and_unlocks_again()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika", "Florian Emmering 1/1", phone: "0151 2222222");
+        var vm = Open(session, null, RoleSlot.Leiter);
+
+        vm.PersonName = "Mustermann, Max";
+        vm.CallSign = "Florian Aich 9/1";
+
+        Assert.True(vm.IsContactEditable);
+        Assert.Equal("Florian Aich 9/1", vm.CallSign);
+
+        vm.PersonName = "Musterfrau, Erika";
+        Assert.False(vm.IsContactEditable);
+
+        vm.PersonName = "Mustermann, Max";
+        Assert.True(vm.IsContactEditable);
+        Assert.Equal("Florian Emmering 11/1", vm.CallSign); // back to the new person's roster values
+        vm.SaveCommand.Execute(null);
+        Assert.Equal("Florian Emmering 11/1", Assert.Single(Running(session)).CallSign);
+    }
 }
