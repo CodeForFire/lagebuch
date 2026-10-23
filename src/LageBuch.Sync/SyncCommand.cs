@@ -24,6 +24,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(UpdateCommandNodeCommand), "updateCommandNode")]
 [JsonDerivedType(typeof(DissolveCommandNodeCommand), "dissolveCommandNode")]
 [JsonDerivedType(typeof(MoveForceUnitCommand), "moveForceUnit")]
+[JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
 [JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
 [JsonDerivedType(typeof(UpdateLeadershipPostCommand), "updateLeadershipPost")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
@@ -126,6 +127,9 @@ public sealed record DissolveCommandNodeCommand(OperatorDto Operator, Guid NodeI
 
 /// <summary>Places a unit in a node, or back to "nicht zugeordnet" when NodeId is null.</summary>
 public sealed record MoveForceUnitCommand(OperatorDto Operator, Guid UnitId, Guid? NodeId) : SyncCommand;
+
+/// <summary>Places a running Funktion in a node and board slot; a null NodeId is the Einsatzleitung.</summary>
+public sealed record PlaceRoleAssignmentCommand(OperatorDto Operator, Guid AssignmentId, Guid? NodeId, RoleSlot Slot) : SyncCommand;
 
 /// <summary>Sets the Führungsstufe; a null Stufe clears it.</summary>
 public sealed record SetFuehrungsstufeCommand(OperatorDto Operator, Fuehrungsstufe? Stufe) : SyncCommand;

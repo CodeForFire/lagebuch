@@ -477,6 +477,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
         Send(new MoveForceUnitCommand(Op(), unitId, nodeId));
 
+    public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
+        Send(new PlaceRoleAssignmentCommand(Op(), assignmentId, nodeId, slot));
+
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Send(new SetFuehrungsstufeCommand(Op(), stufe));
 

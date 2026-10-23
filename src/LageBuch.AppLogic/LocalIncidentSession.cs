@@ -175,6 +175,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
         Mutate(() => Incident.MoveForceUnit(_clock, RequireOperator(), unitId, nodeId));
 
+    public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
+        Mutate(() => Incident.PlaceRoleAssignment(_clock, RequireOperator(), assignmentId, nodeId, slot));
+
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Mutate(() => Incident.SetFuehrungsstufe(_clock, RequireOperator(), stufe));
 

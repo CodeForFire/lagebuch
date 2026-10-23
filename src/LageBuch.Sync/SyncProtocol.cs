@@ -131,7 +131,8 @@ public static class SyncProtocol
     /// Stammdaten payload gains <c>talkGroups</c> and a role <c>slot</c>. A host at 21 would reject
     /// the six commands, so the floor rises to 22. <c>addCommandNode</c> also carries the optional
     /// <c>auftrag</c>, <c>standort</c>, <c>funkgruppe</c>, <c>rufname</c> and <c>telefon</c>, so an
-    /// Abschnitt is created with its details in one command.
+    /// Abschnitt is created with its details in one command. <c>placeRoleAssignment</c> moves an
+    /// existing Funktion into an Abschnitt and a board slot, as <c>moveForceUnit</c> does for a unit.
     /// </para>
     /// </summary>
     public const int ProtocolVersion = 22;
