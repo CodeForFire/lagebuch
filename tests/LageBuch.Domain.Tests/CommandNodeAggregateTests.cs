@@ -718,4 +718,97 @@ public class CommandNodeAggregateTests
 
         Assert.Equal("Nord", Assert.Single(incident.CommandNodes).Name);
     }
+
+    [Fact]
+    public void Placing_a_funktion_in_a_node_sets_node_section_slot_and_logs_it()
+    {
+        var (incident, clock, op) = NewIncident();
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var role = incident.AssignRole(clock, op, "Einsatzleiter", "Huber");
+
+        var placed = incident.PlaceRoleAssignment(clock, op, role.Id, node.Id, RoleSlot.Leiter);
+
+        Assert.Equal(node.Id, placed.NodeId);
+        Assert.Equal("Nord", placed.Section);
+        Assert.Equal(RoleSlot.Leiter, placed.Slot);
+        Assert.Equal(placed, Assert.Single(incident.Roles));
+        Assert.Equal("Funktion Einsatzleiter (Huber) → Nord", Last(incident).Text);
+        Assert.Equal(EtbDirection.System, Last(incident).Direction);
+    }
+
+    [Fact]
+    public void Placing_a_funktion_at_the_root_clears_node_and_section()
+    {
+        var (incident, clock, op) = NewIncident();
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var role = incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", nodeId: node.Id, slot: RoleSlot.Leiter);
+
+        var placed = incident.PlaceRoleAssignment(clock, op, role.Id, null, RoleSlot.Leiter);
+
+        Assert.Null(placed.NodeId);
+        Assert.Null(placed.Section);
+        Assert.Equal(RoleSlot.Leiter, placed.Slot);
+        Assert.Equal("Funktion Abschnittsleiter (Huber) → Einsatzleitung", Last(incident).Text);
+    }
+
+    [Fact]
+    public void Placing_a_funktion_where_it_already_is_writes_nothing()
+    {
+        var (incident, clock, op) = NewIncident();
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var role = incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", nodeId: node.Id, slot: RoleSlot.Leiter);
+        var entries = incident.Journal.Count;
+
+        var placed = incident.PlaceRoleAssignment(clock, op, role.Id, node.Id, RoleSlot.Leiter);
+
+        Assert.Equal(role, placed);
+        Assert.Equal(entries, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Placing_a_funktion_that_is_ended_unknown_or_into_a_bad_target_is_refused_and_changes_nothing()
+    {
+        var (incident, clock, op) = NewIncident();
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var gone = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Süd");
+        incident.DissolveCommandNode(clock, op, gone.Id);
+        var role = incident.AssignRole(clock, op, "Einsatzleiter", "Huber");
+        var ended = incident.AssignRole(clock, op, "Atemschutzüberwacher", "Meier");
+        incident.EndRoleAssignment(ended.Id, clock.Now);
+        var before = incident.Roles.ToList();
+        var entries = incident.Journal.Count;
+
+        Assert.Throws<KeyNotFoundException>(() => incident.PlaceRoleAssignment(clock, op, Guid.NewGuid(), node.Id, RoleSlot.Leiter));
+        Assert.Throws<InvalidOperationException>(() => incident.PlaceRoleAssignment(clock, op, ended.Id, node.Id, RoleSlot.Leiter));
+        Assert.Throws<InvalidOperationException>(() => incident.PlaceRoleAssignment(clock, op, role.Id, gone.Id, RoleSlot.Leiter));
+        Assert.Throws<KeyNotFoundException>(() => incident.PlaceRoleAssignment(clock, op, role.Id, Guid.NewGuid(), RoleSlot.Leiter));
+        Assert.Throws<ArgumentOutOfRangeException>(() => incident.PlaceRoleAssignment(clock, op, role.Id, node.Id, (RoleSlot)42));
+
+        Assert.Equal(before, incident.Roles.ToList());
+        Assert.Equal(entries, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Placing_a_funktion_in_a_closed_incident_is_refused()
+    {
+        var (incident, clock, op) = NewIncident();
+        var role = incident.AssignRole(clock, op, "Einsatzleiter", "Huber");
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(() => incident.PlaceRoleAssignment(clock, op, role.Id, null, RoleSlot.Leiter));
+    }
+
+    [Fact]
+    public void A_placed_funktion_blocks_dissolving_its_node_and_follows_its_rename()
+    {
+        var (incident, clock, op) = NewIncident();
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var role = incident.AssignRole(clock, op, "Abschnittsleiter", "Huber");
+        incident.PlaceRoleAssignment(clock, op, role.Id, node.Id, RoleSlot.Leiter);
+
+        Assert.Throws<InvalidOperationException>(() => incident.DissolveCommandNode(clock, op, node.Id));
+
+        incident.UpdateCommandNode(clock, op, node.Id, "Nordost", null, null, null, null, null);
+        Assert.Equal("Nordost", Assert.Single(incident.Roles).Section);
+    }
 }

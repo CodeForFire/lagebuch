@@ -600,6 +600,61 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Moves a running Funktion into a live node and a board slot, or to the Einsatzleitung when
+    /// <paramref name="nodeId"/> is null (Section cleared). The counterpart of
+    /// <see cref="MoveForceUnit"/> for a Funktion recorded before the board placed it; placing it
+    /// where it already is writes nothing.
+    /// </summary>
+    public RoleAssignment PlaceRoleAssignment(
+        IClock clock, SessionOperator op, Guid assignmentId, Guid? nodeId, RoleSlot slot)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        if (!Enum.IsDefined(slot))
+        {
+            throw new ArgumentOutOfRangeException(nameof(slot), slot, "Unbekannter Posten.");
+        }
+
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Funktionszuweisung {assignmentId} nicht gefunden.");
+        }
+
+        var previous = _roles[index];
+        if (previous.To is not null)
+        {
+            throw new InvalidOperationException("Funktionszuweisung ist bereits beendet.");
+        }
+
+        string? section = null;
+        if (nodeId is { } id)
+        {
+            var node = FindCommandNode(id) ?? throw new KeyNotFoundException($"Abschnitt {id} nicht gefunden.");
+            if (!node.IsLive)
+            {
+                throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+            }
+
+            section = node.Name;
+        }
+
+        if (previous.NodeId == nodeId && previous.Slot == slot
+            && string.Equals(previous.Section, section, StringComparison.Ordinal))
+        {
+            return previous;
+        }
+
+        var updated = previous with { NodeId = nodeId, Section = section, Slot = slot };
+        _roles[index] = updated;
+        AppendSystemEntry(
+            clock, op, $"Funktion {updated.Role} ({updated.PersonName}) → {section ?? "Einsatzleitung"}");
+        return updated;
+    }
+
+    /// <summary>
     /// Corrects a role assignment's phone number. Mirrors <see cref="UpdateForceUnit"/>: only a real
     /// change reaches the ETB, so re-saving the same (normalised) number is not a reportable event.
     /// </summary>

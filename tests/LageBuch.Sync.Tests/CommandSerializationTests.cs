@@ -25,6 +25,8 @@ public class CommandSerializationTests
         new DissolveCommandNodeCommand(Op, Guid.NewGuid()),
         new MoveForceUnitCommand(Op, Guid.NewGuid(), Guid.NewGuid()),
         new MoveForceUnitCommand(Op, Guid.NewGuid(), null),
+        new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), Guid.NewGuid(), RoleSlot.Leiter),
+        new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), null, RoleSlot.None),
         new SetFuehrungsstufeCommand(Op, Fuehrungsstufe.C),
         new SetFuehrungsstufeCommand(Op, null),
         new UpdateLeadershipPostCommand(Op, "Feuerwehrhaus", "Florian EL", "0172", "TG 1"),
@@ -295,6 +297,7 @@ public class CommandSerializationTests
             StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"dissolveCommandNode\"", SyncJson.Serialize<SyncCommand>(new DissolveCommandNodeCommand(Op, Guid.NewGuid())), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"moveForceUnit\"", SyncJson.Serialize<SyncCommand>(new MoveForceUnitCommand(Op, Guid.NewGuid(), null)), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"placeRoleAssignment\"", SyncJson.Serialize<SyncCommand>(new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), null, RoleSlot.Leiter)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"setFuehrungsstufe\"", SyncJson.Serialize<SyncCommand>(new SetFuehrungsstufeCommand(Op, Fuehrungsstufe.B)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"updateLeadershipPost\"", SyncJson.Serialize<SyncCommand>(new UpdateLeadershipPostCommand(Op, null, null, null, null)), StringComparison.Ordinal);
     }

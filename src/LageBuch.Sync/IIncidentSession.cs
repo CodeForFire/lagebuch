@@ -93,6 +93,9 @@ public interface IIncidentSession
     /// <summary>Places a unit in a node; a null <paramref name="nodeId"/> returns it to "nicht zugeordnet".</summary>
     void MoveForceUnit(Guid unitId, Guid? nodeId);
 
+    /// <summary>Places a running Funktion in a node and board slot; a null <paramref name="nodeId"/> is the Einsatzleitung.</summary>
+    void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot);
+
     /// <summary>Sets the Führungsstufe; null clears it.</summary>
     void SetFuehrungsstufe(Fuehrungsstufe? stufe);
 

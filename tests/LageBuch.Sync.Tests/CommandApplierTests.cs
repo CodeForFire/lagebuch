@@ -732,10 +732,32 @@ public class CommandApplierTests
         Assert.Equal("Nord", role.Section);
     }
 
+    [Fact]
+    public void PlaceRoleAssignment_over_the_wire_moves_the_funktion_attributed_to_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var host = new SessionOperator("Host", "FFB 1");
+        var node = incident.AddCommandNode(clock, host, CommandNodeKind.Abschnitt, "Nord");
+        var role = incident.AssignRole(clock, host, "Abschnittsleiter", "Huber");
+
+        ApplyOverWire(
+            new PlaceRoleAssignmentCommand(new OperatorDto("Maier", "FFB 2"), role.Id, node.Id, RoleSlot.Leiter),
+            incident,
+            clock);
+
+        var placed = Assert.Single(incident.Roles);
+        Assert.Equal(node.Id, placed.NodeId);
+        Assert.Equal(RoleSlot.Leiter, placed.Slot);
+        Assert.Equal("Nord", placed.Section);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
     [Theory]
     [InlineData("""{"$type":"addCommandNode","operator":{"name":"M","callSign":null},"kind":99,"name":"Nord","parentId":null}""")]
     [InlineData("""{"$type":"setFuehrungsstufe","operator":{"name":"M","callSign":null},"stufe":7}""")]
     [InlineData("""{"$type":"assignRole","operator":{"name":"M","callSign":null},"role":"AL","personName":"H","callSign":null,"from":null,"to":null,"section":null,"phone":null,"nodeId":null,"slot":42}""")]
+    [InlineData("""{"$type":"placeRoleAssignment","operator":{"name":"M","callSign":null},"assignmentId":"00000000-0000-0000-0000-000000000001","nodeId":null,"slot":42}""")]
     public void A_hostile_peer_sending_an_integer_outside_the_enum_is_refused_and_the_incident_is_unchanged(string json)
     {
         var clock = new FixedClock();
