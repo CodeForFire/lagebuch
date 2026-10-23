@@ -3,6 +3,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 
@@ -63,13 +64,31 @@ public interface IIncidentSession
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? section = null,
-        string? phone = null);
+        string? phone = null,
+        Guid? nodeId = null,
+        RoleSlot slot = RoleSlot.None);
 
     /// <summary>Ends a running assignment and starts a new one for the same role/section — a handover.</summary>
     void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null);
 
     /// <summary>Corrects a role assignment's phone number. Logs to the ETB only on a real change.</summary>
     void EditRolePhone(Guid assignmentId, string? phone);
+
+    /// <summary>Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung.</summary>
+    void AddCommandNode(CommandNodeKind kind, string name, Guid? parentId = null);
+
+    void UpdateCommandNode(
+        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon);
+
+    void DissolveCommandNode(Guid nodeId);
+
+    /// <summary>Places a unit in a node; a null <paramref name="nodeId"/> returns it to "nicht zugeordnet".</summary>
+    void MoveForceUnit(Guid unitId, Guid? nodeId);
+
+    /// <summary>Sets the Führungsstufe; null clears it.</summary>
+    void SetFuehrungsstufe(Fuehrungsstufe? stufe);
+
+    void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe);
 
     void AddForceUnit(
         string brigade,

@@ -49,13 +49,31 @@ public static class CommandApplier
                 incident.ToggleChecklistItem(clock, Operator(c.Operator), c.ItemId);
                 break;
             case AssignRoleCommand c:
-                incident.AssignRole(clock, Operator(c.Operator), c.Role, c.PersonName, c.CallSign, c.From, c.To, c.Section, c.Phone);
+                incident.AssignRole(clock, Operator(c.Operator), c.Role, c.PersonName, c.CallSign, c.From, c.To, c.Section, c.Phone, c.NodeId, c.Slot);
                 break;
             case TransferRoleCommand c:
                 incident.TransferRole(clock, Operator(c.Operator), c.AssignmentId, c.NewPersonName, c.NewCallSign, c.NewPhone);
                 break;
             case EditRolePhoneCommand c:
                 incident.EditRolePhone(clock, Operator(c.Operator), c.AssignmentId, c.Phone);
+                break;
+            case AddCommandNodeCommand c:
+                incident.AddCommandNode(clock, Operator(c.Operator), c.Kind, c.Name, c.ParentId);
+                break;
+            case UpdateCommandNodeCommand c:
+                incident.UpdateCommandNode(clock, Operator(c.Operator), c.NodeId, c.Name, c.Auftrag, c.Standort, c.Funkgruppe, c.Rufname, c.Telefon);
+                break;
+            case DissolveCommandNodeCommand c:
+                incident.DissolveCommandNode(clock, Operator(c.Operator), c.NodeId);
+                break;
+            case MoveForceUnitCommand c:
+                incident.MoveForceUnit(clock, Operator(c.Operator), c.UnitId, c.NodeId);
+                break;
+            case SetFuehrungsstufeCommand c:
+                incident.SetFuehrungsstufe(clock, Operator(c.Operator), c.Stufe);
+                break;
+            case UpdateLeadershipPostCommand c:
+                incident.UpdateLeadershipPost(clock, Operator(c.Operator), c.Standort, c.Rufname, c.Telefon, c.Funkgruppe);
                 break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(

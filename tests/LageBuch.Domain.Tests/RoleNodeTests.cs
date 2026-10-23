@@ -104,4 +104,16 @@ public class RoleNodeTests
         incident.EndRoleAssignment(role.Id, clock.Now);
         Assert.False(incident.DissolveCommandNode(clock, op, node.Id).IsLive);
     }
+
+    [Fact]
+    public void Assigning_an_undefined_slot_is_refused_and_changes_nothing()
+    {
+        // JsonStringEnumConverter also accepts a raw integer, so a sync peer can send "slot": 42.
+        var (incident, clock, op) = NewIncident();
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", slot: (RoleSlot)42));
+
+        Assert.Empty(incident.Roles);
+    }
 }

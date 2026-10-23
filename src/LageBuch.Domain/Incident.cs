@@ -501,6 +501,11 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
+        if (!Enum.IsDefined(slot))
+        {
+            throw new ArgumentOutOfRangeException(nameof(slot), slot, "Unbekannter Posten.");
+        }
+
         // Any node kind may hold a Funktion: Bereitstellung and partner Einsatzleitungen have a
         // Leiter on the sheet too. The node's name wins over a free-text section; the rename
         // propagation keeps Section equal to it, so FindRunningRoleHolder needs no change.
@@ -709,6 +714,11 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
+        if (stufe is { } given && !Enum.IsDefined(given))
+        {
+            throw new ArgumentOutOfRangeException(nameof(stufe), given, "Unbekannte Führungsstufe.");
+        }
+
         if (Fuehrungsstufe == stufe)
         {
             return;
@@ -763,6 +773,12 @@ public sealed class Incident
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
+
+        // The wire also accepts a raw integer for an enum, so a peer can send a kind that is none.
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unbekannte Art des Abschnitts.");
+        }
 
         var node = CommandNode.Create(kind, name, parentId);
         CommandNode? parent = null;

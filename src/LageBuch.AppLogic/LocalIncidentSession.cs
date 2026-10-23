@@ -4,6 +4,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -166,14 +167,35 @@ public sealed class LocalIncidentSession : IIncidentSession
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? section = null,
-        string? phone = null) =>
-        Mutate(() => Incident.AssignRole(_clock, RequireOperator(), role, personName, callSign, from, to, section, phone));
+        string? phone = null,
+        Guid? nodeId = null,
+        RoleSlot slot = RoleSlot.None) =>
+        Mutate(() => Incident.AssignRole(_clock, RequireOperator(), role, personName, callSign, from, to, section, phone, nodeId, slot));
 
     public void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null) =>
         Mutate(() => Incident.TransferRole(_clock, RequireOperator(), assignmentId, newPersonName, newCallSign, newPhone));
 
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
+
+    public void AddCommandNode(CommandNodeKind kind, string name, Guid? parentId = null) =>
+        Mutate(() => Incident.AddCommandNode(_clock, RequireOperator(), kind, name, parentId));
+
+    public void UpdateCommandNode(
+        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
+        Mutate(() => Incident.UpdateCommandNode(_clock, RequireOperator(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon));
+
+    public void DissolveCommandNode(Guid nodeId) =>
+        Mutate(() => Incident.DissolveCommandNode(_clock, RequireOperator(), nodeId));
+
+    public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
+        Mutate(() => Incident.MoveForceUnit(_clock, RequireOperator(), unitId, nodeId));
+
+    public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
+        Mutate(() => Incident.SetFuehrungsstufe(_clock, RequireOperator(), stufe));
+
+    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe) =>
+        Mutate(() => Incident.UpdateLeadershipPost(_clock, RequireOperator(), standort, rufname, telefon, funkgruppe));
 
     public void AddForceUnit(
         string brigade,

@@ -99,4 +99,18 @@ public class FuehrungsstufeTests
         Assert.Throws<IncidentClosedException>(
             () => incident.UpdateLeadershipPost(clock, op, null, null, null, "K1"));
     }
+
+    [Fact]
+    public void Setting_an_undefined_stufe_is_refused_and_changes_nothing()
+    {
+        // JsonStringEnumConverter also accepts a raw integer, so a sync peer can send "stufe": 7.
+        var (incident, clock, op) = NewIncident();
+        var entries = incident.Journal.Count;
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => incident.SetFuehrungsstufe(clock, op, (Fuehrungsstufe)7));
+
+        Assert.Null(incident.Fuehrungsstufe);
+        Assert.Equal(entries, incident.Journal.Count);
+    }
 }

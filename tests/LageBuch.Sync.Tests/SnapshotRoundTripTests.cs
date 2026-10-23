@@ -1,7 +1,9 @@
+using System.Text.Json.Nodes;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -186,6 +188,66 @@ public class SnapshotRoundTripTests
         var back = r.InvolvedParties.Single();
         Assert.Equal("bei Nachbarin Frau Meier", back.Whereabouts);
         Assert.Equal(set.WhereaboutsAt, back.WhereaboutsAt);
+    }
+
+    [Fact]
+    public void Round_trip_preserves_abschnitte_placements_stufe_and_the_leadership_post()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var sub = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord 1", nord.Id);
+        var gone = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR");
+        incident.UpdateCommandNode(clock, op, nord.Id, "Nord", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171");
+        incident.DissolveCommandNode(clock, op, gone.Id);
+        var unit = incident.AddForceUnit(clock, op, "Aich", 9, "Aich 42/1", null, null, 4);
+        incident.MoveForceUnit(clock, op, unit.Id, sub.Id);
+        var al = incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", nodeId: nord.Id, slot: RoleSlot.Leiter);
+        incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0172", "TG 1");
+
+        var r = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(3, r.CommandNodes.Count);
+        var nordBack = r.FindCommandNode(nord.Id);
+        Assert.NotNull(nordBack);
+        Assert.Equal(CommandNodeKind.Abschnitt, nordBack.Kind);
+        Assert.Equal("Brandbekämpfung", nordBack.Auftrag);
+        Assert.Equal("Hauptstraße", nordBack.Standort);
+        Assert.Equal("TG 2", nordBack.Funkgruppe);
+        Assert.Equal("Florian Nord", nordBack.Rufname);
+        Assert.Equal("0171", nordBack.Telefon);
+        Assert.Equal(nord.Id, r.FindCommandNode(sub.Id)?.ParentId);
+        Assert.False(r.FindCommandNode(gone.Id)?.IsLive);
+        Assert.Equal(sub.Id, r.Forces.Single().NodeId);
+        var roleBack = r.Roles.Single(x => x.Id == al.Id);
+        Assert.Equal(nord.Id, roleBack.NodeId);
+        Assert.Equal(RoleSlot.Leiter, roleBack.Slot);
+        Assert.Equal(Fuehrungsstufe.C, r.Fuehrungsstufe);
+        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0172", "TG 1"), r.LeadershipPost);
+    }
+
+    [Fact]
+    public void A_snapshot_without_the_placement_members_reads_as_unplaced()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddForceUnit(clock, op, "Aich", 9, "Aich 42/1", null, null, 4);
+        var node = Assert.IsType<JsonObject>(JsonNode.Parse(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+        foreach (var key in new[] { "commandNodes", "fuehrungsstufe", "elStandort", "elRufname", "elTelefon", "elFunkgruppe" })
+        {
+            node.Remove(key);
+        }
+
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(node.ToJsonString()));
+
+        Assert.Empty(r.CommandNodes);
+        Assert.Null(r.Fuehrungsstufe);
+        Assert.Equal(LeadershipPost.Empty, r.LeadershipPost);
+        Assert.Null(r.Forces.Single().NodeId);
     }
 
     [Fact]
