@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
 using static LageBuch.AppLogic.Tests.LeadershipBoard;
@@ -209,5 +210,59 @@ public class LeadershipViewModelRefreshTests
         AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
 
         Assert.Empty(vm.Sections);
+    }
+
+    [Fact]
+    public void The_top_row_lists_the_Einsatzleitung_the_partners_and_the_Fachberater_in_one_flat_list()
+    {
+        var session = NewSession();
+        AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        session.AssignRole("Fachberater THW", "Peter Maier", slot: RoleSlot.Fachberater);
+        using var vm = NewVm(session);
+
+        Assert.Equal(3, vm.TopRow.Count);
+        Assert.Same(vm.El, vm.TopRow[0]);
+        Assert.Same(vm.Partners.Single(), vm.TopRow[1]);
+        var group = Assert.IsType<FachberaterGroup>(vm.TopRow[2]);
+        Assert.Same(vm.Fachberater, group.People);
+    }
+
+    [Fact]
+    public void The_top_row_keeps_its_cards_across_a_refresh_and_slots_a_new_partner_before_the_Fachberater()
+    {
+        var session = NewSession();
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        session.AssignRole("Fachberater THW", "Peter Maier", slot: RoleSlot.Fachberater);
+        using var vm = NewVm(session);
+        var before = vm.TopRow.ToList();
+        var resets = 0;
+        vm.TopRow.CollectionChanged += (_, e) => resets += e.Action == NotifyCollectionChangedAction.Reset ? 1 : 0;
+
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", null, null, null);
+        Assert.Equal(before.Count, vm.TopRow.Count);
+        for (var i = 0; i < before.Count; i++)
+        {
+            Assert.Same(before[i], vm.TopRow[i]);
+        }
+
+        AddNode(session, CommandNodeKind.Partner, "Polizei");
+        Assert.Equal(4, vm.TopRow.Count);
+        Assert.Same(before[0], vm.TopRow[0]);
+        Assert.Same(before[1], vm.TopRow[1]);
+        Assert.Same(vm.Partners[1], vm.TopRow[2]);
+        Assert.Same(before[2], vm.TopRow[3]);
+
+        session.DissolveCommandNode(rd);
+        Assert.Equal(3, vm.TopRow.Count);
+        Assert.Same(vm.Partners.Single(), vm.TopRow[1]);
+        Assert.Equal(0, resets);
+    }
+
+    [Fact]
+    public void Without_Fachberater_the_top_row_has_no_Fachberater_card()
+    {
+        using var vm = NewVm(NewSession());
+
+        Assert.Same(vm.El, Assert.Single(vm.TopRow));
     }
 }

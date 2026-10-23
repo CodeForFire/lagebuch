@@ -16,24 +16,17 @@
     <Style Selector="ItemsControl.board-wrap">
       <Setter Property="ItemsPanel">
         <ItemsPanelTemplate>
-          <WrapPanel Orientation="Horizontal" ItemWidth="300" ItemSpacing="12" LineSpacing="12" />
+          <WrapPanel Orientation="Horizontal" ItemWidth="320" ItemSpacing="12" LineSpacing="12" />
         </ItemsPanelTemplate>
       </Setter>
     </Style>
-    <!-- The top row holds cards of three kinds, so it wraps cards that size themselves. -->
+    <!-- The sheet's top row, Einsatzleitung Feuerwehr | Rettungsdienst | Polizei | Fachberater: one
+         flat wrap, so each card moves to the next line on its own. The same width as the sections;
+         320 rather than 300 so the Einsatzleitung's names and buttons fit side by side. -->
     <Style Selector="ItemsControl.board-top">
       <Setter Property="ItemsPanel">
         <ItemsPanelTemplate>
-          <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="12" />
-        </ItemsPanelTemplate>
-      </Setter>
-    </Style>
-    <!-- The partner Einsatzleitungen wrap card by card, so a fourth one moves to the next line
-         instead of running off the edge as one block. -->
-    <Style Selector="ItemsControl.board-row">
-      <Setter Property="ItemsPanel">
-        <ItemsPanelTemplate>
-          <WrapPanel Orientation="Horizontal" ItemWidth="300" ItemSpacing="12" LineSpacing="12" />
+          <WrapPanel Orientation="Horizontal" ItemWidth="320" ItemSpacing="12" LineSpacing="12" />
         </ItemsPanelTemplate>
       </Setter>
     </Style>
@@ -44,11 +37,7 @@
         </ItemsPanelTemplate>
       </Setter>
     </Style>
-    <Style Selector="Border.top-card">
-      <Setter Property="Width" Value="300" />
-    </Style>
     <Style Selector="Border#ElCard">
-      <Setter Property="Width" Value="340" />
       <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
     </Style>
 
@@ -171,25 +160,12 @@
         </ItemsPanelTemplate>
       </Setter>
     </Style>
-    <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl.board-row">
-      <Setter Property="ItemsPanel">
-        <ItemsPanelTemplate>
-          <StackPanel Spacing="12" />
-        </ItemsPanelTemplate>
-      </Setter>
-    </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl.board-chips">
       <Setter Property="ItemsPanel">
         <ItemsPanelTemplate>
           <StackPanel Spacing="8" />
         </ItemsPanelTemplate>
       </Setter>
-    </Style>
-    <Style Selector="Panel#WorkspaceRoot.narrow Border.top-card">
-      <Setter Property="Width" Value="NaN" />
-    </Style>
-    <Style Selector="Panel#WorkspaceRoot.narrow Border#ElCard">
-      <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow Border.unit-grip">
       <Setter Property="IsVisible" Value="False" />
@@ -248,9 +224,110 @@
   </UserControl.Resources>
 
   <UserControl.DataTemplates>
+    <!-- The top row's Einsatzleitung Feuerwehr. -->
+    <DataTemplate DataType="vm:ElCard" x:DataType="vm:ElCard">
+      <Border x:Name="ElCard" Classes="board-card">
+        <StackPanel Spacing="9">
+          <StackPanel Spacing="1">
+            <TextBlock Classes="card-kind" Text="Einsatzleitung" />
+            <TextBlock Classes="card-name" Text="Feuerwehr" />
+          </StackPanel>
+
+          <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="EINSATZLEITER" />
+            <TextBlock Grid.Column="1" Classes="field-value" x:Name="ElLeiterText"
+                       Text="{Binding Leiter.Text, FallbackValue='—', TargetNullValue='—'}" />
+            <Button Grid.Column="2" x:Name="LeadershipSetElButton" Classes="board-action" Content="FESTLEGEN"
+                    ToolTip.Tip="Einsatzleiter festlegen" AutomationProperties.Name="Einsatzleiter festlegen"
+                    Command="{Binding SetLeiterCommand}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="ASSISTENZ" VerticalAlignment="Top" Margin="0,4,0,0" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock Classes="field-value" Text="—"
+                         IsVisible="{Binding !Assistants.Count}" />
+              <ItemsControl ItemsSource="{Binding Assistants}" ItemTemplate="{StaticResource PersonRowTemplate}" />
+            </StackPanel>
+            <Button Grid.Column="2" Classes="board-action" Content="+ ASSISTENZ" VerticalAlignment="Top"
+                    ToolTip.Tip="Führungsassistenz hinzufügen" Command="{Binding AddAssistantCommand}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2" ColumnSpacing="6">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="STANDORT" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Classes="field-value" Text="{Binding Standort, TargetNullValue='—'}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="field-label" Text="RUFNAME" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="field-value" Text="{Binding Rufname, TargetNullValue='—'}" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Classes="field-label" Text="TELEFON" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Classes="field-value" Text="{Binding Telefon, TargetNullValue='—'}" />
+            <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="FUNKGRUPPE" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="field-value" Text="{Binding Funkgruppe, TargetNullValue='—'}" />
+          </Grid>
+
+          <!-- The Führungsstufe: a flyout of commands, the NodeChoicePicker idiom, closed on select. -->
+          <StackPanel Spacing="4">
+            <!-- Label above the button: "Keine Führungsstufe festgelegt" needs the card's whole width. -->
+            <StackPanel Spacing="4">
+              <TextBlock Classes="field-label" Text="FÜHRUNGSSTUFE" />
+              <Button x:Name="StufeButton" HorizontalAlignment="Left" Height="28" Padding="10,0"
+                      ToolTip.Tip="Führungsstufe wählen" AutomationProperties.Name="Führungsstufe wählen">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock x:Name="StufeText" Text="{Binding StufeText}" FontSize="13" VerticalAlignment="Center" />
+                  <PathIcon Width="9" Height="9" Foreground="{StaticResource TextSecondaryBrush}"
+                            Data="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" />
+                </StackPanel>
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                    <ItemsControl ItemsSource="{Binding StufeChoices}" MinWidth="150">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StufeChoice">
+                          <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                  Padding="8,5" Command="{Binding SelectCommand}" Click="OnStufeChoiceClick">
+                            <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                              <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
+                              <TextBlock Grid.Column="1" Text="{Binding Label}" />
+                            </Grid>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </StackPanel>
+            <TextBlock x:Name="StufeSuggestionText" Text="{Binding SuggestionText}"
+                       Classes.mismatch="{Binding !MatchesSuggestion}" />
+          </StackPanel>
+
+          <Button Classes="board-action" HorizontalAlignment="Left" Content="ERREICHBARKEIT BEARBEITEN"
+                  ToolTip.Tip="Standort, Rufname, Telefon und Funkgruppe bearbeiten"
+                  Command="{Binding EditPostCommand}" />
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+
+    <!-- All Fachberater on one card, at the end of the top row. -->
+    <DataTemplate DataType="vm:FachberaterGroup" x:DataType="vm:FachberaterGroup">
+      <Border x:Name="FachberaterCard" Classes="board-card">
+        <StackPanel Spacing="8">
+          <StackPanel Spacing="1">
+            <TextBlock Classes="card-kind" Text="Beratung" />
+            <TextBlock Classes="card-name" Text="Fachberater" />
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding People}" ItemTemplate="{StaticResource PersonRowTemplate}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </DataTemplate>
+
     <!-- A Bereitstellung, Abschnitt, Unterabschnitt or partner Einsatzleitung. Children use the same
          template, so an Unterabschnitt card is drawn inside its Abschnitt's. -->
-    <DataTemplate DataType="vm:BoardNodeCard">
+    <DataTemplate DataType="vm:BoardNodeCard" x:DataType="vm:BoardNodeCard">
       <Border Classes="board-card" x:Name="NodeCard">
         <StackPanel Spacing="8">
           <!-- Auflösen sits apart from the other actions, at the card's head: it ends the node. -->
@@ -369,109 +446,7 @@
         <TextBlock Classes="mono" Foreground="{StaticResource TextPrimaryBrush}" Text="{Binding DispatchCentreName}" />
       </Border>
 
-      <ItemsControl Classes="board-top">
-        <!-- Einsatzleitung Feuerwehr. The Panel takes the card's DataContext, so the bindings inside
-             compile against ElCard. -->
-        <Panel DataContext="{Binding El}">
-        <Border x:Name="ElCard" Classes="board-card" x:DataType="vm:ElCard">
-          <StackPanel Spacing="9">
-            <StackPanel Spacing="1">
-              <TextBlock Classes="card-kind" Text="Einsatzleitung" />
-              <TextBlock Classes="card-name" Text="Feuerwehr" />
-            </StackPanel>
-
-            <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
-              <TextBlock Grid.Column="0" Classes="field-label" Text="EINSATZLEITER" />
-              <TextBlock Grid.Column="1" Classes="field-value" x:Name="ElLeiterText"
-                         Text="{Binding Leiter.Text, FallbackValue='—', TargetNullValue='—'}" />
-              <Button Grid.Column="2" x:Name="LeadershipSetElButton" Classes="board-action" Content="FESTLEGEN"
-                      ToolTip.Tip="Einsatzleiter festlegen" AutomationProperties.Name="Einsatzleiter festlegen"
-                      Command="{Binding SetLeiterCommand}" />
-            </Grid>
-
-            <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
-              <TextBlock Grid.Column="0" Classes="field-label" Text="ASSISTENZ" VerticalAlignment="Top" Margin="0,4,0,0" />
-              <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock Classes="field-value" Text="—"
-                           IsVisible="{Binding !Assistants.Count}" />
-                <ItemsControl ItemsSource="{Binding Assistants}" ItemTemplate="{StaticResource PersonRowTemplate}" />
-              </StackPanel>
-              <Button Grid.Column="2" Classes="board-action" Content="+ ASSISTENZ" VerticalAlignment="Top"
-                      ToolTip.Tip="Führungsassistenz hinzufügen" Command="{Binding AddAssistantCommand}" />
-            </Grid>
-
-            <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2" ColumnSpacing="6">
-              <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="STANDORT" />
-              <TextBlock Grid.Row="0" Grid.Column="1" Classes="field-value" Text="{Binding Standort, TargetNullValue='—'}" />
-              <TextBlock Grid.Row="1" Grid.Column="0" Classes="field-label" Text="RUFNAME" />
-              <TextBlock Grid.Row="1" Grid.Column="1" Classes="field-value" Text="{Binding Rufname, TargetNullValue='—'}" />
-              <TextBlock Grid.Row="2" Grid.Column="0" Classes="field-label" Text="TELEFON" />
-              <TextBlock Grid.Row="2" Grid.Column="1" Classes="field-value" Text="{Binding Telefon, TargetNullValue='—'}" />
-              <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="FUNKGRUPPE" />
-              <TextBlock Grid.Row="3" Grid.Column="1" Classes="field-value" Text="{Binding Funkgruppe, TargetNullValue='—'}" />
-            </Grid>
-
-            <!-- The Führungsstufe: a flyout of commands, the NodeChoicePicker idiom, closed on select. -->
-            <StackPanel Spacing="4">
-              <Grid ColumnDefinitions="96,*" ColumnSpacing="6">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="FÜHRUNGSSTUFE" />
-                <Button Grid.Column="1" x:Name="StufeButton" HorizontalAlignment="Left" Height="28" Padding="10,0"
-                        ToolTip.Tip="Führungsstufe wählen" AutomationProperties.Name="Führungsstufe wählen">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock x:Name="StufeText" Text="{Binding StufeText}" FontSize="13" VerticalAlignment="Center" />
-                    <PathIcon Width="9" Height="9" Foreground="{StaticResource TextSecondaryBrush}"
-                              Data="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" />
-                  </StackPanel>
-                  <Button.Flyout>
-                    <Flyout Placement="BottomEdgeAlignedLeft">
-                      <ItemsControl ItemsSource="{Binding StufeChoices}" MinWidth="150">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:StufeChoice">
-                            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                                    Padding="8,5" Command="{Binding SelectCommand}" Click="OnStufeChoiceClick">
-                              <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
-                                <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
-                                <TextBlock Grid.Column="1" Text="{Binding Label}" />
-                              </Grid>
-                            </Button>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </Flyout>
-                  </Button.Flyout>
-                </Button>
-              </Grid>
-              <TextBlock x:Name="StufeSuggestionText" Text="{Binding SuggestionText}"
-                         Classes.mismatch="{Binding !MatchesSuggestion}" />
-            </StackPanel>
-
-            <Button Classes="board-action" HorizontalAlignment="Left" Content="ERREICHBARKEIT BEARBEITEN"
-                    ToolTip.Tip="Standort, Rufname, Telefon und Funkgruppe bearbeiten"
-                    Command="{Binding EditPostCommand}" />
-          </StackPanel>
-        </Border>
-        </Panel>
-
-        <!-- The partner organisations' Einsatzleitungen -->
-        <ItemsControl x:Name="PartnerCards" Classes="board-row" ItemsSource="{Binding Partners}"
-                      IsVisible="{Binding HasPartners}" />
-
-        <Border x:Name="FachberaterCard" Classes="board-card top-card" IsVisible="{Binding HasFachberater}">
-          <StackPanel Spacing="8">
-            <StackPanel Spacing="1">
-              <TextBlock Classes="card-kind" Text="Beratung" />
-              <TextBlock Classes="card-name" Text="Fachberater" />
-            </StackPanel>
-            <ItemsControl ItemsSource="{Binding Fachberater}" ItemTemplate="{StaticResource PersonRowTemplate}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <StackPanel Spacing="6" />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-            </ItemsControl>
-          </StackPanel>
-        </Border>
-      </ItemsControl>
+      <ItemsControl x:Name="TopRowCards" Classes="board-top" ItemsSource="{Binding TopRow}" />
 
       <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
         <Button x:Name="AddRettungsdienstButton" Classes="board-action" Content="+ RETTUNGSDIENST"

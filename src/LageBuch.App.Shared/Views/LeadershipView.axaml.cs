@@ -122,6 +122,8 @@ public partial class LeadershipView : UserControl
         _dropTarget?.Classes.Set("drop-target", true);
     }
 
-    // A Button inside a Flyout does not dismiss it; the command itself runs from the Button.
-    private void OnStufeChoiceClick(object? sender, RoutedEventArgs e) => StufeButton.Flyout?.Hide();
+    // A Button inside a Flyout does not dismiss it; the command itself runs from the Button. The
+    // Stufe button lives in the El card's template, so it is looked up rather than named here.
+    private void OnStufeChoiceClick(object? sender, RoutedEventArgs e) =>
+        this.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "StufeButton")?.Flyout?.Hide();
 }

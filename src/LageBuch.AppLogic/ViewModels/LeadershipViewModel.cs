@@ -30,6 +30,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     private readonly Action<CommandNodeDialogViewModel>? _openDialog;
     private readonly Action<LeadershipPersonDialogViewModel>? _openPersonDialog;
     private readonly IClock _clock;
+    private readonly FachberaterGroup _fachberaterGroup;
 
     // The incident as the last refresh showed it: the move guard judges against what the board offers.
     private Incident _incident;
@@ -65,6 +66,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         IsReadOnly = session.IsReadOnly;
         El = new ElCard(SelectStufe, EditPost, !IsReadOnly, slot => OpenPerson(null, slot));
         DispatchCentreName = masterData.Settings.DispatchCentreName;
+        _fachberaterGroup = new FachberaterGroup(Fachberater);
         Refresh();
         _session.Changed += Refresh;
     }
@@ -102,6 +104,13 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     public ObservableCollection<BoardNodeCard> Partners { get; } = [];
 
     public ObservableCollection<BoardPersonRow> Fachberater { get; } = [];
+
+    /// <summary>
+    /// The sheet's top row as one list, so it wraps card by card: <see cref="El"/>, each of
+    /// <see cref="Partners"/> in order, then a <see cref="FachberaterGroup"/> while there are Fachberater.
+    /// The same instances throughout; a refresh moves, adds or removes them in place.
+    /// </summary>
+    public ObservableCollection<object> TopRow { get; } = [];
 
     /// <summary>Units in no node, or in one that is missing, dissolved or a Partner.</summary>
     public ObservableCollection<BoardUnitRow> UnplacedUnits { get; } = [];
@@ -165,6 +174,14 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
         HasPartners = Partners.Count > 0;
         HasFachberater = Fachberater.Count > 0;
+
+        List<object> top = [El, .. Partners];
+        if (HasFachberater)
+        {
+            top.Add(_fachberaterGroup);
+        }
+
+        RowReconciler.Reconcile(TopRow, top, r => r, i => i, i => i, (_, _) => { });
         HasUnplacedUnits = UnplacedUnits.Count > 0;
         HasFreeTextSections = FreeTextSections.Count > 0;
     }

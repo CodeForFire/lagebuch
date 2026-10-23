@@ -142,6 +142,11 @@ public class LeadershipBoardRenderTests
         return new(window, view, writable, workspace.Leadership);
     }
 
+    // A control inside a card template: its name is the template's, not the view's.
+    private static T Named<T>(Visual root, string name)
+        where T : Control =>
+        root.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
+
     private static List<Border> Cards(Visual root) =>
         root.GetVisualDescendants().OfType<Border>()
             .Where(b => b.Classes.Contains("board-card") && b.DataContext is BoardNodeCard)
@@ -195,9 +200,9 @@ public class LeadershipBoardRenderTests
 
         var badge = view.GetControl<Border>("DispatchCentreBadge");
         Assert.Equal("ILS", badge.GetVisualDescendants().OfType<TextBlock>().Single().Text);
-        Assert.Equal("Max Mustermann · Florian Emmering 1", view.GetControl<TextBlock>("ElLeiterText").Text);
-        Assert.Equal("Stufe B", view.GetControl<TextBlock>("StufeText").Text);
-        Assert.Contains("mismatch", view.GetControl<TextBlock>("StufeSuggestionText").Classes);
+        Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(view, "ElLeiterText").Text);
+        Assert.Equal("Stufe B", Named<TextBlock>(view, "StufeText").Text);
+        Assert.Contains("mismatch", Named<TextBlock>(view, "StufeSuggestionText").Classes);
 
         // The sections wrap into one row of equal width, the Unterabschnitt inside its Abschnitt.
         var sections = view.GetControl<ItemsControl>("SectionCards").GetVisualDescendants().OfType<Border>()
@@ -206,7 +211,7 @@ public class LeadershipBoardRenderTests
         Assert.Equal(
             ["Bereitstellung Marktplatz", "Abschnitt 1 Nord", "Abschnitt 2 Süd"],
             sections.Select(b => ((BoardNodeCard)b.DataContext!).Name));
-        Assert.All(sections, s => Assert.True(Math.Abs(s.Bounds.Width - 300) <= 0.5, $"width {s.Bounds.Width}"));
+        Assert.All(sections, s => Assert.True(Math.Abs(s.Bounds.Width - 320) <= 0.5, $"width {s.Bounds.Width}"));
         Assert.All(sections, s => Assert.True(Math.Abs(s.Bounds.Top - sections[0].Bounds.Top) <= 0.5));
         var dach = Card(view, "Dach");
         Assert.Same(Card(view, "Abschnitt 1 Nord"), dach.GetVisualAncestors().OfType<Border>().First(b => b.Classes.Contains("board-card")));
@@ -214,8 +219,8 @@ public class LeadershipBoardRenderTests
         // The partner Einsatzleitungen and the Fachberater beside the Einsatzleitung.
         Assert.Equal(
             ["Rettungsdienst", "Polizei"],
-            Cards(view.GetControl<ItemsControl>("PartnerCards")).Select(b => ((BoardNodeCard)b.DataContext!).Name));
-        Assert.True(view.GetControl<Border>("FachberaterCard").IsVisible);
+            Cards(view.GetControl<ItemsControl>("TopRowCards")).Select(b => ((BoardNodeCard)b.DataContext!).Name));
+        Assert.True(Named<Border>(view, "FachberaterCard").IsVisible);
         Assert.True(view.GetControl<Border>("UnplacedStrip").IsVisible);
         Assert.Contains(
             "Florian Emmering 11/2",
@@ -236,7 +241,7 @@ public class LeadershipBoardRenderTests
     }
 
     [AvaloniaFact]
-    public void Four_partner_cards_wrap_one_by_one_inside_the_workspace_width()
+    public void The_top_row_wraps_card_by_card_inside_the_workspace_width()
     {
         var board = Show(width: WorkspaceHostWidth, more: s =>
         {
@@ -244,19 +249,26 @@ public class LeadershipBoardRenderTests
             s.AddCommandNode(CommandNodeKind.Partner, "Wasserwacht");
         });
         var boardRoot = board.View.GetControl<StackPanel>("BoardRoot");
-        var partners = Cards(board.View.GetControl<ItemsControl>("PartnerCards"));
-        Assert.Equal(4, partners.Count);
+        var row = board.View.GetControl<ItemsControl>("TopRowCards");
+        var el = Named<Border>(board.View, "ElCard");
+        var partners = Cards(row);
+        Assert.Equal(["Rettungsdienst", "Polizei", "THW", "Wasserwacht"], partners.Select(b => ((BoardNodeCard)b.DataContext!).Name));
+        var cards = new List<Border> { el };
+        cards.AddRange(partners);
+        cards.Add(Named<Border>(board.View, "FachberaterCard"));
 
-        foreach (var card in partners.Append(board.View.GetControl<Border>("FachberaterCard")))
+        double Top(Border b) => b.TranslatePoint(default, boardRoot)!.Value.Y;
+        foreach (var card in cards)
         {
             var right = card.TranslatePoint(new Point(card.Bounds.Width, 0), boardRoot)!.Value.X;
             Assert.True(right <= boardRoot.Bounds.Width + 0.5, $"right edge {right} past {boardRoot.Bounds.Width}");
-            Assert.True(Math.Abs(card.Bounds.Width - 300) <= 0.5, $"width {card.Bounds.Width}");
+            Assert.True(Math.Abs(card.Bounds.Width - 320) <= 0.5, $"width {card.Bounds.Width}");
         }
 
-        // They did wrap: not all four on the El card's line.
-        var tops = partners.Select(c => c.TranslatePoint(default, boardRoot)!.Value.Y).ToList();
-        Assert.True(tops.Max() - tops.Min() > 1);
+        // The sheet's row: Einsatzleitung, Rettungsdienst and Polizei side by side; the rest flows on.
+        Assert.True(Math.Abs(Top(partners[0]) - Top(el)) <= 0.5);
+        Assert.True(Math.Abs(Top(partners[1]) - Top(el)) <= 0.5);
+        Assert.True(Top(partners[2]) > Top(el) + 1);
         Capture(board.Window, "fuehrung-board-workspace.png");
     }
 
@@ -307,8 +319,8 @@ public class LeadershipBoardRenderTests
             Assert.True(Math.Abs(card.Bounds.Width - width) <= 1, $"{((BoardNodeCard)card.DataContext!).Name}: {card.Bounds.Width} of {width}");
         }
 
-        Assert.True(Math.Abs(view.GetControl<Border>("ElCard").Bounds.Width - width) <= 1);
-        Assert.True(Math.Abs(view.GetControl<Border>("FachberaterCard").Bounds.Width - width) <= 1);
+        Assert.True(Math.Abs(Named<Border>(view, "ElCard").Bounds.Width - width) <= 1);
+        Assert.True(Math.Abs(Named<Border>(view, "FachberaterCard").Bounds.Width - width) <= 1);
         var grips = view.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("unit-grip")).ToList();
         Assert.NotEmpty(grips);
         Assert.All(grips, g => Assert.False(g.IsVisible));
@@ -325,11 +337,11 @@ public class LeadershipBoardRenderTests
         var view = board.View;
 
         Assert.Empty(Cards(view));
-        Assert.True(view.GetControl<Border>("ElCard").IsEffectivelyVisible);
-        Assert.Equal("—", view.GetControl<TextBlock>("ElLeiterText").Text);
+        Assert.True(Named<Border>(view, "ElCard").IsEffectivelyVisible);
+        Assert.Equal("—", Named<TextBlock>(view, "ElLeiterText").Text);
         Assert.False(view.GetControl<ItemsControl>("SectionCards").IsVisible);
         Assert.False(view.GetControl<Border>("UnplacedStrip").IsVisible);
-        Assert.False(view.GetControl<Border>("FachberaterCard").IsVisible);
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(), b => b.Name == "FachberaterCard");
         Assert.False(view.GetControl<ItemsControl>("FreeTextSectionCards").IsVisible);
         Assert.True(view.GetControl<Button>("LeadershipAddAbschnittButton").IsEffectivelyEnabled);
         Assert.True(view.GetControl<Button>("AddRettungsdienstButton").IsEffectivelyEnabled);
@@ -484,7 +496,7 @@ public class LeadershipBoardRenderTests
     public void Picking_a_fuehrungsstufe_sets_it_and_closes_the_flyout()
     {
         var board = Show();
-        var stufe = board.View.GetControl<Button>("StufeButton");
+        var stufe = Named<Button>(board.View, "StufeButton");
 
         stufe.Flyout!.ShowAt(stufe);
         Dispatcher.UIThread.RunJobs();
@@ -496,8 +508,8 @@ public class LeadershipBoardRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(Fuehrungsstufe.D, board.Session!.Incident.Fuehrungsstufe);
-        Assert.Equal("Stufe D", board.View.GetControl<TextBlock>("StufeText").Text);
-        Assert.DoesNotContain("mismatch", board.View.GetControl<TextBlock>("StufeSuggestionText").Classes);
+        Assert.Equal("Stufe D", Named<TextBlock>(board.View, "StufeText").Text);
+        Assert.DoesNotContain("mismatch", Named<TextBlock>(board.View, "StufeSuggestionText").Classes);
         Assert.False(((Flyout)stufe.Flyout).IsOpen);
     }
 

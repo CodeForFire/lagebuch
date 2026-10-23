@@ -386,8 +386,8 @@ public class AutomationPropertiesTests
         var grips = view.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("unit-grip")).ToList();
         Assert.Equal(2, grips.Count);
         Assert.All(grips, g => Assert.Equal("Einheit verschieben", Name(g)));
-        Assert.Equal("Führungsstufe wählen", Name(view.GetControl<Button>("StufeButton")));
-        Assert.Equal("Einsatzleiter festlegen", Name(view.GetControl<Button>("LeadershipSetElButton")));
+        Assert.Equal("Führungsstufe wählen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "StufeButton")));
+        Assert.Equal("Einsatzleiter festlegen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElButton")));
     }
 
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) Workspace(
