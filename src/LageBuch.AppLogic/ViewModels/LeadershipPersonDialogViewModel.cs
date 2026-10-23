@@ -23,6 +23,9 @@ namespace LageBuch.AppLogic.ViewModels;
 /// placed where the dialog was opened for, because a Funktion recorded in FUNKTIONEN (or before the
 /// board) has no node and no slot, and a handover keeps both: without the placement the clicked post
 /// would stay empty. When the holder is the person named, the placement is the whole action.
+/// Only a Leiter or Melder post takes a unique Funktion's holder over: a Führungsassistent,
+/// Fachberater or other Funktion added beside others must not pull the running EL out of its post,
+/// so there the conflict is a field error that points at the handover where the holder sits.
 /// </remarks>
 public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
 {
@@ -35,6 +38,9 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     private readonly Guid? _nodeId;
     private readonly RoleSlot _slot;
     private string _seededRole;
+
+    // Whether a save found the Funktion blank; the message then stands until a Funktion is typed.
+    private bool _blankRoleShown;
 
     // What the roster last wrote into Funkrufname and Handynummer (#656).
     private string? _prefilledCallSign;
@@ -123,7 +129,10 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     [ObservableProperty]
     private string? _phone;
 
-    /// <summary>"Funktion fehlt." once a save found the Funktion blank; null otherwise.</summary>
+    /// <summary>
+    /// "Funktion fehlt." once a save found the Funktion blank, or, outside a Leiter or Melder post,
+    /// who already holds the unique Funktion typed; null otherwise. The latter blocks saving.
+    /// </summary>
     [ObservableProperty]
     private string? _roleError;
 
@@ -173,7 +182,10 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         || !string.IsNullOrWhiteSpace(CallSign)
         || !string.IsNullOrWhiteSpace(Phone);
 
-    private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen;
+    private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen && ConflictHolder() is null;
+
+    // Leiter and Melder are single-holder posts: taking the holder over is what was asked for.
+    private bool TakesOverHolders => _slot is RoleSlot.Leiter or RoleSlot.Melder;
 
     // The Funktion in the catalogue's spelling when it matches one apart from case or spacing, so
     // "s2 lage" does not become a second Funktion beside "S2 Lage"; otherwise as typed.
@@ -184,10 +196,20 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
 
     partial void OnRoleChanged(string value)
     {
-        if (RoleError is not null && !string.IsNullOrWhiteSpace(value))
+        if (!string.IsNullOrWhiteSpace(value))
         {
-            RoleError = null;
+            _blankRoleShown = false;
         }
+
+        RefreshRoleError();
+    }
+
+    private void RefreshRoleError()
+    {
+        RoleError = ConflictHolder() is { } holder
+            ? $"„{holder.Role}“ ist bereits mit {holder.PersonName} besetzt – dort übergeben."
+            : _blankRoleShown && IsRoleEditable && string.IsNullOrWhiteSpace(Role) ? "Funktion fehlt." : null;
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnPersonNameChanged(string value)
@@ -221,13 +243,15 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
 
         OnPropertyChanged(nameof(IsRoleEditable));
         OnPropertyChanged(nameof(HandoverText));
+        RefreshRoleError();
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
         SaveError = null;
-        RoleError = IsRoleEditable && string.IsNullOrWhiteSpace(Role) ? "Funktion fehlt." : null;
+        _blankRoleShown = string.IsNullOrWhiteSpace(Role);
+        RefreshRoleError();
         PersonError = string.IsNullOrWhiteSpace(PersonName) ? "Name fehlt." : null;
         if (RoleError is not null || PersonError is not null)
         {
@@ -332,14 +356,24 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
             return (post, true);
         }
 
+        return (TakesOverHolders ? UniqueHolder(role) : null, false);
+    }
+
+    // Outside a Leiter or Melder post, the running holder of the unique Funktion typed: a conflict
+    // to report, never a holder to move.
+    private RoleAssignment? ConflictHolder() => TakesOverHolders ? null : UniqueHolder(RoleToSave);
+
+    // The running holder of a Funktion the Stammdaten allow once per Einsatz, or once per Abschnitt
+    // (node-aware, so a same-named Unterabschnitt elsewhere is no conflict); null otherwise.
+    private RoleAssignment? UniqueHolder(string role)
+    {
         var incident = _session.Incident;
-        var holder = StammdatenCatalogue.Find(role, _roles)?.Uniqueness switch
+        return StammdatenCatalogue.Find(role, _roles)?.Uniqueness switch
         {
             RoleUniqueness.UniquePerIncident => incident.FindRunningRoleHolderInAnySection(role),
             RoleUniqueness.UniquePerSection => incident.FindRunningRoleHolder(role, TargetNode?.Name, _nodeId),
             _ => null,
         };
-        return (holder, false);
     }
 
     // The Einsatzleitung itself is the assignment with no node and no free-text Abschnitt, the same

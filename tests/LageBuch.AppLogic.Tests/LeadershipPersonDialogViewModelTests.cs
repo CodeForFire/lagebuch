@@ -274,24 +274,62 @@ public class LeadershipPersonDialogViewModelTests
     }
 
     [Fact]
-    public void A_role_unique_per_einsatz_held_elsewhere_is_handed_over_from_that_holder()
+    public void A_member_cannot_take_a_role_unique_per_einsatz_held_elsewhere()
     {
         var session = NewSession();
         var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
         var sued = AddNode(session, CommandNodeKind.Abschnitt, "Süd");
         session.AssignRole("Pressesprecher", "Musterfrau, Erika", nodeId: nord);
-        var held = session.Incident.Roles.Single().Id;
+        var before = session.Incident.Roles.Single();
 
         var vm = Open(session, sued, RoleSlot.None);
         vm.Role = "pressesprecher";
         vm.PersonName = "Mustermann, Max";
 
-        Assert.Equal("„Pressesprecher“ hat bereits Musterfrau, Erika – wird hierher übergeben.", vm.HandoverText);
-        vm.SaveCommand.Execute(null);
+        AssertRefusedAndUnchanged(session, vm, "„Pressesprecher“ ist bereits mit Musterfrau, Erika besetzt – dort übergeben.", before);
+    }
 
-        Assert.NotNull(session.Incident.Roles.Single(r => r.Id == held).To);
-        var now = Assert.Single(Running(session));
-        Assert.Equal(("Pressesprecher", "Mustermann, Max", sued), (now.Role, now.PersonName, now.NodeId));
+    [Fact]
+    public void A_fuehrungsassistent_typed_as_el_leaves_the_running_el_where_it_is()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika", slot: RoleSlot.Leiter);
+        var before = session.Incident.Roles.Single();
+
+        var vm = Open(session, null, RoleSlot.Fuehrungsassistent);
+        vm.Role = "EL";
+        vm.PersonName = "Mustermann, Max";
+
+        AssertRefusedAndUnchanged(session, vm, "„EL“ ist bereits mit Musterfrau, Erika besetzt – dort übergeben.", before);
+    }
+
+    [Fact]
+    public void A_fachberater_cannot_take_a_role_unique_per_einsatz_held_elsewhere()
+    {
+        var session = NewSession();
+        session.AssignRole("Pressesprecher", "Musterfrau, Erika");
+        var before = session.Incident.Roles.Single();
+
+        var vm = Open(session, null, RoleSlot.Fachberater);
+        vm.Role = "Pressesprecher";
+        vm.PersonName = "Mustermann, Max";
+
+        AssertRefusedAndUnchanged(session, vm, "„Pressesprecher“ ist bereits mit Musterfrau, Erika besetzt – dort übergeben.", before);
+    }
+
+    [Fact]
+    public void Changing_away_from_a_held_unique_role_clears_the_error()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika", slot: RoleSlot.Leiter);
+        var vm = Open(session, null, RoleSlot.Fuehrungsassistent);
+
+        vm.Role = "EL";
+        Assert.NotNull(vm.RoleError);
+        vm.Role = "S2 Lage";
+
+        Assert.Null(vm.RoleError);
+        Assert.True(vm.SaveCommand.CanExecute(null));
     }
 
     [Fact]
@@ -315,16 +353,19 @@ public class LeadershipPersonDialogViewModelTests
     }
 
     [Fact]
-    public void A_role_unique_per_abschnitt_in_the_same_node_is_handed_over()
+    public void A_member_cannot_take_a_role_unique_per_abschnitt_held_in_the_same_node()
     {
         var session = NewSession();
         var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
         session.AssignRole("Sicherheitsbeauftragter", "Musterfrau, Erika", nodeId: nord);
+        var before = session.Incident.Roles.Single();
 
         var vm = Open(session, nord, RoleSlot.None);
         vm.Role = "Sicherheitsbeauftragter";
+        vm.PersonName = "Mustermann, Max";
 
-        Assert.Equal("„Sicherheitsbeauftragter“ hat bereits Musterfrau, Erika – wird übergeben.", vm.HandoverText);
+        AssertRefusedAndUnchanged(
+            session, vm, "„Sicherheitsbeauftragter“ ist bereits mit Musterfrau, Erika besetzt – dort übergeben.", before);
     }
 
     [Fact]
@@ -597,21 +638,19 @@ public class LeadershipPersonDialogViewModelTests
     [Fact]
     public void A_refused_placement_surfaces_as_a_save_error()
     {
-        var session = NewSession();
-        session.AssignRole("EL", "Musterfrau, Erika");
-
-        // A slot the Domain does not know is the one refusal of a placement no dialog check catches first.
-        var vm = Open(session, null, (RoleSlot)99);
+        // A hostile file carrying one id twice, ended first: the dialog finds the running EL, the
+        // Domain's placement finds the ended copy and refuses.
+        var running = RoleAssignment.Create("EL", "Musterfrau, Erika", from: T0.AddHours(-1));
+        var session = Hostile([], roles: [running.EndedAt(T0.AddMinutes(-30)), running]);
+        var vm = Open(session, null, RoleSlot.Leiter);
         var closed = 0;
         vm.Closed += (_, _) => closed++;
 
-        vm.Role = "EL";
         vm.PersonName = "Mustermann, Max";
         vm.SaveCommand.Execute(null);
 
         Assert.StartsWith("Nicht möglich: ", vm.SaveError, StringComparison.Ordinal);
-        var still = Assert.Single(session.Incident.Roles);
-        Assert.Equal(("Musterfrau, Erika", RoleSlot.None), (still.PersonName, still.Slot));
+        Assert.Equal(("Musterfrau, Erika", RoleSlot.None), (Running(session).Single().PersonName, Running(session).Single().Slot));
         Assert.Equal(0, closed);
     }
 
@@ -635,6 +674,21 @@ public class LeadershipPersonDialogViewModelTests
         session.AssignRole("EL", "Musterfrau, Erika", slot: RoleSlot.Leiter);
 
         Assert.Equal(0, raised);
+    }
+
+    // A uniqueness conflict outside a Leiter or Melder post: a field error, no hint, no save, and the
+    // holder untouched even when the command is forced.
+    private static void AssertRefusedAndUnchanged(
+        LocalIncidentSession session, LeadershipPersonDialogViewModel vm, string error, RoleAssignment before)
+    {
+        Assert.Equal(error, vm.RoleError);
+        Assert.Null(vm.HandoverText);
+        Assert.False(vm.SaveCommand.CanExecute(null));
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Same(before, session.Incident.Roles.Single());
+        Assert.Equal(error, vm.RoleError);
     }
 
     [Fact]
