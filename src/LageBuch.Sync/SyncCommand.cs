@@ -108,7 +108,15 @@ public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentI
 
 /// <summary>Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung.</summary>
 public sealed record AddCommandNodeCommand(
-    OperatorDto Operator, CommandNodeKind Kind, string Name, Guid? ParentId) : SyncCommand;
+    OperatorDto Operator,
+    CommandNodeKind Kind,
+    string Name,
+    Guid? ParentId,
+    string? Auftrag = null,
+    string? Standort = null,
+    string? Funkgruppe = null,
+    string? Rufname = null,
+    string? Telefon = null) : SyncCommand;
 
 public sealed record UpdateCommandNodeCommand(
     OperatorDto Operator, Guid NodeId, string Name, string? Auftrag, string? Standort,

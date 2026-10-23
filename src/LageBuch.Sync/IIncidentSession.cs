@@ -81,7 +81,15 @@ public interface IIncidentSession
     void EditRolePhone(Guid assignmentId, string? phone);
 
     /// <summary>Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung.</summary>
-    void AddCommandNode(CommandNodeKind kind, string name, Guid? parentId = null);
+    void AddCommandNode(
+        CommandNodeKind kind,
+        string name,
+        Guid? parentId = null,
+        string? auftrag = null,
+        string? standort = null,
+        string? funkgruppe = null,
+        string? rufname = null,
+        string? telefon = null);
 
     void UpdateCommandNode(
         Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon);

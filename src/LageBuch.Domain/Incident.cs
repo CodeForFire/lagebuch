@@ -784,7 +784,16 @@ public sealed class Incident
     /// must lie in a live Abschnitt of this incident; live siblings (same parent) have unique names.
     /// </summary>
     public CommandNode AddCommandNode(
-        IClock clock, SessionOperator op, CommandNodeKind kind, string name, Guid? parentId = null)
+        IClock clock,
+        SessionOperator op,
+        CommandNodeKind kind,
+        string name,
+        Guid? parentId = null,
+        string? auftrag = null,
+        string? standort = null,
+        string? funkgruppe = null,
+        string? rufname = null,
+        string? telefon = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -797,6 +806,16 @@ public sealed class Incident
         }
 
         var node = CommandNode.Create(kind, name, parentId);
+
+        // WithDetails trims, maps blank to null and enforces the caps, exactly as an update does; it
+        // runs before anything is added so a refused detail leaves the incident untouched.
+        if (!string.IsNullOrWhiteSpace(auftrag) || !string.IsNullOrWhiteSpace(standort)
+            || !string.IsNullOrWhiteSpace(funkgruppe) || !string.IsNullOrWhiteSpace(rufname)
+            || !string.IsNullOrWhiteSpace(telefon))
+        {
+            node = node.WithDetails(node.Name, auftrag, standort, funkgruppe, rufname, telefon);
+        }
+
         CommandNode? parent = null;
         if (parentId is { } pid)
         {
@@ -819,8 +838,24 @@ public sealed class Incident
             _ => $"Abschnitt gebildet: {node.Name}",
         };
         AppendSystemEntry(clock, op, text);
+        if (node.Auftrag is not null)
+        {
+            AppendSystemEntry(clock, op, AuftragText(node));
+        }
+
+        if (node.Funkgruppe is not null)
+        {
+            AppendSystemEntry(clock, op, FunkgruppeText(node));
+        }
+
         return node;
     }
+
+    private static string AuftragText(CommandNode node) => node.Auftrag is null
+        ? $"Auftrag {node.Name} aufgehoben"
+        : $"Auftrag {node.Name}: {node.Auftrag}";
+
+    private static string FunkgruppeText(CommandNode node) => $"Funkgruppe {node.Name}: {node.Funkgruppe}";
 
     /// <summary>
     /// Corrects a node's name and details. Rename, Auftrag and Funkgruppe changes reach the ETB;
@@ -868,16 +903,13 @@ public sealed class Incident
 
         if (!string.Equals(previous.Auftrag, updated.Auftrag, StringComparison.Ordinal))
         {
-            var auftragText = updated.Auftrag is null
-                ? $"Auftrag {updated.Name} aufgehoben"
-                : $"Auftrag {updated.Name}: {updated.Auftrag}";
-            AppendSystemEntry(clock, op, auftragText);
+            AppendSystemEntry(clock, op, AuftragText(updated));
         }
 
         if (updated.Funkgruppe is not null
             && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
         {
-            AppendSystemEntry(clock, op, $"Funkgruppe {updated.Name}: {updated.Funkgruppe}");
+            AppendSystemEntry(clock, op, FunkgruppeText(updated));
         }
 
         return updated;

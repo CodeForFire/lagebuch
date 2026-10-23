@@ -17,6 +17,72 @@ public class CommandNodeAggregateTests
     private static EtbEntry Last(Incident incident) => incident.Journal[^1];
 
     [Fact]
+    public void Adding_a_node_with_details_records_them_and_logs_auftrag_and_funkgruppe()
+    {
+        var (incident, clock, op) = NewIncident();
+        var before = incident.Journal.Count;
+
+        var node = incident.AddCommandNode(
+            clock,
+            op,
+            CommandNodeKind.Abschnitt,
+            "Nord",
+            null,
+            auftrag: " Brandbekämpfung ",
+            standort: "Hauptstraße 1",
+            funkgruppe: "TG 2",
+            rufname: "Florian Nord",
+            telefon: "0171 1234567");
+
+        Assert.Equal("Brandbekämpfung", node.Auftrag);
+        Assert.Equal("Hauptstraße 1", node.Standort);
+        Assert.Equal("TG 2", node.Funkgruppe);
+        Assert.Equal("Florian Nord", node.Rufname);
+        Assert.Equal("0171 1234567", node.Telefon);
+        Assert.Same(node, incident.FindCommandNode(node.Id));
+        var lines = incident.Journal.Skip(before).ToList();
+        Assert.Equal(
+            new[] { "Abschnitt gebildet: Nord", "Auftrag Nord: Brandbekämpfung", "Funkgruppe Nord: TG 2" },
+            lines.Select(e => e.Text).ToArray());
+        Assert.All(lines, e => Assert.Equal(EtbDirection.System, e.Direction));
+    }
+
+    [Fact]
+    public void Adding_a_node_with_an_oversized_auftrag_is_refused_and_changes_nothing()
+    {
+        var (incident, clock, op) = NewIncident();
+        var nodes = incident.CommandNodes.Count;
+        var entries = incident.Journal.Count;
+
+        Assert.Throws<ArgumentException>(
+            () => incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord", null, auftrag: new string('x', 1001)));
+
+        Assert.Equal(nodes, incident.CommandNodes.Count);
+        Assert.Equal(entries, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Adding_a_node_with_blank_details_logs_only_the_gebildet_line()
+    {
+        var (incident, clock, op) = NewIncident();
+        var before = incident.Journal.Count;
+
+        var node = incident.AddCommandNode(
+            clock,
+            op,
+            CommandNodeKind.Abschnitt,
+            "Nord",
+            null,
+            auftrag: "  ",
+            standort: string.Empty,
+            funkgruppe: " ");
+
+        Assert.Null(node.Auftrag);
+        Assert.Null(node.Funkgruppe);
+        Assert.Equal("Abschnitt gebildet: Nord", Assert.Single(incident.Journal.Skip(before)).Text);
+    }
+
+    [Fact]
     public void Adding_an_abschnitt_logs_abschnitt_gebildet()
     {
         var (incident, clock, op) = NewIncident();
