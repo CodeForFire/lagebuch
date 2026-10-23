@@ -8,7 +8,7 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// The Einsatzleitung Feuerwehr at the top of the Führung board: how it is reached, who leads it,
-/// its Führungsassistenten, and the Führungsstufe set against the one the shape of the Einsatz
+/// its Melder and Führungsassistenten, and the Führungsstufe set against the one the shape of the Einsatz
 /// suggests. One instance for the board's lifetime, updated in place.
 /// </summary>
 public sealed partial class ElCard : ObservableObject
@@ -28,6 +28,7 @@ public sealed partial class ElCard : ObservableObject
         _onSelectStufe = onSelectStufe;
         EditPostCommand = new RelayCommand(() => onEditPost?.Invoke(), () => canEdit);
         SetLeiterCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Leiter), () => canEdit);
+        SetMelderCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Melder), () => canEdit);
         AddAssistantCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Fuehrungsassistent), () => canEdit);
         StufeChoices = BuildStufeChoices(null);
     }
@@ -37,6 +38,9 @@ public sealed partial class ElCard : ObservableObject
 
     /// <summary>Sets the Einsatzleiter, handing over from a running one; off on a read-only Einsatz.</summary>
     public IRelayCommand SetLeiterCommand { get; }
+
+    /// <summary>Sets the Einsatzleitung's Melder, handing over from a running one; off on a read-only Einsatz.</summary>
+    public IRelayCommand SetMelderCommand { get; }
 
     /// <summary>Adds a Führungsassistent (S1 to S6); off on a read-only Einsatz.</summary>
     public IRelayCommand AddAssistantCommand { get; }
@@ -57,6 +61,14 @@ public sealed partial class ElCard : ObservableObject
     [ObservableProperty]
     private BoardPersonRow? _leiter;
 
+    /// <summary>The Einsatzleitung's Melder: a running Melder with no node and no free-text Abschnitt.</summary>
+    [ObservableProperty]
+    private BoardPersonRow? _melder;
+
+    /// <summary>Whether <see cref="Further"/> has anyone, for its "Weitere" heading.</summary>
+    [ObservableProperty]
+    private bool _hasFurther;
+
     [ObservableProperty]
     private string _stufeText = NoStufeText;
 
@@ -67,6 +79,12 @@ public sealed partial class ElCard : ObservableObject
     private bool _matchesSuggestion;
 
     public ObservableCollection<BoardPersonRow> Assistants { get; } = [];
+
+    /// <summary>
+    /// Further Leiter and Melder at the Einsatzleitung beyond the posts (an EAL typed on FUNKTIONEN
+    /// without an Abschnitt): shown under "Weitere", so nobody the Bericht prints is missing here.
+    /// </summary>
+    public ObservableCollection<BoardPersonRow> Further { get; } = [];
 
     /// <summary>Stufe A to D, then "Keine"; replaced only on a real change (#408).</summary>
     public IReadOnlyList<StufeChoice> StufeChoices { get; private set; }
@@ -83,9 +101,12 @@ public sealed partial class ElCard : ObservableObject
         Telefon = post.Telefon;
         Funkgruppe = post.Funkgruppe;
         Leiter = BoardPersonRow.Follow(Leiter, entry.Leiter);
+        Melder = BoardPersonRow.Follow(Melder, entry.Melder);
         BoardPersonRow.Reconcile(Assistants, entry.Others);
-        StufeText = stufe is { } set ? $"Stufe {LeadershipKeys.StufeKey(set)}" : NoStufeText;
-        SuggestionText = $"Vorschlag: Stufe {LeadershipKeys.StufeKey(suggestion.Stufe)} – {suggestion.Reason}";
+        BoardPersonRow.Reconcile(Further, entry.Further);
+        HasFurther = Further.Count > 0;
+        StufeText = stufe is { } set ? $"Stufe {FuehrungsstufeLabels.Of(set)}" : NoStufeText;
+        SuggestionText = $"Vorschlag: Stufe {FuehrungsstufeLabels.Of(suggestion.Stufe)} – {suggestion.Reason}";
         MatchesSuggestion = stufe == suggestion.Stufe;
 
         var choices = BuildStufeChoices(stufe);
@@ -103,7 +124,7 @@ public sealed partial class ElCard : ObservableObject
         Fuehrungsstufe?[] stufen = [Fuehrungsstufe.A, Fuehrungsstufe.B, Fuehrungsstufe.C, Fuehrungsstufe.D, null];
         return [.. stufen.Select(s => new StufeChoice(
             s,
-            s is { } set ? $"Stufe {LeadershipKeys.StufeKey(set)}" : "Keine",
+            s is { } set ? $"Stufe {FuehrungsstufeLabels.Of(set)}" : "Keine",
             s == current,
             new RelayCommand(() => _onSelectStufe(s))))];
     }

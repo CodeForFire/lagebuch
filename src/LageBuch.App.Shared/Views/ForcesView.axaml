@@ -289,7 +289,7 @@
           <DataGridTemplateColumn Header="ABSCHNITT" Width="170">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
-                <ctrl:NodeChoicePicker Margin="6,4" Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}"
+                <ctrl:NodeChoicePicker Margin="6,4" Choices="{Binding NodeChoices}" Label="{Binding NodeCellLabel}"
                                        IsEnabled="{Binding !IsReadOnly}" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>

@@ -81,6 +81,7 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         {
             (RoleSlot.Leiter, null) => ("Einsatzleiter festlegen", "FESTLEGEN"),
             (RoleSlot.Leiter, _) => ($"Leiter festlegen – {label}", "FESTLEGEN"),
+            (RoleSlot.Melder, null) => ("Melder festlegen – Einsatzleitung", "FESTLEGEN"),
             (RoleSlot.Melder, _) => ($"Melder festlegen – {label}", "FESTLEGEN"),
             (RoleSlot.Fuehrungsassistent, _) => ("Führungsassistenz hinzufügen", "HINZUFÜGEN"),
             (RoleSlot.Fachberater, _) => ("Fachberater hinzufügen", "HINZUFÜGEN"),
@@ -337,7 +338,7 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
                 _onChanged?.Invoke();
             }
 
-            SaveError = $"Nicht möglich: {ex.Message}";
+            SaveError = DomainRefusal.Message(ex);
             return;
         }
 

@@ -57,12 +57,38 @@ public class LeadershipBoardPersonTests
         using var vm = NewVmOpening(NewSession(), opened);
 
         vm.El.SetLeiterCommand.Execute(null);
+        vm.El.SetMelderCommand.Execute(null);
         vm.El.AddAssistantCommand.Execute(null);
         vm.AddFachberaterCommand.Execute(null);
 
         Assert.Equal(
-            ["Einsatzleiter festlegen", "Führungsassistenz hinzufügen", "Fachberater hinzufügen"],
+            ["Einsatzleiter festlegen", "Melder festlegen – Einsatzleitung", "Führungsassistenz hinzufügen", "Fachberater hinzufügen"],
             opened.Select(d => d.Title));
+    }
+
+    [Fact]
+    public void The_Einsatzleitungs_Melder_dialog_sets_a_root_Melder_and_hands_it_over()
+    {
+        var session = NewSession();
+        var opened = new List<LeadershipPersonDialogViewModel>();
+        using var vm = NewVmOpening(session, opened);
+
+        vm.El.SetMelderCommand.Execute(null);
+        opened[0].Role = "Melder";
+        opened[0].PersonName = "Tobias Wagner";
+        opened[0].SaveCommand.Execute(null);
+
+        var first = session.Incident.Roles.Single();
+        Assert.Equal(((Guid?)null, RoleSlot.Melder), (first.NodeId, first.Slot));
+        Assert.Equal("Tobias Wagner", vm.El.Melder?.PersonName);
+
+        vm.El.SetMelderCommand.Execute(null);
+        Assert.Equal("Übergabe: Tobias Wagner → neu", opened[1].HandoverText);
+        opened[1].PersonName = "Lena Lehner";
+        opened[1].SaveCommand.Execute(null);
+
+        Assert.Equal("Lena Lehner", vm.El.Melder?.PersonName);
+        Assert.Single(session.Incident.Roles, r => r.To is null);
     }
 
     [Fact]
@@ -92,6 +118,7 @@ public class LeadershipBoardPersonTests
         Assert.False(card.SetMelderCommand.CanExecute(null));
         Assert.False(card.AddMemberCommand.CanExecute(null));
         Assert.False(vm.El.SetLeiterCommand.CanExecute(null));
+        Assert.False(vm.El.SetMelderCommand.CanExecute(null));
         Assert.False(vm.El.AddAssistantCommand.CanExecute(null));
         Assert.False(vm.AddFachberaterCommand.CanExecute(null));
     }
@@ -105,6 +132,7 @@ public class LeadershipBoardPersonTests
 
         Assert.True(vm.Partners.Single().SetLeiterCommand.CanExecute(null));
         Assert.True(vm.El.SetLeiterCommand.CanExecute(null));
+        Assert.True(vm.El.SetMelderCommand.CanExecute(null));
         Assert.True(vm.AddFachberaterCommand.CanExecute(null));
     }
 }

@@ -15,14 +15,21 @@ public static class FuehrungsorganisationSection
     private const float IndentPoints = 14;
 
     /// <summary>
-    /// Whether the incident has anything to show: a live node or a running assignment in a slot.
-    /// A section with nothing in it is left out, heading included.
+    /// Whether the incident has anything to show: a live node, or a running assignment in a slot that
+    /// the section prints. A section with nothing in it is left out, heading included.
     /// </summary>
+    /// <remarks>
+    /// Without a live node, a slotted assignment is printed when it has no node (the Einsatzleitung
+    /// or a free-text Abschnitt) or is a Fachberater, who are listed wherever they sit. One that
+    /// names a node a hostile file left out would print nothing under the heading, so it does not count.
+    /// </remarks>
     public static bool HasContent(Incident incident)
     {
         ArgumentNullException.ThrowIfNull(incident);
         return incident.CommandNodes.Any(n => n.IsLive)
-            || incident.Roles.Any(r => r.To is null && r.Slot != RoleSlot.None);
+            || incident.Roles.Any(r => r.To is null
+                && r.Slot != RoleSlot.None
+                && (r.NodeId is null || r.Slot == RoleSlot.Fachberater));
     }
 
     public static void Compose(IContainer container, Incident incident)
@@ -83,6 +90,11 @@ public static class FuehrungsorganisationSection
                 yield return (sub, $"Führungsassistenz: {assistant.Role} {assistant.PersonName}", false);
             }
 
+            if (entry.Further.Count > 0)
+            {
+                yield return (sub, $"Weitere: {People(entry.Further, withParentheses: false)}", false);
+            }
+
             yield break;
         }
 
@@ -97,35 +109,42 @@ public static class FuehrungsorganisationSection
         }
     }
 
-    private static string Headline(Incident incident, ReportingEntry entry)
+    // The Fachberater row never gets here, so a row without a node is the Einsatzleitung.
+    private static string Headline(Incident incident, ReportingEntry entry) =>
+        entry.Node is { } node ? NodeHeadline(entry, node) : EinsatzleitungHeadline(incident, entry);
+
+    private static string EinsatzleitungHeadline(Incident incident, ReportingEntry entry)
     {
-        if (entry.Kind == ReportingEntryKind.Einsatzleitung)
+        var line = "Einsatzleitung Feuerwehr";
+        if (entry.Leiter is { } leiter)
         {
-            var line = "Einsatzleitung Feuerwehr";
-            if (entry.Leiter is { } leiter)
+            line += $" – EL {leiter.PersonName}";
+            if (!string.IsNullOrWhiteSpace(leiter.CallSign))
             {
-                line += $" – EL {leiter.PersonName}";
-                if (!string.IsNullOrWhiteSpace(leiter.CallSign))
-                {
-                    line += $" ({leiter.CallSign})";
-                }
+                line += $" ({leiter.CallSign})";
             }
-
-            if (incident.Fuehrungsstufe is { } stufe)
-            {
-                line += $" · Stufe {stufe}";
-            }
-
-            if (!string.IsNullOrWhiteSpace(incident.LeadershipPost.Funkgruppe))
-            {
-                line += $" · Funkgruppe {incident.LeadershipPost.Funkgruppe}";
-            }
-
-            return line;
         }
 
-        var node = entry.Node!;
+        if (entry.Melder is { } melder)
+        {
+            line += $" – Melder: {melder.PersonName}";
+        }
 
+        if (incident.Fuehrungsstufe is { } stufe)
+        {
+            line += $" · Stufe {FuehrungsstufeLabels.Of(stufe)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(incident.LeadershipPost.Funkgruppe))
+        {
+            line += $" · Funkgruppe {incident.LeadershipPost.Funkgruppe}";
+        }
+
+        return line;
+    }
+
+    private static string NodeHeadline(ReportingEntry entry, CommandNode node)
+    {
         // The Unterabschnitt's parent is the headline right above it, so its own name is enough. A
         // name that already starts with the kind ("Abschnitt 1 Nord") is not prefixed twice.
         var label = CommandNodeKindLabels.Of(node.Kind);

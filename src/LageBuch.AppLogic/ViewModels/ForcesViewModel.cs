@@ -119,6 +119,7 @@ public sealed partial class ForceRow : ObservableObject
         {
             NodeLabel = label;
             OnPropertyChanged(nameof(NodeLabel));
+            OnPropertyChanged(nameof(NodeCellLabel));
         }
 
         _pulling = true;
@@ -154,8 +155,7 @@ public sealed partial class ForceRow : ObservableObject
     private (IReadOnlyList<NodeChoice> Choices, string Label) BuildNode(Domain.ForceUnit unit, Domain.Incident incident)
     {
         var choices = ViewModels.NodeChoices.Build(incident, unit.NodeId, MoveTo);
-        var placed = ViewModels.NodeChoices.CurrentNodeId(choices);
-        return (choices, Domain.Formatting.OrDash(incident.NodeLabel(placed)));
+        return (choices, ViewModels.NodeChoices.LabelOf(incident, choices));
     }
 
     // The Abschnitt the unit counts as sitting in: a hostile NodeId (missing, dissolved, Partner)
@@ -176,8 +176,14 @@ public sealed partial class ForceRow : ObservableObject
     /// <summary>The Abschnitt picker's entries (shared with the Führung board); replaced only on a real change.</summary>
     public IReadOnlyList<NodeChoice> NodeChoices { get; private set; }
 
-    /// <summary>Where the unit sits, for the grid cell; "—" when it is in no Abschnitt.</summary>
+    /// <summary>Where the unit sits, for the picker; <see cref="ViewModels.NodeChoices.UnplacedLabel"/> when it is in no Abschnitt.</summary>
     public string NodeLabel { get; private set; }
+
+    /// <summary>
+    /// <see cref="NodeLabel"/> for the grid's narrow ABSCHNITT column: "—" for an unplaced unit, where
+    /// "— nicht zugeordnet —" would be cut to "— nicht zugeordn…". The phone card has the room.
+    /// </summary>
+    public string NodeCellLabel => _placedNodeId is null ? "—" : NodeLabel;
 
     public Guid Id { get; }
 
@@ -815,7 +821,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
                 catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
                 {
                     // A peer got there first (the Abschnitt was dissolved a moment ago): say so, leave the list as is.
-                    ActionError = $"Nicht möglich: {ex.Message}";
+                    ActionError = DomainRefusal.Message(ex);
                     return;
                 }
 

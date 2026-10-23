@@ -50,7 +50,7 @@ public class RolesNodeLabelRenderTests
         var cells = window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "RoleSectionText").ToList();
         Assert.Equal(["Abschnitt 1 / Nord", "Wache Süd"], cells.Select(c => c.Text));
         Assert.Equal(
-            ["Auf der Führungstafel zugeordnet", null],
+            ["Unter FÜHRUNG zugeordnet", null],
             cells.Select(c => (string?)ToolTip.GetTip(c)));
 
         var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");

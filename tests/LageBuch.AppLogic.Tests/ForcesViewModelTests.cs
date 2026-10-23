@@ -1036,14 +1036,19 @@ public class ForcesViewModelTests
     {
         var (vm, session, changes) = NewVmWithUnits();
         var row = vm.Forces[0];
-        Assert.Equal("—", row.NodeLabel);
+        Assert.Equal(NodeChoices.UnplacedLabel, row.NodeLabel);
+        Assert.Equal("—", row.NodeCellLabel);
         var nord = session.Incident.CommandNodes.Single();
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
         row.NodeChoices.Single(c => c.NodeId == nord.Id).SelectCommand.Execute(null);
 
         Assert.Equal(nord.Id, session.Incident.Forces[0].NodeId);
         Assert.Equal(1, changes[0]);
         Assert.Equal("Nord", row.NodeLabel);
+        Assert.Equal("Nord", row.NodeCellLabel);
+        Assert.Contains(nameof(ForceRow.NodeCellLabel), raised);
         Assert.Equal(nord.Id, Assert.Single(row.NodeChoices, c => c.IsCurrent).NodeId);
         Assert.Null(Assert.Single(vm.Forces[1].NodeChoices, c => c.IsCurrent).NodeId);
     }

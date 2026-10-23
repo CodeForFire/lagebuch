@@ -97,6 +97,69 @@ public class ReportingLineTests
     }
 
     [Fact]
+    public void A_Melder_typed_without_an_Abschnitt_is_the_Einsatzleitungs_Melder()
+    {
+        var incident = NewIncident();
+        var melder = incident.AssignRole(Clock, Op, "Melder", "Wagner", slot: RoleSlot.Melder);
+        incident.AssignRole(Clock, Op, "Melder", "Lang", section: "Nord", slot: RoleSlot.Melder);
+
+        var el = ReportingLine.Of(incident)[0];
+
+        Assert.Equal(melder, el.Melder);
+        Assert.Empty(el.Further);
+    }
+
+    [Fact]
+    public void Further_root_Leiter_and_Melder_are_kept_as_further_people_of_the_Einsatzleitung()
+    {
+        var incident = NewIncident();
+        var eal = incident.AssignRole(Clock, Op, "EAL", "Bauer", slot: RoleSlot.Leiter);
+        var el = incident.AssignRole(Clock, Op, "EL", "Huber", slot: RoleSlot.Leiter);
+        var melder = incident.AssignRole(Clock, Op, "Melder", "Wagner", slot: RoleSlot.Melder);
+        var second = incident.AssignRole(Clock, Op, "Melder", "Lang", slot: RoleSlot.Melder);
+        var assistent = incident.AssignRole(Clock, Op, "FA", "Mayer", slot: RoleSlot.Fuehrungsassistent);
+
+        var entry = ReportingLine.Of(incident)[0];
+
+        Assert.Equal(eal, entry.Leiter);
+        Assert.Equal(melder, entry.Melder);
+        Assert.Equal([el, second], entry.Further.ToArray());
+        Assert.Equal(assistent, Assert.Single(entry.Others));
+    }
+
+    [Fact]
+    public void Only_the_Einsatzleitung_has_further_people()
+    {
+        var incident = NewIncident();
+        var nord = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Nord");
+        incident.AssignRole(Clock, Op, "Fachberater THW", "Gruber", slot: RoleSlot.Fachberater);
+        incident.AssignRole(Clock, Op, "AL", "Huber", nodeId: nord.Id, slot: RoleSlot.Leiter);
+        incident.AssignRole(Clock, Op, "AL", "Fischer", nodeId: nord.Id, slot: RoleSlot.Leiter);
+
+        Assert.All(ReportingLine.Of(incident).Skip(1), e => Assert.Empty(e.Further));
+    }
+
+    [Fact]
+    public void A_node_lists_a_second_Leiter_or_Melder_and_a_Fuehrungsassistent_among_its_others()
+    {
+        var incident = NewIncident();
+        var nord = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Nord");
+        var leiter = incident.AssignRole(Clock, Op, "AL", "Huber", nodeId: nord.Id, slot: RoleSlot.Leiter);
+        var secondLeiter = incident.AssignRole(Clock, Op, "AL", "Fischer", nodeId: nord.Id, slot: RoleSlot.Leiter);
+        var melder = incident.AssignRole(Clock, Op, "Melder", "Mayer", nodeId: nord.Id, slot: RoleSlot.Melder);
+        var secondMelder = incident.AssignRole(Clock, Op, "Melder", "Lang", nodeId: nord.Id, slot: RoleSlot.Melder);
+        var assistent = incident.AssignRole(Clock, Op, "S2", "Bauer", nodeId: nord.Id, slot: RoleSlot.Fuehrungsassistent);
+        var member = incident.AssignRole(Clock, Op, "Sicherheit", "Gruber", nodeId: nord.Id);
+        incident.AssignRole(Clock, Op, "Fachberater THW", "Wolf", nodeId: nord.Id, slot: RoleSlot.Fachberater);
+
+        var entry = ReportingLine.Of(incident).Single(e => e.Node?.Id == nord.Id);
+
+        Assert.Equal(leiter, entry.Leiter);
+        Assert.Equal(melder, entry.Melder);
+        Assert.Equal([secondLeiter, secondMelder, assistent, member], entry.Others.ToArray());
+    }
+
+    [Fact]
     public void A_Leiter_with_a_free_text_Section_is_not_the_Einsatzleitung()
     {
         var incident = NewIncident();

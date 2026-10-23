@@ -82,7 +82,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     public bool IsPlaced => NodeId is not null;
 
     /// <summary>Why the cell cannot be typed into, for a placed row; null for one that was typed in.</summary>
-    public string? SectionToolTip => IsPlaced ? "Auf der Führungstafel zugeordnet" : null;
+    public string? SectionToolTip => IsPlaced ? "Unter FÜHRUNG zugeordnet" : null;
 
     public string? CallSign { get; }
 

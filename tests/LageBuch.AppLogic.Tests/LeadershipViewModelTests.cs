@@ -146,7 +146,7 @@ public class LeadershipViewModelTests
         Assert.True(vm.HasUnplacedUnits);
         var unplaced = Assert.Single(vm.UnplacedUnits);
         Assert.Equal("Florian Steinhöring 40/1", unplaced.Title);
-        Assert.Equal("—", unplaced.NodeLabel);
+        Assert.Equal(NodeChoices.UnplacedLabel, unplaced.NodeLabel);
 
         Assert.True(vm.HasFreeTextSections);
         var freeText = Assert.Single(vm.FreeTextSections);
@@ -168,6 +168,42 @@ public class LeadershipViewModelTests
 
         Assert.Equal("Vorschlag: Stufe B – 1 Abschnitt, keine Einheiten", vm.El.SuggestionText);
         Assert.True(vm.El.MatchesSuggestion);
+    }
+
+    [Fact]
+    public void A_Melder_and_a_further_Leiter_typed_on_FUNKTIONEN_show_on_the_Einsatzleitung()
+    {
+        var session = NewSession();
+        session.AssignRole("Einsatzleiter", "Max Mustermann", slot: RoleSlot.Leiter);
+        session.AssignRole("Melder", "Tobias Wagner", "Florian Emmering 1/2", slot: RoleSlot.Melder);
+        session.AssignRole("Einsatzabschnittsleiter", "Hans Huber", slot: RoleSlot.Leiter);
+
+        using var vm = NewVm(session);
+
+        Assert.Equal("Max Mustermann", vm.El.Leiter?.PersonName);
+        Assert.Equal("Tobias Wagner · Florian Emmering 1/2", vm.El.Melder?.Text);
+        var further = Assert.Single(vm.El.Further);
+        Assert.Equal(("Einsatzabschnittsleiter", "Hans Huber"), (further.Role, further.PersonName));
+        Assert.True(vm.El.HasFurther);
+    }
+
+    [Fact]
+    public void The_Einsatzleitungs_Melder_follows_a_correction_and_a_handover()
+    {
+        var session = NewSession();
+        session.AssignRole("Melder", "Tobias Wagner", slot: RoleSlot.Melder);
+        var melder = session.Incident.Roles.Single();
+        using var vm = NewVm(session);
+        var row = vm.El.Melder;
+
+        session.EditRolePhone(melder.Id, "0151 1234567");
+        Assert.Same(row, vm.El.Melder);
+        Assert.Equal("0151 1234567", vm.El.Melder?.Phone);
+
+        session.TransferRole(melder.Id, "Lena Lehner");
+        Assert.Equal("Lena Lehner", vm.El.Melder?.PersonName);
+        Assert.Empty(vm.El.Further);
+        Assert.False(vm.El.HasFurther);
     }
 
     [Fact]

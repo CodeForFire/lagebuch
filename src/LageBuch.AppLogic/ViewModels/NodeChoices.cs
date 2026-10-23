@@ -37,6 +37,16 @@ public static class NodeChoices
         return choices;
     }
 
+    /// <summary>
+    /// What a closed picker says: the label of the node marked current, or <see cref="UnplacedLabel"/>
+    /// when the unit counts as unplaced, so an empty picker still reads as one rather than a bare dash.
+    /// </summary>
+    public static string LabelOf(Incident incident, IReadOnlyList<NodeChoice> choices)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        return incident.NodeLabel(CurrentNodeId(choices)) ?? UnplacedLabel;
+    }
+
     /// <summary>The node the entry marked current stands for; null when the unit counts as unplaced.</summary>
     public static Guid? CurrentNodeId(IReadOnlyList<NodeChoice> choices)
     {

@@ -419,6 +419,113 @@ public class CommandNodeDialogViewModelTests
     }
 
     [Fact]
+    public void Saving_one_changed_field_keeps_a_peers_edit_to_the_others()
+    {
+        var session = NewSession();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", null, "Brandbekämpfung", "Hofeinfahrt", null, "Florian Nord", null);
+        var id = session.Incident.CommandNodes[^1].Id;
+        var vm = CommandNodeDialogViewModel.ForEdit(session, WithTalkGroups(), id);
+
+        session.UpdateCommandNode(id, "Nord", "Riegelstellung", "Hofeinfahrt", "TMO FW_MUSTER 1000", "Florian Nord", "0151 1234567");
+        vm.Name = "Nord-West";
+        vm.SaveCommand.Execute(null);
+
+        var node = session.Incident.CommandNodes.Single();
+        Assert.Equal(
+            ("Nord-West", "Riegelstellung", "Hofeinfahrt", "TMO FW_MUSTER 1000", "Florian Nord", "0151 1234567"),
+            (node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon));
+    }
+
+    [Fact]
+    public void A_peers_rename_survives_an_edit_to_another_field()
+    {
+        var session = NewSession();
+        var id = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var vm = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, id);
+
+        session.UpdateCommandNode(id, "Nord-Ost", null, null, null, null, null);
+        vm.Auftrag = "Riegelstellung";
+        vm.SaveCommand.Execute(null);
+
+        var node = session.Incident.CommandNodes.Single();
+        Assert.Equal(("Nord-Ost", "Riegelstellung"), (node.Name, node.Auftrag));
+    }
+
+    [Fact]
+    public void A_field_the_Lagebuchfuehrer_changed_wins_over_a_peers_edit_to_it()
+    {
+        var session = NewSession();
+        var id = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var vm = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, id);
+
+        session.UpdateCommandNode(id, "Nord", "Riegelstellung", null, null, null, null);
+        vm.Auftrag = "Menschenrettung";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Menschenrettung", session.Incident.CommandNodes.Single().Auftrag);
+    }
+
+    [Fact]
+    public void Saving_one_changed_post_field_keeps_a_peers_edit_to_the_others()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", null, null);
+        var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
+
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 12345", "TMO FW_MUSTER 1000");
+        vm.Standort = "ELW am Marktplatz";
+        vm.SaveCommand.Execute(null);
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal(
+            ("ELW am Marktplatz", "Florian Emmering 1", "08141 12345", "TMO FW_MUSTER 1000"),
+            (post.Standort, post.Rufname, post.Telefon, post.Funkgruppe));
+    }
+
+    [Fact]
+    public void Forming_an_Unterabschnitt_under_an_Abschnitt_a_peer_dissolved_shows_an_error_and_saves_nothing()
+    {
+        var session = NewSession();
+        var parent = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var vm = Create(session, CommandNodeKind.Unterabschnitt, parent, "Dach");
+        session.DissolveCommandNode(parent);
+        var closed = 0;
+        vm.Closed += (_, _) => closed++;
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Dieser Abschnitt wurde inzwischen aufgelöst.", vm.SaveError);
+        Assert.Single(session.Incident.CommandNodes);
+        Assert.Equal(0, closed);
+    }
+
+    [Fact]
+    public void An_Unterabschnitt_is_formed_under_a_live_Abschnitt_beside_others()
+    {
+        var session = NewSession();
+        AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Süd");
+        var vm = Create(session, CommandNodeKind.Unterabschnitt, sued, "Dach");
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Null(vm.SaveError);
+        Assert.Equal(sued, session.Incident.CommandNodes.Single(n => n.Name == "Dach").ParentId);
+    }
+
+    [Fact]
+    public void A_domain_refusal_is_shown_without_the_parameter_name()
+    {
+        var session = NewSession();
+        var vm = Create(session, name: "Nord");
+        vm.Telefon = new string('1', 51);
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.DoesNotContain("(Parameter", vm.SaveError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void An_untouched_edit_dialog_does_not_ask_over_a_funkgruppe_spelt_off_catalogue()
     {
         var session = NewSession();

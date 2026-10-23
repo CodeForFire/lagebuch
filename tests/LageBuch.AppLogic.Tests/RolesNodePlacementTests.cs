@@ -61,8 +61,10 @@ public class RolesNodePlacementTests
         var typed = vm.Roles.Single(r => r.Role == "ZF");
         Assert.Equal("Abschnitt 1 / Nord", placed.SectionLabel);
         Assert.True(placed.IsPlaced);
+        Assert.Equal("Unter FÜHRUNG zugeordnet", placed.SectionToolTip);
         Assert.Equal("Wache Süd", typed.SectionLabel);
         Assert.False(typed.IsPlaced);
+        Assert.Null(typed.SectionToolTip);
     }
 
     [Fact]
@@ -81,6 +83,46 @@ public class RolesNodePlacementTests
         Assert.Equal(nord, row.NodeId);
         Assert.Equal("Nord", row.SectionLabel);
         Assert.True(row.IsPlaced);
+    }
+
+    [Fact]
+    public void Renaming_a_node_on_the_board_relabels_its_placed_row_in_place()
+    {
+        var f = new Fixture(RoleUniqueness.Multiple);
+        var abschnitt = f.Node(CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var nord = f.Node(CommandNodeKind.Unterabschnitt, "Nord", abschnitt);
+        f.Place("Mustermann, Max", nord);
+        using var vm = f.Vm();
+        var row = vm.Roles.Single();
+
+        f.Session.UpdateCommandNode(abschnitt, "Abschnitt 1 Brandbekämpfung", null, null, null, null, null);
+        Assert.Equal("Abschnitt 1 Brandbekämpfung / Nord", row.SectionLabel);
+
+        f.Session.UpdateCommandNode(nord, "Dach", null, null, null, null, null);
+        Assert.Same(row, vm.Roles.Single());
+        Assert.Equal("Abschnitt 1 Brandbekämpfung / Dach", row.SectionLabel);
+    }
+
+    [Fact]
+    public void An_ended_row_keeps_its_last_label_after_its_node_is_dissolved()
+    {
+        var f = new Fixture(RoleUniqueness.Multiple);
+        var nord = f.Node(CommandNodeKind.Abschnitt, "Nord");
+        f.Place("Mustermann, Max", nord);
+        using var vm = f.Vm();
+        var ended = vm.Roles.Single();
+
+        // A handover ends the row; the successor then leaves for the Einsatzleitung, which frees the node.
+        f.Session.TransferRole(ended.Id, "Musterfrau, Erika");
+        var successor = f.Session.Incident.Roles.Single(r => r.To is null);
+        f.Session.PlaceRoleAssignment(successor.Id, null, RoleSlot.Leiter);
+        f.Session.DissolveCommandNode(nord);
+        vm.ShowAllRoles = true;
+
+        var row = vm.Roles.Single(r => r.Id == ended.Id);
+        Assert.NotNull(row.To);
+        Assert.Equal("Nord", row.SectionLabel);
+        Assert.Null(vm.Roles.Single(r => r.Id == successor.Id).SectionLabel);
     }
 
     [Fact]

@@ -121,6 +121,18 @@
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
     </Style>
 
+    <!-- Why AUFLÖSEN is off. The desktop says it in the button's tooltip; a phone has no hover, so
+         the narrow layout shows it under the button instead. Hidden by a Style, not an attribute, so
+         the narrow style below can turn it on. -->
+    <Style Selector="TextBlock.dissolve-reason">
+      <Setter Property="IsVisible" Value="False" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="TextAlignment" Value="Right" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+
     <Style Selector="Button.board-action">
       <Setter Property="Height" Value="26" />
       <Setter Property="Padding" Value="9,0" />
@@ -173,6 +185,9 @@
     <!-- On a phone the picker is the only way to move a unit: a thumb target. -->
     <Style Selector="Panel#WorkspaceRoot.narrow ctrl|NodeChoicePicker.unit-picker">
       <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock.dissolve-reason.blocked">
+      <Setter Property="IsVisible" Value="True" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow Button.board-action">
       <Setter Property="Height" Value="36" />
@@ -243,6 +258,15 @@
           </Grid>
 
           <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="MELDER" />
+            <TextBlock Grid.Column="1" Classes="field-value" x:Name="ElMelderText"
+                       Text="{Binding Melder.Text, FallbackValue='—', TargetNullValue='—'}" />
+            <Button Grid.Column="2" x:Name="LeadershipSetElMelderButton" Classes="board-action" Content="FESTLEGEN"
+                    ToolTip.Tip="Melder festlegen" AutomationProperties.Name="Melder der Einsatzleitung festlegen"
+                    Command="{Binding SetMelderCommand}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
             <TextBlock Grid.Column="0" Classes="field-label" Text="ASSISTENZ" VerticalAlignment="Top" Margin="0,4,0,0" />
             <StackPanel Grid.Column="1" Spacing="4">
               <TextBlock Classes="field-value" Text="—"
@@ -251,6 +275,13 @@
             </StackPanel>
             <Button Grid.Column="2" Classes="board-action" Content="+ ASSISTENZ" VerticalAlignment="Top"
                     ToolTip.Tip="Führungsassistenz hinzufügen" Command="{Binding AddAssistantCommand}" />
+          </Grid>
+
+          <!-- A second Leiter or Melder typed on FUNKTIONEN without an Abschnitt (an EAL beside the
+               EL): shown, so nobody the Bericht prints is missing from the board. -->
+          <Grid x:Name="ElFurther" ColumnDefinitions="96,*" ColumnSpacing="6" IsVisible="{Binding HasFurther}">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="WEITERE" VerticalAlignment="Top" Margin="0,4,0,0" />
+            <ItemsControl Grid.Column="1" ItemsSource="{Binding Further}" ItemTemplate="{StaticResource PersonRowTemplate}" />
           </Grid>
 
           <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2" ColumnSpacing="6">
@@ -362,6 +393,8 @@
                     Command="{Binding DissolveCommand}"
                     ToolTip.Tip="{Binding DissolveBlockedReason}" ToolTip.ShowOnDisabled="True" />
           </Grid>
+          <TextBlock x:Name="DissolveBlockedText" Classes="dissolve-reason" Text="{Binding DissolveBlockedReason}"
+                     Classes.blocked="{Binding DissolveBlockedReason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
 
           <Grid ColumnDefinitions="76,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6">

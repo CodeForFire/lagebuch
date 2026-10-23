@@ -85,7 +85,7 @@ public static class NavigationLayout
         InsertMissingModules(
             slots, s => s.Key, k => new Slot(k, new NavItemSpec(k, null)), seenModules);
 
-        var result = slots.Where(s => s.Spec is not null).Select(s => s.Spec!).ToList();
+        var result = slots.Select(s => s.Spec).OfType<NavItemSpec>().ToList();
 
         // Unreachable while NavModules.All contains the ETB -- the pass above already appends it
         // when a layout omits it. Kept as the one place the "the ETB is always in the rail"

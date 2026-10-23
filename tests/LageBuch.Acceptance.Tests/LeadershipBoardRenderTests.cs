@@ -57,6 +57,7 @@ public class LeadershipBoardRenderTests
     {
         session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 40123", "TMO FW_EMMERING 1000");
         session.AssignRole("Einsatzleiter", "Max Mustermann", "Florian Emmering 1", slot: RoleSlot.Leiter);
+        session.AssignRole("Melder", "Lukas Brandl", slot: RoleSlot.Melder);
         session.AssignRole("S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
 
         var markt = AddNode(session, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz", auftrag: "Nachrückende Kräfte sammeln");
@@ -201,7 +202,14 @@ public class LeadershipBoardRenderTests
         var badge = view.GetControl<Border>("DispatchCentreBadge");
         Assert.Equal("ILS", badge.GetVisualDescendants().OfType<TextBlock>().Single().Text);
         Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(view, "ElLeiterText").Text);
+        Assert.Equal("Lukas Brandl", Named<TextBlock>(view, "ElMelderText").Text);
+        Assert.False(Named<Grid>(view, "ElFurther").IsVisible);
         Assert.Equal("Stufe B", Named<TextBlock>(view, "StufeText").Text);
+
+        // On the desktop the reason AUFLÖSEN is off is the button's tooltip, not a line on the card.
+        Assert.All(
+            view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "DissolveBlockedText"),
+            t => Assert.False(t.IsVisible));
         Assert.Contains("mismatch", Named<TextBlock>(view, "StufeSuggestionText").Classes);
 
         // The sections wrap into one row of equal width, the Unterabschnitt inside its Abschnitt.
@@ -327,7 +335,34 @@ public class LeadershipBoardRenderTests
         Assert.All(
             view.GetVisualDescendants().OfType<NodeChoicePicker>().ToList(),
             p => Assert.True(p.IsEffectivelyVisible && p.IsEffectivelyEnabled));
+
+        // A phone has no hover: the reason AUFLÖSEN is off stands on the card, only where it is off.
+        TextBlock Reason(string name) => Card(view, name).GetVisualDescendants().OfType<TextBlock>()
+            .First(t => t.Name == "DissolveBlockedText");
+        Assert.True(Reason("Abschnitt 2 Süd").IsVisible);
+        Assert.Equal("Erst die Einheiten verschieben.", Reason("Abschnitt 2 Süd").Text);
         Capture(board.Window, "fuehrung-board-narrow.png");
+    }
+
+    [AvaloniaFact]
+    public void The_narrow_board_shows_no_reason_on_a_card_that_can_be_dissolved()
+    {
+        var board = Show(narrow: true, filled: false, more: s => s.AddCommandNode(CommandNodeKind.Abschnitt, "Abschnitt 1"));
+
+        var reason = Card(board.View, "Abschnitt 1").GetVisualDescendants().OfType<TextBlock>()
+            .First(t => t.Name == "DissolveBlockedText");
+        Assert.False(reason.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void A_further_leiter_typed_on_funktionen_stands_under_weitere_on_the_einsatzleitung()
+    {
+        var board = Show(more: s => s.AssignRole("Einsatzabschnittsleiter", "Georg Lechner", slot: RoleSlot.Leiter));
+
+        var further = Named<Grid>(board.View, "ElFurther");
+        Assert.True(further.IsVisible);
+        Assert.Contains("Georg Lechner", further.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(board.View, "ElLeiterText").Text);
     }
 
     [AvaloniaFact]

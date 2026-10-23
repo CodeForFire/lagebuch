@@ -16,8 +16,9 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 /// <remarks>
 /// The Domain is the last guard for lengths and names; this dialog pre-checks what it refuses (a blank
-/// or taken name, a node a peer dissolved meanwhile) so the Lagebuchführer sees a field error rather
-/// than an exception. The caps are enforced as <c>MaxLength</c> in the view.
+/// or taken name, a node or an Unterabschnitt's Abschnitt a peer dissolved meanwhile) so the
+/// Lagebuchführer sees a field error rather than an exception. The caps are enforced as
+/// <c>MaxLength</c> in the view.
 /// </remarks>
 public sealed partial class CommandNodeDialogViewModel : ObservableObject
 {
@@ -232,7 +233,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
         {
-            SaveError = $"Nicht möglich: {ex.Message}";
+            SaveError = DomainRefusal.Message(ex);
             return;
         }
 
@@ -243,12 +244,18 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     // nothing to write.
     private bool Apply()
     {
-        var name = Name?.Trim() ?? string.Empty;
+        var typed = Current();
         switch (_mode)
         {
             case Mode.Create:
+                if (ParentIsGone())
+                {
+                    SaveError = "Dieser Abschnitt wurde inzwischen aufgelöst.";
+                    return false;
+                }
+
                 _session.AddCommandNode(
-                    _kind, name, _parentId, Normalize(Auftrag), Normalize(Standort), FunkgruppeToSave, Normalize(Rufname), Normalize(Telefon));
+                    _kind, typed.Name, _parentId, typed.Auftrag, typed.Standort, typed.Funkgruppe, typed.Rufname, typed.Telefon);
                 _onChanged?.Invoke();
                 return true;
             case Mode.Edit:
@@ -260,8 +267,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
                 if (HasChanges)
                 {
-                    _session.UpdateCommandNode(
-                        node.Id, name, Normalize(Auftrag), Normalize(Standort), FunkgruppeToSave, Normalize(Rufname), Normalize(Telefon));
+                    var save = Merge(typed, Seen(node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon));
+                    _session.UpdateCommandNode(node.Id, save.Name, save.Auftrag, save.Standort, save.Funkgruppe, save.Rufname, save.Telefon);
                     _onChanged?.Invoke();
                 }
 
@@ -269,13 +276,44 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             default:
                 if (HasChanges)
                 {
-                    _session.UpdateLeadershipPost(Normalize(Standort), Normalize(Rufname), Normalize(Telefon), FunkgruppeToSave);
+                    var post = _session.Incident.LeadershipPost;
+                    var save = Merge(typed, Seen(string.Empty, null, post.Standort, post.Funkgruppe, post.Rufname, post.Telefon));
+                    _session.UpdateLeadershipPost(save.Standort, save.Rufname, save.Telefon, save.Funkgruppe);
                     _onChanged?.Invoke();
                 }
 
                 return true;
         }
     }
+
+    // The live record in the form this dialog seeds and saves its fields, so it lines up with _seeded.
+    private Fields Seen(string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
+        new(
+            name.Trim(),
+            Normalize(auftrag),
+            Normalize(standort),
+            Normalize(StammdatenCatalogue.Normalize(funkgruppe, FunkgruppeOptions)),
+            Normalize(rufname),
+            Normalize(telefon));
+
+    // A save writes every field, so one the Lagebuchführer left alone takes the live value: a peer
+    // may have changed it meanwhile, and renaming the node must not put back the Auftrag the dialog
+    // opened with. A field typed here wins, peer or not.
+    private Fields Merge(Fields typed, Fields live) => new(
+        Pick(typed.Name, _seeded.Name, live.Name),
+        Pick(typed.Auftrag, _seeded.Auftrag, live.Auftrag),
+        Pick(typed.Standort, _seeded.Standort, live.Standort),
+        Pick(typed.Funkgruppe, _seeded.Funkgruppe, live.Funkgruppe),
+        Pick(typed.Rufname, _seeded.Rufname, live.Rufname),
+        Pick(typed.Telefon, _seeded.Telefon, live.Telefon));
+
+    private static T Pick<T>(T typed, T seeded, T live) =>
+        EqualityComparer<T>.Default.Equals(typed, seeded) ? live : typed;
+
+    // An Unterabschnitt needs its Abschnitt still standing; a peer may have dissolved it meanwhile.
+    private bool ParentIsGone() =>
+        _kind == CommandNodeKind.Unterabschnitt
+        && !_session.Incident.CommandNodes.Any(n => n.Id == _parentId && n.IsLive && n.Kind == CommandNodeKind.Abschnitt);
 
     /// <summary>ABBRECHEN, and Esc: closes at once when nothing was typed, asks first otherwise.</summary>
     [RelayCommand]

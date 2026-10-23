@@ -106,7 +106,7 @@ public sealed partial class BoardNodeCard : ObservableObject
     /// <summary>What the card says the node is; a partner's node is an Einsatzleitung.</summary>
     public string KindLabel => CommandNodeKindLabels.Of(Kind);
 
-    /// <summary>Running Funktionen in the node with no post (Slot None).</summary>
+    /// <summary>Running Funktionen in the node beside its Leiter and Melder: no post, or one held twice.</summary>
     public ObservableCollection<BoardPersonRow> Members { get; } = [];
 
     public ObservableCollection<BoardUnitRow> Units { get; } = [];

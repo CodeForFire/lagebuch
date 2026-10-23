@@ -1,3 +1,4 @@
+using LageBuch.Documents.Sections;
 using LageBuch.Domain;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Time;
@@ -76,6 +77,94 @@ public class FuehrungsorganisationSectionTests
         PdfText.AssertInOrder(text, Heading, "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1)");
         Assert.DoesNotContain("Stufe", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Funkgruppe", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Einsatzleitungs_Melder_and_a_further_Leiter_typed_on_FUNKTIONEN_are_printed()
+    {
+        var incident = Fresh();
+        El(incident);
+        incident.AssignRole(Clock, Op, "Melder", "Tobias Wagner", slot: RoleSlot.Melder);
+        incident.AssignRole(Clock, Op, "Einsatzabschnittsleiter", "Hans Huber", slot: RoleSlot.Leiter);
+        incident.AssignRole(Clock, Op, "S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
+        incident.SetFuehrungsstufe(Clock, Op, Fuehrungsstufe.C);
+
+        PdfText.AssertInOrder(
+            Print(incident),
+            Heading,
+            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) – Melder: Tobias Wagner · Stufe C",
+            "Führungsassistenz: S2 Lage Erika Musterfrau",
+            "Weitere: Einsatzabschnittsleiter Hans Huber");
+    }
+
+    [Fact]
+    public void A_Melder_alone_at_the_Einsatzleitung_prints_the_section_with_him()
+    {
+        var incident = Fresh();
+        incident.AssignRole(Clock, Op, "Melder", "Tobias Wagner", slot: RoleSlot.Melder);
+
+        PdfText.AssertInOrder(Print(incident), Heading, "Einsatzleitung Feuerwehr – Melder: Tobias Wagner");
+    }
+
+    [Theory]
+    [InlineData(RoleSlot.Leiter, null)]
+    [InlineData(RoleSlot.Melder, null)]
+    [InlineData(RoleSlot.Fuehrungsassistent, null)]
+    [InlineData(RoleSlot.Fachberater, null)]
+    [InlineData(RoleSlot.Leiter, "Wache Süd")]
+    [InlineData(RoleSlot.Melder, "Wache Süd")]
+    [InlineData(RoleSlot.Fuehrungsassistent, "Wache Süd")]
+    [InlineData(RoleSlot.Fachberater, "Wache Süd")]
+    public void Whoever_makes_the_section_print_is_in_it(RoleSlot slot, string? section)
+    {
+        // FUNKTIONEN stamps the Stammdaten slot on whatever is typed there, with or without an
+        // Abschnitt; at the Einsatzleitung a second Leiter has to show as well as the first.
+        var incident = Fresh();
+        incident.AssignRole(Clock, Op, "Funktion", "Tobias Wagner", section: section, slot: slot);
+        if (slot == RoleSlot.Leiter && section is null)
+        {
+            incident.AssignRole(Clock, Op, "Einsatzabschnittsleiter", "Hans Huber", slot: RoleSlot.Leiter);
+        }
+
+        Assert.True(FuehrungsorganisationSection.HasContent(incident));
+        var text = Print(incident);
+        Assert.Contains("Tobias Wagner", text, StringComparison.Ordinal);
+        if (slot == RoleSlot.Leiter && section is null)
+        {
+            Assert.Contains("Hans Huber", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void A_Leiter_whose_node_is_missing_does_not_print_an_empty_section()
+    {
+        var lost = RoleAssignment.Create("Abschnittsleiter", "Tobias Wagner", nodeId: Guid.NewGuid(), slot: RoleSlot.Leiter);
+        var incident = Incident.Rehydrate(
+            Guid.NewGuid(),
+            Started,
+            IncidentState.Open,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Array.Empty<ChecklistList>(),
+            Array.Empty<Domain.Etb.EtbEntry>(),
+            [lost],
+            Array.Empty<ForceUnit>(),
+            Array.Empty<Domain.Atemschutz.AtemschutzTrupp>(),
+            Array.Empty<AuditEvent>(),
+            Array.Empty<IncidentTimerState>(),
+            Array.Empty<Domain.Files.IncidentFile>(),
+            Array.Empty<Domain.Tasks.IncidentTask>(),
+            Array.Empty<Domain.CoMeasurement.Building>(),
+            Array.Empty<Domain.CoMeasurement.Dwelling>(),
+            Array.Empty<Domain.Involved.InvolvedParty>());
+
+        Assert.False(FuehrungsorganisationSection.HasContent(incident));
+        Assert.DoesNotContain(Heading, Print(incident), StringComparison.Ordinal);
     }
 
     [Fact]

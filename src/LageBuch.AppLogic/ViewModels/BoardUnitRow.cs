@@ -56,7 +56,7 @@ public sealed partial class BoardUnitRow : ObservableObject
     /// <summary>The Abschnitt picker's entries; replaced only on a real change (#408).</summary>
     public IReadOnlyList<NodeChoice> NodeChoices { get; private set; }
 
-    /// <summary>Where the unit sits; "—" when it is in no Abschnitt.</summary>
+    /// <summary>Where the unit sits; <see cref="ViewModels.NodeChoices.UnplacedLabel"/> when it is in no Abschnitt, so the picker reads as one.</summary>
     public string NodeLabel { get; private set; }
 
     /// <summary>Brings the row in line with its unit; <paramref name="unit"/> may be a new instance.</summary>
@@ -85,7 +85,7 @@ public sealed partial class BoardUnitRow : ObservableObject
     private (IReadOnlyList<NodeChoice> Choices, string Label) BuildNode(ForceUnit unit, Incident incident)
     {
         var choices = ViewModels.NodeChoices.Build(incident, unit.NodeId, MoveTo);
-        return (choices, Formatting.OrDash(incident.NodeLabel(ViewModels.NodeChoices.CurrentNodeId(choices))));
+        return (choices, ViewModels.NodeChoices.LabelOf(incident, choices));
     }
 
     private void MoveTo(Guid? nodeId)

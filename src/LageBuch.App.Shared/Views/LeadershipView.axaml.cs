@@ -30,11 +30,15 @@ public partial class LeadershipView : UserControl
     private LeadershipViewModel? ViewModel => DataContext as LeadershipViewModel;
 
     // A press on a unit's grip starts the drag; a mouse or pen only, so a finger on a wide tablet
-    // still scrolls the board (the picker moves the unit there). Tunnelled, so no control under the
-    // grip can swallow the press first.
+    // still scrolls the board (the picker moves the unit there). On Android a mouse only: a pen drag
+    // there has never been tried on a device. Tunnelled, so no control under the grip can swallow
+    // the press first.
+    private static bool StartsDrag(PointerType type) =>
+        type == PointerType.Mouse || (type == PointerType.Pen && !OperatingSystem.IsAndroid());
+
     private async void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (e.Pointer.Type is not (PointerType.Mouse or PointerType.Pen)
+        if (!StartsDrag(e.Pointer.Type)
             || e.Source is not Control source
             || source.GetSelfAndVisualAncestors().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("unit-grip"))
                 is not { DataContext: BoardUnitRow row }

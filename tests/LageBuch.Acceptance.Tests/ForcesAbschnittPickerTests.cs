@@ -159,7 +159,7 @@ public class ForcesAbschnittPickerTests
         var pickers = Pickers(cards);
         Assert.Equal(2, pickers.Count);
         Assert.Equal(
-            new[] { "Abschnitt 1 / Nord", "—" },
+            new[] { "Abschnitt 1 / Nord", NodeChoices.UnplacedLabel },
             pickers.Select(p => (string)((TextBlock)p.Content!).Text!));
         Assert.Equal(2, cards.GetVisualDescendants().OfType<TextBlock>().Count(t => t.Text == "ABSCHNITT"));
         Capture(window, "kraefte-abschnitt-narrow.png");

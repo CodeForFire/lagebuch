@@ -389,7 +389,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
         {
-            ActionError = $"Nicht möglich: {ex.Message}";
+            ActionError = DomainRefusal.Message(ex);
             return false;
         }
 
