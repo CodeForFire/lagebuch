@@ -183,6 +183,10 @@ public class LeadershipPersonDialogViewModelTests
 
         var vm = Open(session, nord, RoleSlot.Leiter);
 
+        // The handover keeps the holder's Funktion, so the field shows it and is locked, rather than
+        // offering the preselected "UAL" that the save would silently drop.
+        Assert.Equal("Abschnittsleiter", vm.Role);
+        Assert.False(vm.IsRoleEditable);
         Assert.Equal("Übergabe: Musterfrau, Erika → neu", vm.HandoverText);
         vm.PersonName = "Mustermann, Max";
         vm.SaveCommand.Execute(null);
@@ -282,12 +286,12 @@ public class LeadershipPersonDialogViewModelTests
         vm.Role = "pressesprecher";
         vm.PersonName = "Mustermann, Max";
 
-        Assert.Equal("„Pressesprecher“ hat bereits Musterfrau, Erika – wird übergeben.", vm.HandoverText);
+        Assert.Equal("„Pressesprecher“ hat bereits Musterfrau, Erika – wird hierher übergeben.", vm.HandoverText);
         vm.SaveCommand.Execute(null);
 
         Assert.NotNull(session.Incident.Roles.Single(r => r.Id == held).To);
         var now = Assert.Single(Running(session));
-        Assert.Equal(("Pressesprecher", "Mustermann, Max"), (now.Role, now.PersonName));
+        Assert.Equal(("Pressesprecher", "Mustermann, Max", sued), (now.Role, now.PersonName, now.NodeId));
     }
 
     [Fact]
@@ -455,6 +459,182 @@ public class LeadershipPersonDialogViewModelTests
         untouched.Closed += (_, _) => closed++;
         untouched.CancelCommand.Execute(null);
         Assert.Equal(2, closed);
+    }
+
+    [Fact]
+    public void An_einsatzleiter_recorded_in_funktionen_is_placed_and_handed_over()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika"); // FUNKTIONEN: no node, no Abschnitt, slot None
+        using var board = NewVm(session, masterData: MasterData);
+        Assert.Null(board.El.Leiter);
+
+        var vm = Open(session, null, RoleSlot.Leiter);
+        vm.PersonName = "Mustermann, Max";
+
+        Assert.Equal("„EL“ hat bereits Musterfrau, Erika – wird hierher übergeben.", vm.HandoverText);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Null(vm.SaveError);
+        Assert.Equal("Mustermann, Max", board.El.Leiter?.PersonName);
+        var el = ReportingLine.Of(session.Incident).Single(e => e.Kind == ReportingEntryKind.Einsatzleitung).Leiter;
+        Assert.Equal(("EL", "Mustermann, Max", RoleSlot.Leiter), (el?.Role, el?.PersonName, el?.Slot));
+        Assert.Single(Running(session));
+    }
+
+    [Fact]
+    public void A_nodes_leiter_holding_the_el_funktion_is_moved_up_to_the_einsatzleitung()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        session.AssignRole("EL", "Musterfrau, Erika", nodeId: nord, slot: RoleSlot.Leiter);
+        using var board = NewVm(session, masterData: MasterData);
+
+        var vm = Open(session, null, RoleSlot.Leiter);
+        vm.PersonName = "Mustermann, Max";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Mustermann, Max", board.El.Leiter?.PersonName);
+        Assert.Null(board.Sections.Single().Leiter);
+        var now = Assert.Single(Running(session));
+        Assert.Equal(((Guid?)null, (string?)null), (now.NodeId, now.Section));
+    }
+
+    [Fact]
+    public void Naming_the_holder_again_only_places_the_funktion()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika", "Florian Emmering 1/1");
+        var held = session.Incident.Roles.Single().Id;
+        var changes = new[] { 0 };
+        using var board = NewVm(session, masterData: MasterData);
+        var vm = Open(session, null, RoleSlot.Leiter, () => changes[0]++);
+        var closed = 0;
+        vm.Closed += (_, _) => closed++;
+
+        vm.PersonName = "musterfrau, erika";
+
+        Assert.Equal("„EL“ (Musterfrau, Erika) wird hierher übernommen.", vm.HandoverText);
+        vm.SaveCommand.Execute(null);
+
+        var only = Assert.Single(session.Incident.Roles);
+        Assert.Equal((held, (DateTimeOffset?)null, RoleSlot.Leiter, "Florian Emmering 1/1"), (only.Id, only.To, only.Slot, only.CallSign));
+        Assert.Equal("Musterfrau, Erika", board.El.Leiter?.PersonName);
+        Assert.Equal(1, changes[0]);
+        Assert.Equal(1, closed);
+    }
+
+    [Fact]
+    public void Naming_the_holder_of_the_post_again_writes_nothing()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika", slot: RoleSlot.Leiter);
+        var before = session.Incident.Roles.Single();
+        var changes = new[] { 0 };
+        var vm = Open(session, null, RoleSlot.Leiter, () => changes[0]++);
+        var closed = 0;
+        vm.Closed += (_, _) => closed++;
+
+        vm.PersonName = "Musterfrau, Erika";
+
+        Assert.Equal("„EL“ hat bereits Musterfrau, Erika.", vm.HandoverText);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Same(before, session.Incident.Roles.Single());
+        Assert.Equal(0, changes[0]);
+        Assert.Equal(1, closed);
+    }
+
+    [Fact]
+    public void A_locked_funktion_does_not_block_the_handover()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        session.AssignRole("Melder", "Musterfrau, Erika", nodeId: nord, slot: RoleSlot.Melder);
+        var vm = Open(session, nord, RoleSlot.Melder);
+
+        vm.Role = string.Empty;
+        vm.PersonName = "Mustermann, Max";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Null(vm.RoleError);
+        Assert.Equal(("Melder", "Mustermann, Max"), (Running(session).Single().Role, Running(session).Single().PersonName));
+    }
+
+    [Fact]
+    public void A_post_a_peer_fills_while_open_locks_the_funktion_to_the_holders()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var vm = Open(session, nord, RoleSlot.Leiter);
+        Assert.True(vm.IsRoleEditable);
+
+        session.AssignRole("Abschnittsleiter", "Musterfrau, Erika", nodeId: nord, slot: RoleSlot.Leiter);
+
+        Assert.False(vm.IsRoleEditable);
+        Assert.Equal("Abschnittsleiter", vm.Role);
+        Assert.False(vm.HasChanges);
+    }
+
+    [Fact]
+    public void A_refused_handover_surfaces_as_a_save_error()
+    {
+        // A hostile file: the holder starts after now, so ending it is refused by the Domain.
+        var holder = RoleAssignment.Create("EL", "Musterfrau, Erika", from: T0.AddHours(1), slot: RoleSlot.Leiter);
+        var session = Hostile([], roles: [holder]);
+        var vm = Open(session, null, RoleSlot.Leiter);
+        var closed = 0;
+        vm.Closed += (_, _) => closed++;
+
+        vm.PersonName = "Mustermann, Max";
+        vm.SaveCommand.Execute(null);
+
+        Assert.StartsWith("Nicht möglich: ", vm.SaveError, StringComparison.Ordinal);
+        Assert.Equal("Musterfrau, Erika", Running(session).Single().PersonName);
+        Assert.Equal(0, closed);
+    }
+
+    [Fact]
+    public void A_refused_placement_surfaces_as_a_save_error()
+    {
+        var session = NewSession();
+        session.AssignRole("EL", "Musterfrau, Erika");
+
+        // A slot the Domain does not know is the one refusal of a placement no dialog check catches first.
+        var vm = Open(session, null, (RoleSlot)99);
+        var closed = 0;
+        vm.Closed += (_, _) => closed++;
+
+        vm.Role = "EL";
+        vm.PersonName = "Mustermann, Max";
+        vm.SaveCommand.Execute(null);
+
+        Assert.StartsWith("Nicht möglich: ", vm.SaveError, StringComparison.Ordinal);
+        var still = Assert.Single(session.Incident.Roles);
+        Assert.Equal(("Musterfrau, Erika", RoleSlot.None), (still.PersonName, still.Slot));
+        Assert.Equal(0, closed);
+    }
+
+    [Fact]
+    public void Funkrufname_suggestions_are_the_stammdaten_call_signs()
+    {
+        var md = MasterData with { Vehicles = [new Vehicle("FF Aich", "Florian Aich 40/1", 9)] };
+
+        Assert.Equal(["Florian Aich 40/1", "Florian Emmering 11/1"], Open(NewSession(), null, RoleSlot.Leiter, masterData: md).CallSignOptions);
+    }
+
+    [Fact]
+    public void A_detached_dialog_stops_following_the_session()
+    {
+        var session = NewSession();
+        var vm = Open(session, null, RoleSlot.Leiter);
+        var raised = 0;
+        vm.PropertyChanged += (_, _) => raised++;
+
+        vm.Detach();
+        session.AssignRole("EL", "Musterfrau, Erika", slot: RoleSlot.Leiter);
+
+        Assert.Equal(0, raised);
     }
 
     [Fact]

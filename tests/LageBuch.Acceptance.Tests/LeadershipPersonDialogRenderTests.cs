@@ -83,7 +83,7 @@ public class LeadershipPersonDialogRenderTests
 
         Assert.Equal("Leiter festlegen – Abschnitt 1 Nord", Find<TextBlock>(window, "PersonDialogTitle").Text);
         Assert.Equal("Abschnittsleiter", Find<AutoCompleteBox>(window, "PersonDialogRoleBox").Text);
-        Assert.Equal("Florian Emmering 11/1", Find<TextBox>(window, "PersonDialogCallSignBox").Text);
+        Assert.Equal("Florian Emmering 11/1", Find<AutoCompleteBox>(window, "PersonDialogCallSignBox").Text);
         Assert.Equal("0151 2345678", Find<TextBox>(window, "PersonDialogPhoneBox").Text);
         Assert.Equal("FESTLEGEN", Find<Button>(window, "PersonDialogSaveButton").Content);
         Assert.False(Find<TextBlock>(window, "PersonDialogHandoverText").IsVisible);
@@ -126,6 +126,44 @@ public class LeadershipPersonDialogRenderTests
     }
 
     [AvaloniaFact]
+    public void A_funktion_recorded_elsewhere_is_announced_as_taken_over_here()
+    {
+        var session = Session();
+        session.AssignRole("Einsatzleiter", "Mustermann, Max", "Florian Emmering 11/1", from: Clock.Now, phone: "0151 2345678");
+        var vm = new LeadershipPersonDialogViewModel(session, Clock, MasterData(), null, RoleSlot.Leiter)
+        {
+            PersonName = "Mustermann, Max",
+        };
+        var (window, _) = Show(vm, 560, 560);
+
+        var hint = Find<TextBlock>(window, "PersonDialogHandoverText");
+        Assert.Equal("„Einsatzleiter“ (Mustermann, Max) wird hierher übernommen.", hint.Text);
+        Assert.True(hint.IsEffectivelyVisible);
+        Capture(window, "person-dialog-placement.png");
+    }
+
+    [AvaloniaFact]
+    public void A_held_post_shows_the_holders_funktion_locked()
+    {
+        var session = Session();
+        var vm = LeiterFor(session, out var nodeId);
+        session.AssignRole("Abschnittsleiter", "Musterfrau, Erika", from: Clock.Now, nodeId: nodeId, slot: RoleSlot.Leiter);
+        var (window, _) = Show(vm, 560, 560);
+
+        var role = Find<AutoCompleteBox>(window, "PersonDialogRoleBox");
+        Assert.False(role.IsEnabled);
+        Assert.Equal("Abschnittsleiter", role.Text);
+    }
+
+    [AvaloniaFact]
+    public void Funkrufname_offers_the_stammdaten_call_signs()
+    {
+        var (window, _) = Show(new LeadershipPersonDialogViewModel(Session(), Clock, MasterData(), null, RoleSlot.Fachberater), 560, 560);
+
+        Assert.Equal(["Florian Emmering 11/1", "Florian Emmering 40/1"], Find<AutoCompleteBox>(window, "PersonDialogCallSignBox").ItemsSource!.Cast<string>());
+    }
+
+    [AvaloniaFact]
     public void Field_errors_show_under_their_fields()
     {
         var vm = new LeadershipPersonDialogViewModel(Session(), Clock, MasterData(), null, RoleSlot.Fachberater);
@@ -149,12 +187,12 @@ public class LeadershipPersonDialogRenderTests
         var vm = new LeadershipPersonDialogViewModel(Session(), Clock, MasterData(), null, RoleSlot.Leiter);
         vm.Closed += (_, _) => closed++;
         var (window, _) = Show(vm, 560, 560);
-        Find<TextBox>(window, "PersonDialogCallSignBox").Focus();
+        Find<AutoCompleteBox>(window, "PersonDialogCallSignBox").Focus();
 
         window.Press(PhysicalKey.Escape);
         Assert.Equal(1, closed);
 
-        Find<TextBox>(window, "PersonDialogCallSignBox").Text = "Florian Emmering 11/1";
+        Find<AutoCompleteBox>(window, "PersonDialogCallSignBox").Text = "Florian Emmering 11/1";
         window.Press(PhysicalKey.Escape);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(1, closed);

@@ -774,6 +774,29 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void A_replaced_or_dropped_person_dialog_stops_following_the_session()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.Leadership.El.SetLeiterCommand.Execute(null);
+        var first = vm.PendingLeadershipPersonDialog!;
+        var raised = 0;
+        first.PropertyChanged += (_, _) => raised++;
+
+        vm.Leadership.AddFachberaterCommand.Execute(null);
+        var second = vm.PendingLeadershipPersonDialog!;
+        second.Role = "Fachberater THW";
+        second.PersonName = "Mustermann, Max";
+        second.SaveCommand.Execute(null);
+
+        Assert.Equal(0, raised);
+
+        vm.Leadership.AddFachberaterCommand.Execute(null);
+        Assert.NotNull(vm.PendingLeadershipPersonDialog);
+        vm.Dispose();
+        Assert.Null(vm.PendingLeadershipPersonDialog);
+    }
+
+    [Fact]
     public void CloseIncident_prompts_for_confirmation_before_closing()
     {
         var vm = NewWorkspace(out _, out _);

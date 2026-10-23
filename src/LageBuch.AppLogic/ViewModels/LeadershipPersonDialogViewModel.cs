@@ -19,8 +19,10 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 /// <remarks>
 /// Who is replaced follows FUNKTIONEN (#470): a Leiter or Melder post that is already held is handed
-/// over, and so is a Funktion the Stammdaten mark unique whose holder is running. A handover keeps
-/// the holder's Funktion, node and slot, as <see cref="IIncidentSession.TransferRole"/> always does.
+/// over, and so is a Funktion the Stammdaten mark unique whose holder is running. The holder is first
+/// placed where the dialog was opened for, because a Funktion recorded in FUNKTIONEN (or before the
+/// board) has no node and no slot, and a handover keeps both: without the placement the clicked post
+/// would stay empty. When the holder is the person named, the placement is the whole action.
 /// </remarks>
 public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
 {
@@ -32,7 +34,7 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     private readonly IReadOnlyList<string> _spellings;
     private readonly Guid? _nodeId;
     private readonly RoleSlot _slot;
-    private readonly string _seededRole;
+    private string _seededRole;
 
     // What the roster last wrote into Funkrufname and Handynummer (#656).
     private string? _prefilledCallSign;
@@ -66,6 +68,7 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         RoleOptions = BuildRoleOptions(masterData.Roles, slot);
         _spellings = [.. RoleOptions.Concat(masterData.Roles.Select(r => r.Name))];
         PersonOptions = [.. masterData.Personnel.Select(p => p.DisplayName)];
+        CallSignOptions = masterData.RadioCallSigns;
 
         var label = session.Incident.CommandNodes.FirstOrDefault(n => n.Id == nodeId)?.Name ?? string.Empty;
         (Title, PrimaryText) = (slot, nodeId) switch
@@ -78,7 +81,8 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
             _ => ($"Funktion hinzufügen – {label}", "HINZUFÜGEN"),
         };
 
-        _seededRole = Preselect(masterData.Roles, slot, nodeId);
+        // A post already held is handed over in its own Funktion, so that is what the field shows.
+        _seededRole = PostHolder()?.Role ?? Preselect(masterData.Roles, slot, nodeId);
         _role = _seededRole;
         _session.Changed += OnSessionChanged;
     }
@@ -96,11 +100,21 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     /// <summary>The Personal roster's names; empty without a roster, the box stays free text.</summary>
     public IReadOnlyList<string> PersonOptions { get; }
 
+    /// <summary>The Funkrufnamen of the Stammdaten, as suggestions, as in FUNKTIONEN.</summary>
+    public IReadOnlyList<string> CallSignOptions { get; }
+
+    /// <summary>
+    /// False while the post is held: a handover keeps the holder's Funktion, so the field shows it
+    /// and cannot promise another.
+    /// </summary>
+    public bool IsRoleEditable => PostHolder() is null;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HandoverText))]
     private string _role;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HandoverText))]
     private string _personName = string.Empty;
 
     [ObservableProperty]
@@ -127,15 +141,30 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     private bool _isDiscardConfirmOpen;
 
     /// <summary>
-    /// Who the save hands over from, in German, or null when it assigns a new Funktion: the running
-    /// holder of the Leiter or Melder post, or the holder of a Funktion the Stammdaten mark unique.
+    /// What the save does to an existing holder, in German, or null when it assigns a new Funktion:
+    /// the running holder of the Leiter or Melder post, or the holder of a Funktion the Stammdaten mark
+    /// unique, is moved here and/or handed over to the person named.
     /// </summary>
-    public string? HandoverText => FindHolder(RoleToSave) switch
+    public string? HandoverText
     {
-        (null, _) => null,
-        ({ } holder, true) => $"Übergabe: {holder.PersonName} → neu",
-        ({ } holder, false) => $"„{holder.Role}“ hat bereits {holder.PersonName} – wird übergeben.",
-    };
+        get
+        {
+            var (holder, isPost) = FindHolder(RoleToSave);
+            if (holder is null)
+            {
+                return null;
+            }
+
+            return (IsInPlace(holder), IsSamePerson(holder)) switch
+            {
+                (false, true) => $"„{holder.Role}“ ({holder.PersonName}) wird hierher übernommen.",
+                (true, true) => $"„{holder.Role}“ hat bereits {holder.PersonName}.",
+                _ when isPost => $"Übergabe: {holder.PersonName} → neu",
+                (false, false) => $"„{holder.Role}“ hat bereits {holder.PersonName} – wird hierher übergeben.",
+                _ => $"„{holder.Role}“ hat bereits {holder.PersonName} – wird übergeben.",
+            };
+        }
+    }
 
     /// <summary>Whether anything was typed since the dialog opened.</summary>
     public bool HasChanges =>
@@ -173,15 +202,32 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         _prefilledCallSign = RosterLookup.Refill(CallSign, _prefilledCallSign, person?.CallSign, v => CallSign = v);
     }
 
+    /// <summary>
+    /// Stops following the session. <see cref="Closed"/> does this itself; a host that drops the
+    /// dialog without closing it (the incident closed under the overlay) calls it.
+    /// </summary>
+    public void Detach() => _session.Changed -= OnSessionChanged;
+
     // A peer's handover or assignment changes who would be replaced; the hint must not name someone
-    // who already left (#470). The save itself asks again, so this only keeps the text honest.
-    private void OnSessionChanged() => OnPropertyChanged(nameof(HandoverText));
+    // who already left (#470). The save itself asks again, so this only keeps the text honest. A post
+    // a peer just filled turns the dialog into its handover, in that holder's Funktion.
+    private void OnSessionChanged()
+    {
+        if (PostHolder() is { } post && !string.Equals(Role, post.Role, StringComparison.Ordinal))
+        {
+            _seededRole = post.Role;
+            Role = post.Role;
+        }
+
+        OnPropertyChanged(nameof(IsRoleEditable));
+        OnPropertyChanged(nameof(HandoverText));
+    }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
         SaveError = null;
-        RoleError = string.IsNullOrWhiteSpace(Role) ? "Funktion fehlt." : null;
+        RoleError = IsRoleEditable && string.IsNullOrWhiteSpace(Role) ? "Funktion fehlt." : null;
         PersonError = string.IsNullOrWhiteSpace(PersonName) ? "Name fehlt." : null;
         if (RoleError is not null || PersonError is not null)
         {
@@ -195,27 +241,49 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         }
 
         var role = RoleToSave;
+        var person = PersonName.Trim();
         var callSign = Normalize(CallSign);
         var phone = Normalize(Phone);
+        var wrote = false;
         try
         {
             if (FindHolder(role).Holder is { } holder)
             {
-                _session.TransferRole(holder.Id, PersonName.Trim(), callSign, phone);
+                if (!IsInPlace(holder))
+                {
+                    _session.PlaceRoleAssignment(holder.Id, _nodeId, _slot);
+                    wrote = true;
+                }
+
+                if (!IsSamePerson(holder))
+                {
+                    _session.TransferRole(holder.Id, person, callSign, phone);
+                    wrote = true;
+                }
             }
             else
             {
-                _session.AssignRole(
-                    role, PersonName.Trim(), callSign, from: _clock.Now, phone: phone, nodeId: _nodeId, slot: _slot);
+                _session.AssignRole(role, person, callSign, from: _clock.Now, phone: phone, nodeId: _nodeId, slot: _slot);
+                wrote = true;
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
         {
+            // A placement that went through before the handover was refused is still a change.
+            if (wrote)
+            {
+                _onChanged?.Invoke();
+            }
+
             SaveError = $"Nicht möglich: {ex.Message}";
             return;
         }
 
-        _onChanged?.Invoke();
+        if (wrote)
+        {
+            _onChanged?.Invoke();
+        }
+
         Close();
     }
 
@@ -244,21 +312,27 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
 
     private void Close()
     {
-        _session.Changed -= OnSessionChanged;
+        Detach();
         Closed?.Invoke(this, EventArgs.Empty);
     }
+
+    // The running holder of the Leiter or Melder post this dialog was opened for; null for any other
+    // slot, which several may hold.
+    private RoleAssignment? PostHolder() =>
+        _slot is RoleSlot.Leiter or RoleSlot.Melder
+            ? _session.Incident.Roles.FirstOrDefault(r => r.To is null && r.Slot == _slot && IsInTarget(r))
+            : null;
 
     // The running assignment this save would hand over from, and whether it is the post itself
     // (a Leiter or Melder already set) rather than a Funktion the Stammdaten allow only once.
     private (RoleAssignment? Holder, bool IsPost) FindHolder(string role)
     {
-        var incident = _session.Incident;
-        if (_slot is RoleSlot.Leiter or RoleSlot.Melder
-            && incident.Roles.FirstOrDefault(r => r.To is null && r.Slot == _slot && IsInTarget(r)) is { } post)
+        if (PostHolder() is { } post)
         {
             return (post, true);
         }
 
+        var incident = _session.Incident;
         var holder = StammdatenCatalogue.Find(role, _roles)?.Uniqueness switch
         {
             RoleUniqueness.UniquePerIncident => incident.FindRunningRoleHolderInAnySection(role),
@@ -272,6 +346,12 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     // test ReportingLine uses for its Leiter.
     private bool IsInTarget(RoleAssignment r) =>
         _nodeId is { } id ? r.NodeId == id : r.NodeId is null && string.IsNullOrWhiteSpace(r.Section);
+
+    // Exactly where the dialog puts people: the target and the slot. Anything else is placed first.
+    private bool IsInPlace(RoleAssignment r) => r.Slot == _slot && IsInTarget(r);
+
+    private bool IsSamePerson(RoleAssignment r) =>
+        string.Equals(r.PersonName, PersonName?.Trim(), StringComparison.OrdinalIgnoreCase);
 
     private static string[] BuildRoleOptions(IReadOnlyList<Role> roles, RoleSlot slot)
     {

@@ -427,6 +427,11 @@ public class CommandNodeDialogViewModelTests
         var vm = CommandNodeDialogViewModel.ForEdit(session, WithTalkGroups(), id);
 
         Assert.False(vm.HasChanges);
+
+        // Once another field changes, the save writes the Funkgruppe in the catalogue's spelling.
+        vm.Rufname = "Florian Emmering 11/1";
+        vm.SaveCommand.Execute(null);
+        Assert.Equal("TMO FW_MUSTER 1000", session.Incident.CommandNodes.Single().Funkgruppe);
     }
 
     [Fact]

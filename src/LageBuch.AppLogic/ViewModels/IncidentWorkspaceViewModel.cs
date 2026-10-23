@@ -335,6 +335,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         PendingCommandNodeDialog = dialog;
     }
 
+    // A dialog replaced or dropped without closing (the workspace torn down under it) must stop
+    // following the session.
+    partial void OnPendingLeadershipPersonDialogChanged(
+        LeadershipPersonDialogViewModel? oldValue, LeadershipPersonDialogViewModel? newValue) => oldValue?.Detach();
+
     private void OpenLeadershipPersonDialog(LeadershipPersonDialogViewModel dialog)
     {
         dialog.Closed += (_, _) => PendingLeadershipPersonDialog = null;
@@ -817,6 +822,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         _disposed = true;
         _session.Changed -= RefreshIncidentData;
+        PendingLeadershipPersonDialog = null;
         _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
         if (_alarmMute is not null)
         {

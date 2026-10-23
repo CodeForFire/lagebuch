@@ -29,6 +29,7 @@
               <AutoCompleteBox x:Name="PersonDialogRoleBox" ItemsSource="{Binding RoleOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
                                AutomationProperties.Name="Funktion"
+                               IsEnabled="{Binding IsRoleEditable}"
                                PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
                                Text="{Binding Role}" />
             </HeaderedContentControl>
@@ -41,10 +42,12 @@
                                Text="{Binding PersonName}" />
             </HeaderedContentControl>
             <Grid ColumnDefinitions="3*,2*" ColumnSpacing="12">
-              <HeaderedContentControl Grid.Column="0" Classes="field" Header="FUNKRUFNAME">
-                <TextBox x:Name="PersonDialogCallSignBox" Text="{Binding CallSign}" MaxLength="200"
-                         AutomationProperties.Name="Funkrufname"
-                         PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}" />
+              <HeaderedContentControl Grid.Column="0" Classes="field suggest" Header="FUNKRUFNAME">
+                <AutoCompleteBox x:Name="PersonDialogCallSignBox" ItemsSource="{Binding CallSignOptions}"
+                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                                 AutomationProperties.Name="Funkrufname"
+                                 PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                 Text="{Binding CallSign}" />
               </HeaderedContentControl>
               <HeaderedContentControl Grid.Column="1" Classes="field" Header="HANDYNUMMER">
                 <TextBox x:Name="PersonDialogPhoneBox" Classes="mono" Text="{Binding Phone}" MaxLength="50"
