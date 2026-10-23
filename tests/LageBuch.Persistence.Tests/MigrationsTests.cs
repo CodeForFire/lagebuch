@@ -413,4 +413,42 @@ public class MigrationsTests : IDisposable
             "'issued_by','issued_at','returned_at','returned_by');";
         Assert.Equal(11L, (long)check.ExecuteScalar()!);
     }
+
+    [Fact]
+    public void V33_database_upgrades_to_v34_with_every_unit_and_funktion_unplaced()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (33);" +
+                "CREATE TABLE force_units (id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, brigade TEXT NOT NULL);" +
+                "CREATE TABLE role_assignments (id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, role TEXT NOT NULL, person_name TEXT NOT NULL);" +
+                "CREATE TABLE incident_meta (id TEXT PRIMARY KEY, started_at TEXT NOT NULL);" +
+                "INSERT INTO force_units (id, ordinal, brigade) VALUES ('u', 0, 'FF Puch');" +
+                "INSERT INTO role_assignments (id, ordinal, role, person_name) VALUES ('r', 0, 'EL', 'Muster');" +
+                "INSERT INTO incident_meta (id, started_at) VALUES ('i', '2026-09-27T14:00:00+02:00');";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText =
+            "SELECT (SELECT node_id FROM force_units), (SELECT node_id FROM role_assignments), " +
+            "(SELECT slot FROM role_assignments), (SELECT fuehrungsstufe FROM incident_meta), " +
+            "(SELECT el_standort FROM incident_meta), (SELECT COUNT(*) FROM command_nodes);";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.True(r.IsDBNull(i));
+        }
+
+        Assert.Equal(0, r.GetInt32(5));
+    }
 }

@@ -1,6 +1,7 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -718,5 +719,131 @@ public class IncidentRoundTripTests : IDisposable
         IncidentRepository.Save(_path, incident);
 
         Assert.Empty(IncidentRepository.Load(_path).SituationReports);
+    }
+
+    [Fact]
+    public void Command_nodes_round_trip_with_every_field()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var abschnitt = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        incident.UpdateCommandNode(clock, op, abschnitt.Id, "Nord", "Brandbekämpfung", "Hauptstr. 1", "TBZ 1", "Florian Nord", "0171 0000001");
+        var unter = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord 1", abschnitt.Id);
+        incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei");
+        var bereit = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR 1");
+        clock.Now = clock.Now.AddMinutes(30);
+        incident.DissolveCommandNode(clock, op, bereit.Id);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(incident.CommandNodes, loaded.CommandNodes);
+        Assert.Equal(unter.Id, loaded.CommandNodes[1].Id);
+        Assert.Equal(abschnitt.Id, loaded.CommandNodes[1].ParentId);
+        Assert.Equal(clock.Now, loaded.CommandNodes[3].DissolvedAt);
+    }
+
+    [Fact]
+    public void Unit_and_role_node_ids_and_slot_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var unit = incident.AddForceUnit(clock, op, "FF Puch", 9);
+        incident.MoveForceUnit(clock, op, unit.Id, node.Id);
+        incident.AssignRole(clock, op, "Abschnittsleiter", "Erika Beispiel", nodeId: node.Id, slot: RoleSlot.Leiter);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(node.Id, Assert.Single(loaded.Forces).NodeId);
+        var role = Assert.Single(loaded.Roles);
+        Assert.Equal(node.Id, role.NodeId);
+        Assert.Equal(RoleSlot.Leiter, role.Slot);
+    }
+
+    [Fact]
+    public void Fuehrungsstufe_and_post_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", "TBZ 2");
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(Fuehrungsstufe.C, loaded.Fuehrungsstufe);
+        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0171 0000002", "TBZ 2"), loaded.LeadershipPost);
+    }
+
+    [Fact]
+    public void Unknown_kind_and_slot_keys_read_as_defaults()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei");
+        incident.AssignRole(clock, op, "Melder", "Max Muster", nodeId: node.Id, slot: RoleSlot.Melder);
+        IncidentRepository.Save(_path, incident);
+
+        ExecRaw("UPDATE command_nodes SET kind = 'zauberschloss'; UPDATE role_assignments SET slot = 'koenig'; UPDATE incident_meta SET fuehrungsstufe = 'Z';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(CommandNodeKind.Abschnitt, Assert.Single(loaded.CommandNodes).Kind);
+        Assert.Equal(RoleSlot.None, Assert.Single(loaded.Roles).Slot);
+        Assert.Null(loaded.Fuehrungsstufe);
+    }
+
+    [Fact]
+    public void A_node_whose_parent_is_missing_loads_with_no_parent()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var abschnitt = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var unter = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord 1", abschnitt.Id);
+        var partner = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei");
+        var unter2 = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord 2", abschnitt.Id);
+        IncidentRepository.Save(_path, incident);
+
+        // unter: parent id names no node; partner: carries a parent it must not have;
+        // unter2: parent is a node that is not an Abschnitt (the partner).
+        ExecRaw(
+            $"UPDATE command_nodes SET parent_id = '{Guid.NewGuid()}' WHERE id = '{unter.Id}';" +
+            $"UPDATE command_nodes SET parent_id = '{abschnitt.Id}' WHERE id = '{partner.Id}';" +
+            $"UPDATE command_nodes SET parent_id = '{partner.Id}' WHERE id = '{unter2.Id}';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(4, loaded.CommandNodes.Count);
+        foreach (var id in new[] { unter.Id, partner.Id, unter2.Id })
+        {
+            Assert.Null(loaded.CommandNodes.Single(x => x.Id == id).ParentId);
+        }
+
+        Assert.Equal(CommandNodeKind.Partner, loaded.CommandNodes.Single(x => x.Id == partner.Id).Kind);
+        Assert.Equal(CommandNodeKind.Abschnitt, loaded.CommandNodes.Single(x => x.Id == unter.Id).Kind);
+        Assert.Equal(CommandNodeKind.Abschnitt, loaded.CommandNodes.Single(x => x.Id == unter2.Id).Kind);
+        Assert.Equal(abschnitt.Id, loaded.CommandNodes.Single(x => x.Id == abschnitt.Id).Id);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Test-only hostile-file fixture; the SQL is built from generated Guids and constants.")]
+    private void ExecRaw(string sql)
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
     }
 }
