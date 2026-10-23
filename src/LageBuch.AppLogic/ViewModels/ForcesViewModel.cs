@@ -57,7 +57,7 @@ public sealed partial class ForceRow : ObservableObject
         _onRemoved = onRemoved;
         _onMoved = onMoved;
         (NodeChoices, NodeLabel) = BuildNode(unit, incident);
-        _placedNodeId = PlacedNodeId(NodeChoices);
+        _placedNodeId = ViewModels.NodeChoices.CurrentNodeId(NodeChoices);
         Edits = unit.Edits;
         _syncedStrength = StrengthOf(unit);
         _zugfuehrerCount = unit.ZugfuehrerCount;
@@ -108,10 +108,10 @@ public sealed partial class ForceRow : ObservableObject
         // Same rule for the Abschnitt picker: its Flyout is rebuilt from NodeChoices, so it is
         // replaced only when the entries, their labels or the current mark really differ.
         var (choices, label) = BuildNode(unit, incident);
-        if (!choices.Select(NodeKey).SequenceEqual(NodeChoices.Select(NodeKey)))
+        if (!ViewModels.NodeChoices.SameEntries(choices, NodeChoices))
         {
             NodeChoices = choices;
-            _placedNodeId = PlacedNodeId(choices);
+            _placedNodeId = ViewModels.NodeChoices.CurrentNodeId(choices);
             OnPropertyChanged(nameof(NodeChoices));
         }
 
@@ -151,14 +151,10 @@ public sealed partial class ForceRow : ObservableObject
         }
     }
 
-    private static (Guid? NodeId, string Label, bool IsCurrent) NodeKey(NodeChoice c) => (c.NodeId, c.Label, c.IsCurrent);
-
-    private static Guid? PlacedNodeId(IReadOnlyList<NodeChoice> choices) => choices.First(c => c.IsCurrent).NodeId;
-
     private (IReadOnlyList<NodeChoice> Choices, string Label) BuildNode(Domain.ForceUnit unit, Domain.Incident incident)
     {
         var choices = ViewModels.NodeChoices.Build(incident, unit.NodeId, MoveTo);
-        var placed = PlacedNodeId(choices);
+        var placed = ViewModels.NodeChoices.CurrentNodeId(choices);
         return (choices, Domain.Formatting.OrDash(incident.NodeLabel(placed)));
     }
 

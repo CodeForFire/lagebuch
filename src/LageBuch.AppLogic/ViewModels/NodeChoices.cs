@@ -37,6 +37,27 @@ public static class NodeChoices
         return choices;
     }
 
+    /// <summary>The node the entry marked current stands for; null when the unit counts as unplaced.</summary>
+    public static Guid? CurrentNodeId(IReadOnlyList<NodeChoice> choices)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+        return choices.FirstOrDefault(c => c.IsCurrent)?.NodeId;
+    }
+
+    /// <summary>
+    /// Whether two pickers show the same thing: the same entries, labels and current mark. A picker's
+    /// Flyout is rebuilt from its list, so an owner replaces the list only when this is false: swapping
+    /// an items source under an open picker is what froze the Atemschutz picker in #408.
+    /// </summary>
+    public static bool SameEntries(IReadOnlyList<NodeChoice> a, IReadOnlyList<NodeChoice> b)
+    {
+        ArgumentNullException.ThrowIfNull(a);
+        ArgumentNullException.ThrowIfNull(b);
+        return a.Select(Key).SequenceEqual(b.Select(Key));
+    }
+
+    private static (Guid? NodeId, string Label, bool IsCurrent) Key(NodeChoice c) => (c.NodeId, c.Label, c.IsCurrent);
+
     private static NodeChoice Choice(Guid? nodeId, string label, bool isCurrent, Action<Guid?> onSelect) =>
         new(nodeId, label, isCurrent, new RelayCommand(() => onSelect(nodeId)));
 }
