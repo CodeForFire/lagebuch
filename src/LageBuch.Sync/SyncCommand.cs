@@ -62,8 +62,10 @@ public abstract record SyncCommand;
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
 public sealed record OperatorDto(string Name, string? CallSign);
 
+// EntryId is minted by the sending device so it can link an Aufgabe to the entry at once; the
+// host honours it unless it is taken. Defaulted, so a payload from an older client still reads.
 public sealed record AddJournalEntryCommand(
-    OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To) : SyncCommand;
+    OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To, Guid? EntryId = null) : SyncCommand;
 
 public sealed record EditJournalEntryCommand(OperatorDto Operator, Guid EntryId, string Text) : SyncCommand;
 
@@ -155,9 +157,11 @@ public sealed record RemoveFileCommand(OperatorDto Operator, Guid FileId) : Sync
 
 // TimerMinutes travels instead of an absolute DueAt: the host stamps the anchor with its own
 // authoritative clock on apply, like every timestamped command.
+// SourceEntryId: the ETB entry the Aufgabe was given out from. Defaulted for older clients; the
+// host keeps any non-empty id, since the entry's own command may still be on its way.
 public sealed record AddTaskCommand(
     OperatorDto Operator, string Text, string Assignee,
-    TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes) : SyncCommand;
+    TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes, Guid? SourceEntryId = null) : SyncCommand;
 
 public sealed record SetTaskCompletedCommand(OperatorDto Operator, Guid TaskId, bool IsDone) : SyncCommand;
 

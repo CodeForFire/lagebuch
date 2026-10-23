@@ -75,8 +75,14 @@ public static class SyncProtocol
     /// <c>whereabouts</c> and <c>whereaboutsAt</c>, the Aufenthaltsort (#701). A host at 11 would
     /// reject the command, so the floor rises to 12.
     /// </para>
+    /// <para>
+    /// 13: <c>addJournalEntry</c> may carry the <c>entryId</c> the client minted, <c>addTask</c> a
+    /// <c>sourceEntryId</c>, and the snapshot's tasks the same. A host at 12 ignores both fields --
+    /// the Aufgabe is simply not linked -- and a client at 12 drops the snapshot's, so the floor
+    /// stays at 12.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 12;
+    public const int ProtocolVersion = 13;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

@@ -382,6 +382,23 @@ public class SnapshotRoundTripTests
             new[] { KeyAvailability.Available, KeyAvailability.NotAvailable, KeyAvailability.Unknown },
             restored.Dwellings.Where(d => d.FloorOrdinal == 0).OrderBy(d => d.ApartmentNumber).Select(d => d.KeyAvailable));
     }
+
+    [Fact]
+    public void A_tasks_source_entry_survives_the_snapshot()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Stromleitung hängt tief");
+        incident.AddTask(clock, op, "EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entry.Id);
+        incident.AddTask(clock, op, "Ohne Herkunft", null, TaskImportance.Low, TaskUrgency.Low, 30);
+
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(entry.Id, restored.Tasks[0].SourceEntryId);
+        Assert.Null(restored.Tasks[1].SourceEntryId);
+    }
 }
 
 internal sealed class FixedClock : IClock

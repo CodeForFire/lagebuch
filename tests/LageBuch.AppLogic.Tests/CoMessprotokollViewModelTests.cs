@@ -1142,7 +1142,7 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void ChangeOperator(SessionOperator op) => _inner.ChangeOperator(op);
 
-    public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
+    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         _inner.AddJournalEntry(direction, text, from, to);
 
     public void EditJournalEntry(Guid entryId, string text) => _inner.EditJournalEntry(entryId, text);
@@ -1182,8 +1182,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void RemoveForceUnit(Guid unitId) => _inner.RemoveForceUnit(unitId);
 
-    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
-        _inner.AddTask(text, assignee, importance, urgency, timerMinutes);
+    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes, Guid? sourceEntryId = null) =>
+        _inner.AddTask(text, assignee, importance, urgency, timerMinutes, sourceEntryId);
 
     public void SetTaskCompleted(Guid taskId, bool isDone) => _inner.SetTaskCompleted(taskId, isDone);
 

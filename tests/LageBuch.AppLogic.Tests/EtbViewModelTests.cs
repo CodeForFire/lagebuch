@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -109,7 +110,7 @@ public class EtbViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, created.Add);
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (text, _) => created.Add(text));
 
         vm.NewText = "Lagemeldung";
         vm.AddEntryCommand.Execute(null);
@@ -531,7 +532,7 @@ public class EtbViewModelTests
             clock,
             MasterDataSet.Empty,
             () => { },
-            CaptureCreateTask)
+            (text, _) => CaptureCreateTask(text))
         { NewText = "Lagemeldung" };
         vm.AddEntryCommand.Execute(null);
         var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
@@ -555,7 +556,7 @@ public class EtbViewModelTests
             Array.Empty<(string, bool)>());
         session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
         session.Close();
-        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, _ => { });
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (_, _) => { });
 
         var row = Assert.Single(vm.Entries, r => r.Text == "Lagemeldung");
         Assert.False(row.CanCreateTask);
@@ -804,7 +805,8 @@ public class EtbViewModelTests
     private static EtbViewModel NewVm(MasterDataSet masterData, Action offerReminderReset, Action<string>? createTask = null)
     {
         var clock = new FixedClock(T0);
-        return new EtbViewModel(NewSession(clock), clock, masterData, () => { }, createTask, offerReminderReset);
+        return new EtbViewModel(
+            NewSession(clock), clock, masterData, () => { }, createTask is null ? null : (text, _) => createTask(text), offerReminderReset);
     }
 
     private static EtbViewModel NewVm()
@@ -818,5 +820,107 @@ public class EtbViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         return new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+    }
+
+    [Fact]
+    public void Hinzufuegen_und_aufgabe_hands_the_dialog_the_new_entrys_id()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        Guid? handed = null;
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (_, id) => handed = id)
+        {
+            NewText = "Stromleitung hängt tief",
+        };
+
+        vm.AddEntryAndCreateTaskCommand.Execute(null);
+
+        Assert.Equal(session.Incident.Journal[^1].Id, handed);
+    }
+
+    [Fact]
+    public void A_rows_create_task_icon_hands_the_dialog_that_rows_id()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        Guid? handed = null;
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (_, id) => handed = id);
+
+        vm.Entries.Single(r => r.Id == entryId).CreateTaskCommand.Execute(null);
+
+        Assert.Equal(entryId, handed);
+    }
+
+    [Fact]
+    public void The_badge_counts_the_aufgaben_from_an_entry_and_follows_their_completion()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var row = vm.Entries.Single(r => r.Id == entryId);
+        Assert.False(row.HasTasks);
+        Assert.Equal(string.Empty, row.TaskBadge);
+
+        session.AddTask("EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        Assert.True(row.HasTasks);
+        Assert.Equal("1 Aufgabe · 1 offen", row.TaskBadge);
+        Assert.True(row.HasOpenTasks);
+
+        session.AddTask("Bereich absperren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        session.SetTaskCompleted(session.Incident.Tasks[0].Id, true);
+        Assert.Equal("2 Aufgaben · 1 offen", row.TaskBadge);
+
+        session.SetTaskCompleted(session.Incident.Tasks[1].Id, true);
+        Assert.Equal("2 Aufgaben · erledigt", row.TaskBadge);
+        Assert.False(row.HasOpenTasks);
+    }
+
+    [Fact]
+    public void The_badge_asks_the_workspace_to_show_that_entrys_aufgaben()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        Guid? shown = null;
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, showTasksFrom: id => shown = id);
+        var row = vm.Entries.Single(r => r.Id == entryId);
+        Assert.False(row.ShowTasksCommand.CanExecute(null)); // nothing to show yet
+
+        session.AddTask("EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        Assert.True(row.ShowTasksCommand.CanExecute(null));
+        row.ShowTasksCommand.Execute(null);
+
+        Assert.Equal(entryId, shown);
+    }
+
+    [Fact]
+    public void A_moved_count_raises_every_badge_property_and_an_unmoved_one_raises_nothing()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var row = vm.Entries.Single(r => r.Id == entryId);
+        var raised = new List<string?>();
+        var canExecuteChanged = 0;
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        row.ShowTasksCommand.CanExecuteChanged += (_, _) => canExecuteChanged++;
+
+        // Only the total moves; the open count stays at 0.
+        row.SetTaskCounts(1, 0);
+
+        Assert.Equal("1 Aufgabe · erledigt", row.TaskBadge);
+        Assert.Equal(
+            new[] { nameof(row.TaskCount), nameof(row.OpenTaskCount), nameof(row.HasTasks), nameof(row.HasOpenTasks), nameof(row.TaskBadge) },
+            raised);
+        Assert.Equal(1, canExecuteChanged);
+
+        raised.Clear();
+        row.SetTaskCounts(1, 0);
+
+        Assert.Empty(raised);
+        Assert.Equal(1, canExecuteChanged);
     }
 }

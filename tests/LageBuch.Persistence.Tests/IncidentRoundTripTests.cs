@@ -619,4 +619,21 @@ public class IncidentRoundTripTests : IDisposable
 
         Assert.Empty(IncidentRepository.Load(_path).InvolvedParties);
     }
+
+    [Fact]
+    public void A_tasks_source_entry_round_trips_and_a_task_without_one_stays_unlinked()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Stromleitung hängt tief");
+        incident.AddTask(clock, op, "EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entry.Id);
+        incident.AddTask(clock, op, "Ohne Herkunft", null, TaskImportance.Low, TaskUrgency.Low, 30);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(entry.Id, loaded.Tasks[0].SourceEntryId);
+        Assert.Null(loaded.Tasks[1].SourceEntryId);
+    }
 }

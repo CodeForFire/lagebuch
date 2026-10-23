@@ -207,4 +207,71 @@ public class IncidentTaskAggregateTests
         Assert.Equal("Fertig", restored.Tasks[1].Text);
         Assert.True(restored.Tasks[1].IsCompleted);
     }
+
+    [Fact]
+    public void AddTask_keeps_a_source_entry_that_is_in_the_journal()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        var entry = incident.AddJournalEntry(clock, op, Etb.EtbDirection.Incoming, "Stromleitung hängt tief");
+
+        var task = incident.AddTask(clock, op, "EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entry.Id);
+
+        Assert.Equal(entry.Id, task.SourceEntryId);
+    }
+
+    [Fact]
+    public void AddTask_keeps_a_link_to_an_entry_that_has_not_arrived_yet()
+    {
+        // A joined device's entry and task are two fire-and-forget commands; the task may reach
+        // the host first. The link has to survive that, and it becomes visible once the entry lands.
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Client");
+        var minted = Guid.NewGuid();
+
+        var task = incident.AddTask(clock, op, "EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, minted);
+        var entry = incident.AddJournalEntry(clock, op, Etb.EtbDirection.Incoming, "Stromleitung hängt tief", id: minted);
+
+        Assert.Equal(minted, task.SourceEntryId);
+        Assert.Equal(minted, entry.Id);
+    }
+
+    [Fact]
+    public void AddTask_treats_an_empty_source_id_as_no_link()
+    {
+        var (incident, clock) = NewIncident();
+
+        var task = incident.AddTask(
+            clock, new SessionOperator("Client"), "EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, Guid.Empty);
+
+        Assert.Null(task.SourceEntryId);
+    }
+
+    [Fact]
+    public void AddJournalEntry_keeps_an_id_the_caller_minted()
+    {
+        var (incident, clock) = NewIncident();
+        var minted = Guid.NewGuid();
+
+        var entry = incident.AddJournalEntry(clock, new SessionOperator("Client"), Etb.EtbDirection.Incoming, "Lage", id: minted);
+
+        Assert.Equal(minted, entry.Id);
+    }
+
+    [Fact]
+    public void AddJournalEntry_mints_afresh_when_the_offered_id_is_taken_or_empty()
+    {
+        // Replays a peer offering an id that is already in the journal: two entries must never
+        // share one, or an edit or an Aufgabe link could land on the wrong entry.
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Client");
+        var taken = incident.Journal[0].Id;
+
+        var collided = incident.AddJournalEntry(clock, op, Etb.EtbDirection.Incoming, "Doppelt", id: taken);
+        var empty = incident.AddJournalEntry(clock, op, Etb.EtbDirection.Incoming, "Leer", id: Guid.Empty);
+
+        Assert.NotEqual(taken, collided.Id);
+        Assert.NotEqual(Guid.Empty, empty.Id);
+        Assert.Equal(incident.Journal.Count, incident.Journal.Select(e => e.Id).Distinct().Count());
+    }
 }

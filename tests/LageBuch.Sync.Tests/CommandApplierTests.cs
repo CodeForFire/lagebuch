@@ -578,4 +578,50 @@ public class CommandApplierTests
 
         Assert.Equal(expected, incident.Dwellings[0].KeyAvailable);
     }
+
+    [Fact]
+    public void A_client_minted_entry_id_lets_its_aufgabe_link_before_the_snapshot_returns()
+    {
+        // The joined device's HINZUFÜGEN & AUFGABE: it mints the entry's id, sends the entry, then
+        // the Aufgabe naming that id -- without ever having seen the host's journal.
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var minted = Guid.NewGuid();
+        var op = new OperatorDto("Client", "RUF 1");
+
+        ApplyOverWire(new AddJournalEntryCommand(op, EtbDirection.Incoming, "Stromleitung hängt tief", "ILS", null, minted), incident, clock);
+        ApplyOverWire(new AddTaskCommand(op, "EVU informieren", string.Empty, TaskImportance.High, TaskUrgency.High, 5, minted), incident, clock);
+
+        Assert.Contains(incident.Journal, e => e.Id == minted);
+        Assert.Equal(minted, Assert.Single(incident.Tasks).SourceEntryId);
+    }
+
+    [Fact]
+    public void The_link_survives_the_task_overtaking_its_entry_on_the_way_to_the_host()
+    {
+        // RemoteIncidentSession.Send is fire-and-forget: the two POSTs race, either may land first.
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var minted = Guid.NewGuid();
+        var op = new OperatorDto("Client", "RUF 1");
+
+        ApplyOverWire(new AddTaskCommand(op, "EVU informieren", string.Empty, TaskImportance.High, TaskUrgency.High, 5, minted), incident, clock);
+        ApplyOverWire(new AddJournalEntryCommand(op, EtbDirection.Incoming, "Stromleitung hängt tief", "ILS", null, minted), incident, clock);
+
+        Assert.Equal(minted, Assert.Single(incident.Tasks).SourceEntryId);
+        Assert.Contains(incident.Journal, e => e.Id == minted);
+    }
+
+    [Fact]
+    public void A_client_offering_an_entry_id_already_in_the_journal_gets_a_new_one()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var taken = incident.Journal[0].Id;
+
+        ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", null), EtbDirection.Incoming, "Doppelt", null, null, taken), incident, clock);
+
+        Assert.Equal(incident.Journal.Count, incident.Journal.Select(e => e.Id).Distinct().Count());
+        Assert.Equal("Doppelt", incident.Journal[^1].Text);
+    }
 }

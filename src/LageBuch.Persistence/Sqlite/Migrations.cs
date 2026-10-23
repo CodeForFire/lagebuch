@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 28;
+    public const int CurrentVersion = 29;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -189,6 +189,15 @@ public static class Migrations
         if (version < 28)
         {
             ApplyV28(cn, tx);
+
+            // Stryker restore all
+        }
+
+        // Stryker disable all : V29 only adds a nullable column that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 29)
+        {
+            ApplyV29(cn, tx);
 
             // Stryker restore all
         }
@@ -853,6 +862,16 @@ public static class Migrations
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "whereabouts", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "involved_parties", "whereabouts_at", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The ETB entry an Aufgabe was given out from. Additive and nullable: an older file's tasks
+    // read back unlinked, which is what they were. No FOREIGN KEY, for the reason ApplyV22 gives.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV29(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_tasks", "source_entry_id", "TEXT");
 
         // Stryker restore all
     }

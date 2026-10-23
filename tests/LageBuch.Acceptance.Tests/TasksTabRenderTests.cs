@@ -99,6 +99,33 @@ public class TasksTabRenderTests
         Capture(window, "aufgaben-dialog.png");
     }
 
+    [AvaloniaFact]
+    public void An_etb_entry_shows_its_aufgaben_and_the_badge_leads_to_them()
+    {
+        var (window, vm, session, _, clock) = ShowWorkspace();
+        session.AddJournalEntry(Domain.Etb.EtbDirection.Incoming, "Baum auf Fahrbahn, Hauptstraße 5", from: "ILS");
+        var entryId = session.AddJournalEntry(Domain.Etb.EtbDirection.Incoming, "Stromleitung hängt tief, Bereich abgesperrt", from: "Florian Musterstadt 40/1");
+        session.AddTask("Energieversorger informieren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        session.AddTask("Bereich weiträumig absperren", "Florian Musterstadt 40/1", TaskImportance.High, TaskUrgency.Medium, 15, entryId);
+        session.SetTaskCompleted(session.Incident.Tasks[1].Id, true);
+        clock.Now = clock.Now.AddMinutes(2);
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        Capture(window, "etb-aufgaben-badge.png");
+
+        var row = vm.Etb.Entries.Single(r => r.Id == entryId);
+        Assert.Equal("2 Aufgaben · 1 offen", row.TaskBadge);
+        var badge = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.IsEffectivelyVisible && Equals(b.Content, "2 Aufgaben · 1 offen"));
+
+        badge.Command!.Execute(badge.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("AUFGABEN", vm.SelectedNavItem?.Header);
+        Assert.Equal("Energieversorger informieren", vm.Tasks.SelectedTask?.Text);
+        Assert.EndsWith("· aus ETB 09:00", vm.Tasks.SelectedTask!.CreatedDisplay, StringComparison.Ordinal);
+        Capture(window, "aufgaben-aus-etb.png");
+    }
+
     // #246: editing opens a panel in the dock's place; the grid above keeps reading as triage, and
     // the chosen segments fill in the colour the grid uses for that level.
     [AvaloniaFact]
