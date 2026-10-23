@@ -864,6 +864,7 @@ public class EtbViewModelTests
         Assert.Equal(string.Empty, row.TaskBadge);
 
         session.AddTask("EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        Assert.True(row.HasTasks);
         Assert.Equal("1 Aufgabe · 1 offen", row.TaskBadge);
         Assert.True(row.HasOpenTasks);
 
@@ -888,8 +889,38 @@ public class EtbViewModelTests
         Assert.False(row.ShowTasksCommand.CanExecute(null)); // nothing to show yet
 
         session.AddTask("EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        Assert.True(row.ShowTasksCommand.CanExecute(null));
         row.ShowTasksCommand.Execute(null);
 
         Assert.Equal(entryId, shown);
+    }
+
+    [Fact]
+    public void A_moved_count_raises_every_badge_property_and_an_unmoved_one_raises_nothing()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var row = vm.Entries.Single(r => r.Id == entryId);
+        var raised = new List<string?>();
+        var canExecuteChanged = 0;
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        row.ShowTasksCommand.CanExecuteChanged += (_, _) => canExecuteChanged++;
+
+        // Only the total moves; the open count stays at 0.
+        row.SetTaskCounts(1, 0);
+
+        Assert.Equal("1 Aufgabe · erledigt", row.TaskBadge);
+        Assert.Equal(
+            new[] { nameof(row.TaskCount), nameof(row.OpenTaskCount), nameof(row.HasTasks), nameof(row.HasOpenTasks), nameof(row.TaskBadge) },
+            raised);
+        Assert.Equal(1, canExecuteChanged);
+
+        raised.Clear();
+        row.SetTaskCounts(1, 0);
+
+        Assert.Empty(raised);
+        Assert.Equal(1, canExecuteChanged);
     }
 }

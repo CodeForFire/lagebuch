@@ -873,15 +873,31 @@ public class TasksViewModelTests
     [Fact]
     public void A_task_from_an_etb_entry_says_so_on_its_row()
     {
-        var (session, _, _) = NewSession();
+        // Two entries at different times, the task linked to the later one: the row names the entry
+        // the link points at, not just any entry in the journal.
+        var (session, clock, _) = NewSession();
+        session.AddJournalEntry(EtbDirection.Incoming, "Baum auf Fahrbahn");
+        clock.Now = T0.AddMinutes(12);
         var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
         session.AddTask("EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
         session.AddTask("Ohne Herkunft", null, TaskImportance.Low, TaskUrgency.Low, 30);
         using var vm = new TasksViewModel(
-            session, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
+            session, clock, new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
 
-        Assert.EndsWith("· aus ETB 09:00", vm.Rows.Single(r => r.Text == "EVU informieren").CreatedDisplay, StringComparison.Ordinal);
+        Assert.EndsWith("· aus ETB 09:12", vm.Rows.Single(r => r.Text == "EVU informieren").CreatedDisplay, StringComparison.Ordinal);
         Assert.DoesNotContain("aus ETB", vm.Rows.Single(r => r.Text == "Ohne Herkunft").CreatedDisplay, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_task_linked_to_an_entry_that_never_arrived_shows_no_etb_note()
+    {
+        // A joined device's task can overtake its entry, and the entry may never arrive.
+        var (session, clock, _) = NewSession();
+        session.AddTask("EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, Guid.NewGuid());
+        using var vm = new TasksViewModel(
+            session, clock, new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
+
+        Assert.DoesNotContain("aus ETB", Assert.Single(vm.Rows).CreatedDisplay, StringComparison.Ordinal);
     }
 
     [Fact]
