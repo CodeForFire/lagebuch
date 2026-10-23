@@ -20,16 +20,26 @@ public sealed partial class ElCard : ObservableObject
     /// <param name="onSelectStufe">Sets the Führungsstufe (null clears it); the board decides whether that is allowed.</param>
     /// <param name="onEditPost">Opens the dialog for the Einsatzleitung's own post.</param>
     /// <param name="canEdit">False on a read-only Einsatz.</param>
-    public ElCard(Action<Fuehrungsstufe?> onSelectStufe, Action? onEditPost = null, bool canEdit = true)
+    /// <param name="onPerson">Opens the person dialog for the Einsatzleitung and the given post.</param>
+    public ElCard(
+        Action<Fuehrungsstufe?> onSelectStufe, Action? onEditPost = null, bool canEdit = true, Action<RoleSlot>? onPerson = null)
     {
         ArgumentNullException.ThrowIfNull(onSelectStufe);
         _onSelectStufe = onSelectStufe;
         EditPostCommand = new RelayCommand(() => onEditPost?.Invoke(), () => canEdit);
+        SetLeiterCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Leiter), () => canEdit);
+        AddAssistantCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Fuehrungsassistent), () => canEdit);
         StufeChoices = BuildStufeChoices(null);
     }
 
     /// <summary>Opens the dialog for the Standort, Rufname, Telefon and Funkgruppe; cannot execute on a read-only Einsatz.</summary>
     public IRelayCommand EditPostCommand { get; }
+
+    /// <summary>Sets the Einsatzleiter, handing over from a running one; off on a read-only Einsatz.</summary>
+    public IRelayCommand SetLeiterCommand { get; }
+
+    /// <summary>Adds a Führungsassistent (S1 to S6); off on a read-only Einsatz.</summary>
+    public IRelayCommand AddAssistantCommand { get; }
 
     [ObservableProperty]
     private string? _standort;

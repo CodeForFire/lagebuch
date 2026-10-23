@@ -24,15 +24,18 @@
                        TextWrapping="Wrap" />
             <HeaderedContentControl Classes="field required" Header="NAME" IsVisible="{Binding ShowName}"
                                     ctrl:Field.Error="{Binding NameError}">
-              <TextBox x:Name="CommandNodeNameBox" Text="{Binding Name}" MaxLength="200" />
+              <TextBox x:Name="CommandNodeNameBox" Text="{Binding Name}" MaxLength="200"
+                       AutomationProperties.Name="Name" />
             </HeaderedContentControl>
             <HeaderedContentControl Classes="field" Header="AUFTRAG" IsVisible="{Binding ShowAuftrag}">
               <TextBox x:Name="CommandNodeAuftragBox" Text="{Binding Auftrag}" MaxLength="1000"
+                       AutomationProperties.Name="Auftrag"
                        AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="140"
                        PlaceholderText="z. B. Brandbekämpfung Nordseite" />
             </HeaderedContentControl>
             <HeaderedContentControl Classes="field" Header="STANDORT">
               <TextBox x:Name="CommandNodeStandortBox" Text="{Binding Standort}" MaxLength="200"
+                       AutomationProperties.Name="Standort"
                        PlaceholderText="z. B. Hofeinfahrt Hauptstr. 12" />
             </HeaderedContentControl>
             <!-- The Stammdaten's Funkgruppen as suggestions, not a closed set: a channel the list
@@ -40,15 +43,18 @@
             <HeaderedContentControl Classes="field suggest" Header="FUNKGRUPPE">
               <AutoCompleteBox x:Name="CommandNodeFunkgruppeBox" ItemsSource="{Binding FunkgruppeOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                               AutomationProperties.Name="Funkgruppe"
                                Text="{Binding Funkgruppe}" PlaceholderText="z. B. TMO FW_MUSTER 1000" />
             </HeaderedContentControl>
             <Grid ColumnDefinitions="3*,2*" ColumnSpacing="12">
               <HeaderedContentControl Grid.Column="0" Classes="field" Header="RUFNAME">
                 <TextBox x:Name="CommandNodeRufnameBox" Text="{Binding Rufname}" MaxLength="200"
+                         AutomationProperties.Name="Rufname"
                          PlaceholderText="z. B. Florian Emmering" />
               </HeaderedContentControl>
               <HeaderedContentControl Grid.Column="1" Classes="field" Header="TELEFON">
-                <TextBox x:Name="CommandNodeTelefonBox" Classes="mono" Text="{Binding Telefon}" MaxLength="50" />
+                <TextBox x:Name="CommandNodeTelefonBox" Classes="mono" Text="{Binding Telefon}" MaxLength="50"
+                         AutomationProperties.Name="Telefon" />
               </HeaderedContentControl>
             </Grid>
             <TextBlock x:Name="CommandNodeSaveError" Classes="field-error" TextWrapping="Wrap"

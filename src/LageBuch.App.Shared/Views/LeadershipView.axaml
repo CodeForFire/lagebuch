@@ -11,5 +11,8 @@
     <!-- Until the board's own add buttons land, the one way to reach the Abschnitt dialog. -->
     <Button x:Name="LeadershipAddAbschnittButton" Content="ABSCHNITT BILDEN" Classes="signal"
             HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding AddAbschnittCommand}" />
+    <!-- Likewise for the person dialog, until the Einsatzleitung card carries its own. -->
+    <Button x:Name="LeadershipSetElButton" Content="EINSATZLEITER FESTLEGEN"
+            HorizontalAlignment="Left" Margin="0,10,0,0" Command="{Binding El.SetLeiterCommand}" />
   </StackPanel>
 </UserControl>

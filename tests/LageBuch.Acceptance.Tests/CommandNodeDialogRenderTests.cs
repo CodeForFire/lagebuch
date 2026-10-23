@@ -67,7 +67,7 @@ public class CommandNodeDialogRenderTests
         vm.Auftrag = "Brandbekämpfung Nordseite, Riegelstellung zum Stallgebäude.";
         vm.Standort = "Hofeinfahrt Hauptstraße 12, Emmering";
         vm.Funkgruppe = "TMO FW_EMMERING 1000";
-        vm.Rufname = "Florian Emmering 40/1";
+        vm.Rufname = "Florian Emmering 11/1";
         vm.Telefon = "0151 2345678";
         return vm;
     }

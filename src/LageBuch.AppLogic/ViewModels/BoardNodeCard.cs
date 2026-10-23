@@ -18,17 +18,22 @@ public sealed partial class BoardNodeCard : ObservableObject
     /// <param name="onDissolve">Asks the board to dissolve the node; the card only offers the command.</param>
     /// <param name="onEdit">Opens the edit dialog for the node.</param>
     /// <param name="onAddUnterabschnitt">Opens the dialog to form an Unterabschnitt in this Abschnitt.</param>
+    /// <param name="onPerson">Opens the person dialog for this node and the given post.</param>
     public BoardNodeCard(
         Guid id,
         Action<BoardNodeCard>? onDissolve = null,
         Action<BoardNodeCard>? onEdit = null,
-        Action<BoardNodeCard>? onAddUnterabschnitt = null)
+        Action<BoardNodeCard>? onAddUnterabschnitt = null,
+        Action<BoardNodeCard, RoleSlot>? onPerson = null)
     {
         Id = id;
         DissolveCommand = new RelayCommand(() => onDissolve?.Invoke(this), () => CanDissolve);
         EditCommand = new RelayCommand(() => onEdit?.Invoke(this), () => !_isReadOnly);
         AddUnterabschnittCommand = new RelayCommand(
             () => onAddUnterabschnitt?.Invoke(this), () => !_isReadOnly && Kind == CommandNodeKind.Abschnitt);
+        SetLeiterCommand = new RelayCommand(() => onPerson?.Invoke(this, RoleSlot.Leiter), () => !_isReadOnly);
+        SetMelderCommand = new RelayCommand(() => onPerson?.Invoke(this, RoleSlot.Melder), () => !_isReadOnly);
+        AddMemberCommand = new RelayCommand(() => onPerson?.Invoke(this, RoleSlot.None), () => !_isReadOnly);
     }
 
     private bool _isReadOnly = true;
@@ -38,6 +43,15 @@ public sealed partial class BoardNodeCard : ObservableObject
 
     /// <summary>Forms an Unterabschnitt in this node; only an Abschnitt can hold one.</summary>
     public IRelayCommand AddUnterabschnittCommand { get; }
+
+    /// <summary>Sets the node's Leiter, handing over from a running one; off on a read-only Einsatz.</summary>
+    public IRelayCommand SetLeiterCommand { get; }
+
+    /// <summary>Sets the node's Melder, handing over from a running one; off on a read-only Einsatz.</summary>
+    public IRelayCommand SetMelderCommand { get; }
+
+    /// <summary>Adds another Funktion to the node (a GF, a Sicherheitsbeauftragter); off on a read-only Einsatz.</summary>
+    public IRelayCommand AddMemberCommand { get; }
 
     /// <summary>Dissolves the node; can execute exactly when <see cref="CanDissolve"/> is true.</summary>
     public IRelayCommand DissolveCommand { get; }
@@ -150,5 +164,8 @@ public sealed partial class BoardNodeCard : ObservableObject
         CanDissolve = !isReadOnly && blockedReason is null;
         EditCommand.NotifyCanExecuteChanged();
         AddUnterabschnittCommand.NotifyCanExecuteChanged();
+        SetLeiterCommand.NotifyCanExecuteChanged();
+        SetMelderCommand.NotifyCanExecuteChanged();
+        AddMemberCommand.NotifyCanExecuteChanged();
     }
 }

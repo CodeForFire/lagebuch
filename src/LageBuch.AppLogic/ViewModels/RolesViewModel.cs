@@ -607,30 +607,9 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         Func<string?> getCallSign,
         Action<string?> setCallSign)
     {
-        var person = _personnel.FirstOrDefault(
-            p => string.Equals(p.DisplayName, personName, StringComparison.OrdinalIgnoreCase));
-        prefill.Phone = Refill(getPhone(), prefill.Phone, person?.Phone, setPhone);
-        prefill.CallSign = Refill(getCallSign(), prefill.CallSign, person?.CallSign, setCallSign);
-    }
-
-    // Writes the roster's value unless the field holds something typed by hand, and returns what
-    // the roster now owns in that field.
-    private static string? Refill(string? current, string? prefilled, string? fromRoster, Action<string?> set)
-    {
-        var rosterOwnsIt = string.IsNullOrWhiteSpace(current)
-            || string.Equals(current, prefilled, StringComparison.Ordinal);
-        if (!rosterOwnsIt)
-        {
-            return null;
-        }
-
-        if (!string.Equals(current, fromRoster, StringComparison.Ordinal)
-            && !(string.IsNullOrWhiteSpace(current) && string.IsNullOrWhiteSpace(fromRoster)))
-        {
-            set(fromRoster);
-        }
-
-        return fromRoster;
+        var person = RosterLookup.Find(_personnel, personName);
+        prefill.Phone = RosterLookup.Refill(getPhone(), prefill.Phone, person?.Phone, setPhone);
+        prefill.CallSign = RosterLookup.Refill(getCallSign(), prefill.CallSign, person?.CallSign, setCallSign);
     }
 
     private sealed class RosterPrefill

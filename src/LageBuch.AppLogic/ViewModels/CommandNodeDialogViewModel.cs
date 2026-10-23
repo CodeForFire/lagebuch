@@ -34,7 +34,11 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     private readonly CommandNodeKind _kind;
     private readonly Guid? _parentId;
     private readonly Guid? _nodeId;
-    private readonly string _initialName;
+
+    // What the fields held when the dialog opened, in the form they would be saved: HasChanges is
+    // "did the Lagebuchführer type anything", so a peer's edit to the node meanwhile, or a
+    // Funkgruppe the record spells off-catalogue, must not read as one.
+    private Fields _seeded;
 
     private CommandNodeDialogViewModel(
         IIncidentSession session,
@@ -54,7 +58,6 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         _kind = kind;
         _parentId = parentId;
         _nodeId = nodeId;
-        _initialName = name;
         _name = name;
         FunkgruppeOptions = [.. masterData.TalkGroups.Select(g => g.Display)];
     }
@@ -115,7 +118,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         Guid? parentId,
         string suggestedName,
         Action? onChanged = null) =>
-        new(session, masterData, Mode.Create, kind, parentId, null, suggestedName ?? string.Empty, onChanged)
+        new CommandNodeDialogViewModel(session, masterData, Mode.Create, kind, parentId, null, suggestedName ?? string.Empty, onChanged)
         {
             Title = kind switch
             {
@@ -130,7 +133,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                 CommandNodeKind.Bereitstellung => "EINRICHTEN",
                 _ => "BILDEN",
             },
-        };
+        }.Seeded();
 
     /// <summary>Opens the dialog on an existing node; a node that is gone shows an error on save instead of throwing.</summary>
     public static CommandNodeDialogViewModel ForEdit(
@@ -139,7 +142,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(session);
         var node = session.Incident.CommandNodes.FirstOrDefault(n => n.Id == nodeId);
         var kind = node?.Kind ?? CommandNodeKind.Abschnitt;
-        return new(session, masterData, Mode.Edit, kind, node?.ParentId, nodeId, node?.Name ?? string.Empty, onChanged)
+        return new CommandNodeDialogViewModel(session, masterData, Mode.Edit, kind, node?.ParentId, nodeId, node?.Name ?? string.Empty, onChanged)
         {
             Title = $"{BoardNodeCard.LabelOf(kind)} bearbeiten",
             Auftrag = node?.Auftrag,
@@ -147,7 +150,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             Funkgruppe = node?.Funkgruppe,
             Rufname = node?.Rufname,
             Telefon = node?.Telefon,
-        };
+        }.Seeded();
     }
 
     /// <summary>Opens the dialog on the Einsatzleitung Feuerwehr's own post.</summary>
@@ -156,25 +159,22 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(session);
         var post = session.Incident.LeadershipPost;
-        return new(session, masterData, Mode.Post, CommandNodeKind.Abschnitt, null, null, string.Empty, onChanged)
+        return new CommandNodeDialogViewModel(session, masterData, Mode.Post, CommandNodeKind.Abschnitt, null, null, string.Empty, onChanged)
         {
             Title = "Einsatzleitung Feuerwehr",
             Standort = post.Standort,
             Funkgruppe = post.Funkgruppe,
             Rufname = post.Rufname,
             Telefon = post.Telefon,
-        };
+        }.Seeded();
     }
 
-    /// <summary>Whether anything differs from what the dialog opened with, or from the live record when editing.</summary>
-    public bool HasChanges => _mode switch
-    {
-        Mode.Create => !string.Equals(Name, _initialName, StringComparison.Ordinal)
-            || Normalize(Auftrag) is not null || Normalize(Standort) is not null
-            || FunkgruppeToSave is not null || Normalize(Rufname) is not null || Normalize(Telefon) is not null,
-        Mode.Edit => LiveNode is { } node && DiffersFrom(node),
-        _ => PostDiffers(_session.Incident.LeadershipPost),
-    };
+    /// <summary>
+    /// Whether any field differs from what the dialog opened with. Deliberately not compared with the
+    /// live record: a peer's edit meanwhile is not something typed here, and must neither ask the
+    /// discard question nor be overwritten by an untouched save.
+    /// </summary>
+    public bool HasChanges => Current() != _seeded;
 
     private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen && NameError is null;
 
@@ -204,19 +204,14 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         return taken ? "Name ist bereits vergeben." : null;
     }
 
-    private bool DiffersFrom(CommandNode node) =>
-        !string.Equals(Name?.Trim(), node.Name, StringComparison.Ordinal)
-        || Normalize(Auftrag) != node.Auftrag
-        || Normalize(Standort) != node.Standort
-        || FunkgruppeToSave != node.Funkgruppe
-        || Normalize(Rufname) != node.Rufname
-        || Normalize(Telefon) != node.Telefon;
+    private Fields Current() =>
+        new(Name?.Trim() ?? string.Empty, Normalize(Auftrag), Normalize(Standort), FunkgruppeToSave, Normalize(Rufname), Normalize(Telefon));
 
-    private bool PostDiffers(LeadershipPost post) =>
-        Normalize(Standort) != post.Standort
-        || Normalize(Rufname) != post.Rufname
-        || Normalize(Telefon) != post.Telefon
-        || FunkgruppeToSave != post.Funkgruppe;
+    private CommandNodeDialogViewModel Seeded()
+    {
+        _seeded = Current();
+        return this;
+    }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
@@ -263,7 +258,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                     return false;
                 }
 
-                if (DiffersFrom(node))
+                if (HasChanges)
                 {
                     _session.UpdateCommandNode(
                         node.Id, name, Normalize(Auftrag), Normalize(Standort), FunkgruppeToSave, Normalize(Rufname), Normalize(Telefon));
@@ -272,7 +267,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
                 return true;
             default:
-                if (PostDiffers(_session.Incident.LeadershipPost))
+                if (HasChanges)
                 {
                     _session.UpdateLeadershipPost(Normalize(Standort), Normalize(Rufname), Normalize(Telefon), FunkgruppeToSave);
                     _onChanged?.Invoke();
@@ -307,4 +302,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private readonly record struct Fields(
+        string Name, string? Auftrag, string? Standort, string? Funkgruppe, string? Rufname, string? Telefon);
 }

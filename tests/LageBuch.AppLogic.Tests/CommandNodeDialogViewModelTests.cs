@@ -389,6 +389,58 @@ public class CommandNodeDialogViewModelTests
     }
 
     [Fact]
+    public void An_untouched_edit_dialog_does_not_ask_after_a_peer_edited_the_node()
+    {
+        var session = NewSession();
+        var id = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var vm = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, id);
+        var closed = 0;
+        vm.Closed += (_, _) => closed++;
+
+        session.UpdateCommandNode(id, "Nord", "Riegelstellung", null, null, "Florian Emmering 11/1", null);
+
+        Assert.False(vm.HasChanges);
+        vm.CancelCommand.Execute(null);
+        Assert.False(vm.IsDiscardConfirmOpen);
+        Assert.Equal(1, closed);
+    }
+
+    [Fact]
+    public void Saving_an_untouched_edit_dialog_keeps_a_peers_edit()
+    {
+        var session = NewSession();
+        var id = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var vm = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, id);
+
+        session.UpdateCommandNode(id, "Nord", "Riegelstellung", null, null, null, null);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Riegelstellung", session.Incident.CommandNodes.Single().Auftrag);
+    }
+
+    [Fact]
+    public void An_untouched_edit_dialog_does_not_ask_over_a_funkgruppe_spelt_off_catalogue()
+    {
+        var session = NewSession();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", null, null, null, "tmo fw_muster 1000", null, null);
+        var id = session.Incident.CommandNodes[^1].Id;
+        var vm = CommandNodeDialogViewModel.ForEdit(session, WithTalkGroups(), id);
+
+        Assert.False(vm.HasChanges);
+    }
+
+    [Fact]
+    public void An_untouched_post_dialog_does_not_ask_after_a_peer_edited_the_post()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
+
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", null, null, null);
+
+        Assert.False(vm.HasChanges);
+    }
+
+    [Fact]
     public void A_read_only_incident_cannot_save()
     {
         var vm = Create(ReadOnlySession());

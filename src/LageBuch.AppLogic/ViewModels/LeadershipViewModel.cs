@@ -28,6 +28,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     private readonly Action<string, string, Action, string>? _requestConfirm;
     private readonly MasterDataSet _masterData;
     private readonly Action<CommandNodeDialogViewModel>? _openDialog;
+    private readonly Action<LeadershipPersonDialogViewModel>? _openPersonDialog;
+    private readonly IClock _clock;
 
     // The incident as the last refresh showed it: the move guard judges against what the board offers.
     private Incident _incident;
@@ -36,7 +38,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action (title, message,
     /// the action, the confirm button's label); without it the action runs at once, as in tests.
     /// <paramref name="openDialog"/> hands the host the node dialog to show; without it the board's
-    /// add and edit commands do nothing.
+    /// add and edit commands do nothing. <paramref name="openPersonDialog"/> does the same for the
+    /// person dialog behind Leiter, Melder, Führungsassistenz and Fachberater.
     /// </summary>
     public LeadershipViewModel(
         IIncidentSession session,
@@ -44,7 +47,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         MasterDataSet masterData,
         Action onChanged,
         Action<string, string, Action, string>? requestConfirm = null,
-        Action<CommandNodeDialogViewModel>? openDialog = null)
+        Action<CommandNodeDialogViewModel>? openDialog = null,
+        Action<LeadershipPersonDialogViewModel>? openPersonDialog = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clock);
@@ -55,9 +59,11 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         _requestConfirm = requestConfirm;
         _masterData = masterData;
         _openDialog = openDialog;
+        _openPersonDialog = openPersonDialog;
+        _clock = clock;
         _incident = session.Incident;
         IsReadOnly = session.IsReadOnly;
-        El = new ElCard(SelectStufe, EditPost, !IsReadOnly);
+        El = new ElCard(SelectStufe, EditPost, !IsReadOnly, slot => OpenPerson(null, slot));
         DispatchCentreName = masterData.Settings.DispatchCentreName;
         Refresh();
         _session.Changed += Refresh;
@@ -193,7 +199,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             e => e.Node.Id,
             e =>
             {
-                var card = new BoardNodeCard(e.Node.Id, RequestDissolve, EditNode, AddUnterabschnitt);
+                var card = new BoardNodeCard(
+                    e.Node.Id, RequestDissolve, EditNode, AddUnterabschnitt, (c, slot) => OpenPerson(c.Id, slot));
                 UpdateCard(card, e, incident, hints, childrenOf);
                 return card;
             },
@@ -282,6 +289,12 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private void AddPartner(string? preset) =>
         OpenCreate(CommandNodeKind.Partner, null, preset ?? string.Empty);
+
+    [RelayCommand(CanExecute = nameof(CanAdd))]
+    private void AddFachberater() => OpenPerson(null, RoleSlot.Fachberater);
+
+    private void OpenPerson(Guid? nodeId, RoleSlot slot) =>
+        _openPersonDialog?.Invoke(new LeadershipPersonDialogViewModel(_session, _clock, _masterData, nodeId, slot, _onChanged));
 
     private void AddUnterabschnitt(BoardNodeCard parent) =>
         OpenCreate(CommandNodeKind.Unterabschnitt, parent.Id, string.Empty);

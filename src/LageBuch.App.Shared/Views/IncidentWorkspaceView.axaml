@@ -906,5 +906,9 @@
     <!-- Abschnitt overlay (form, edit, the Einsatzleitung's post) from the FÜHRUNG board -->
     <ContentControl Content="{Binding PendingCommandNodeDialog}"
                     IsVisible="{Binding PendingCommandNodeDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Person overlay (Leiter, Melder, Führungsassistenz, Fachberater) from the FÜHRUNG board -->
+    <ContentControl Content="{Binding PendingLeadershipPersonDialog}"
+                    IsVisible="{Binding PendingLeadershipPersonDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>

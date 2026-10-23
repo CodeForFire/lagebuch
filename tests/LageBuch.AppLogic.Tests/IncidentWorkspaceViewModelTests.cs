@@ -756,6 +756,24 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void The_boards_person_dialog_is_hosted_as_an_overlay_until_it_closes()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.Leadership.El.SetLeiterCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingLeadershipPersonDialog);
+        Assert.Equal("Einsatzleiter festlegen", vm.PendingLeadershipPersonDialog!.Title);
+
+        vm.PendingLeadershipPersonDialog.Role = "EL";
+        vm.PendingLeadershipPersonDialog.PersonName = "Mustermann, Max";
+        vm.PendingLeadershipPersonDialog.SaveCommand.Execute(null);
+
+        Assert.Null(vm.PendingLeadershipPersonDialog);
+        Assert.Equal("Mustermann, Max", vm.Leadership.El.Leiter?.PersonName);
+    }
+
+    [Fact]
     public void CloseIncident_prompts_for_confirmation_before_closing()
     {
         var vm = NewWorkspace(out _, out _);
