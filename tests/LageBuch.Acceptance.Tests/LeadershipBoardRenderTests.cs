@@ -55,7 +55,7 @@ public class LeadershipBoardRenderTests
     // A Wohnhausbrand in Emmering as the sheet would carry it an hour in.
     private static void Fill(LocalIncidentSession session)
     {
-        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 40123", "TMO 310");
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 40123", "TMO FW_EMMERING 1000");
         session.AssignRole("Einsatzleiter", "Max Mustermann", "Florian Emmering 1", slot: RoleSlot.Leiter);
         session.AssignRole("S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
 
@@ -63,7 +63,7 @@ public class LeadershipBoardRenderTests
         AddUnit(session, "FF Steinhöring", "Florian Steinhöring 40/1", 9, 4, 1, markt);
 
         var nord = AddNode(
-            session, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung Wohnhaus, Menschenrettung", funkgruppe: "TMO 311");
+            session, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung Wohnhaus, Menschenrettung", funkgruppe: "DMO 301_F");
         session.AssignRole("Abschnittsleiter", "Hans Huber", "Florian Aich 1", nodeId: nord, slot: RoleSlot.Leiter);
         session.AssignRole("Melder", "Lena Lehner", nodeId: nord, slot: RoleSlot.Melder);
         AddUnit(session, "FF Emmering", "Florian Emmering 40/1", 9, 4, 1, nord);
@@ -71,24 +71,27 @@ public class LeadershipBoardRenderTests
         var dach = AddNode(session, CommandNodeKind.Unterabschnitt, "Dach", nord, auftrag: "Riegelstellung Dachstuhl");
         AddUnit(session, "FF Emmering", "Florian Emmering 30/1", 3, 0, 1, dach);
 
-        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", auftrag: "Schutz Nachbargebäude", funkgruppe: "TMO 312");
+        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", auftrag: "Schutz Nachbargebäude", funkgruppe: "DMO 302_F");
         session.AssignRole("Abschnittsleiter", "Josef Bauer", "Florian Aich 2", nodeId: sued, slot: RoleSlot.Leiter);
         AddUnit(session, "FF Aich", "Florian Aich 40/1", 9, 4, 1, sued);
 
-        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst", funkgruppe: "TMO 380");
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst", funkgruppe: "TMO RD_FFB 1001");
         session.AssignRole("Einsatzleiter RD", "Sabine Schmid", "Rotkreuz Fürstenfeldbruck 1", nodeId: rd, slot: RoleSlot.Leiter);
         var polizei = AddNode(session, CommandNodeKind.Partner, "Polizei");
         session.AssignRole("Einsatzleiter Polizei", "Thomas Wagner", nodeId: polizei, slot: RoleSlot.Leiter);
         session.AssignRole("Fachberater THW", "Peter Maier", "Heros Fürstenfeldbruck 10/1", slot: RoleSlot.Fachberater);
 
-        AddUnit(session, "FF Emmering", "Florian Emmering 11/1", 6, 0, 0, null);
+        AddUnit(session, "FF Emmering", "Florian Emmering 11/2", 6, 0, 0, null);
         session.AssignRole("ZF", "Maria Musterfrau", section: "Wache Süd");
         session.SetFuehrungsstufe(Fuehrungsstufe.B);
     }
 
     private sealed record Board(Window Window, LeadershipView View, LocalIncidentSession? Session, LeadershipViewModel Vm);
 
-    private static Board Show(bool narrow = false, bool filled = true)
+    // What the FÜHRUNG tab gives a module in a 1400 px window: the rail takes 172 px.
+    private const double WorkspaceHostWidth = 1228;
+
+    private static Board Show(bool narrow = false, bool filled = true, double? width = null, Action<LocalIncidentSession>? more = null)
     {
         var clock = new FixedClock();
         var session = NewSession(new FakeStore(), clock);
@@ -97,7 +100,8 @@ public class LeadershipBoardRenderTests
             Fill(session);
         }
 
-        return Host(session, clock, narrow, session);
+        more?.Invoke(session);
+        return Host(session, clock, narrow, session, width);
     }
 
     private static Board ShowReadOnly()
@@ -110,7 +114,7 @@ public class LeadershipBoardRenderTests
         return Host(LocalIncidentSession.OpenReadOnly(store, clock, IncidentPath), clock, narrow: false, null);
     }
 
-    private static Board Host(IIncidentSession session, FixedClock clock, bool narrow, LocalIncidentSession? writable)
+    private static Board Host(IIncidentSession session, FixedClock clock, bool narrow, LocalIncidentSession? writable, double? width = null)
     {
         var workspace = new IncidentWorkspaceViewModel(
             session,
@@ -132,7 +136,7 @@ public class LeadershipBoardRenderTests
         };
         var root = new Panel { Name = "WorkspaceRoot", Children = { frame } };
         root.Classes.Set("narrow", narrow);
-        var window = new Window { Content = root, Width = narrow ? 400 : 1400, Height = narrow ? 2900 : 1500 };
+        var window = new Window { Content = root, Width = width ?? (narrow ? 400 : 1400), Height = narrow ? 2900 : width is null ? 1500 : 2000 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return new(window, view, writable, workspace.Leadership);
@@ -214,7 +218,7 @@ public class LeadershipBoardRenderTests
         Assert.True(view.GetControl<Border>("FachberaterCard").IsVisible);
         Assert.True(view.GetControl<Border>("UnplacedStrip").IsVisible);
         Assert.Contains(
-            "Florian Emmering 11/1",
+            "Florian Emmering 11/2",
             view.GetControl<ItemsControl>("UnplacedUnits").GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
         Assert.Contains(
             "Abschnitt (Freitext): Wache Süd",
@@ -229,6 +233,50 @@ public class LeadershipBoardRenderTests
         Assert.False(OffersUnterabschnitt(Card(view, "Polizei")));
 
         Capture(board.Window, "fuehrung-board.png");
+    }
+
+    [AvaloniaFact]
+    public void Four_partner_cards_wrap_one_by_one_inside_the_workspace_width()
+    {
+        var board = Show(width: WorkspaceHostWidth, more: s =>
+        {
+            s.AddCommandNode(CommandNodeKind.Partner, "THW", funkgruppe: "TMO THW_FFB 1002");
+            s.AddCommandNode(CommandNodeKind.Partner, "Wasserwacht");
+        });
+        var boardRoot = board.View.GetControl<StackPanel>("BoardRoot");
+        var partners = Cards(board.View.GetControl<ItemsControl>("PartnerCards"));
+        Assert.Equal(4, partners.Count);
+
+        foreach (var card in partners.Append(board.View.GetControl<Border>("FachberaterCard")))
+        {
+            var right = card.TranslatePoint(new Point(card.Bounds.Width, 0), boardRoot)!.Value.X;
+            Assert.True(right <= boardRoot.Bounds.Width + 0.5, $"right edge {right} past {boardRoot.Bounds.Width}");
+            Assert.True(Math.Abs(card.Bounds.Width - 300) <= 0.5, $"width {card.Bounds.Width}");
+        }
+
+        // They did wrap: not all four on the El card's line.
+        var tops = partners.Select(c => c.TranslatePoint(default, boardRoot)!.Value.Y).ToList();
+        Assert.True(tops.Max() - tops.Min() > 1);
+        Capture(board.Window, "fuehrung-board-workspace.png");
+    }
+
+    [AvaloniaFact]
+    public void A_unit_title_is_never_trimmed_in_a_card_or_an_unterabschnitt()
+    {
+        var board = Show(more: s => s.AddForceUnit(
+            "FF Fürstenfeldbruck", 9, "Florian Fürstenfeldbruck 40/1", scbaCount: 4, officerCount: 1));
+        var id = board.Session!.Incident.Forces[^1].Id;
+        board.Session.MoveForceUnit(id, NodeId(board.Session, "Dach"));
+        Dispatcher.UIThread.RunJobs();
+
+        var titles = board.View.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "UnitTitle").ToList();
+        Assert.Contains(titles, t => t.Text == "Florian Fürstenfeldbruck 40/1");
+        Assert.All(titles, t =>
+        {
+            Assert.Equal(Avalonia.Media.TextTrimming.None, t.TextTrimming);
+            Assert.True(t.TextLayout.TextLines.Count == 1, $"{t.Text} breaks over {t.TextLayout.TextLines.Count} lines");
+            Assert.Equal(t.Text, ToolTip.GetTip(t));
+        });
     }
 
     [AvaloniaFact]

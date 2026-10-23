@@ -137,12 +137,12 @@ public class LeadershipViewModelRefreshTests
         var card = vm.Sections[0];
         var unit = card.Units[0];
 
-        session.UpdateCommandNode(abschnitt, "Abschnitt 1 Nordost", "Riegelstellung", null, "TMO 312", null, null);
+        session.UpdateCommandNode(abschnitt, "Abschnitt 1 Nordost", "Riegelstellung", null, "DMO 302_F", null, null);
 
         Assert.Same(card, vm.Sections[0]);
         Assert.Equal("Abschnitt 1 Nordost", card.Name);
         Assert.Equal("Riegelstellung", card.Auftrag);
-        Assert.Equal("TMO 312", card.Funkgruppe);
+        Assert.Equal("DMO 302_F", card.Funkgruppe);
         Assert.Same(unit, card.Units[0]);
         Assert.Equal("Abschnitt 1 Nordost", unit.NodeLabel);
     }

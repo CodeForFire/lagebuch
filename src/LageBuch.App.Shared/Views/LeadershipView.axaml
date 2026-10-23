@@ -28,10 +28,12 @@
         </ItemsPanelTemplate>
       </Setter>
     </Style>
+    <!-- The partner Einsatzleitungen wrap card by card, so a fourth one moves to the next line
+         instead of running off the edge as one block. -->
     <Style Selector="ItemsControl.board-row">
       <Setter Property="ItemsPanel">
         <ItemsPanelTemplate>
-          <StackPanel Orientation="Horizontal" Spacing="12" />
+          <WrapPanel Orientation="Horizontal" ItemWidth="300" ItemSpacing="12" LineSpacing="12" />
         </ItemsPanelTemplate>
       </Setter>
     </Style>
@@ -49,9 +51,6 @@
       <Setter Property="Width" Value="340" />
       <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
     </Style>
-    <Style Selector="ItemsControl#PartnerCards ContentPresenter > Border.board-card">
-      <Setter Property="Width" Value="300" />
-    </Style>
 
     <Style Selector="Border.board-card">
       <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
@@ -68,13 +67,15 @@
       <Setter Property="Padding" Value="10,8" />
     </Style>
     <!-- The card a dragged unit would land in, set by the code-behind during a drag. -->
+    <!-- Focus cyan, not signal red: red is alarm and error in this app. The padding gives back the
+         extra pixel of border, so nothing inside shifts while the pointer passes over. -->
     <Style Selector="Border.board-card.drop-target">
-      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
-      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="Padding" Value="11,9" />
     </Style>
-    <Style Selector="Border#UnplacedStrip.drop-target">
-      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
-      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
+    <Style Selector="Border.board-card Border.board-card.drop-target">
+      <Setter Property="Padding" Value="9,7" />
     </Style>
 
     <Style Selector="TextBlock.card-name">
@@ -100,11 +101,14 @@
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="VerticalAlignment" Value="Center" />
-      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <!-- The picker's label at the size of the row around it, not the global TextBlock's 14. -->
     <Style Selector="ctrl|NodeChoicePicker TextBlock">
       <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="ctrl|NodeChoicePicker.unit-picker">
+      <Setter Property="Height" Value="26" />
     </Style>
     <Style Selector="TextBlock.field-value">
       <Setter Property="FontSize" Value="13" />
@@ -187,11 +191,12 @@
     <Style Selector="Panel#WorkspaceRoot.narrow Border#ElCard">
       <Setter Property="Width" Value="NaN" />
     </Style>
-    <Style Selector="Panel#WorkspaceRoot.narrow ItemsControl#PartnerCards ContentPresenter > Border.board-card">
-      <Setter Property="Width" Value="NaN" />
-    </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow Border.unit-grip">
       <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- On a phone the picker is the only way to move a unit: a thumb target. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow ctrl|NodeChoicePicker.unit-picker">
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow Button.board-action">
       <Setter Property="Height" Value="36" />
@@ -203,33 +208,33 @@
     <!-- One unit: on a card a row of the units table, in the strip a chip. The grip starts a drag on
          the desktop; the picker moves the unit anywhere, and is the phone's only way. -->
     <DataTemplate x:Key="UnitRowTemplate" x:DataType="vm:BoardUnitRow">
-      <Grid RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="3">
+      <Grid RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardStrength" />
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardAgt" />
         </Grid.ColumnDefinitions>
-        <Border Grid.Row="0" Grid.Column="0" Classes="unit-grip" x:Name="UnitGrip"
+        <Border Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Classes="unit-grip" x:Name="UnitGrip"
                 ToolTip.Tip="Ziehen, um die Einheit zu verschieben"
                 AutomationProperties.Name="Einheit verschieben">
           <PathIcon Width="9" Height="14" Foreground="{StaticResource TextSecondaryBrush}"
                     Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
         </Border>
-        <TextBlock Grid.Row="0" Grid.Column="1" Classes="unit-title"
-                   Text="{Binding Title}" ToolTip.Tip="{Binding Brigade}" />
-        <TextBlock Grid.Row="0" Grid.Column="2" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
+        <!-- The Funkrufname is the unit's name on the sheet: never trimmed, wrapped if it must. -->
+        <TextBlock Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitTitle" Classes="unit-title"
+                   Text="{Binding Title}" ToolTip.Tip="{Binding Title}" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Classes="secondary" FontSize="11" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Text="{Binding Brigade}" ToolTip.Tip="{Binding Brigade}"
+                   IsVisible="{Binding CallSign, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <TextBlock Grid.Row="1" Grid.Column="2" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
                    Text="{Binding StrengthText}" ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt" />
-        <TextBlock Grid.Row="0" Grid.Column="3" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
+        <TextBlock Grid.Row="1" Grid.Column="3" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
                    MinWidth="22" TextAlignment="Right"
                    Text="{Binding ScbaCount}" ToolTip.Tip="davon Atemschutzgeräteträger" />
-        <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Classes="secondary" FontSize="11" VerticalAlignment="Center"
-                     TextTrimming="CharacterEllipsis" Text="{Binding Brigade}"
-                     IsVisible="{Binding CallSign, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          <ctrl:NodeChoicePicker Grid.Column="1" x:Name="UnitNodePicker" MinWidth="80" MaxWidth="150" Height="26"
-                                 Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}" />
-        </Grid>
+        <ctrl:NodeChoicePicker Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitNodePicker" Classes="unit-picker"
+                               HorizontalAlignment="Left" MinWidth="80" MaxWidth="200"
+                               Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}" />
       </Grid>
     </DataTemplate>
 
