@@ -4,6 +4,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Sync;
@@ -1156,13 +1157,41 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? section = null,
-        string? phone = null) =>
-        _inner.AssignRole(role, personName, callSign, from, to, section, phone);
+        string? phone = null,
+        Guid? nodeId = null,
+        RoleSlot slot = RoleSlot.None) =>
+        _inner.AssignRole(role, personName, callSign, from, to, section, phone, nodeId, slot);
 
     public void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null) =>
         _inner.TransferRole(assignmentId, newPersonName, newCallSign, newPhone);
 
     public void EditRolePhone(Guid assignmentId, string? phone) => _inner.EditRolePhone(assignmentId, phone);
+
+    public void AddCommandNode(
+        CommandNodeKind kind,
+        string name,
+        Guid? parentId = null,
+        string? auftrag = null,
+        string? standort = null,
+        string? funkgruppe = null,
+        string? rufname = null,
+        string? telefon = null) =>
+        _inner.AddCommandNode(kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon);
+
+    public void UpdateCommandNode(
+        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
+        _inner.UpdateCommandNode(nodeId, name, auftrag, standort, funkgruppe, rufname, telefon);
+
+    public void DissolveCommandNode(Guid nodeId) => _inner.DissolveCommandNode(nodeId);
+
+    public void MoveForceUnit(Guid unitId, Guid? nodeId) => _inner.MoveForceUnit(unitId, nodeId);
+
+    public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
+
+    public void SetFuehrungsstufe(Fuehrungsstufe? stufe) => _inner.SetFuehrungsstufe(stufe);
+
+    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe) =>
+        _inner.UpdateLeadershipPost(standort, rufname, telefon, funkgruppe);
 
     public void AddForceUnit(
         string brigade,

@@ -1,4 +1,5 @@
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Time;
 
 namespace LageBuch.Documents.Tests;
@@ -22,14 +23,131 @@ public class ForcesSectionTests
         PdfText.AssertInOrder(
             text,
             "Kräfteübersicht",
-            "Feuerwehr Funkrufname Stärke AGT Status Bemerkung",
-            "Emmering 1/40 0/1/5/6 2 Im Einsatz Drehleiter",
-            "Aich — 0/0/3/3 0 — —");
+            "Feuerwehr Funkrufname Abschnitt Stärke AGT Status Bemerkung",
+            "Emmering 1/40 — 0/1/5/6 2 Im Einsatz Drehleiter",
+            "Aich — — 0/0/3/3 0 — —");
 
-        // All six cells on one line: a missing column definition would wrap the row.
+        // All seven cells on one line: a missing column definition would wrap the row.
         Assert.Contains(
-            "Emmering 1/40 0/1/5/6 2 Im Einsatz Drehleiter",
+            "Emmering 1/40 — 0/1/5/6 2 Im Einsatz Drehleiter",
             PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces));
+    }
+
+    [Fact]
+    public void Forces_table_names_the_abschnitt_of_each_unit()
+    {
+        var incident = Incident.Start(Clock, Op);
+        var abschnitt = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var unit = incident.AddForceUnit(Clock, Op, "Emmering", 6, callSign: "1/40");
+        incident.MoveForceUnit(Clock, Op, unit.Id, abschnitt.Id);
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces);
+
+        Assert.Contains("Feuerwehr Funkrufname Abschnitt Stärke AGT Status Bemerkung", lines);
+        Assert.Contains("Emmering 1/40 Abschnitt 1 0/0/6/6 0 — —", lines);
+    }
+
+    [Fact]
+    public void An_unterabschnitt_is_printed_with_its_abschnitt_so_same_named_ones_stay_apart()
+    {
+        var incident = Incident.Start(Clock, Op);
+        var one = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var two = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2");
+        var nordOne = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Nord", one.Id);
+        var nordTwo = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Nord", two.Id);
+        var a = incident.AddForceUnit(Clock, Op, "Emmering", 6, callSign: "1/40");
+        var b = incident.AddForceUnit(Clock, Op, "Aich", 6, callSign: "2/10");
+        incident.MoveForceUnit(Clock, Op, a.Id, nordOne.Id);
+        incident.MoveForceUnit(Clock, Op, b.Id, nordTwo.Id);
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces);
+
+        Assert.Contains("Emmering 1/40 Abschnitt 1 / Nord 0/0/6/6 0 — —", lines);
+        Assert.Contains("Aich 2/10 Abschnitt 2 / Nord 0/0/6/6 0 — —", lines);
+    }
+
+    [Fact]
+    public void A_dissolved_abschnitt_still_names_the_unit_placed_in_it()
+    {
+        var started = Incident.Start(Clock, Op);
+        var abschnitt = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Abschnitt 1", null, null, null, null, null, null, Started);
+        var unit = ForceUnit.Rehydrate(
+            Guid.NewGuid(), "Emmering", "1/40", 6, 0, null, null, 0, nodeId: abschnitt.Id);
+        var incident = Incident.Rehydrate(
+            started.Id,
+            Started,
+            IncidentState.Open,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            [],
+            [],
+            [],
+            [unit],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            commandNodes: [abschnitt]);
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces);
+
+        Assert.Contains("Emmering 1/40 Abschnitt 1 0/0/6/6 0 — —", lines);
+    }
+
+    [Fact]
+    public void Unplaced_unit_shows_a_dash()
+    {
+        var incident = Incident.Start(Clock, Op);
+        incident.AddForceUnit(Clock, Op, "Aich", 3, callSign: "2/10");
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces);
+
+        Assert.Contains("Aich 2/10 — 0/0/3/3 0 — —", lines);
+    }
+
+    [Fact]
+    public void Unit_pointing_at_an_unknown_node_shows_a_dash()
+    {
+        var started = Incident.Start(Clock, Op);
+        var unit = ForceUnit.Rehydrate(
+            Guid.NewGuid(), "Aich", "2/10", 3, 0, null, null, 0, nodeId: Guid.NewGuid());
+        var incident = Incident.Rehydrate(
+            started.Id,
+            Started,
+            IncidentState.Open,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            [],
+            [],
+            [],
+            [unit],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []);
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces);
+
+        Assert.Contains("Aich 2/10 — 0/0/3/3 0 — —", lines);
     }
 
     // #621: the total is in the same Zugführer/Führungskraft/Mannschaft/Gesamt notation as each
@@ -43,7 +161,7 @@ public class ForcesSectionTests
 
         var text = PdfText.Of(incident, Started, IncidentPdfSections.Forces);
 
-        PdfText.AssertInOrder(text, "Emmering — 1/1/4/6", "Aich — 0/2/7/9");
+        PdfText.AssertInOrder(text, "Emmering — — 1/1/4/6", "Aich — — 0/2/7/9");
         Assert.Contains("Gesamtstärke: 1/3/11/15 davon Atemschutzgeräteträger: 6", text, StringComparison.Ordinal);
         Assert.DoesNotContain("keine Einträge", text, StringComparison.Ordinal);
     }

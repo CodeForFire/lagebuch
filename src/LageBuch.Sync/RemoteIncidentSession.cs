@@ -9,6 +9,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -412,14 +413,46 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? section = null,
-        string? phone = null) =>
-        Send(new AssignRoleCommand(Op(), role, personName, callSign, from, to, section, phone));
+        string? phone = null,
+        Guid? nodeId = null,
+        RoleSlot slot = RoleSlot.None) =>
+        Send(new AssignRoleCommand(Op(), role, personName, callSign, from, to, section, phone, nodeId, slot));
 
     public void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null) =>
         Send(new TransferRoleCommand(Op(), assignmentId, newPersonName, newCallSign, newPhone));
 
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Send(new EditRolePhoneCommand(Op(), assignmentId, phone));
+
+    public void AddCommandNode(
+        CommandNodeKind kind,
+        string name,
+        Guid? parentId = null,
+        string? auftrag = null,
+        string? standort = null,
+        string? funkgruppe = null,
+        string? rufname = null,
+        string? telefon = null) =>
+        Send(new AddCommandNodeCommand(Op(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon));
+
+    public void UpdateCommandNode(
+        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
+        Send(new UpdateCommandNodeCommand(Op(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon));
+
+    public void DissolveCommandNode(Guid nodeId) =>
+        Send(new DissolveCommandNodeCommand(Op(), nodeId));
+
+    public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
+        Send(new MoveForceUnitCommand(Op(), unitId, nodeId));
+
+    public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
+        Send(new PlaceRoleAssignmentCommand(Op(), assignmentId, nodeId, slot));
+
+    public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
+        Send(new SetFuehrungsstufeCommand(Op(), stufe));
+
+    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe) =>
+        Send(new UpdateLeadershipPostCommand(Op(), standort, rufname, telefon, funkgruppe));
 
     public void AddForceUnit(
         string brigade,
