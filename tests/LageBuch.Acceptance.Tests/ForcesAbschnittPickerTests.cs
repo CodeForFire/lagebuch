@@ -62,6 +62,42 @@ public class ForcesAbschnittPickerTests
         frame.SavePng(Path.Join(dir, name));
     }
 
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_refused_Abschnitt_pick_says_so_above_the_list(bool narrow)
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Mustermann", "FFB 12/1");
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddForceUnit(clock, op, "FF Emmering", 9, "Florian Emmering 40/1", "Im Einsatz");
+        var abschnitt = session.Incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var vm = new ForcesViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var view = new ForcesView { DataContext = vm };
+        var workspace = new Panel { Name = "WorkspaceRoot", Children = { view } };
+        workspace.Classes.Set("narrow", narrow);
+        var window = new Window { Content = workspace, Width = narrow ? 420 : 1400, Height = narrow ? 800 : 500 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var line = view.GetControl<TextBlock>("ForcesActionError");
+        Assert.False(line.IsEffectivelyVisible);
+        var pick = vm.Forces.Single().NodeChoices.Single(c => c.NodeId == abschnitt.Id);
+        vm.Dispose(); // the list keeps offering the Abschnitt a peer dissolves next
+        session.DissolveCommandNode(abschnitt.Id);
+
+        pick.SelectCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(line.IsEffectivelyVisible);
+        Assert.StartsWith("Nicht möglich: ", line.Text, StringComparison.Ordinal);
+    }
+
     [AvaloniaFact]
     public void The_grid_has_an_ABSCHNITT_column_showing_where_each_unit_sits()
     {

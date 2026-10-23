@@ -136,6 +136,11 @@
       </Border>
     </Grid>
 
+    <!-- Why an Abschnitt pick was refused (a peer dissolved it a moment ago); the list stays as it is. -->
+    <TextBlock x:Name="ForcesActionError" Classes="field-error" DockPanel.Dock="Top" Margin="0,0,0,10"
+               Text="{Binding ActionError}"
+               IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
     <!-- The phone's way in to the dock, at the bottom edge where the thumb already is. -->
     <Button KeyboardNavigation.TabIndex="3" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
             Margin="0,12,0,0" HorizontalAlignment="Stretch"

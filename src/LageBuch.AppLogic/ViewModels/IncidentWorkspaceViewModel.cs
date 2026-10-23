@@ -936,9 +936,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
-        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, (title, message, onConfirmed) => RequestConfirm(title, message, onConfirmed));
+        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirmDefault);
 
-        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, (title, message, onConfirmed) => RequestConfirm(title, message, onConfirmed));
+        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirmDefault);
 
         Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
@@ -946,7 +946,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnHeaderSourceChanged;
 
-        Files = new FilesViewModel(_session, _dialogs, OnChanged, (title, message, onConfirmed) => RequestConfirm(title, message, onConfirmed), _clock);
+        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirmDefault, _clock);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
         Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs);
@@ -1100,6 +1100,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         return true;
     }
+
+    private void RequestConfirmDefault(string title, string message, Action onConfirmed) =>
+        RequestConfirm(title, message, onConfirmed);
 
     /// <summary>
     /// Generic confirm-before-acting hook for children (e.g. ForcesViewModel removing a unit) that

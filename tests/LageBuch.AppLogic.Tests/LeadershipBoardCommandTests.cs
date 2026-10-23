@@ -378,7 +378,6 @@ public class LeadershipBoardCommandTests
         var card = Assert.Single(vm.Sections);
         Assert.Equal(dach, card.Id);
         Assert.Empty(card.Children);
-        Assert.Single(vm.Sections, c => c.Id == dach);
     }
 
     [Fact]
