@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -1002,6 +1003,100 @@ public class ForcesViewModelTests
         vm.AddForceCommand.Execute(null);
 
         Assert.Equal(new[] { false, true }, outcomes);
+    }
+
+    // --- Abschnitt: a unit is placed from the Kräfte list through the shared picker. ---
+    private static (ForcesViewModel Vm, LocalIncidentSession Session, int[] Changes) NewVmWithUnits(bool readOnly = false)
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FF Emmering", 9, "Florian Emmering 40/1");
+        seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FF Aich", 7, "Florian Aich 42/1");
+        seed.Incident.AddCommandNode(clock, new SessionOperator("Müller"), CommandNodeKind.Abschnitt, "Nord");
+        LocalIncidentSession session = seed;
+        if (readOnly)
+        {
+            seed.Close();
+            session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        }
+
+        var changes = new int[1];
+        return (new ForcesViewModel(session, clock, Md(), () => changes[0]++), session, changes);
+    }
+
+    [Fact]
+    public void Selecting_an_Abschnitt_moves_the_unit_and_the_row_label_follows()
+    {
+        var (vm, session, changes) = NewVmWithUnits();
+        var row = vm.Forces[0];
+        Assert.Equal("—", row.NodeLabel);
+        var nord = session.Incident.CommandNodes.Single();
+
+        row.NodeChoices.Single(c => c.NodeId == nord.Id).SelectCommand.Execute(null);
+
+        Assert.Equal(nord.Id, session.Incident.Forces[0].NodeId);
+        Assert.Equal(1, changes[0]);
+        Assert.Equal("Nord", row.NodeLabel);
+        Assert.Equal(nord.Id, Assert.Single(row.NodeChoices, c => c.IsCurrent).NodeId);
+        Assert.Null(Assert.Single(vm.Forces[1].NodeChoices, c => c.IsCurrent).NodeId);
+    }
+
+    [Fact]
+    public void Selecting_the_current_entry_does_nothing()
+    {
+        var (vm, session, changes) = NewVmWithUnits();
+        var row = vm.Forces[0];
+
+        row.NodeChoices.Single(c => c.IsCurrent).SelectCommand.Execute(null);
+
+        Assert.Equal(0, changes[0]);
+        Assert.Null(session.Incident.Forces[0].NodeId);
+    }
+
+    [Fact]
+    public void Selecting_an_Abschnitt_on_a_readonly_incident_does_nothing()
+    {
+        var (vm, session, changes) = NewVmWithUnits(readOnly: true);
+        var row = vm.Forces[0];
+        var nord = session.Incident.CommandNodes.Single();
+
+        row.NodeChoices.Single(c => c.NodeId == nord.Id).SelectCommand.Execute(null);
+
+        Assert.Equal(0, changes[0]);
+        Assert.Null(session.Incident.Forces[0].NodeId);
+    }
+
+    [Fact]
+    public void An_unchanged_refresh_keeps_the_same_NodeChoices_instance()
+    {
+        var (vm, session, _) = NewVmWithUnits();
+        var row = vm.Forces[0];
+        var before = row.NodeChoices;
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        session.UpdateForceUnit(row.Id, "Alarmiert", "Notiz"); // raises Changed, moves no node
+
+        Assert.Same(before, row.NodeChoices);
+        Assert.DoesNotContain(nameof(ForceRow.NodeChoices), raised);
+        Assert.DoesNotContain(nameof(ForceRow.NodeLabel), raised);
+    }
+
+    [Fact]
+    public void A_newly_formed_Abschnitt_appears_in_every_rows_choices()
+    {
+        var (vm, session, _) = NewVmWithUnits();
+
+        session.AddCommandNode(CommandNodeKind.Bereitstellung, "Marktplatz");
+
+        Assert.All(vm.Forces, r => Assert.Contains(r.NodeChoices, c => c.Label == "Marktplatz"));
     }
 
     private static ForcesViewModel NewVm()

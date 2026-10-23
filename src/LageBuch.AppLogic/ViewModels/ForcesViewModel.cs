@@ -28,6 +28,7 @@ public sealed partial class ForceRow : ObservableObject
     private readonly Action<string?, string?> _onEdited;
     private readonly Action<int, int, int, int> _onStrengthEdited;
     private readonly Action _onRemoved;
+    private readonly Action<Guid?> _onMoved;
 
     public ForceRow(
         Domain.ForceUnit unit,
@@ -35,9 +36,13 @@ public sealed partial class ForceRow : ObservableObject
         bool isReadOnly,
         Action<string?, string?> onEdited,
         Action<int, int, int, int> onStrengthEdited,
-        Action onRemoved)
+        Action onRemoved,
+        Domain.Incident incident,
+        Action<Guid?> onMoved)
     {
         ArgumentNullException.ThrowIfNull(unit);
+        ArgumentNullException.ThrowIfNull(incident);
+        ArgumentNullException.ThrowIfNull(onMoved);
         Id = unit.Id;
         Brigade = unit.Brigade;
         CallSign = unit.CallSign;
@@ -50,6 +55,8 @@ public sealed partial class ForceRow : ObservableObject
         _onEdited = onEdited;
         _onStrengthEdited = onStrengthEdited;
         _onRemoved = onRemoved;
+        _onMoved = onMoved;
+        (NodeChoices, NodeLabel) = BuildNode(unit, incident);
         Edits = unit.Edits;
         _syncedStrength = StrengthOf(unit);
         _zugfuehrerCount = unit.ZugfuehrerCount;
@@ -81,10 +88,11 @@ public sealed partial class ForceRow : ObservableObject
     /// joined device rebuilds its whole aggregate from each snapshot. Brigade and Funkrufname are
     /// not touched -- no session operation changes them.
     /// </remarks>
-    public void Update(Domain.ForceUnit unit, IReadOnlyList<string> statusOptions)
+    public void Update(Domain.ForceUnit unit, IReadOnlyList<string> statusOptions, Domain.Incident incident)
     {
         ArgumentNullException.ThrowIfNull(unit);
         ArgumentNullException.ThrowIfNull(statusOptions);
+        ArgumentNullException.ThrowIfNull(incident);
 
         // Options first, so a status set elsewhere that the Stammdaten do not list already has an
         // entry to select when Status changes. Replaced only when the list really differs: swapping
@@ -94,6 +102,21 @@ public sealed partial class ForceRow : ObservableObject
         {
             StatusOptions = options;
             OnPropertyChanged(nameof(StatusOptions));
+        }
+
+        // Same rule for the Abschnitt picker: its Flyout is rebuilt from NodeChoices, so it is
+        // replaced only when the entries, their labels or the current mark really differ.
+        var (choices, label) = BuildNode(unit, incident);
+        if (!choices.Select(NodeKey).SequenceEqual(NodeChoices.Select(NodeKey)))
+        {
+            NodeChoices = choices;
+            OnPropertyChanged(nameof(NodeChoices));
+        }
+
+        if (!string.Equals(label, NodeLabel, StringComparison.Ordinal))
+        {
+            NodeLabel = label;
+            OnPropertyChanged(nameof(NodeLabel));
         }
 
         _pulling = true;
@@ -125,6 +148,37 @@ public sealed partial class ForceRow : ObservableObject
             OnPropertyChanged(nameof(EditLines));
         }
     }
+
+    private static (Guid? NodeId, string Label, bool IsCurrent) NodeKey(NodeChoice c) => (c.NodeId, c.Label, c.IsCurrent);
+
+    private (IReadOnlyList<NodeChoice> Choices, string Label) BuildNode(Domain.ForceUnit unit, Domain.Incident incident)
+    {
+        var choices = ViewModels.NodeChoices.Build(incident, unit.NodeId, MoveTo);
+        var placed = choices.First(c => c.IsCurrent).NodeId;
+        _placedNodeId = placed;
+        return (choices, Domain.Formatting.OrDash(incident.NodeLabel(placed)));
+    }
+
+    // The Abschnitt the unit counts as sitting in: a hostile NodeId (missing, dissolved, Partner)
+    // reads as none, the same as ReportingLine.UnplacedUnits.
+    private Guid? _placedNodeId;
+
+    // A closed Einsatz is a historical record, so a stray selection is inert instead of throwing.
+    private void MoveTo(Guid? nodeId)
+    {
+        if (IsReadOnly || nodeId == _placedNodeId)
+        {
+            return;
+        }
+
+        _onMoved(nodeId);
+    }
+
+    /// <summary>The Abschnitt picker's entries (shared with the Führung board); replaced only on a real change.</summary>
+    public IReadOnlyList<NodeChoice> NodeChoices { get; private set; }
+
+    /// <summary>Where the unit sits, for the grid cell; "—" when it is in no Abschnitt.</summary>
+    public string NodeLabel { get; private set; }
 
     public Guid Id { get; }
 
@@ -331,7 +385,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
             r => r.Id,
             f => f.Id,
             ToRow,
-            (row, f) => row.Update(f, StatusOptions));
+            (row, f) => row.Update(f, StatusOptions, _session.Incident));
 
         TotalPersonnel = _session.Incident.TotalPersonnel;
         TotalOfficer = _session.Incident.TotalOfficer;
@@ -746,5 +800,11 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
                         _session.RemoveForceUnit(f.Id); // Changed → RefreshForces drops the row
                         _onChanged();
                     });
+            },
+            _session.Incident,
+            nodeId =>
+            {
+                _session.MoveForceUnit(f.Id, nodeId);
+                _onChanged();
             });
 }

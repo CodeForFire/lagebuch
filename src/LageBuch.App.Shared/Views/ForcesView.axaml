@@ -281,6 +281,40 @@
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
+          <!-- Placed through a flyout of commands and not a ComboBox: a selection bound to a
+               domain write re-enters through Changed mid-update (see SafetyTruppChoice). -->
+          <DataGridTemplateColumn Header="ABSCHNITT" Width="170">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="6,4"
+                        Padding="8,4" FontSize="12"
+                        IsEnabled="{Binding !IsReadOnly}"
+                        ToolTip.Tip="{Binding NodeLabel}" AutomationProperties.Name="Abschnitt wählen">
+                  <TextBlock Text="{Binding NodeLabel}" TextTrimming="CharacterEllipsis" />
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                      <ItemsControl ItemsSource="{Binding NodeChoices}" MinWidth="190">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:NodeChoice">
+                            <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left" Padding="8,5"
+                                    Command="{Binding SelectCommand}">
+                              <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                                <!-- The entry in force is marked rather than styled, so it still reads at a
+                                     glance on the ELW's dimmed screen. -->
+                                <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" />
+                              </Grid>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <!-- Stärke im 1/1/2-Format; die Zahlen bleiben nach dem Eintrag korrigierbar (#76),
                gebündelt in einem Editor, damit eine Korrektur ein Protokolleintrag bleibt.
                Verlauf zeigt die Wert-Historie der Einheit. -->
@@ -455,6 +489,35 @@
                                ToolTip.Tip="Atemschutzgeräteträger" />
                     <TextBlock Text="{Binding ScbaCount}" VerticalAlignment="Center" />
                   </StackPanel>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <TextBlock Grid.Column="0" Text="ABSCHNITT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Padding="8,4" FontSize="12"
+                            IsEnabled="{Binding !IsReadOnly}"
+                            ToolTip.Tip="{Binding NodeLabel}" AutomationProperties.Name="Abschnitt wählen">
+                      <TextBlock Text="{Binding NodeLabel}" TextTrimming="CharacterEllipsis" />
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <ItemsControl ItemsSource="{Binding NodeChoices}" MinWidth="190">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:NodeChoice">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left" Padding="8,5"
+                                        Command="{Binding SelectCommand}">
+                                  <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                                    <!-- The entry in force is marked rather than styled, so it still reads at a
+                                         glance on the ELW's dimmed screen. -->
+                                    <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Label}" />
+                                  </Grid>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                  </Grid>
                   <ComboBox HorizontalAlignment="Stretch"
                             ItemsSource="{Binding StatusOptions}"
                             SelectedItem="{Binding Status}"
