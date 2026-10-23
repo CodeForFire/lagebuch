@@ -144,7 +144,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         var kind = node?.Kind ?? CommandNodeKind.Abschnitt;
         return new CommandNodeDialogViewModel(session, masterData, Mode.Edit, kind, node?.ParentId, nodeId, node?.Name ?? string.Empty, onChanged)
         {
-            Title = $"{BoardNodeCard.LabelOf(kind)} bearbeiten",
+            Title = $"{CommandNodeKindLabels.Of(kind)} bearbeiten",
             Auftrag = node?.Auftrag,
             Standort = node?.Standort,
             Funkgruppe = node?.Funkgruppe,

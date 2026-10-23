@@ -104,15 +104,7 @@ public sealed partial class BoardNodeCard : ObservableObject
     public bool IsAbschnitt => Kind == CommandNodeKind.Abschnitt;
 
     /// <summary>What the card says the node is; a partner's node is an Einsatzleitung.</summary>
-    public string KindLabel => LabelOf(Kind);
-
-    internal static string LabelOf(CommandNodeKind kind) => kind switch
-    {
-        CommandNodeKind.Unterabschnitt => "Unterabschnitt",
-        CommandNodeKind.Bereitstellung => "Bereitstellung",
-        CommandNodeKind.Partner => "Einsatzleitung",
-        _ => "Abschnitt",
-    };
+    public string KindLabel => CommandNodeKindLabels.Of(Kind);
 
     /// <summary>Running Funktionen in the node with no post (Slot None).</summary>
     public ObservableCollection<BoardPersonRow> Members { get; } = [];

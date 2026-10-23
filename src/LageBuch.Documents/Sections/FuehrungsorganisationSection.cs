@@ -40,41 +40,47 @@ public static class FuehrungsorganisationSection
 
             foreach (var entry in ReportingLine.Of(incident))
             {
-                foreach (var (level, text) in Lines(incident, entry))
+                foreach (var (level, text, isHeadline) in Lines(incident, entry))
                 {
-                    column.Item().PaddingLeft(level * IndentPoints).Text(text);
+                    var line = column.Item().PaddingLeft(level * IndentPoints).Text(text);
+                    if (isHeadline)
+                    {
+                        line.SemiBold();
+                    }
                 }
             }
 
             var unplaced = ReportingLine.UnplacedUnits(incident);
             if (unplaced.Count > 0)
             {
-                column.Item().Text($"Nicht zugeordnet: {string.Join(", ", unplaced.Select(Title))}");
+                column.Item().Text($"Nicht zugeordnet: {string.Join(", ", unplaced.Select(Title))}").SemiBold();
             }
 
             foreach (var (section, assignments) in ReportingLine.FreeTextSections(incident))
             {
-                column.Item().Text($"Abschnitt (Freitext) {section}: {People(assignments, withParentheses: false)}");
+                column.Item().Text($"Abschnitt (Freitext) {section}: {People(assignments, withParentheses: false)}").SemiBold();
             }
         });
     }
 
-    private static IEnumerable<(int Level, string Text)> Lines(Incident incident, ReportingEntry entry)
+    // A headline stands at the entry's Depth (an Unterabschnitt one level under its Abschnitt) and is
+    // bold; its detail lines sit one level deeper, so a nested headline is never mistaken for a detail.
+    private static IEnumerable<(int Level, string Text, bool IsHeadline)> Lines(Incident incident, ReportingEntry entry)
     {
         if (entry.Kind == ReportingEntryKind.Fachberater)
         {
-            yield return (entry.Depth, $"Fachberater: {People(entry.Others, withParentheses: true)}");
+            yield return (entry.Depth, $"Fachberater: {People(entry.Others, withParentheses: true)}", true);
             yield break;
         }
 
-        yield return (entry.Depth, Headline(incident, entry));
+        yield return (entry.Depth, Headline(incident, entry), true);
 
         var sub = entry.Depth + 1;
         if (entry.Kind == ReportingEntryKind.Einsatzleitung)
         {
             foreach (var assistant in entry.Others)
             {
-                yield return (sub, $"Führungsassistenz: {assistant.Role} {assistant.PersonName}");
+                yield return (sub, $"Führungsassistenz: {assistant.Role} {assistant.PersonName}", false);
             }
 
             yield break;
@@ -82,12 +88,12 @@ public static class FuehrungsorganisationSection
 
         if (entry.Units.Count > 0)
         {
-            yield return (sub, $"Einheiten: {string.Join(", ", entry.Units.Select(Title))}");
+            yield return (sub, $"Einheiten: {string.Join(", ", entry.Units.Select(Title))}", false);
         }
 
         if (entry.Others.Count > 0)
         {
-            yield return (sub, $"Weitere: {People(entry.Others, withParentheses: false)}");
+            yield return (sub, $"Weitere: {People(entry.Others, withParentheses: false)}", false);
         }
     }
 
@@ -119,15 +125,12 @@ public static class FuehrungsorganisationSection
         }
 
         var node = entry.Node!;
-        var label = entry.Kind switch
-        {
-            ReportingEntryKind.Bereitstellung => "Bereitstellung",
-            ReportingEntryKind.Unterabschnitt => "Unterabschnitt",
-            ReportingEntryKind.Partner => "Partner",
-            _ => "Abschnitt",
-        };
-        var name = entry.Kind == ReportingEntryKind.Unterabschnitt ? incident.NodeLabel(node.Id) ?? node.Name : node.Name;
-        var text = $"{label} {name}";
+
+        // The Unterabschnitt's parent is the headline right above it, so its own name is enough. A
+        // name that already starts with the kind ("Abschnitt 1 Nord") is not prefixed twice.
+        var label = CommandNodeKindLabels.Of(node.Kind);
+        var name = node.Name.Trim();
+        var text = name.StartsWith(label, StringComparison.OrdinalIgnoreCase) ? name : $"{label} {name}";
         if (!string.IsNullOrWhiteSpace(node.Auftrag))
         {
             text += $" – Auftrag: {node.Auftrag}";

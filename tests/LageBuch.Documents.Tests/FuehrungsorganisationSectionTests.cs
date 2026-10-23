@@ -19,7 +19,7 @@ public class FuehrungsorganisationSectionTests
         PdfText.Of(incident, Started, IncidentPdfSections.Fuehrungsorganisation);
 
     private static RoleAssignment El(Incident incident) =>
-        incident.AssignRole(Clock, Op, "EL", "Max Mustermann", callSign: "Florian Emmering 1", slot: RoleSlot.Leiter);
+        incident.AssignRole(Clock, Op, "Einsatzleiter", "Max Mustermann", callSign: "Florian Emmering 1", slot: RoleSlot.Leiter);
 
     private static Incident FullBoard()
     {
@@ -27,27 +27,32 @@ public class FuehrungsorganisationSectionTests
         El(incident);
         incident.SetFuehrungsstufe(Clock, Op, Fuehrungsstufe.B);
         incident.UpdateLeadershipPost(Clock, Op, null, null, null, "TMO FW_EMMERING 1000");
-        incident.AssignRole(Clock, Op, "Führungsassistent", "Anna Beispiel", slot: RoleSlot.Fuehrungsassistent);
+        incident.AssignRole(Clock, Op, "S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
 
         incident.AddCommandNode(Clock, Op, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz");
         var nord = incident.AddCommandNode(
-            Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung", funkgruppe: "TMO FW_EMMERING 1001");
-        incident.AssignRole(Clock, Op, "Abschnittsleiter", "Erika Muster", nodeId: nord.Id, slot: RoleSlot.Leiter);
-        incident.AssignRole(Clock, Op, "Melder", "Paul Probe", nodeId: nord.Id, slot: RoleSlot.Melder);
-        incident.AssignRole(Clock, Op, "Sichter", "Tim Test", nodeId: nord.Id);
-        incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Dach", nord.Id);
-        var sued = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd");
-        incident.AddCommandNode(Clock, Op, CommandNodeKind.Partner, "Rettungsdienst");
+            Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung", funkgruppe: "DMO 301_F");
+        incident.AssignRole(
+            Clock, Op, "Abschnittsleiter", "Hans Huber", callSign: "Florian Aich 1", nodeId: nord.Id, slot: RoleSlot.Leiter);
+        incident.AssignRole(Clock, Op, "Lagemelder", "Lena Lehner", nodeId: nord.Id, slot: RoleSlot.Melder);
+        incident.AssignRole(Clock, Op, "Gerätewart", "Anton Reiter", nodeId: nord.Id);
+        var dach = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Dach", nord.Id);
+        var sued = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", funkgruppe: "DMO 302_F");
+        incident.AssignRole(Clock, Op, "Abschnittsleiter", "Josef Bauer", nodeId: sued.Id, slot: RoleSlot.Leiter);
+        var rettungsdienst = incident.AddCommandNode(Clock, Op, CommandNodeKind.Partner, "Rettungsdienst");
+        incident.AssignRole(
+            Clock, Op, "Einsatzleiter", "Sabine Schmid", callSign: "Rotkreuz Fürstenfeldbruck 1", nodeId: rettungsdienst.Id, slot: RoleSlot.Leiter);
         incident.AssignRole(Clock, Op, "Fachberater THW", "Peter Maier", slot: RoleSlot.Fachberater);
 
-        var emmering = incident.AddForceUnit(Clock, Op, "Emmering", 6, callSign: "Florian Emmering 11/1");
-        var aich = incident.AddForceUnit(Clock, Op, "Aich", 4);
+        var emmering = incident.AddForceUnit(Clock, Op, "Emmering", 6, callSign: "Florian Emmering 40/1");
+        var aich = incident.AddForceUnit(Clock, Op, "Aich", 4, callSign: "Florian Aich 44/1");
+        var onRoof = incident.AddForceUnit(Clock, Op, "Emmering", 3, callSign: "Florian Emmering 30/1");
         incident.AddForceUnit(Clock, Op, "Emmering", 3, callSign: "Florian Emmering 11/2");
         incident.MoveForceUnit(Clock, Op, emmering.Id, nord.Id);
         incident.MoveForceUnit(Clock, Op, aich.Id, sued.Id);
-        incident.AddForceUnit(Clock, Op, "Steinhöring", 3, callSign: "Florian Steinhöring 20/1");
+        incident.MoveForceUnit(Clock, Op, onRoof.Id, dach.Id);
 
-        incident.AssignRole(Clock, Op, "Verkehrslenkung", "Karl Kurz", section: "Zufahrt");
+        incident.AssignRole(Clock, Op, "Zugführer", "Maria Musterfrau", section: "Wache Süd");
         return incident;
     }
 
@@ -55,7 +60,7 @@ public class FuehrungsorganisationSectionTests
     public void Nothing_is_printed_without_nodes_and_without_a_slotted_assignment()
     {
         var incident = Fresh();
-        incident.AssignRole(Clock, Op, "Sichter", "Tim Test");
+        incident.AssignRole(Clock, Op, "Gerätewart", "Anton Reiter");
 
         Assert.DoesNotContain(Heading, Print(incident), StringComparison.Ordinal);
     }
@@ -74,7 +79,7 @@ public class FuehrungsorganisationSectionTests
     }
 
     [Fact]
-    public void The_tree_prints_in_board_order()
+    public void The_tree_prints_in_board_order_without_doubled_kind_labels()
     {
         var text = Print(FullBoard());
 
@@ -82,39 +87,47 @@ public class FuehrungsorganisationSectionTests
             text,
             Heading,
             "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Stufe B · Funkgruppe TMO FW_EMMERING 1000",
-            "Führungsassistenz: Führungsassistent Anna Beispiel",
-            "Bereitstellung Bereitstellung Marktplatz",
-            "Abschnitt Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Erika Muster – Melder: Paul Probe – Funkgruppe: TMO FW_EMMERING 1001",
-            "Einheiten: Florian Emmering 11/1",
-            "Weitere: Sichter Tim Test",
-            "Unterabschnitt Abschnitt 1 Nord / Dach",
-            "Abschnitt Abschnitt 2 Süd",
-            "Einheiten: Aich",
-            "Partner Rettungsdienst",
+            "Führungsassistenz: S2 Lage Erika Musterfrau",
+            "Bereitstellung Marktplatz",
+            "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppe: DMO 301_F",
+            "Einheiten: Florian Emmering 40/1",
+            "Weitere: Gerätewart Anton Reiter",
+            "Unterabschnitt Dach",
+            "Einheiten: Florian Emmering 30/1",
+            "Abschnitt 2 Süd – Leiter: Josef Bauer – Funkgruppe: DMO 302_F",
+            "Einheiten: Florian Aich 44/1",
+            "Einsatzleitung Rettungsdienst – Leiter: Sabine Schmid",
             "Fachberater: Fachberater THW (Peter Maier)",
-            "Nicht zugeordnet: Florian Emmering 11/2, Florian Steinhöring 20/1",
-            "Abschnitt (Freitext) Zufahrt: Verkehrslenkung Karl Kurz");
+            "Nicht zugeordnet: Florian Emmering 11/2",
+            "Abschnitt (Freitext) Wache Süd: Zugführer Maria Musterfrau");
+        foreach (var doubled in new[] { "Bereitstellung Bereitstellung", "Abschnitt Abschnitt", "Unterabschnitt Abschnitt", "Partner" })
+        {
+            Assert.DoesNotContain(doubled, text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
-    public void A_nested_Unterabschnitt_is_indented_deeper_than_its_Abschnitt()
+    public void A_nested_Unterabschnitt_is_a_deeper_headline_after_its_Abschnitts_details()
     {
-        var lefts = LineLefts(FullBoard());
+        var lines = LinePositions(FullBoard());
 
-        var el = lefts["Einsatzleitung Feuerwehr –"];
-        var assistenz = lefts["Führungsassistenz: Führungsassistent Anna"];
-        var bereitstellung = lefts["Bereitstellung Bereitstellung Marktplatz"];
-        var nord = lefts["Abschnitt Abschnitt 1"];
-        var dach = lefts["Unterabschnitt Abschnitt 1"];
-        var nordUnits = lefts["Einheiten: Florian Emmering"];
-        var partner = lefts["Partner Rettungsdienst"];
+        var el = lines["Einsatzleitung Feuerwehr – EL"];
+        var assistenz = lines["Führungsassistenz: S2 Lage Erika"];
+        var bereitstellung = lines["Bereitstellung Marktplatz"];
+        var nord = lines["Abschnitt 1 Nord –"];
+        var nordUnits = lines["Einheiten: Florian Emmering 40/1"];
+        var dach = lines["Unterabschnitt Dach"];
+        var dachUnits = lines["Einheiten: Florian Emmering 30/1"];
+        var partner = lines["Einsatzleitung Rettungsdienst – Leiter:"];
 
-        Assert.True(bereitstellung > el + 5);
-        Assert.True(assistenz > el + 5);
-        Assert.True(Math.Abs(nord - bereitstellung) < 1);
-        Assert.True(dach > nord + 5);
-        Assert.True(nordUnits > nord + 5);
-        Assert.True(Math.Abs(partner - el) < 1);
+        Assert.True(assistenz.Left > el.Left + 5);
+        Assert.True(bereitstellung.Left > el.Left + 5);
+        Assert.True(Math.Abs(nord.Left - bereitstellung.Left) < 1);
+        Assert.True(nordUnits.Left > nord.Left + 5);
+        Assert.True(dach.Left > nord.Left + 5);
+        Assert.True(dachUnits.Left > dach.Left + 5);
+        Assert.True(nordUnits.Y > dach.Y, "Abschnitt 1's Einheiten are printed before the Dach headline.");
+        Assert.True(Math.Abs(partner.Left - el.Left) < 1);
     }
 
     [Fact]
@@ -126,7 +139,7 @@ public class FuehrungsorganisationSectionTests
 
         var text = Print(incident);
 
-        Assert.Contains("Abschnitt Abschnitt 1 Nord", text, StringComparison.Ordinal);
+        Assert.Contains("Abschnitt 1 Nord", text, StringComparison.Ordinal);
         foreach (var clause in new[] { "Auftrag", "Leiter:", "Melder", "Funkgruppe", "Einheiten", "Weitere", "Fachberater", "Nicht zugeordnet", "Freitext", "Stufe" })
         {
             Assert.DoesNotContain(clause, text, StringComparison.Ordinal);
@@ -147,7 +160,7 @@ public class FuehrungsorganisationSectionTests
 
         Assert.DoesNotContain("Abschnitt 3 Ost", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Mustermann", text, StringComparison.Ordinal);
-        Assert.Contains("Abschnitt Abschnitt 1 Nord", text, StringComparison.Ordinal);
+        Assert.Contains("Abschnitt 1 Nord", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -163,20 +176,20 @@ public class FuehrungsorganisationSectionTests
             StringComparison.Ordinal);
     }
 
-    // The left edge of each line's first word, keyed by the line's first words, to compare indents.
-    private static Dictionary<string, double> LineLefts(Incident incident)
+    // Left edge and baseline of each line's first word, keyed by the line's first words.
+    private static Dictionary<string, (double Left, double Y)> LinePositions(Incident incident)
     {
         using var document = PdfDocument.Open(IncidentPdf.Generate(incident, Started, sections: IncidentPdfSections.Fuehrungsorganisation));
-        var lefts = new Dictionary<string, double>();
+        var lines = new Dictionary<string, (double Left, double Y)>();
         foreach (var line in document.GetPages().SelectMany(p => p.GetWords())
             .GroupBy(w => Math.Round(w.Letters[0].StartBaseLine.Y)))
         {
             var words = line.OrderBy(w => w.BoundingBox.Left).ToList();
-            var key = string.Join(' ', words.Take(words.Count > 3 ? 3 : words.Count).Select(w => w.Text));
-            lefts.TryAdd(key, words[0].BoundingBox.Left);
+            var key = string.Join(' ', words.Take(Math.Min(words.Count, 4)).Select(w => w.Text));
+            lines.TryAdd(key, (words[0].BoundingBox.Left, line.Key));
         }
 
-        return lefts;
+        return lines;
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock
