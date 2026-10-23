@@ -371,6 +371,10 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         _session.Changed += RefreshForces;
     }
 
+    /// <summary>Why the last Abschnitt pick was refused, in German; null when it went through.</summary>
+    [ObservableProperty]
+    private string? _actionError;
+
     public void Dispose() => _session.Changed -= RefreshForces;
 
     // Brings the rows in line with the incident on any change -- this device's edit, or (when
@@ -803,7 +807,18 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
             _session.Incident,
             nodeId =>
             {
-                _session.MoveForceUnit(f.Id, nodeId);
+                ActionError = null;
+                try
+                {
+                    _session.MoveForceUnit(f.Id, nodeId);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
+                {
+                    // A peer got there first (the Abschnitt was dissolved a moment ago): say so, leave the list as is.
+                    ActionError = $"Nicht möglich: {ex.Message}";
+                    return;
+                }
+
                 _onChanged();
             });
 }

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Leadership;
 
@@ -13,6 +14,16 @@ namespace LageBuch.AppLogic.ViewModels;
 public sealed partial class ElCard : ObservableObject
 {
     internal const string NoStufeText = "Keine Führungsstufe festgelegt";
+
+    private readonly Action<Fuehrungsstufe?> _onSelectStufe;
+
+    /// <param name="onSelectStufe">Sets the Führungsstufe (null clears it); the board decides whether that is allowed.</param>
+    public ElCard(Action<Fuehrungsstufe?> onSelectStufe)
+    {
+        ArgumentNullException.ThrowIfNull(onSelectStufe);
+        _onSelectStufe = onSelectStufe;
+        StufeChoices = BuildStufeChoices(null);
+    }
 
     [ObservableProperty]
     private string? _standort;
@@ -41,6 +52,9 @@ public sealed partial class ElCard : ObservableObject
 
     public ObservableCollection<BoardPersonRow> Assistants { get; } = [];
 
+    /// <summary>Stufe A to D, then "Keine"; replaced only on a real change (#408).</summary>
+    public IReadOnlyList<StufeChoice> StufeChoices { get; private set; }
+
     /// <summary>Takes the Einsatzleitung row of the reporting line and the incident's post and Stufe.</summary>
     public void Update(ReportingEntry entry, LeadershipPost post, Fuehrungsstufe? stufe, FuehrungsstufeSuggestion suggestion)
     {
@@ -57,5 +71,34 @@ public sealed partial class ElCard : ObservableObject
         StufeText = stufe is { } set ? $"Stufe {LeadershipKeys.StufeKey(set)}" : NoStufeText;
         SuggestionText = $"Vorschlag: Stufe {LeadershipKeys.StufeKey(suggestion.Stufe)} – {suggestion.Reason}";
         MatchesSuggestion = stufe == suggestion.Stufe;
+
+        var choices = BuildStufeChoices(stufe);
+        if (!choices.Select(Key).SequenceEqual(StufeChoices.Select(Key)))
+        {
+            StufeChoices = choices;
+            OnPropertyChanged(nameof(StufeChoices));
+        }
+    }
+
+    private static (Fuehrungsstufe? Stufe, string Label, bool IsCurrent) Key(StufeChoice c) => (c.Stufe, c.Label, c.IsCurrent);
+
+    private StufeChoice[] BuildStufeChoices(Fuehrungsstufe? current)
+    {
+        Fuehrungsstufe?[] stufen = [Fuehrungsstufe.A, Fuehrungsstufe.B, Fuehrungsstufe.C, Fuehrungsstufe.D, null];
+        return [.. stufen.Select(s => new StufeChoice(
+            s,
+            s is { } set ? $"Stufe {LeadershipKeys.StufeKey(set)}" : "Keine",
+            s == current,
+            new RelayCommand(() => _onSelectStufe(s))))];
     }
 }
+
+/// <summary>
+/// One entry of the Führungsstufe picker: a Stufe, or <c>null</c> for "Keine". A command per entry for
+/// the reason documented on <see cref="SafetyTruppChoice"/>.
+/// </summary>
+/// <param name="Stufe">The Führungsstufe, or null for none.</param>
+/// <param name="Label">What the entry says.</param>
+/// <param name="IsCurrent">Whether this is the Stufe in force, for the check mark.</param>
+/// <param name="SelectCommand">Sets the Stufe.</param>
+public sealed record StufeChoice(Fuehrungsstufe? Stufe, string Label, bool IsCurrent, IRelayCommand SelectCommand);

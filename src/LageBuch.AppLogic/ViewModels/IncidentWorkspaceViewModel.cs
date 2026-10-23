@@ -936,17 +936,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
-        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
+        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, (title, message, onConfirmed) => RequestConfirm(title, message, onConfirmed));
 
-        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirm);
+        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, (title, message, onConfirmed) => RequestConfirm(title, message, onConfirmed));
 
-        Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged);
+        Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnHeaderSourceChanged;
 
-        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm, _clock);
+        Files = new FilesViewModel(_session, _dialogs, OnChanged, (title, message, onConfirmed) => RequestConfirm(title, message, onConfirmed), _clock);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
         Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs);
@@ -1105,11 +1105,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// Generic confirm-before-acting hook for children (e.g. ForcesViewModel removing a unit) that
     /// need the same destructive-action guard as <see cref="CloseIncident"/> without each owning
     /// its own ConfirmDialogViewModel wiring. The caller names what is removed in the title
-    /// (#670), as every other confirm does.
+    /// (#670), as every other confirm does; <paramref name="confirmLabel"/> is the button's text.
     /// </summary>
-    private void RequestConfirm(string title, string message, Action onConfirmed)
+    private void RequestConfirm(string title, string message, Action onConfirmed, string confirmLabel = "ENTFERNEN")
     {
-        var dialog = new ConfirmDialogViewModel(title, message, "ENTFERNEN", onConfirmed);
+        var dialog = new ConfirmDialogViewModel(title, message, confirmLabel, onConfirmed);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }

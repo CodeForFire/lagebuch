@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LageBuch.Domain;
 using LageBuch.Domain.Leadership;
 
@@ -13,10 +14,16 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class BoardNodeCard : ObservableObject
 {
-    public BoardNodeCard(Guid id)
+    /// <param name="id">The node this card shows.</param>
+    /// <param name="onDissolve">Asks the board to dissolve the node; the card only offers the command.</param>
+    public BoardNodeCard(Guid id, Action<BoardNodeCard>? onDissolve = null)
     {
         Id = id;
+        DissolveCommand = new RelayCommand(() => onDissolve?.Invoke(this), () => CanDissolve);
     }
+
+    /// <summary>Dissolves the node; can execute exactly when <see cref="CanDissolve"/> is true.</summary>
+    public IRelayCommand DissolveCommand { get; }
 
     public Guid Id { get; }
 
@@ -54,6 +61,8 @@ public sealed partial class BoardNodeCard : ObservableObject
 
     [ObservableProperty]
     private bool _canDissolve;
+
+    partial void OnCanDissolveChanged(bool value) => DissolveCommand.NotifyCanExecuteChanged();
 
     /// <summary>Why the node cannot be dissolved yet; null when it can, or on a read-only Einsatz.</summary>
     [ObservableProperty]

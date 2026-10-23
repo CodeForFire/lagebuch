@@ -24,8 +24,21 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
+    private readonly Action<string, string, Action, string>? _requestConfirm;
 
-    public LeadershipViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
+    // The incident as the last refresh showed it: the move guard judges against what the board offers.
+    private Incident _incident;
+
+    /// <summary>
+    /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action (title, message,
+    /// the action, the confirm button's label); without it the action runs at once, as in tests.
+    /// </summary>
+    public LeadershipViewModel(
+        IIncidentSession session,
+        IClock clock,
+        MasterDataSet masterData,
+        Action onChanged,
+        Action<string, string, Action, string>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clock);
@@ -33,7 +46,10 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         ArgumentNullException.ThrowIfNull(onChanged);
         _session = session;
         _onChanged = onChanged;
+        _requestConfirm = requestConfirm;
+        _incident = session.Incident;
         IsReadOnly = session.IsReadOnly;
+        El = new ElCard(SelectStufe);
         DispatchCentreName = masterData.Settings.DispatchCentreName;
         Refresh();
         _session.Changed += Refresh;
@@ -46,10 +62,24 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     [ObservableProperty]
     private bool _isNarrow;
 
+    /// <summary>
+    /// Why the last board command was refused, in German; null when it went through. Cleared by the
+    /// next command. The board itself is left as the next refresh shows it.
+    /// </summary>
+    [ObservableProperty]
+    private string? _actionError;
+
+    /// <summary>The unit being dragged, or null; the view highlights the places it may drop.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDraggingUnit))]
+    private Guid? _draggingUnitId;
+
+    public bool IsDraggingUnit => DraggingUnitId is not null;
+
     /// <summary>The Leitstelle the Einsatzleitung reports to, from the Stammdaten (default "ILS").</summary>
     public string DispatchCentreName { get; }
 
-    public ElCard El { get; } = new();
+    public ElCard El { get; }
 
     /// <summary>Bereitstellungen, Abschnitte and orphaned Unterabschnitte, in reporting-line order.</summary>
     public ObservableCollection<BoardNodeCard> Sections { get; } = [];
@@ -82,6 +112,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     private void Refresh()
     {
         var incident = _session.Incident;
+        _incident = incident;
         var line = ReportingLine.Of(incident);
         var hints = FuehrungsspanneHints.For(incident);
 
@@ -154,7 +185,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             e => e.Node.Id,
             e =>
             {
-                var card = new BoardNodeCard(e.Node.Id);
+                var card = new BoardNodeCard(e.Node.Id, RequestDissolve);
                 UpdateCard(card, e, incident, hints, childrenOf);
                 return card;
             },
@@ -184,9 +215,97 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             u => new BoardUnitRow(u, incident, IsReadOnly, nodeId => MoveUnit(u.Id, nodeId)),
             (r, u) => r.Update(u, incident));
 
-    private void MoveUnit(Guid unitId, Guid? nodeId)
+    /// <summary>
+    /// Whether <paramref name="unitId"/> may go to <paramref name="nodeId"/> (null = unplace it): the
+    /// Einsatz is open, the unit is known, the target is one of the nodes the picker offers and is
+    /// not where the unit already sits.
+    /// </summary>
+    public bool CanMoveUnit(Guid unitId, Guid? nodeId)
     {
-        _session.MoveForceUnit(unitId, nodeId);
+        if (IsReadOnly)
+        {
+            return false;
+        }
+
+        var unit = _incident.Forces.FirstOrDefault(u => u.Id == unitId);
+        if (unit is null)
+        {
+            return false;
+        }
+
+        var choices = NodeChoices.Build(_incident, unit.NodeId, _ => { });
+        return choices.Any(c => c.NodeId == nodeId) && NodeChoices.CurrentNodeId(choices) != nodeId;
+    }
+
+    /// <summary>Moves a unit; false when <see cref="CanMoveUnit"/> says no or the session refuses.</summary>
+    public bool MoveUnit(Guid unitId, Guid? nodeId)
+    {
+        ActionError = null;
+        if (!CanMoveUnit(unitId, nodeId))
+        {
+            return false;
+        }
+
+        return Run(() => _session.MoveForceUnit(unitId, nodeId));
+    }
+
+    /// <summary>A drag of <paramref name="unitId"/> began; ignored on a read-only Einsatz.</summary>
+    public void BeginDrag(Guid unitId)
+    {
+        if (!IsReadOnly)
+        {
+            DraggingUnitId = unitId;
+        }
+    }
+
+    public void EndDrag() => DraggingUnitId = null;
+
+    private void RequestDissolve(BoardNodeCard card)
+    {
+        ActionError = null;
+        var id = card.Id;
+        void Dissolve() => Run(() => _session.DissolveCommandNode(id));
+
+        if (_requestConfirm is null)
+        {
+            Dissolve();
+            return;
+        }
+
+        _requestConfirm(
+            $"{card.KindLabel} auflösen?",
+            $"„{card.Name}“ wird aufgelöst. Das Einsatztagebuch behält den Eintrag.",
+            Dissolve,
+            "AUFLÖSEN");
+    }
+
+    private void SelectStufe(Fuehrungsstufe? stufe)
+    {
+        ActionError = null;
+        if (IsReadOnly || stufe == _incident.Fuehrungsstufe)
+        {
+            return;
+        }
+
+        Run(() => _session.SetFuehrungsstufe(stufe));
+    }
+
+    // Runs a session command and tells the host. The Domain's refusals are German sentences about a
+    // state a peer got to first (a node dissolved a moment ago), so they are shown as they are.
+    private bool Run(Action command)
+    {
+        ActionError = null;
+        try
+        {
+            command();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            ActionError = $"Nicht möglich: {ex.Message}";
+            return false;
+        }
+
         _onChanged();
+        return true;
     }
 }

@@ -142,9 +142,9 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Module(NavModules.Scba, visible: false), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal("etb", Keys(specs)[0]);
-        Assert.Contains("files", Keys(specs));
-        Assert.DoesNotContain("scba", Keys(specs));
+        Assert.Equal(
+            ["etb", "tasks", "roles", "forces", "involved", "leadership", "co", "files", "links", "contacts"],
+            Keys(specs));
     }
 
     // The ETB is the legal record and the target of every system entry; hiding it would make the
@@ -157,8 +157,9 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb, visible: false), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal("etb", Keys(specs)[0]);
-        Assert.Contains("files", Keys(specs));
+        Assert.Equal(
+            ["etb", "tasks", "roles", "forces", "involved", "scba", "leadership", "co", "files", "links", "contacts"],
+            Keys(specs));
     }
 
     // Omitting an entry is not how a module is hidden -- `visible: false` is. Omission only
@@ -244,9 +245,9 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Module("zeitschiene"), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal("etb", Keys(specs)[0]);
-        Assert.Contains("files", Keys(specs));
-        Assert.DoesNotContain("zeitschiene", Keys(specs));
+        Assert.Equal(
+            ["etb", "tasks", "roles", "forces", "involved", "scba", "leadership", "co", "files", "links", "contacts"],
+            Keys(specs));
     }
 
     // A layout saved by an older build cannot mention a module added since. Without this, that
