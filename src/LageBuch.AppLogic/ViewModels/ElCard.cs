@@ -18,12 +18,18 @@ public sealed partial class ElCard : ObservableObject
     private readonly Action<Fuehrungsstufe?> _onSelectStufe;
 
     /// <param name="onSelectStufe">Sets the Führungsstufe (null clears it); the board decides whether that is allowed.</param>
-    public ElCard(Action<Fuehrungsstufe?> onSelectStufe)
+    /// <param name="onEditPost">Opens the dialog for the Einsatzleitung's own post.</param>
+    /// <param name="canEdit">False on a read-only Einsatz.</param>
+    public ElCard(Action<Fuehrungsstufe?> onSelectStufe, Action? onEditPost = null, bool canEdit = true)
     {
         ArgumentNullException.ThrowIfNull(onSelectStufe);
         _onSelectStufe = onSelectStufe;
+        EditPostCommand = new RelayCommand(() => onEditPost?.Invoke(), () => canEdit);
         StufeChoices = BuildStufeChoices(null);
     }
+
+    /// <summary>Opens the dialog for the Standort, Rufname, Telefon and Funkgruppe; cannot execute on a read-only Einsatz.</summary>
+    public IRelayCommand EditPostCommand { get; }
 
     [ObservableProperty]
     private string? _standort;

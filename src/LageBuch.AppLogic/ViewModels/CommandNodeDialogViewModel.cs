@@ -1,0 +1,310 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services;
+using LageBuch.Domain.Leadership;
+using LageBuch.Persistence.MasterData;
+using LageBuch.Sync;
+
+namespace LageBuch.AppLogic.ViewModels;
+
+/// <summary>
+/// The Führung board's one form: forms a Bereitstellung, Abschnitt, Unterabschnitt or partner
+/// Einsatzleitung with all its details, edits an existing node, or edits the Einsatzleitung
+/// Feuerwehr's own post (Standort, Rufname, Telefon, Funkgruppe). Buffered until the primary button,
+/// with the Einsatzdaten dialog's contract: a discard question on ABBRECHEN after typing (#652) and
+/// <see cref="Closed"/> on every outcome so the host clears the overlay.
+/// </summary>
+/// <remarks>
+/// The Domain is the last guard for lengths and names; this dialog pre-checks what it refuses (a blank
+/// or taken name, a node a peer dissolved meanwhile) so the Lagebuchführer sees a field error rather
+/// than an exception. The caps are enforced as <c>MaxLength</c> in the view.
+/// </remarks>
+public sealed partial class CommandNodeDialogViewModel : ObservableObject
+{
+    private enum Mode
+    {
+        Create,
+        Edit,
+        Post,
+    }
+
+    private readonly IIncidentSession _session;
+    private readonly Action? _onChanged;
+    private readonly Mode _mode;
+    private readonly CommandNodeKind _kind;
+    private readonly Guid? _parentId;
+    private readonly Guid? _nodeId;
+    private readonly string _initialName;
+
+    private CommandNodeDialogViewModel(
+        IIncidentSession session,
+        MasterDataSet masterData,
+        Mode mode,
+        CommandNodeKind kind,
+        Guid? parentId,
+        Guid? nodeId,
+        string name,
+        Action? onChanged)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(masterData);
+        _session = session;
+        _onChanged = onChanged;
+        _mode = mode;
+        _kind = kind;
+        _parentId = parentId;
+        _nodeId = nodeId;
+        _initialName = name;
+        _name = name;
+        FunkgruppeOptions = [.. masterData.TalkGroups.Select(g => g.Display)];
+    }
+
+    public event EventHandler? Closed;
+
+    /// <summary>The Funkgruppen of the Stammdaten, offered as suggestions and never enforced.</summary>
+    public IReadOnlyList<string> FunkgruppeOptions { get; }
+
+    public string Title { get; private init; } = string.Empty;
+
+    /// <summary>The label of the primary button.</summary>
+    public string PrimaryText { get; private init; } = "SPEICHERN";
+
+    /// <summary>False when editing the Einsatzleitung's own post: it has no name.</summary>
+    public bool ShowName => _mode != Mode.Post;
+
+    /// <summary>False when editing the Einsatzleitung's own post: it has no Auftrag.</summary>
+    public bool ShowAuftrag => _mode != Mode.Post;
+
+    [ObservableProperty]
+    private string _name;
+
+    [ObservableProperty]
+    private string? _auftrag;
+
+    [ObservableProperty]
+    private string? _standort;
+
+    [ObservableProperty]
+    private string? _funkgruppe;
+
+    [ObservableProperty]
+    private string? _rufname;
+
+    [ObservableProperty]
+    private string? _telefon;
+
+    /// <summary>Why the Name cannot be used, in German; null when it can.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string? _nameError;
+
+    /// <summary>Why the last save was refused, in German; null otherwise.</summary>
+    [ObservableProperty]
+    private string? _saveError;
+
+    /// <summary>Set while ABBRECHEN asks whether typed details may go (#652); SPEICHERN waits for the answer.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _isDiscardConfirmOpen;
+
+    /// <summary>Opens the dialog to form a node of <paramref name="kind"/> (under <paramref name="parentId"/> for an Unterabschnitt).</summary>
+    public static CommandNodeDialogViewModel ForCreate(
+        IIncidentSession session,
+        MasterDataSet masterData,
+        CommandNodeKind kind,
+        Guid? parentId,
+        string suggestedName,
+        Action? onChanged = null) =>
+        new(session, masterData, Mode.Create, kind, parentId, null, suggestedName ?? string.Empty, onChanged)
+        {
+            Title = kind switch
+            {
+                CommandNodeKind.Unterabschnitt => "Unterabschnitt bilden",
+                CommandNodeKind.Bereitstellung => "Bereitstellung einrichten",
+                CommandNodeKind.Partner => "Einsatzleitung eintragen",
+                _ => "Abschnitt bilden",
+            },
+            PrimaryText = kind switch
+            {
+                CommandNodeKind.Partner => "EINTRAGEN",
+                CommandNodeKind.Bereitstellung => "EINRICHTEN",
+                _ => "BILDEN",
+            },
+        };
+
+    /// <summary>Opens the dialog on an existing node; a node that is gone shows an error on save instead of throwing.</summary>
+    public static CommandNodeDialogViewModel ForEdit(
+        IIncidentSession session, MasterDataSet masterData, Guid nodeId, Action? onChanged = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        var node = session.Incident.CommandNodes.FirstOrDefault(n => n.Id == nodeId);
+        var kind = node?.Kind ?? CommandNodeKind.Abschnitt;
+        return new(session, masterData, Mode.Edit, kind, node?.ParentId, nodeId, node?.Name ?? string.Empty, onChanged)
+        {
+            Title = $"{BoardNodeCard.LabelOf(kind)} bearbeiten",
+            Auftrag = node?.Auftrag,
+            Standort = node?.Standort,
+            Funkgruppe = node?.Funkgruppe,
+            Rufname = node?.Rufname,
+            Telefon = node?.Telefon,
+        };
+    }
+
+    /// <summary>Opens the dialog on the Einsatzleitung Feuerwehr's own post.</summary>
+    public static CommandNodeDialogViewModel ForPost(
+        IIncidentSession session, MasterDataSet masterData, Action? onChanged = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        var post = session.Incident.LeadershipPost;
+        return new(session, masterData, Mode.Post, CommandNodeKind.Abschnitt, null, null, string.Empty, onChanged)
+        {
+            Title = "Einsatzleitung Feuerwehr",
+            Standort = post.Standort,
+            Funkgruppe = post.Funkgruppe,
+            Rufname = post.Rufname,
+            Telefon = post.Telefon,
+        };
+    }
+
+    /// <summary>Whether anything differs from what the dialog opened with, or from the live record when editing.</summary>
+    public bool HasChanges => _mode switch
+    {
+        Mode.Create => !string.Equals(Name, _initialName, StringComparison.Ordinal)
+            || Normalize(Auftrag) is not null || Normalize(Standort) is not null
+            || FunkgruppeToSave is not null || Normalize(Rufname) is not null || Normalize(Telefon) is not null,
+        Mode.Edit => LiveNode is { } node && DiffersFrom(node),
+        _ => PostDiffers(_session.Incident.LeadershipPost),
+    };
+
+    private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen && NameError is null;
+
+    private CommandNode? LiveNode =>
+        _session.Incident.CommandNodes.FirstOrDefault(n => n.Id == _nodeId && n.IsLive);
+
+    private string? FunkgruppeToSave => Normalize(StammdatenCatalogue.Normalize(Funkgruppe, FunkgruppeOptions));
+
+    partial void OnNameChanged(string value) => NameError = ValidateName();
+
+    private string? ValidateName()
+    {
+        if (!ShowName)
+        {
+            return null;
+        }
+
+        var name = Name?.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            return "Name fehlt.";
+        }
+
+        var taken = _session.Incident.CommandNodes.Any(n =>
+            n.IsLive && n.Id != _nodeId && n.ParentId == _parentId
+            && string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase));
+        return taken ? "Name ist bereits vergeben." : null;
+    }
+
+    private bool DiffersFrom(CommandNode node) =>
+        !string.Equals(Name?.Trim(), node.Name, StringComparison.Ordinal)
+        || Normalize(Auftrag) != node.Auftrag
+        || Normalize(Standort) != node.Standort
+        || FunkgruppeToSave != node.Funkgruppe
+        || Normalize(Rufname) != node.Rufname
+        || Normalize(Telefon) != node.Telefon;
+
+    private bool PostDiffers(LeadershipPost post) =>
+        Normalize(Standort) != post.Standort
+        || Normalize(Rufname) != post.Rufname
+        || Normalize(Telefon) != post.Telefon
+        || FunkgruppeToSave != post.Funkgruppe;
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private void Save()
+    {
+        SaveError = null;
+        NameError = ValidateName();
+        if (NameError is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!Apply())
+            {
+                return;
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            SaveError = $"Nicht möglich: {ex.Message}";
+            return;
+        }
+
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Returns false when the save was refused with SaveError set; true when it went through or had
+    // nothing to write.
+    private bool Apply()
+    {
+        var name = Name?.Trim() ?? string.Empty;
+        switch (_mode)
+        {
+            case Mode.Create:
+                _session.AddCommandNode(
+                    _kind, name, _parentId, Normalize(Auftrag), Normalize(Standort), FunkgruppeToSave, Normalize(Rufname), Normalize(Telefon));
+                _onChanged?.Invoke();
+                return true;
+            case Mode.Edit:
+                if (LiveNode is not { } node)
+                {
+                    SaveError = "Dieser Abschnitt wurde inzwischen aufgelöst.";
+                    return false;
+                }
+
+                if (DiffersFrom(node))
+                {
+                    _session.UpdateCommandNode(
+                        node.Id, name, Normalize(Auftrag), Normalize(Standort), FunkgruppeToSave, Normalize(Rufname), Normalize(Telefon));
+                    _onChanged?.Invoke();
+                }
+
+                return true;
+            default:
+                if (PostDiffers(_session.Incident.LeadershipPost))
+                {
+                    _session.UpdateLeadershipPost(Normalize(Standort), Normalize(Rufname), Normalize(Telefon), FunkgruppeToSave);
+                    _onChanged?.Invoke();
+                }
+
+                return true;
+        }
+    }
+
+    /// <summary>ABBRECHEN, and Esc: closes at once when nothing was typed, asks first otherwise.</summary>
+    [RelayCommand]
+    private void Cancel()
+    {
+        if (HasChanges)
+        {
+            IsDiscardConfirmOpen = true;
+            return;
+        }
+
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void ConfirmDiscard()
+    {
+        IsDiscardConfirmOpen = false;
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void CancelDiscard() => IsDiscardConfirmOpen = false;
+
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

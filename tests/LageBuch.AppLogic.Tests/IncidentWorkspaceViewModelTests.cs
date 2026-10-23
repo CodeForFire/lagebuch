@@ -740,6 +740,22 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void The_boards_dialog_is_hosted_as_an_overlay_until_it_closes()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.Leadership.AddAbschnittCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingCommandNodeDialog);
+        Assert.Equal("Abschnitt bilden", vm.PendingCommandNodeDialog!.Title);
+
+        vm.PendingCommandNodeDialog.SaveCommand.Execute(null);
+
+        Assert.Null(vm.PendingCommandNodeDialog);
+        Assert.Single(vm.Leadership.Sections);
+    }
+
+    [Fact]
     public void CloseIncident_prompts_for_confirmation_before_closing()
     {
         var vm = NewWorkspace(out _, out _);

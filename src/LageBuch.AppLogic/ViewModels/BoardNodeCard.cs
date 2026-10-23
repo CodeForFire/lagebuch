@@ -16,11 +16,28 @@ public sealed partial class BoardNodeCard : ObservableObject
 {
     /// <param name="id">The node this card shows.</param>
     /// <param name="onDissolve">Asks the board to dissolve the node; the card only offers the command.</param>
-    public BoardNodeCard(Guid id, Action<BoardNodeCard>? onDissolve = null)
+    /// <param name="onEdit">Opens the edit dialog for the node.</param>
+    /// <param name="onAddUnterabschnitt">Opens the dialog to form an Unterabschnitt in this Abschnitt.</param>
+    public BoardNodeCard(
+        Guid id,
+        Action<BoardNodeCard>? onDissolve = null,
+        Action<BoardNodeCard>? onEdit = null,
+        Action<BoardNodeCard>? onAddUnterabschnitt = null)
     {
         Id = id;
         DissolveCommand = new RelayCommand(() => onDissolve?.Invoke(this), () => CanDissolve);
+        EditCommand = new RelayCommand(() => onEdit?.Invoke(this), () => !_isReadOnly);
+        AddUnterabschnittCommand = new RelayCommand(
+            () => onAddUnterabschnitt?.Invoke(this), () => !_isReadOnly && Kind == CommandNodeKind.Abschnitt);
     }
+
+    private bool _isReadOnly = true;
+
+    /// <summary>Opens the node's edit dialog; cannot execute on a read-only Einsatz.</summary>
+    public IRelayCommand EditCommand { get; }
+
+    /// <summary>Forms an Unterabschnitt in this node; only an Abschnitt can hold one.</summary>
+    public IRelayCommand AddUnterabschnittCommand { get; }
 
     /// <summary>Dissolves the node; can execute exactly when <see cref="CanDissolve"/> is true.</summary>
     public IRelayCommand DissolveCommand { get; }
@@ -69,7 +86,9 @@ public sealed partial class BoardNodeCard : ObservableObject
     private string? _dissolveBlockedReason;
 
     /// <summary>What the card says the node is; a partner's node is an Einsatzleitung.</summary>
-    public string KindLabel => Kind switch
+    public string KindLabel => LabelOf(Kind);
+
+    internal static string LabelOf(CommandNodeKind kind) => kind switch
     {
         CommandNodeKind.Unterabschnitt => "Unterabschnitt",
         CommandNodeKind.Bereitstellung => "Bereitstellung",
@@ -115,6 +134,7 @@ public sealed partial class BoardNodeCard : ObservableObject
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(node);
 
+        _isReadOnly = isReadOnly;
         Kind = node.Kind;
         Name = node.Name;
         Auftrag = node.Auftrag;
@@ -128,5 +148,7 @@ public sealed partial class BoardNodeCard : ObservableObject
         Hint = hint;
         DissolveBlockedReason = isReadOnly ? null : blockedReason;
         CanDissolve = !isReadOnly && blockedReason is null;
+        EditCommand.NotifyCanExecuteChanged();
+        AddUnterabschnittCommand.NotifyCanExecuteChanged();
     }
 }

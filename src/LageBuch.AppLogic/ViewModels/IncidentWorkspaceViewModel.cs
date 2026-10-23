@@ -251,6 +251,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private IncidentDataDialogViewModel? _pendingIncidentDataDialog;
 
+    // The Abschnitt dialog behind the Führung board (form, edit, the Einsatzleitung's post); null while closed.
+    [ObservableProperty]
+    private CommandNodeDialogViewModel? _pendingCommandNodeDialog;
+
     // ===== Header: display projections of the incident's head data. None of these write back --
     // the only write path is the Einsatzdaten dialog (EditIncidentData), which replaced the inline
     // Einsatznummer editor of #69. They are seeded in the constructor and refreshed from the
@@ -319,6 +323,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // the header projections refresh through the session's Changed event.
         dialog.Closed += (_, _) => PendingIncidentDataDialog = null;
         PendingIncidentDataDialog = dialog;
+    }
+
+    private void OpenCommandNodeDialog(CommandNodeDialogViewModel dialog)
+    {
+        dialog.Closed += (_, _) => PendingCommandNodeDialog = null;
+        PendingCommandNodeDialog = dialog;
     }
 
     private void RefreshIncidentData()
@@ -634,7 +644,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private bool IsOverlayOpen =>
         PendingPrompt is not null || PendingConfirm is not null || PendingTaskDialog is not null
-        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null;
+        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null
+        || PendingCommandNodeDialog is not null;
 
     private bool StepRail(int step)
     {
@@ -940,7 +951,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirmDefault);
 
-        Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
+        Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm, OpenCommandNodeDialog);
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;

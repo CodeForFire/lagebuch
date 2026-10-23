@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Leadership;
@@ -25,6 +26,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly Action<string, string, Action, string>? _requestConfirm;
+    private readonly MasterDataSet _masterData;
+    private readonly Action<CommandNodeDialogViewModel>? _openDialog;
 
     // The incident as the last refresh showed it: the move guard judges against what the board offers.
     private Incident _incident;
@@ -32,13 +35,16 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     /// <summary>
     /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action (title, message,
     /// the action, the confirm button's label); without it the action runs at once, as in tests.
+    /// <paramref name="openDialog"/> hands the host the node dialog to show; without it the board's
+    /// add and edit commands do nothing.
     /// </summary>
     public LeadershipViewModel(
         IIncidentSession session,
         IClock clock,
         MasterDataSet masterData,
         Action onChanged,
-        Action<string, string, Action, string>? requestConfirm = null)
+        Action<string, string, Action, string>? requestConfirm = null,
+        Action<CommandNodeDialogViewModel>? openDialog = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clock);
@@ -47,9 +53,11 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         _session = session;
         _onChanged = onChanged;
         _requestConfirm = requestConfirm;
+        _masterData = masterData;
+        _openDialog = openDialog;
         _incident = session.Incident;
         IsReadOnly = session.IsReadOnly;
-        El = new ElCard(SelectStufe);
+        El = new ElCard(SelectStufe, EditPost, !IsReadOnly);
         DispatchCentreName = masterData.Settings.DispatchCentreName;
         Refresh();
         _session.Changed += Refresh;
@@ -185,7 +193,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             e => e.Node.Id,
             e =>
             {
-                var card = new BoardNodeCard(e.Node.Id, RequestDissolve);
+                var card = new BoardNodeCard(e.Node.Id, RequestDissolve, EditNode, AddUnterabschnitt);
                 UpdateCard(card, e, incident, hints, childrenOf);
                 return card;
             },
@@ -259,6 +267,56 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     }
 
     public void EndDrag() => DraggingUnitId = null;
+
+    private bool CanAdd => !IsReadOnly;
+
+    [RelayCommand(CanExecute = nameof(CanAdd))]
+    private void AddAbschnitt() =>
+        OpenCreate(CommandNodeKind.Abschnitt, null, SuggestName("Abschnitt", alwaysNumbered: true));
+
+    [RelayCommand(CanExecute = nameof(CanAdd))]
+    private void AddBereitstellung() =>
+        OpenCreate(CommandNodeKind.Bereitstellung, null, SuggestName("Bereitstellung", alwaysNumbered: false));
+
+    /// <param name="preset">The organisation's name ("Rettungsdienst", "Polizei"), or blank for "Weitere".</param>
+    [RelayCommand(CanExecute = nameof(CanAdd))]
+    private void AddPartner(string? preset) =>
+        OpenCreate(CommandNodeKind.Partner, null, preset ?? string.Empty);
+
+    private void AddUnterabschnitt(BoardNodeCard parent) =>
+        OpenCreate(CommandNodeKind.Unterabschnitt, parent.Id, string.Empty);
+
+    private void EditNode(BoardNodeCard card) =>
+        _openDialog?.Invoke(CommandNodeDialogViewModel.ForEdit(_session, _masterData, card.Id, _onChanged));
+
+    private void EditPost() =>
+        _openDialog?.Invoke(CommandNodeDialogViewModel.ForPost(_session, _masterData, _onChanged));
+
+    private void OpenCreate(CommandNodeKind kind, Guid? parentId, string suggestedName) =>
+        _openDialog?.Invoke(CommandNodeDialogViewModel.ForCreate(_session, _masterData, kind, parentId, suggestedName, _onChanged));
+
+    // "Abschnitt 1", "Abschnitt 2", ...: the lowest number no live top-level node carries. A
+    // dissolved node's name is free again. Without alwaysNumbered the bare prefix comes first.
+    private string SuggestName(string prefix, bool alwaysNumbered)
+    {
+        var taken = _session.Incident.CommandNodes
+            .Where(n => n.IsLive && n.ParentId is null)
+            .Select(n => n.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!alwaysNumbered && !taken.Contains(prefix))
+        {
+            return prefix;
+        }
+
+        for (var n = alwaysNumbered ? 1 : 2; ; n++)
+        {
+            var candidate = $"{prefix} {n}";
+            if (!taken.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
 
     private void RequestDissolve(BoardNodeCard card)
     {

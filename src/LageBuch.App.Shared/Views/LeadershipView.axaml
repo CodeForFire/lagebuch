@@ -8,5 +8,8 @@
     <TextBlock x:Name="LeadershipTitle" Text="FÜHRUNG" Classes="overline" Margin="0,0,0,14" />
     <TextBlock x:Name="LeadershipPlaceholder" Text="Die Führungsorganisation erscheint hier."
                Foreground="{StaticResource TextMutedBrush}" />
+    <!-- Until the board's own add buttons land, the one way to reach the Abschnitt dialog. -->
+    <Button x:Name="LeadershipAddAbschnittButton" Content="ABSCHNITT BILDEN" Classes="signal"
+            HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding AddAbschnittCommand}" />
   </StackPanel>
 </UserControl>

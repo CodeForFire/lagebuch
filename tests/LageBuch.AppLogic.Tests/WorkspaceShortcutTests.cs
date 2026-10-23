@@ -201,6 +201,22 @@ public class WorkspaceShortcutTests
     }
 
     [Fact]
+    public void No_shortcut_runs_while_the_abschnitt_dialog_is_open()
+    {
+        var (vm, _, _) = Workspace();
+        var before = Selected(vm);
+        vm.Leadership.AddAbschnittCommand.Execute(null);
+        Assert.NotNull(vm.PendingCommandNodeDialog);
+
+        Assert.False(vm.TryRunShortcut(CtrlTab));
+        Assert.Equal(before, Selected(vm));
+
+        vm.PendingCommandNodeDialog!.CancelCommand.Execute(null);
+        vm.PendingCommandNodeDialog?.ConfirmDiscardCommand.Execute(null);
+        Assert.Null(vm.PendingCommandNodeDialog);
+    }
+
+    [Fact]
     public void Without_an_open_warning_f9_does_nothing()
     {
         var (vm, _, _) = Workspace();
