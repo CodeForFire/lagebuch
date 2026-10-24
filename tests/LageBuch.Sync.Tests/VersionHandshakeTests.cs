@@ -156,7 +156,17 @@ public class VersionHandshakeTests
     {
         // 16 lets a client send the four Lagemeldung commands (#592). A host at 15 has none of them in
         // its command allowlist and would reject the report, so a 15 and a 16 must not connect.
-        Assert.Equal(16, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 16, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 16, int.MaxValue);
+    }
+
+    [Fact]
+    public void Objekte_raise_the_protocol_to_seventeen_but_not_the_floor()
+    {
+        // 17 adds premises to the Stammdaten payload and apartmentLabels to addCoBuilding. A peer at
+        // 16 skips the key and offers no Objekte, and a host there creates the Haus without its
+        // labels, so it stays joinable.
+        Assert.Equal(17, SyncProtocol.ProtocolVersion);
         Assert.Equal(16, SyncProtocol.MinimumProtocolVersion);
     }
 }

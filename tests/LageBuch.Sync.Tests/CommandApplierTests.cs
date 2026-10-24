@@ -410,6 +410,42 @@ public class CommandApplierTests
         Assert.Equal(9, incident.Dwellings.Count);
     }
 
+    // #420: a Haus picked from an Objekt arrives with its Wohnungsbezeichnungen in the same command,
+    // because a joined client never learns the new Haus's id to label it afterwards.
+    [Fact]
+    public void Apply_AddCoBuilding_creates_the_haus_with_the_labels_it_carries()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var labels = new Dictionary<string, string?> { ["0:1"] = "Hausmeister", ["-1:2"] = "Heizungskeller" };
+
+        ApplyOverWire(new AddCoBuildingCommand(new OperatorDto("Test", null), "Haus A", 2, 3, 1, labels), incident, clock);
+
+        var building = Assert.Single(incident.Buildings);
+        Assert.Equal("Hausmeister", building.ApartmentLabels["0:1"]);
+        Assert.Equal("Heizungskeller", building.ApartmentLabels["-1:2"]);
+    }
+
+    // The labels come from a peer on a shared LAN: one naming Wohnungen the Haus does not have, or
+    // carrying a megabyte of text, must not reach the incident file.
+    [Fact]
+    public void Apply_AddCoBuilding_drops_hostile_labels_from_a_peer()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var labels = new Dictionary<string, string?> { ["0:1"] = new string('x', 10_000) };
+        for (var i = 0; i < 1_000; i++)
+        {
+            labels[$"{i + 10}:1"] = "kein solches Geschoss";
+        }
+
+        ApplyOverWire(new AddCoBuildingCommand(new OperatorDto("Test", null), "Haus A", 2, 3, 0, labels), incident, clock);
+
+        var building = Assert.Single(incident.Buildings);
+        Assert.Equal("0:1", Assert.Single(building.ApartmentLabels).Key);
+        Assert.Equal(Building.MaxApartmentLabelLength, building.ApartmentLabels["0:1"]!.Length);
+    }
+
     // #419: the removal has to survive the wire as a selection, not a count -- a joined device
     // must delete the same Wohnungen the host's crew ticked, not the ones on the right-hand end.
     [Fact]

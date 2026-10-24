@@ -204,7 +204,12 @@ public interface IIncidentSession
     /// </summary>
     Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default);
 
-    void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0);
+    void AddCoBuilding(
+        string name,
+        int floorCount,
+        int apartmentsPerFloor,
+        int undergroundFloorCount = 0,
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null);
 
     void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0);
 

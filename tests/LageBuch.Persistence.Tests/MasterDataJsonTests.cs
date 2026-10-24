@@ -901,4 +901,104 @@ public class MasterDataJsonTests
     [InlineData("""{ "textSnippets": [{ "shortcut": "x", "text": null }] }""")]
     public void Parse_refuses_a_textbaustein_with_a_null_field(string json) =>
         Assert.Throws<JsonException>(() => Parse(json));
+
+    [Fact]
+    public void Parse_reads_objekte_with_their_address_structure_and_labels()
+    {
+        var set = Parse("""
+            {
+              "premises": [
+                {
+                  "name": "Wohnanlage Lindenallee", "street": "Lindenallee", "houseNumber": "12",
+                  "postalCode": "12345", "place": "Musterstadt",
+                  "floors": 4, "apartmentsPerFloor": 3, "undergroundFloors": 1,
+                  "apartmentLabels": { "0:1": "Hausmeister", "-1:2": "Waschküche" }
+                },
+                { "name": " Haus A " }
+              ]
+            }
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                new Premises("Wohnanlage Lindenallee", "Lindenallee", "12", "12345", "Musterstadt", 4, 3, 1)
+                {
+                    ApartmentLabels = new Dictionary<string, string?> { ["0:1"] = "Hausmeister", ["-1:2"] = "Waschküche" },
+                },
+                new Premises("Haus A"),
+            },
+            set.Premises);
+    }
+
+    [Theory]
+    [InlineData("""{ "roles": ["EL"] }""")]
+    [InlineData("""{ "premises": { "name": "Haus A" } }""")]
+    [InlineData("""{ "premises": null }""")]
+    public void Parse_treats_a_missing_or_non_array_premises_key_as_no_objekte(string json) =>
+        Assert.Empty(Parse(json).Premises);
+
+    [Fact]
+    public void Parse_clamps_an_objekt_structure_a_haus_cannot_have_and_drops_labels_outside_it()
+    {
+        var premises = Assert.Single(Parse("""
+            {
+              "premises": [
+                {
+                  "name": "Hochhaus", "floors": 99, "apartmentsPerFloor": 0, "undergroundFloors": -4,
+                  "apartmentLabels": { "50:1": "Dach", "0:2": "keine solche Wohnung", "-1:1": "kein UG" }
+                }
+              ]
+            }
+            """).Premises);
+
+        Assert.Equal((50, 1, 0), (premises.FloorCount, premises.ApartmentsPerFloor, premises.UndergroundFloorCount));
+        Assert.Equal("50:1", Assert.Single(premises.ApartmentLabels).Key);
+    }
+
+    // The premises key arrives from a sync host as well as a file: nothing in it may throw outside
+    // the exceptions the join catches, and nothing in it may grow without bound.
+    [Fact]
+    public void Parse_skips_a_malformed_objekt_row_instead_of_failing_the_file()
+    {
+        var set = Parse("""
+            {
+              "premises": [
+                "Haus A",
+                { "street": "Lindenallee" },
+                { "name": null },
+                { "name": "Haus B", "floors": "acht", "street": 5, "apartmentLabels": ["0:1"] },
+                { "name": "Haus C", "apartmentLabels": { "0:1": "erste", "0:1": "zweite", "0:2": 7 } }
+              ]
+            }
+            """);
+
+        Assert.Equal(new[] { new Premises("Haus B"), new Premises("Haus C") { ApartmentLabels = new Dictionary<string, string?> { ["0:1"] = "erste" } } }, set.Premises);
+    }
+
+    [Fact]
+    public void Parse_caps_the_objekte_list_and_each_label()
+    {
+        var rows = string.Join(",", Enumerable.Range(0, Premises.MaxCount + 50).Select(i => $$"""{ "name": "Haus {{i}}" }"""));
+        var longLabel = new string('x', 10_000);
+
+        var set = Parse($$"""{ "premises": [ { "name": "Lang", "apartmentLabels": { "0:1": "{{longLabel}}" } }, {{rows}} ] }""");
+
+        Assert.Equal(Premises.MaxCount, set.Premises.Count);
+        Assert.Equal(LageBuch.Domain.CoMeasurement.Building.MaxApartmentLabelLength, set.Premises[0].ApartmentLabels["0:1"]!.Length);
+    }
+
+    [Fact]
+    public void Parse_keeps_the_first_of_two_objekte_with_the_same_name() =>
+        Assert.Equal(
+            "Lindenallee",
+            Assert.Single(Parse("""{ "premises": [ { "name": "Haus A", "street": "Lindenallee" }, { "name": "haus a" } ] }""").Premises).Street);
+
+    [Fact]
+    public void Serialize_round_trips_the_objekte_through_Parse()
+    {
+        var set = MasterDataSet.Empty with { Premises = AnonymizedExampleData.Premises };
+
+        Assert.Equal(AnonymizedExampleData.Premises, Parse(MasterDataJson.Serialize(set)).Premises);
+    }
 }

@@ -331,8 +331,13 @@ public sealed class LocalIncidentSession : IIncidentSession
     public Task DeleteFileBytesAsync(string storageFileName, CancellationToken cancellationToken = default) =>
         _store.DeleteFileBytesAsync(Path, storageFileName, cancellationToken);
 
-    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
-        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor, undergroundFloorCount));
+    public void AddCoBuilding(
+        string name,
+        int floorCount,
+        int apartmentsPerFloor,
+        int undergroundFloorCount = 0,
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null) =>
+        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels));
 
     public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         Mutate(() => Incident.UpdateCoBuildingStructure(_clock, RequireOperator(), buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount));

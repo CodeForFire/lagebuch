@@ -221,8 +221,15 @@ public sealed record ExtendTaskTimerCommand(Guid TaskId, int Minutes) : SyncComm
 
 // UndergroundFloorCount defaults to 0 so a pre-#218 payload deserializes as "keine
 // Untergeschosse" instead of failing the contract (same convention as #76's OfficerCount).
+// ApartmentLabels are an Objekt's Wohnungsbezeichnungen (#420), optional for the same reason; the
+// host keeps only those that fit the Haus (Building.Create).
 public sealed record AddCoBuildingCommand(
-    OperatorDto Operator, string Name, int FloorCount, int ApartmentsPerFloor, int UndergroundFloorCount = 0) : SyncCommand;
+    OperatorDto Operator,
+    string Name,
+    int FloorCount,
+    int ApartmentsPerFloor,
+    int UndergroundFloorCount = 0,
+    IReadOnlyDictionary<string, string?>? ApartmentLabels = null) : SyncCommand;
 
 public sealed record UpdateCoBuildingStructureCommand(
     OperatorDto Operator, Guid BuildingId, int FloorCount, int ApartmentsPerFloor, int UndergroundFloorCount = 0) : SyncCommand;

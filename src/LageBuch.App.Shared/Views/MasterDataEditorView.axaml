@@ -816,6 +816,106 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Objekte editor (#420): a card per Objekt, because name, address and structure are
+                   too many columns for one header. The fields wrap, so the card works on a phone.
+                   The Wohnungsbezeichnungen open below as a grid of every floor and Wohnung. -->
+              <DataTemplate x:DataType="vm:PremisesSection">
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PremisesRow">
+                          <Border Classes="row-card" Margin="0,0,0,8">
+                            <DockPanel>
+                              <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
+                                   $parent path cannot resolve here. -->
+                              <Button DockPanel.Dock="Right" VerticalAlignment="Top" Classes="icon-btn" Margin="8,0,0,0"
+                                      ToolTip.Tip="Entfernen" AutomationProperties.Name="Entfernen"
+                                      Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                      CommandParameter="{Binding}">
+                                <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                              </Button>
+                              <StackPanel Spacing="8">
+                                <WrapPanel ItemSpacing="8" LineSpacing="8">
+                                  <HeaderedContentControl Classes="field" Header="BEZEICHNUNG" Width="240">
+                                    <TextBox Text="{Binding Name}"
+                                             PlaceholderText="{x:Static md:AnonymizedExampleData.BuildingNamePlaceholder}" />
+                                  </HeaderedContentControl>
+                                  <HeaderedContentControl Classes="field" Header="GESCHOSSE">
+                                    <NumericUpDown Width="110" Increment="1" FormatString="0"
+                                                   Minimum="{Binding MinFloorCount}" Maximum="{Binding MaxFloorCount}"
+                                                   Value="{Binding FloorCount}" />
+                                  </HeaderedContentControl>
+                                  <HeaderedContentControl Classes="field" Header="WOHNUNGEN/GESCHOSS">
+                                    <NumericUpDown Width="110" Increment="1" FormatString="0"
+                                                   Minimum="{Binding MinApartmentsPerFloor}" Maximum="{Binding MaxApartmentsPerFloor}"
+                                                   Value="{Binding ApartmentsPerFloor}" />
+                                  </HeaderedContentControl>
+                                  <HeaderedContentControl Classes="field" Header="UNTERGESCHOSSE">
+                                    <NumericUpDown Width="110" Increment="1" FormatString="0"
+                                                   Minimum="0" Maximum="{Binding MaxUndergroundFloorCount}"
+                                                   Value="{Binding UndergroundFloorCount}" />
+                                  </HeaderedContentControl>
+                                </WrapPanel>
+                                <WrapPanel ItemSpacing="8" LineSpacing="8">
+                                  <HeaderedContentControl Classes="field" Header="STRASSE" Width="240">
+                                    <TextBox Text="{Binding Street}" PlaceholderText="z. B. Lindenallee" />
+                                  </HeaderedContentControl>
+                                  <HeaderedContentControl Classes="field" Header="HAUSNR." Width="80">
+                                    <TextBox Text="{Binding HouseNumber}" PlaceholderText="12" />
+                                  </HeaderedContentControl>
+                                  <HeaderedContentControl Classes="field" Header="PLZ" Width="80">
+                                    <TextBox Text="{Binding PostalCode}" PlaceholderText="12345" />
+                                  </HeaderedContentControl>
+                                  <HeaderedContentControl Classes="field" Header="ORT" Width="180">
+                                    <TextBox Text="{Binding Place}" PlaceholderText="z. B. Musterstadt" />
+                                  </HeaderedContentControl>
+                                </WrapPanel>
+                                <Button x:Name="PremisesLabelToggle" HorizontalAlignment="Left"
+                                        Content="{Binding LabelToggleText}" Command="{Binding ToggleLabelGridCommand}" />
+                                <!-- Top floor first, as the CO matrix shows the Haus. A cell left blank
+                                     keeps the name the matrix gives it, shown as the placeholder. The grid
+                                     scrolls sideways rather than squeezing 30 Wohnungen onto a phone. -->
+                                <ScrollViewer IsVisible="{Binding IsLabelGridOpen}"
+                                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                  <ItemsControl x:Name="PremisesLabelGrid" ItemsSource="{Binding Floors}">
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="vm:PremisesFloorRow">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
+                                          <TextBlock Width="56" VerticalAlignment="Center" Classes="secondary"
+                                                     Text="{Binding FloorLabel}" />
+                                          <ItemsControl ItemsSource="{Binding Cells}">
+                                            <ItemsControl.ItemsPanel>
+                                              <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                                              </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                              <DataTemplate x:DataType="vm:PremisesLabelCell">
+                                                <TextBox Width="120" Text="{Binding Label}"
+                                                         PlaceholderText="{Binding Placeholder}"
+                                                         MaxLength="{x:Static vm:PremisesRow.MaxApartmentLabelLength}"
+                                                         AutomationProperties.Name="{Binding Placeholder}" />
+                                              </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                          </ItemsControl>
+                                        </StackPanel>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                </ScrollViewer>
+                              </StackPanel>
+                            </DockPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Funktionen editor (#470): a row is a name plus how often the Funktion may be
                    held, so this is a typed section rather than the plain name list — the mode used
                    to be dropped on load and defaulted again on save. -->

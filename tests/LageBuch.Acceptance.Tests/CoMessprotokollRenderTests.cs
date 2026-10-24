@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -122,5 +123,29 @@ public class CoMessprotokollRenderTests
         Assert.Equal(3, ogRow.Cells.Count); // untouched floor keeps the building's default (#265)
 
         Capture(window, "co-messung-per-floor-count.png");
+    }
+
+    // #420: the Bezeichnung suggests the Stammdaten's Objekte, and a pick says what it brought.
+    [AvaloniaFact]
+    public void The_add_dialog_offers_the_objekte_and_shows_what_a_pick_brings()
+    {
+        var (window, vm, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        vm.CoMessprotokoll.AddBuildingCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var nameBox = window.GetVisualDescendants().OfType<AutoCompleteBox>().Single(b => b.Name == "NewBuildingNameBox");
+        var hint = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "NewBuildingPremisesHint");
+        Assert.Equal(new[] { "Wohnanlage Lindenallee", "Haus A" }, nameBox.ItemsSource!.Cast<string>());
+        Assert.False(hint.IsVisible);
+
+        nameBox.Text = "Wohnanlage Lindenallee";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(hint.IsVisible);
+        Assert.Equal("Aus den Stammdaten · Lindenallee 12, 12345 Musterstadt · 4 Wohnungsbezeichnungen", hint.Text);
+        Assert.Equal(4, vm.CoMessprotokoll.NewBuildingFloors);
+
+        Capture(window, "co-messung-objekt-pick.png");
     }
 }
