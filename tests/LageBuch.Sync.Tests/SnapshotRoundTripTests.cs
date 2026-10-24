@@ -55,7 +55,7 @@ public class SnapshotRoundTripTests
         clock.Now = clock.Now.AddMinutes(2);
         incident.StartScbaTrupp(clock, trupp.Id);
         clock.Now = clock.Now.AddMinutes(5);
-        incident.RecordScbaPressure(clock, trupp.Id, bar: 250);
+        incident.RecordScbaPressure(clock, trupp.Id, bar: 250, location: "2. OG");
         clock.Now = clock.Now.AddMinutes(3);
         incident.WithdrawScbaTrupp(clock, trupp.Id);
         clock.Now = clock.Now.AddMinutes(1);
@@ -142,7 +142,7 @@ public class SnapshotRoundTripTests
         Assert.Equal(300, trupp.EntryPressure);
         Assert.NotNull(trupp.WithdrawTime);
         Assert.NotNull(trupp.ExitTime);
-        Assert.Contains(trupp.PressureReadings, p => p.Bar == 250);
+        Assert.Contains(trupp.PressureReadings, p => p.Bar == 250 && p.Location == "2. OG");
         Assert.NotEmpty(r.Audit);
 
         var file = Assert.Single(r.Files);

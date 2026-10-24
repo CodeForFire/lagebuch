@@ -881,12 +881,12 @@ public sealed class Incident
         return trupp;
     }
 
-    public AtemschutzTrupp RecordScbaPressure(IClock clock, Guid truppId, int bar)
+    public AtemschutzTrupp RecordScbaPressure(IClock clock, Guid truppId, int bar, string? location = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         var trupp = FindScbaTrupp(truppId);
-        trupp.RecordPressure(clock.Now, bar);
+        trupp.RecordPressure(clock.Now, bar, location);
         return trupp;
     }
 

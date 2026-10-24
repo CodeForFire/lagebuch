@@ -94,20 +94,26 @@ public static class AtemschutzSection
     /// <summary>
     /// The sub-line under a Trupp's row: its status at <paramref name="asOf"/>, then its Messreihe.
     /// The series appears only from two readings up — with one it just repeats "Druck akt." and the
-    /// time beneath it, the same rule the CO Messreihe follows (#424).
+    /// time beneath it, the same rule the CO Messreihe follows (#424) — unless that one reading has
+    /// an Ort, which nothing else on the row shows.
     /// </summary>
     public static string DetailLine(AtemschutzTrupp trupp, DateTimeOffset asOf)
     {
         ArgumentNullException.ThrowIfNull(trupp);
         var status = $"Status: {trupp.StatusLabel(asOf)}";
-        if (trupp.PressureReadings.Count < 2)
+        if (trupp.PressureReadings.Count < 2 && trupp.LatestLocation is null)
         {
             return status;
         }
 
-        var series = string.Join(" · ", trupp.PressureReadings.Select(r => $"{Formatting.TimeOfDay(r.Time)} {r.Bar} bar"));
+        var series = string.Join(" · ", trupp.PressureReadings.Select(Reading));
         return $"{status} · Messreihe: {series}";
     }
+
+    private static string Reading(PressureReading r) =>
+        r.Location is null
+            ? $"{Formatting.TimeOfDay(r.Time)} {r.Bar} bar"
+            : $"{Formatting.TimeOfDay(r.Time)} {r.Bar} bar ({r.Location})";
 
     /// <summary>
     /// When "Druck akt." was measured, or null while it is still only the entry pressure — that

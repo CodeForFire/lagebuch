@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 31;
+    public const int CurrentVersion = 32;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -210,6 +210,15 @@ public static class Migrations
         if (version < 31)
         {
             ApplyV31(cn, tx);
+        }
+
+        // Stryker disable all : V32 only adds a nullable column that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 32)
+        {
+            ApplyV32(cn, tx);
+
+            // Stryker restore all
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -915,6 +924,16 @@ public static class Migrations
     // IncidentRepository rewrites on save.
     private static void ApplyV31(SqliteConnection cn, SqliteTransaction tx) =>
         IncidentFileBlobs.EnsureTable(cn, tx);
+
+    // Where a Trupp said it was at a Druckabfrage. Additive and nullable: an older file's readings
+    // read back without an Ort, which is what they were.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV32(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_pressure_readings", "location", "TEXT");
+
+        // Stryker restore all
+    }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

@@ -46,6 +46,7 @@ public class CommandSerializationTests
             TruppNumber: 3),
         new StartScbaTruppCommand(Guid.NewGuid()),
         new RecordScbaPressureCommand(Guid.NewGuid(), 250),
+        new RecordScbaPressureCommand(Guid.NewGuid(), 250, "2. OG"),
         new WithdrawScbaTruppCommand(Guid.NewGuid()),
         new MarkScbaRemovedCommand(Guid.NewGuid()),
         new SetScbaSafetyTruppCommand(Guid.NewGuid(), Guid.NewGuid()),
@@ -164,6 +165,20 @@ public class CommandSerializationTests
 
         Assert.Equal(0, command.OfficerCount);
         Assert.Equal(9, command.PersonnelCount);
+    }
+
+    // A client below protocol 19 sends recordScbaPressure without an Ort; it must still record the bar.
+    [Fact]
+    public void Legacy_recordScbaPressure_without_location_deserializes_with_no_ort()
+    {
+        const string legacyJson = """
+            {"$type":"recordScbaPressure","truppId":"7d1c4c1e-1f2a-4b3c-9d4e-5f6a7b8c9d0e","bar":250}
+            """;
+
+        var command = Assert.IsType<RecordScbaPressureCommand>(SyncJson.Deserialize<SyncCommand>(legacyJson));
+
+        Assert.Equal(250, command.Bar);
+        Assert.Null(command.Location);
     }
 
     // TruppNumber is optional on the wire so the host's auto-assign path (Incident.NextFreeScbaTruppNumber)

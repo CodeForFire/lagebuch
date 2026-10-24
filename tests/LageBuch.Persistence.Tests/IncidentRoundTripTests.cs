@@ -287,7 +287,7 @@ public class IncidentRoundTripTests : IDisposable
         clock.Now = clock.Now.AddMinutes(3);
         incident.StartScbaTrupp(clock, active.Id);
         clock.Now = clock.Now.AddMinutes(5);
-        incident.RecordScbaPressure(clock, active.Id, 240);
+        incident.RecordScbaPressure(clock, active.Id, 240, "2. OG, Treppenraum");
         clock.Now = clock.Now.AddMinutes(5);
         incident.RecordScbaPressure(clock, active.Id, 180);
 
@@ -350,6 +350,8 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(60, loadedActive.ReturnPressureBar);
         Assert.Equal(5, loadedActive.PressureControlIntervalMinutes);
         Assert.Equal(2, loadedActive.PressureReadings.Count);
+        Assert.Equal("2. OG, Treppenraum", loadedActive.PressureReadings[0].Location);
+        Assert.Null(loadedActive.PressureReadings[1].Location);
         Assert.Equal(180, loadedActive.LatestPressure);
         Assert.True(loadedActive.IsActive);
         Assert.Equal("Trupp 1 (Angriffstrupp)", loadedActive.DisplayName);

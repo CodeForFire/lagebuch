@@ -21,10 +21,13 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class ScbaTruppRow : ObservableObject
 {
+    /// <summary>The Ort field's length limit, for the view.</summary>
+    public const int MaxLocationLength = AtemschutzTrupp.MaxLocationLength;
+
     private readonly IClock _clock;
     private readonly bool _isReadOnly;
     private readonly Action _onStart;
-    private readonly Action<int> _onRecordPressure;
+    private readonly Action<int, string?> _onRecordPressure;
     private readonly Action _onWithdraw;
     private readonly Action _onMarkRemoved;
     private readonly Action<Guid?> _onAssignSafetyTrupp;
@@ -37,7 +40,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         IClock clock,
         bool isReadOnly,
         Action onStart,
-        Action<int> onRecordPressure,
+        Action<int, string?> onRecordPressure,
         Action onWithdraw,
         Action onMarkRemoved,
         IReadOnlyList<SafetyTruppChoice> safetyTruppChoices,
@@ -101,6 +104,9 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     public string? PressureDisplay => _trupp.LatestPressure is { } p ? $"{p} bar" : null;
 
+    /// <summary>Where the Trupp last said it was at a Druckabfrage, or "—".</summary>
+    public string LocationDisplay => _trupp.LatestLocation ?? "—";
+
     public string ElapsedDisplay => _trupp.HasStarted ? Clock(_trupp.Elapsed(_clock.Now)) : "—";
 
     public string RemainingDisplay
@@ -160,6 +166,15 @@ public sealed partial class ScbaTruppRow : ObservableObject
     [ObservableProperty]
     private int? _pressureInput;
 
+    /// <summary>Where the Trupp says it is, typed beside the Druck; optional, and emptied with it.</summary>
+    [ObservableProperty]
+    private string? _locationInput;
+
+    /// <summary>The last Ort as the empty field's placeholder, the way <see cref="PressurePlaceholder"/>
+    /// shows the last Druck: in sight, but not recorded again unless it is typed.</summary>
+    public string LocationPlaceholder =>
+        _trupp.LatestLocation is { } l ? $"zuletzt {l}" : "Ort";
+
     /// <summary>The last reading as the empty field's placeholder, so the operator sees what the
     /// Trupp reported last without it being one keypress away from being recorded again.</summary>
     public string PressurePlaceholder =>
@@ -194,6 +209,9 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _warnedPressure = null;
     }
 
+    // Only the error: a warning is about the Druck, and still stands whatever the Ort says.
+    partial void OnLocationInputChanged(string? value) => PressureError = null;
+
     private bool CanStart => !_isReadOnly && _trupp.IsWaiting;
 
     [RelayCommand(CanExecute = nameof(CanStart))]
@@ -215,6 +233,13 @@ public sealed partial class ScbaTruppRow : ObservableObject
             return;
         }
 
+        var location = string.IsNullOrWhiteSpace(LocationInput) ? null : LocationInput.Trim();
+        if (location is { Length: > AtemschutzTrupp.MaxLocationLength })
+        {
+            PressureError = ValidationMessages.ControlLocationTooLong;
+            return;
+        }
+
         if (bar != _warnedPressure && !_trupp.IsPlausiblePressure(bar, _clock.Now))
         {
             _warnedPressure = bar;
@@ -222,8 +247,9 @@ public sealed partial class ScbaTruppRow : ObservableObject
             return;
         }
 
-        _onRecordPressure(bar);
+        _onRecordPressure(bar, location);
         PressureInput = null; // only once it is recorded: a failed write must not take the value with it
+        LocationInput = null;
     }
 
     private bool CanWithdraw => !_isReadOnly && _trupp.IsActive;
@@ -244,9 +270,9 @@ public sealed partial class ScbaTruppRow : ObservableObject
     /// </summary>
     /// <remarks>
     /// <paramref name="trupp"/> may be a different instance than the one held: a joined device
-    /// rebuilds its whole aggregate from each snapshot. <see cref="PressureInput"/> is deliberately
-    /// left alone — it is a half-typed Druckabfrage, and another device's edit must not overwrite
-    /// what the operator is in the middle of entering.
+    /// rebuilds its whole aggregate from each snapshot. <see cref="PressureInput"/> and
+    /// <see cref="LocationInput"/> are deliberately left alone — they are a half-typed Druckabfrage,
+    /// and another device's edit must not overwrite what the operator is in the middle of entering.
     /// </remarks>
     public void Update(
         AtemschutzTrupp trupp,
@@ -280,6 +306,8 @@ public sealed partial class ScbaTruppRow : ObservableObject
         OnPropertyChanged(nameof(StartTimeDisplay));
         OnPropertyChanged(nameof(PressureDisplay));
         OnPropertyChanged(nameof(PressurePlaceholder));
+        OnPropertyChanged(nameof(LocationDisplay));
+        OnPropertyChanged(nameof(LocationPlaceholder));
         OnPropertyChanged(nameof(ElapsedDisplay));
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(ControlRemainingDisplay));
@@ -882,7 +910,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             _clock,
             IsReadOnly,
             () => Start(trupp.Id),
-            bar => RecordPressure(trupp.Id, bar),
+            (bar, location) => RecordPressure(trupp.Id, bar, location),
             () => Withdraw(trupp.Id),
             () => MarkRemoved(trupp.Id),
             SafetyChoicesFor(trupp),
@@ -1055,13 +1083,16 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         _onChanged();
     }
 
-    private void RecordPressure(Guid truppId, int bar)
+    private void RecordPressure(Guid truppId, int bar, string? location)
     {
         var (displayName, callSign) = TruppLabel(truppId);
-        _session.RecordScbaPressure(truppId, bar);
+        _session.RecordScbaPressure(truppId, bar, location);
+        var text = location is null
+            ? $"Druckkontrolle {displayName}: {bar} bar"
+            : $"Druckkontrolle {displayName}: {bar} bar – {location}";
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Druckkontrolle {displayName}: {bar} bar",
+            text,
             from: callSign,
             to: null);
         var tripped = LogNewAlarms(); // a low reading may immediately trip the Rückzugsdruck alarm

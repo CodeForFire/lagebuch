@@ -267,7 +267,7 @@ public sealed class IncidentRepository
                 var reading = t.PressureReadings[j];
                 Run(
                     inserts,
-                    "INSERT INTO scba_pressure_readings (id, trupp_id, ordinal, reading_time, bar) VALUES ($id,$tid,$o,$time,$bar);",
+                    "INSERT INTO scba_pressure_readings (id, trupp_id, ordinal, reading_time, bar, location) VALUES ($id,$tid,$o,$time,$bar,$loc);",
                     p =>
                     {
                         p("$id", Guid.NewGuid().ToString());
@@ -275,6 +275,7 @@ public sealed class IncidentRepository
                         p("$o", j);
                         p("$time", reading.Time.ToString(Iso));
                         p("$bar", reading.Bar);
+                        p("$loc", (object?)reading.Location ?? DBNull.Value);
                     });
             }
         }
@@ -687,9 +688,9 @@ public sealed class IncidentRepository
 
         var readingsByTrupp = ReadAll(
             cn,
-            "SELECT trupp_id, reading_time, bar FROM scba_pressure_readings ORDER BY ordinal;",
+            "SELECT trupp_id, reading_time, bar, location FROM scba_pressure_readings ORDER BY ordinal;",
             r => (TruppId: Guid.Parse(r.GetString(0)),
-                  Reading: new Domain.Atemschutz.PressureReading(ParseDate(r.GetString(1)), r.GetInt32(2))))
+                  Reading: new Domain.Atemschutz.PressureReading(ParseDate(r.GetString(1)), r.GetInt32(2), Str(r, 3))))
             .GroupBy(x => x.TruppId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Reading).ToList());
 

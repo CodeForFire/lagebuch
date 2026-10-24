@@ -1,0 +1,1 @@
+Atemschutz: a Druckabfrage can record where the Trupp is, typed beside the Druck and kept with each reading, so the last Ort shows on the Trupp, the ETB line carries it, and the PDF's Messreihe lists the Trupp's route.

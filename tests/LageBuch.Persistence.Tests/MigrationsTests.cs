@@ -360,4 +360,32 @@ public class MigrationsTests : IDisposable
             "SELECT count(*) FROM pragma_table_info('incident_file_blobs') WHERE name IN ('storage_name','bytes');";
         Assert.Equal(2L, (long)check.ExecuteScalar()!);
     }
+
+    [Fact]
+    public void V31_database_upgrades_to_v32_and_its_druckabfragen_have_no_ort()
+    {
+        // A V31 file: today's schema minus the column, with a reading already in it.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE scba_pressure_readings DROP COLUMN location;
+                INSERT INTO scba_pressure_readings (id, trupp_id, ordinal, reading_time, bar)
+                    VALUES ('r', 't', 0, '2026-08-24T09:05:00.0000000+02:00', 240);
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (31);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(32, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT location FROM scba_pressure_readings WHERE id = 'r';";
+        Assert.Equal(DBNull.Value, check.ExecuteScalar());
+    }
 }

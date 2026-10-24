@@ -524,7 +524,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void StartScbaTrupp(Guid truppId) => Send(new StartScbaTruppCommand(truppId));
 
-    public void RecordScbaPressure(Guid truppId, int bar) => Send(new RecordScbaPressureCommand(truppId, bar));
+    public void RecordScbaPressure(Guid truppId, int bar, string? location = null) =>
+        Send(new RecordScbaPressureCommand(truppId, bar, location));
 
     public void WithdrawScbaTrupp(Guid truppId) => Send(new WithdrawScbaTruppCommand(truppId));
 

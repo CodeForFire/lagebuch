@@ -236,8 +236,8 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void StartScbaTrupp(Guid truppId) =>
         Mutate(() => Incident.StartScbaTrupp(_clock, truppId));
 
-    public void RecordScbaPressure(Guid truppId, int bar) =>
-        Mutate(() => Incident.RecordScbaPressure(_clock, truppId, bar));
+    public void RecordScbaPressure(Guid truppId, int bar, string? location = null) =>
+        Mutate(() => Incident.RecordScbaPressure(_clock, truppId, bar, location));
 
     public void WithdrawScbaTrupp(Guid truppId) =>
         Mutate(() => Incident.WithdrawScbaTrupp(_clock, truppId));

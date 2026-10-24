@@ -1535,6 +1535,84 @@ public class ScbaViewModelTests
     }
 
     [Fact]
+    public void A_pressure_with_an_ort_records_it_writes_it_to_the_etb_and_empties_both_fields()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+
+        row.PressureInput = 270;
+        row.LocationInput = " 2. OG, Treppenraum ";
+        row.RecordPressureCommand.Execute(null);
+
+        var reading = Assert.Single(session.Incident.ScbaTrupps.Single(t => t.Id == row.Id).PressureReadings);
+        Assert.Equal("2. OG, Treppenraum", reading.Location);
+        Assert.Null(row.PressureInput);
+        Assert.Null(row.LocationInput);
+        Assert.Equal("2. OG, Treppenraum", row.LocationDisplay);
+        Assert.Equal("zuletzt 2. OG, Treppenraum", row.LocationPlaceholder);
+        Assert.Contains(session.Incident.Journal, e => e.Text.EndsWith(": 270 bar – 2. OG, Treppenraum", StringComparison.Ordinal));
+    }
+
+    // The row is updated in place (#294), so the Ort it shows only moves if the refresh raises it.
+    [Fact]
+    public void Recording_an_ort_raises_the_rows_ort_display_and_placeholder()
+    {
+        var clock = new FixedClock(T0);
+        var row = StartTrupp(Vm(clock, NewSession(clock)), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        row.PressureInput = 270;
+        row.LocationInput = "EG";
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Contains(nameof(ScbaTruppRow.LocationDisplay), raised);
+        Assert.Contains(nameof(ScbaTruppRow.LocationPlaceholder), raised);
+    }
+
+    [Fact]
+    public void A_pressure_without_an_ort_writes_the_etb_as_before()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+
+        row.PressureInput = 270;
+        row.LocationInput = "   ";
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal("—", row.LocationDisplay);
+        Assert.Equal("Ort", row.LocationPlaceholder);
+        Assert.Contains(session.Incident.Journal, e => e.Text.EndsWith(": 270 bar", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void An_ort_over_the_limit_records_nothing_and_keeps_both_fields()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+        var tooLong = new string('x', AtemschutzTrupp.MaxLocationLength + 1);
+
+        row.PressureInput = 270;
+        row.LocationInput = tooLong;
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal(0, ReadingsOf(session, row));
+        Assert.Equal(270, row.PressureInput);
+        Assert.Equal(tooLong, row.LocationInput);
+        Assert.Equal(ValidationMessages.ControlLocationTooLong, row.PressureError);
+
+        row.LocationInput = "EG";
+        Assert.Null(row.PressureError);
+    }
+
+    [Fact]
     public void An_implausible_pressure_is_held_back_once_with_a_warning()
     {
         var clock = new FixedClock(T0);
