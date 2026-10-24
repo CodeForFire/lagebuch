@@ -11,7 +11,9 @@
       <ItemsControl ItemsSource="{Binding Items}" IsEnabled="{Binding !IsReadOnly}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:ChecklistItemViewModel">
+            <!-- The whole row ticks the item, not just the box (code-behind forwards the tap). -->
             <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                    Cursor="Hand"
                     CornerRadius="{StaticResource RadiusSm}" Padding="14,11" Margin="0,0,0,7">
               <Grid ColumnDefinitions="Auto,*,Auto">
                 <CheckBox Grid.Column="0" IsChecked="{Binding IsDone}" VerticalAlignment="Center" />

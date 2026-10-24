@@ -76,6 +76,38 @@ public class ChecklistViewModelTests
     }
 
     [Fact]
+    public void Toggle_done_command_flips_the_item_and_persists()
+    {
+        var changes = 0;
+        var session = NewSession();
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => changes++);
+
+        // A click on the row outside the CheckBox.
+        vm.Items[0].ToggleDoneCommand.Execute(null);
+
+        Assert.True(vm.Items[0].IsDone);
+        Assert.True(session.Incident.Checklists[0].Items[0].IsDone);
+
+        vm.Items[0].ToggleDoneCommand.Execute(null);
+
+        Assert.False(vm.Items[0].IsDone);
+        Assert.False(session.Incident.Checklists[0].Items[0].IsDone);
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void Toggle_done_command_leaves_a_read_only_session_untouched()
+    {
+        var session = NewSession();
+        session.Close();
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => Assert.Fail("onChanged must not fire when read-only"));
+
+        vm.Items[0].ToggleDoneCommand.Execute(null);
+
+        Assert.False(session.Incident.Checklists[0].Items[0].IsDone);
+    }
+
+    [Fact]
     public void Items_carry_the_mandatory_flag_from_the_domain()
     {
         var session = NewSession(aufbau: new[] { ("Pflicht", true), ("Optional", false) });
