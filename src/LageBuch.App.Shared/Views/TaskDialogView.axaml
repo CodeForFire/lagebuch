@@ -26,7 +26,8 @@
           <TextBlock Text="AUFGABE ERSTELLEN" Classes="display" FontSize="20" />
           <HeaderedContentControl Classes="field required" Header="AUFGABE" ctrl:Field.Error="{Binding TextError}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="TaskDialogText" Text="{Binding Text}" AcceptsReturn="False" />
+            <TextBox x:Name="TaskDialogText" Text="{Binding Text}" AcceptsReturn="False"
+                     b:SnippetCompletion.Snippets="{Binding TextSnippets}" />
           </HeaderedContentControl>
           <!-- Triage segments (#246) on a row of their own: a scale wants its width. -->
           <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="12">

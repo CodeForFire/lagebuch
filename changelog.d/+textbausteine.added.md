@@ -1,0 +1,1 @@
+Textbausteine, a new Stammdaten list whose entries are each ticked for the ETB, for Aufgaben or both, are offered by typing ::kürzel in those text fields, insert their text with Enter or a tap and select the first [...] gap so it can be typed over.

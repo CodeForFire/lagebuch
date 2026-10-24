@@ -49,7 +49,9 @@ public static class EnterSubmit
 
     private static void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || sender is not InputElement input || (input is AutoCompleteBox box && SuggestionBox.ClaimsEnter(box)))
+        if (e.Key != Key.Enter || sender is not InputElement input
+            || (input is AutoCompleteBox box && SuggestionBox.ClaimsEnter(box))
+            || (input is TextBox field && SnippetCompletion.ClaimsEnter(field)))
         {
             return;
         }

@@ -171,6 +171,7 @@ public static class EntryForm
             switch (visual)
             {
                 case AutoCompleteBox box when SuggestionBox.ClaimsEnter(box):
+                case TextBox field when SnippetCompletion.ClaimsEnter(field):
                 case ComboBox { IsDropDownOpen: true }:
                 case TextBox { AcceptsReturn: true }:
                 case Button:

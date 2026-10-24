@@ -192,7 +192,7 @@ public class MasterDataEditorViewModelTests
             {
                 "Einstellungen", "Navigation", "Einheiten-Status",
                 "Fahrzeuge", "Links", "Ortsteile", "Personal", "Rollen", "Stichwörter", "Straßen",
-                "Trupp-Typen",
+                "Textbausteine", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
     }
