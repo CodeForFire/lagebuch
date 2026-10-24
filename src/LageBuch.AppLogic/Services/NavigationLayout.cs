@@ -28,7 +28,7 @@ public static class NavigationLayout
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(incidentLists);
 
-        var effective = layout.Count == 0 ? NavLayout.Default : layout;
+        var effective = layout.Count == 0 ? NavLayout.Default : FoldLegacyFuehrung(layout);
 
         // Hidden modules keep a slot (Spec null) so a module the layout predates can still be placed
         // after its predecessor when that predecessor was switched off.
@@ -99,6 +99,46 @@ public static class NavigationLayout
     }
 
     /// <summary>
+    /// Turns a layout that still names Funktionen or Kräfte as rail entries of their own into one
+    /// Führung entry, at the place of whichever of the three came first, shown if any of them was.
+    /// </summary>
+    /// <remarks>
+    /// Every layout saved before the two became tabs of Führung names them, because the editor
+    /// writes a row for every module. Without this they would be dropped as unknown keys and
+    /// Führung would keep its old place after Atemschutz instead of moving up to where Funktionen
+    /// was. A layout naming neither is returned as it is, so a Führung the operator has since
+    /// moved stays where they put it. Shared with the Stammdaten editor, whose next save then
+    /// stores the folded layout.
+    /// </remarks>
+    public static IReadOnlyList<NavEntry> FoldLegacyFuehrung(IReadOnlyList<NavEntry> layout)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+
+        if (!layout.Any(e => !e.IsChecklist && IsLegacyFuehrungTab(e.ModuleKey)))
+        {
+            return layout;
+        }
+
+        var isVisible = layout.Any(e => !e.IsChecklist && IsFuehrung(e.ModuleKey) && e.IsVisible);
+        var folded = new List<NavEntry>(layout.Count);
+        var placed = false;
+        foreach (var entry in layout)
+        {
+            if (entry.IsChecklist || !IsFuehrung(entry.ModuleKey))
+            {
+                folded.Add(entry);
+            }
+            else if (!placed)
+            {
+                folded.Add(new NavEntry(NavModules.Leadership, null, isVisible));
+                placed = true;
+            }
+        }
+
+        return folded;
+    }
+
+    /// <summary>
     /// Inserts every built-in module <paramref name="seen"/> lacks after the nearest preceding
     /// module of <see cref="NavLayout.Default"/> that <paramref name="items"/> holds — switched-off
     /// ones included, so the position does not depend on a toggle — and appends it when none is
@@ -146,6 +186,14 @@ public static class NavigationLayout
     private sealed record Slot(string Key, NavItemSpec? Spec);
 
     private static bool IsEtb(string key) => string.Equals(key, NavModules.Etb, StringComparison.Ordinal);
+
+    // The keys Funktionen and Kräfte had as rail entries; only FoldLegacyFuehrung still reads them.
+    private static bool IsLegacyFuehrungTab(string key) =>
+        string.Equals(key, "roles", StringComparison.Ordinal)
+        || string.Equals(key, "forces", StringComparison.Ordinal);
+
+    private static bool IsFuehrung(string key) =>
+        IsLegacyFuehrungTab(key) || string.Equals(key, NavModules.Leadership, StringComparison.Ordinal);
 }
 
 /// <summary>One rail entry, resolved: a built-in module, or one of this Einsatz's Checklisten.</summary>

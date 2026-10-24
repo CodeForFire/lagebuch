@@ -76,7 +76,7 @@ public class WorkspaceShortcutTests
     {
         // Every module is named, so no missing one is slotted in behind its default predecessor
         // and shifts the positions this test counts.
-        var leading = new[] { NavModules.Forces, NavModules.Etb, NavModules.Scba };
+        var leading = new[] { NavModules.Leadership, NavModules.Etb, NavModules.Scba };
         var navigation = leading
             .Concat(NavModules.All.Except(leading))
             .Select(key => new NavEntry(key, null, true))
@@ -86,7 +86,7 @@ public class WorkspaceShortcutTests
         vm.ModuleFocusRequested += (_, _) => focusRequests++;
 
         Assert.True(vm.TryRunShortcut(Ctrl(ShortcutKey.D1)));
-        Assert.Equal("KRÄFTE", Selected(vm));
+        Assert.Equal("FÜHRUNG", Selected(vm));
         Assert.Equal(1, focusRequests);
 
         Assert.True(vm.TryRunShortcut(Ctrl(ShortcutKey.D3)));
@@ -94,14 +94,14 @@ public class WorkspaceShortcutTests
     }
 
     [Fact]
-    public void Ctrl_8_opens_Fuehrung_and_Ctrl_1_to_7_keep_their_modules()
+    public void Ctrl_4_opens_Fuehrung_in_the_place_funktionen_had()
     {
         var (vm, _, _) = Workspace();
 
         string[] expected =
         [
-            "AUFBAU", "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE", "BETEILIGTE", "ATEMSCHUTZ",
-            "FÜHRUNG", "CO-MESSUNG",
+            "AUFBAU", "ETB", "AUFGABEN", "FÜHRUNG", "BETEILIGTE", "ATEMSCHUTZ", "CO-MESSUNG",
+            "DATEIEN", "LINKS",
         ];
         for (var i = 0; i < expected.Length; i++)
         {
@@ -115,7 +115,7 @@ public class WorkspaceShortcutTests
     {
         // Every module is named, so none is slotted in behind its default predecessor and shifts
         // the positions this test counts.
-        var leading = new[] { NavModules.Forces, NavModules.Tasks, NavModules.Etb };
+        var leading = new[] { NavModules.Leadership, NavModules.Tasks, NavModules.Etb };
         var navigation = leading
             .Concat(NavModules.All.Except(leading))
             .Select(key => new NavEntry(key, null, key != NavModules.Tasks))

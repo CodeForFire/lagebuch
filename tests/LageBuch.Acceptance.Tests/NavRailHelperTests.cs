@@ -36,8 +36,8 @@ public class NavRailHelperTests
         Assert.Equal(
             new[]
             {
-                "AUFBAU", "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE", "BETEILIGTE",
-                "ATEMSCHUTZ", "FÜHRUNG", "CO-MESSUNG", "DATEIEN", "LINKS", "KONTAKTE", "ABBAU",
+                "AUFBAU", "ETB", "AUFGABEN", "FÜHRUNG", "BETEILIGTE", "ATEMSCHUTZ",
+                "CO-MESSUNG", "DATEIEN", "LINKS", "KONTAKTE", "ABBAU",
             },
             WorkspaceRenderHelper.RailHeaders(window));
     }
@@ -49,7 +49,8 @@ public class NavRailHelperTests
 
         foreach (var (header, expectedIndex) in new[]
                  {
-                     ("ATEMSCHUTZ", 6), ("AUFBAU", 0), ("ABBAU", 12), ("ETB", 1), ("CO-MESSUNG", 8), ("BETEILIGTE", 5), ("FÜHRUNG", 7),
+                     ("ATEMSCHUTZ", 5), ("AUFBAU", 0), ("ABBAU", 10), ("ETB", 1), ("CO-MESSUNG", 6), ("BETEILIGTE", 4), ("FÜHRUNG", 3),
+                     ("KRÄFTE", 3),
                  })
         {
             var tabs = WorkspaceRenderHelper.SelectTab(window, header);

@@ -45,10 +45,10 @@ public class ModuleTabsScrollingTests
         }
 
         var tabs = ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-        var tabItems = tabs.GetVisualDescendants().OfType<TabItem>().ToArray();
+        var tabItems = tabs.GetVisualDescendants().OfType<TabItem>().Where(t => tabs.IndexFromContainer(t) >= 0).ToArray();
 
         // Nothing lost: every declared rail tab is still realized.
-        Assert.Equal(13, tabItems.Length);
+        Assert.Equal(11, tabItems.Length);
 
         // One column, not side-by-side columns: every tab shares the same horizontal origin.
         var columns = tabItems

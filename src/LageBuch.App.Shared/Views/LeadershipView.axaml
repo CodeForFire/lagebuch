@@ -466,7 +466,6 @@
   <ScrollViewer x:Name="BoardScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <StackPanel x:Name="BoardRoot" Spacing="14" Background="Transparent"
                 IsEnabled="{Binding !IsReadOnly}" DragDrop.AllowDrop="{Binding !IsReadOnly}">
-      <TextBlock x:Name="LeadershipTitle" Text="FÜHRUNG" Classes="overline" />
 
       <!-- Why the last board command was refused (a peer dissolved the node a moment ago). -->
       <TextBlock x:Name="LeadershipActionError" Classes="field-error"

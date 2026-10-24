@@ -43,7 +43,7 @@ public sealed partial class NavigationSection : EditorSection
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(checklists);
 
-        var effective = layout.Count == 0 ? NavLayout.Default : layout;
+        var effective = layout.Count == 0 ? NavLayout.Default : Services.NavigationLayout.FoldLegacyFuehrung(layout);
         var byId = checklists.ToDictionary(c => c.Id);
         var seenLists = new HashSet<Guid>();
         var seenModules = new HashSet<string>(StringComparer.Ordinal);
@@ -179,11 +179,9 @@ public sealed partial class NavRow : ObservableObject
         {
             [NavModules.Etb] = "ETB",
             [NavModules.Tasks] = "Aufgaben",
-            [NavModules.Roles] = "Funktionen",
-            [NavModules.Forces] = "Kräfte",
+            [NavModules.Leadership] = "Führung",
             [NavModules.InvolvedParties] = "Beteiligte",
             [NavModules.Scba] = "Atemschutz",
-            [NavModules.Leadership] = "Führung",
             [NavModules.Co] = "CO-Messung",
             [NavModules.Files] = "Dateien",
             [NavModules.Links] = "Links",

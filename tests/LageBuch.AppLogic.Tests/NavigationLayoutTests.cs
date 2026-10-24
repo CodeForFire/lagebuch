@@ -34,14 +34,14 @@ public class NavigationLayoutTests
         Assert.Equal(
             new[]
             {
-                "checklist:Aufbau", "etb", "tasks", "roles", "forces", "involved",
-                "scba", "leadership", "co", "files", "links", "contacts", "checklist:Abbau",
+                "checklist:Aufbau", "etb", "tasks", "leadership", "involved",
+                "scba", "co", "files", "links", "contacts", "checklist:Abbau",
             },
             Keys(specs));
     }
 
     [Fact]
-    public void A_layout_saved_before_beteiligte_existed_still_shows_it_after_kraefte()
+    public void A_layout_saved_before_beteiligte_existed_still_shows_it_after_fuehrung()
     {
         var saved = NavModules.All
             .Where(k => !string.Equals(k, NavModules.InvolvedParties, StringComparison.Ordinal))
@@ -50,59 +50,133 @@ public class NavigationLayoutTests
 
         var keys = Keys(NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>()));
 
-        Assert.Equal(keys.IndexOf(NavModules.Forces) + 1, keys.IndexOf(NavModules.InvolvedParties));
+        Assert.Equal(keys.IndexOf(NavModules.Leadership) + 1, keys.IndexOf(NavModules.InvolvedParties));
     }
 
+    // Funktionen and Kräfte were rail entries of their own until they became tabs of Führung. A
+    // layout saved back then names all three, and the merged entry takes the first one's place --
+    // which, unless someone reordered, is where Funktionen was.
     [Fact]
-    public void An_older_layout_without_leadership_gets_it_right_after_atemschutz()
-    {
-        var saved = NavModules.All
-            .Where(k => !string.Equals(k, NavModules.Leadership, StringComparison.Ordinal))
-            .Select(k => Module(k))
-            .ToArray();
-
-        var keys = Keys(NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>()));
-
-        Assert.Equal(keys.IndexOf(NavModules.Scba) + 1, keys.IndexOf(NavModules.Leadership));
-        Assert.Equal(NavModules.All.Count, keys.Count);
-    }
-
-    [Fact]
-    public void Leadership_follows_atemschutz_to_wherever_the_layout_moved_it()
+    public void A_layout_with_funktionen_and_kraefte_folds_them_into_fuehrung_at_the_first_ones_place()
     {
         var keys = Keys(NavigationLayout.Resolve(
             new[]
             {
-                Module(NavModules.Etb), Module(NavModules.Files), Module(NavModules.Scba),
+                Module(NavModules.Etb), Module(NavModules.Tasks), Module("roles"), Module("forces"),
+                Module(NavModules.InvolvedParties), Module(NavModules.Scba), Module(NavModules.Leadership),
+                Module(NavModules.Co),
+            },
+            Array.Empty<ChecklistList>()));
+
+        Assert.Equal(
+            ["etb", "tasks", "leadership", "involved", "scba", "co", "files", "links", "contacts"],
+            keys);
+    }
+
+    [Fact]
+    public void A_layout_from_before_the_board_gets_fuehrung_where_its_first_entry_was()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[]
+            {
+                Module(NavModules.Etb), Module(NavModules.Scba), Module("forces"), Module("roles"),
+                Module(NavModules.Files),
+            },
+            Array.Empty<ChecklistList>()));
+
+        // CO-Messung, which this layout omits, is slotted in behind Atemschutz and so lands between.
+        Assert.True(keys.IndexOf(NavModules.Scba) < keys.IndexOf(NavModules.Leadership));
+        Assert.True(keys.IndexOf(NavModules.Leadership) < keys.IndexOf(NavModules.Files));
+        Assert.True(keys.IndexOf(NavModules.Tasks) < keys.IndexOf(NavModules.Scba));
+        Assert.Single(keys, k => k == NavModules.Leadership);
+    }
+
+    [Fact]
+    public void Fuehrung_is_shown_when_any_of_the_entries_it_replaces_was()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[]
+            {
+                Module(NavModules.Etb), Module("roles", visible: false), Module("forces"),
+                Module(NavModules.Leadership, visible: false),
+            },
+            Array.Empty<ChecklistList>()));
+
+        Assert.Contains(NavModules.Leadership, keys);
+    }
+
+    [Fact]
+    public void Fuehrung_stays_hidden_when_every_entry_it_replaces_was()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[]
+            {
+                Module(NavModules.Etb), Module("roles", visible: false), Module("forces", visible: false),
+                Module(NavModules.Leadership, visible: false),
+            },
+            Array.Empty<ChecklistList>()));
+
+        Assert.DoesNotContain(NavModules.Leadership, keys);
+        Assert.DoesNotContain("roles", keys);
+        Assert.DoesNotContain("forces", keys);
+    }
+
+    // Once the fold has been saved, the layout names only Führung. Moving it after Atemschutz is
+    // then a deliberate choice, and nothing may pull it back to where Funktionen used to be.
+    [Fact]
+    public void A_layout_naming_only_fuehrung_keeps_it_where_it_was_put()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[]
+            {
+                Module(NavModules.Etb), Module(NavModules.Tasks), Module(NavModules.Scba),
+                Module(NavModules.Leadership), Module(NavModules.InvolvedParties), Module(NavModules.Co),
+                Module(NavModules.Files), Module(NavModules.Links), Module(NavModules.Contacts),
+            },
+            Array.Empty<ChecklistList>()));
+
+        Assert.Equal(keys.IndexOf(NavModules.Scba) + 1, keys.IndexOf(NavModules.Leadership));
+        Assert.Equal(keys.IndexOf(NavModules.Tasks) + 1, keys.IndexOf(NavModules.Scba));
+    }
+
+    [Fact]
+    public void Folding_leaves_a_layout_without_funktionen_or_kraefte_untouched()
+    {
+        var layout = new[] { Module(NavModules.Etb), Module(NavModules.Leadership, visible: false) };
+
+        Assert.Same(layout, NavigationLayout.FoldLegacyFuehrung(layout));
+    }
+
+    [Fact]
+    public void Fuehrung_follows_aufgaben_to_wherever_the_layout_moved_it()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[]
+            {
+                Module(NavModules.Etb), Module(NavModules.Files), Module(NavModules.Tasks),
                 Module(NavModules.Links),
             },
             Array.Empty<ChecklistList>()));
 
-        Assert.Equal(keys.IndexOf(NavModules.Scba) + 1, keys.IndexOf(NavModules.Leadership));
-        Assert.True(keys.IndexOf(NavModules.Files) < keys.IndexOf(NavModules.Scba));
+        Assert.Equal(keys.IndexOf(NavModules.Tasks) + 1, keys.IndexOf(NavModules.Leadership));
+        Assert.True(keys.IndexOf(NavModules.Files) < keys.IndexOf(NavModules.Tasks));
     }
 
-    // A switched-off Atemschutz still holds its place in the layout, so Führung does not jump
+    // A switched-off Aufgaben still holds its place in the layout, so Führung does not jump
     // somewhere else just because a toggle is off.
     [Fact]
-    public void Leadership_keeps_atemschutzs_place_when_atemschutz_is_switched_off()
+    public void Fuehrung_keeps_aufgabens_place_when_aufgaben_is_switched_off()
     {
         var keys = Keys(NavigationLayout.Resolve(
             new[]
             {
-                Module(NavModules.Etb), Module(NavModules.Scba, visible: false),
-                Module(NavModules.Files), Module(NavModules.Links),
+                Module(NavModules.Etb), Module(NavModules.Files), Module(NavModules.Tasks, visible: false),
+                Module(NavModules.Links),
             },
             Array.Empty<ChecklistList>()));
 
-        Assert.DoesNotContain(NavModules.Scba, keys);
-        Assert.Equal(
-            new[]
-            {
-                "etb", "tasks", "roles", "forces", "involved", "leadership", "co", "files", "links",
-                "contacts",
-            },
-            keys);
+        Assert.DoesNotContain(NavModules.Tasks, keys);
+        Assert.Equal(keys.IndexOf(NavModules.Files) + 1, keys.IndexOf(NavModules.Leadership));
     }
 
     [Fact]
@@ -129,8 +203,8 @@ public class NavigationLayoutTests
         Assert.Equal(
             new[]
             {
-                "etb", "tasks", "roles", "forces", "involved", "scba", "leadership", "co", "files",
-                "links", "contacts",
+                "etb", "tasks", "leadership", "involved", "scba", "co", "files", "links",
+                "contacts",
             },
             keys);
     }
@@ -143,7 +217,7 @@ public class NavigationLayoutTests
             Array.Empty<ChecklistList>());
 
         Assert.Equal(
-            ["etb", "tasks", "roles", "forces", "involved", "leadership", "co", "files", "links", "contacts"],
+            ["etb", "tasks", "leadership", "involved", "co", "files", "links", "contacts"],
             Keys(specs));
     }
 
@@ -158,7 +232,7 @@ public class NavigationLayoutTests
             Array.Empty<ChecklistList>());
 
         Assert.Equal(
-            ["etb", "tasks", "roles", "forces", "involved", "scba", "leadership", "co", "files", "links", "contacts"],
+            ["etb", "tasks", "leadership", "involved", "scba", "co", "files", "links", "contacts"],
             Keys(specs));
     }
 
@@ -246,7 +320,7 @@ public class NavigationLayoutTests
             Array.Empty<ChecklistList>());
 
         Assert.Equal(
-            ["etb", "tasks", "roles", "forces", "involved", "scba", "leadership", "co", "files", "links", "contacts"],
+            ["etb", "tasks", "leadership", "involved", "scba", "co", "files", "links", "contacts"],
             Keys(specs));
     }
 

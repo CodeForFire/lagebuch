@@ -14,11 +14,9 @@ public static class ModuleLabels
         {
             [NavModules.Etb] = "ETB",
             [NavModules.Tasks] = "AUFGABEN",
-            [NavModules.Roles] = "FUNKTIONEN",
-            [NavModules.Forces] = "KRÄFTE",
+            [NavModules.Leadership] = "FÜHRUNG",
             [NavModules.InvolvedParties] = "BETEILIGTE",
             [NavModules.Scba] = "ATEMSCHUTZ",
-            [NavModules.Leadership] = "FÜHRUNG",
             [NavModules.Co] = "CO-MESSUNG",
             [NavModules.Files] = "DATEIEN",
             [NavModules.Links] = "LINKS",

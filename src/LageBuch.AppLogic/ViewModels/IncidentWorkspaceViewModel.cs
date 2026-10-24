@@ -451,7 +451,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Leadership, CoMessprotokoll, Files, Links, Contacts];
+        object?[] modules = [Etb, Tasks, LeadershipTabs, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
         return modules.OfType<INarrowAware>();
     }
 
@@ -521,6 +521,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
 
     public LeadershipViewModel Leadership { get; private set; } = null!;
+
+    /// <summary>The Führung rail entry, which shows <see cref="Leadership"/>, <see cref="Roles"/> and <see cref="Forces"/> as tabs.</summary>
+    public LeadershipTabsViewModel LeadershipTabs { get; private set; } = null!;
 
     public ScbaViewModel Scba { get; private set; } = null!;
 
@@ -950,6 +953,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // A Checkliste's key is shared by every list, so its label tells them apart.
         var reopen = SelectedNavItem is { } open ? (open.ModuleKey, open.Header) : default((string Key, string Header)?);
 
+        // The same goes for the tab Führung had open.
+        var reopenTab = LeadershipTabs is { } tabs ? tabs.SelectedTabIndex : LeadershipTabsViewModel.OrganisationTab;
+
         DisposeChildren();
 
         Etb = new EtbViewModel(
@@ -968,6 +974,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirmDefault);
 
         Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm, OpenCommandNodeDialog, OpenLeadershipPersonDialog);
+
+        LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, reopenTab);
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
@@ -1018,6 +1026,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(InvolvedParties));
         OnPropertyChanged(nameof(Leadership));
+        OnPropertyChanged(nameof(LeadershipTabs));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
@@ -1044,11 +1053,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         {
             [NavModules.Etb] = Etb,
             [NavModules.Tasks] = Tasks,
-            [NavModules.Roles] = Roles,
-            [NavModules.Forces] = Forces,
+            [NavModules.Leadership] = LeadershipTabs,
             [NavModules.InvolvedParties] = InvolvedParties,
             [NavModules.Scba] = Scba,
-            [NavModules.Leadership] = Leadership,
             [NavModules.Co] = CoMessprotokoll,
             [NavModules.Files] = Files,
             [NavModules.Links] = Links,
