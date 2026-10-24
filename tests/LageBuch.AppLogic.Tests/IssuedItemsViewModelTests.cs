@@ -55,6 +55,82 @@ public class IssuedItemsViewModelTests
         Assert.Equal(journalBefore, session.Incident.Journal.Count);
     }
 
+    [Fact]
+    public void After_a_refused_press_a_successful_add_leaves_an_empty_form_without_complaint()
+    {
+        var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices);
+        vm.AddCommand.Execute(null);
+        Assert.NotNull(vm.NewItemError);
+
+        vm.NewDevice = "AED";
+        vm.NewIssuedTo = "Max Beispiel";
+        vm.AddCommand.Execute(null);
+
+        Assert.Null(vm.NewItemError);
+        Assert.False(vm.IsNewDeviceMissing);
+        Assert.False(vm.IsNewIssuedToMissing);
+    }
+
+    [Fact]
+    public void A_refused_press_announces_the_complaint_and_the_marked_fields()
+    {
+        var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.AddCommand.Execute(null);
+
+        Assert.Contains(nameof(IssuedItemsViewModel.NewItemError), changed);
+        Assert.Contains(nameof(IssuedItemsViewModel.IsNewDeviceMissing), changed);
+        Assert.Contains(nameof(IssuedItemsViewModel.IsNewIssuedToMissing), changed);
+    }
+
+    [Fact]
+    public void Without_stammdaten_geraete_the_suggestions_are_empty()
+    {
+        Assert.Empty(new IssuedItemsViewModel(NewSession(), () => { }).DeviceOptions);
+    }
+
+    // The first field in form order that is too long is the one named, so the message points at
+    // the box to fix first.
+    [Theory]
+    [InlineData(true, true, false, false, false, "Gerät")]
+    [InlineData(false, true, true, false, false, "Ausgegeben an")]
+    [InlineData(false, false, true, true, false, "Telefon")]
+    [InlineData(false, false, false, true, true, "Organisation / Kontakt")]
+    public void With_two_fields_too_long_the_first_is_named(
+        bool device, bool issuedTo, bool phone, bool details, bool remark, string named)
+    {
+        static string? Long(bool on, string? fallback) => on ? new string('1', IssuedItem.MaxRemarkLength + 1) : fallback;
+
+        var error = IssuedItemsViewModel.Validate(
+            Long(device, "AED"), Long(issuedTo, "Max"), Long(phone, null), Long(details, null), Long(remark, null));
+
+        Assert.StartsWith($"{named} ist zu lang", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(nameof(IssuedItem.Device))]
+    [InlineData(nameof(IssuedItem.IssuedTo))]
+    public void A_required_field_too_long_is_explained(string field)
+    {
+        var device = field == nameof(IssuedItem.Device) ? new string('x', IssuedItem.MaxDeviceLength + 1) : "AED";
+        var issuedTo = field == nameof(IssuedItem.IssuedTo) ? new string('x', IssuedItem.MaxIssuedToLength + 1) : "Max";
+
+        Assert.EndsWith("ist zu lang (höchstens 200 Zeichen)", IssuedItemsViewModel.Validate(device, issuedTo, null, null, null), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Every_field_exactly_at_its_cap_is_accepted()
+    {
+        Assert.Null(IssuedItemsViewModel.Validate(
+            new string('x', IssuedItem.MaxDeviceLength),
+            new string('x', IssuedItem.MaxIssuedToLength),
+            new string('1', IssuedItem.MaxPhoneLength),
+            new string('x', IssuedItem.MaxDetailsLength),
+            new string('x', IssuedItem.MaxRemarkLength)));
+    }
+
     // A typed Gerät that matches the Stammdaten apart from case and spacing records in their spelling;
     // anything the list lacks is kept as typed (#337).
     [Theory]
@@ -151,11 +227,14 @@ public class IssuedItemsViewModelTests
         var session = NewSession();
         session.IssueItem("AED", "Max Beispiel", null, null, null);
         session.ReturnIssuedItem(session.Incident.IssuedItems[0].Id);
-        var vm = new IssuedItemsViewModel(session, () => { }, Devices);
+        var changes = 0;
+        var vm = new IssuedItemsViewModel(session, () => changes++, Devices);
         Assert.Equal("Alle Geräte zurück", vm.Summary);
         Assert.False(vm.HasItemsOut);
 
         vm.Items[0].UndoReturnCommand.Execute(null);
+
+        Assert.Equal(1, changes);
 
         Assert.True(Assert.Single(vm.Items).IsOut);
         Assert.True(Assert.Single(session.Incident.IssuedItems).IsOut);
@@ -174,6 +253,11 @@ public class IssuedItemsViewModelTests
         var session = NewSession();
         session.IssueItem("AED", "Max Beispiel", null, null, null);
         var vm = new IssuedItemsViewModel(session, () => { }, Devices);
+
+        var changes = 0;
+        var tracked = new IssuedItemsViewModel(session, () => changes++, Devices);
+        tracked.Items[0].Remark = "Gehäuse beschädigt";
+        Assert.Equal(1, changes);
 
         vm.Items[0].IssuedToPhone = "0171 0000001";
 
@@ -203,7 +287,8 @@ public class IssuedItemsViewModelTests
         string? confirmTitle = null;
         string? confirmMessage = null;
         Action? confirmAction = null;
-        var vm = new IssuedItemsViewModel(session, () => { }, Devices, (title, message, onConfirmed) =>
+        var changes = 0;
+        var vm = new IssuedItemsViewModel(session, () => changes++, Devices, (title, message, onConfirmed) =>
         {
             confirmTitle = title;
             confirmMessage = message;
@@ -213,6 +298,7 @@ public class IssuedItemsViewModelTests
         vm.Items[0].RemoveCommand.Execute(null);
 
         Assert.Single(vm.Items); // nothing happened yet — the host only recorded the request
+        Assert.Equal(0, changes);
         Assert.Equal("Ausgabe entfernen?", confirmTitle);
         Assert.Equal("„AED“ an „Max Beispiel“ aus der Ausgabeliste entfernen. Fortfahren?", confirmMessage);
 
@@ -220,6 +306,7 @@ public class IssuedItemsViewModelTests
 
         Assert.Empty(vm.Items);
         Assert.Empty(session.Incident.IssuedItems);
+        Assert.Equal(1, changes);
     }
 
     [Fact]
@@ -228,8 +315,13 @@ public class IssuedItemsViewModelTests
         var session = NewSession();
         using var vm = new IssuedItemsViewModel(session, () => { }, Devices);
 
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
         session.IssueItem("Weste EAL", "Erika Beispiel", null, null, null);
 
+        Assert.Contains(nameof(IssuedItemsViewModel.Summary), changed);
+        Assert.Contains(nameof(IssuedItemsViewModel.HasItemsOut), changed);
         Assert.Equal("Weste EAL", Assert.Single(vm.Items).Device);
         Assert.Equal("1 Gerät ausgegeben", vm.Summary);
     }
@@ -241,20 +333,28 @@ public class IssuedItemsViewModelTests
         var store = new FakeStore();
         var seed = NewSession(store);
         seed.IssueItem("AED", "Max Beispiel", null, null, null);
+        seed.IssueItem("Fernglas", "Erika Beispiel", null, null, null);
+        seed.ReturnIssuedItem(seed.Incident.IssuedItems[1].Id);
         seed.Close();
 
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new IssuedItemsViewModel(ro, () => { }, Devices);
 
-        var row = Assert.Single(vm.Items);
+        var row = vm.Items[0];
+        var returned = vm.Items[1];
+        Assert.False(returned.UndoReturnCommand.CanExecute(null));
+        returned.UndoReturnCommand.Execute(null); // inert, not throwing
+        Assert.False(ro.Incident.IssuedItems[1].IsOut);
         Assert.False(vm.AddCommand.CanExecute(null));
         Assert.False(vm.ShowComposer);
+        vm.IsNarrow = true;
+        Assert.False(vm.ShowComposerButton);
         Assert.False(row.ReturnCommand.CanExecute(null));
         Assert.False(row.RemoveCommand.CanExecute(null));
         row.ReturnCommand.Execute(null); // inert, not throwing
         row.RemoveCommand.Execute(null); // inert, not throwing
         row.Remark = "nachträglich"; // inert, not throwing
-        Assert.True(Assert.Single(ro.Incident.IssuedItems).IsOut);
+        Assert.True(ro.Incident.IssuedItems[0].IsOut);
         Assert.Null(ro.Incident.IssuedItems[0].Remark);
     }
 
@@ -289,6 +389,21 @@ public class IssuedItemsViewModelTests
 
         Assert.Null(vm.NewItemError);
         Assert.False(vm.IsNewDeviceMissing);
+        Assert.False(vm.IsComposerOpen);
+        Assert.False(vm.ShowComposer);
+        Assert.True(vm.ShowComposerButton);
+    }
+
+    [Fact]
+    public void On_a_wide_window_the_form_is_always_there_and_needs_no_button()
+    {
+        var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices);
+
+        Assert.True(vm.ShowComposer);
+        Assert.False(vm.ShowComposerButton);
+
+        vm.IsComposerOpen = true;
+        Assert.False(vm.ShowComposerButton);
     }
 
     // #540: the view refocuses on EntrySubmitted -- GERÄT after an add and after a refusal alike.

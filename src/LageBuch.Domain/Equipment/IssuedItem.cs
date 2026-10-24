@@ -28,9 +28,11 @@ public sealed record IssuedItem
     public Guid Id { get; private init; }
 
     /// <summary>The Gerät as it was picked or typed: "Mobilteil 1", "Weste EAL".</summary>
+    // Stryker disable once String : only satisfies nullability; Create and Rehydrate always set it.
     public string Device { get; private init; } = string.Empty;
 
     /// <summary>The person the Gerät was handed to.</summary>
+    // Stryker disable once String : only satisfies nullability; Create and Rehydrate always set it.
     public string IssuedTo { get; private init; } = string.Empty;
 
     /// <summary>That person's phone number exactly as typed, or null.</summary>
@@ -44,6 +46,7 @@ public sealed record IssuedItem
 
     public DateTimeOffset IssuedAt { get; private init; }
 
+    // Stryker disable once String : only satisfies nullability; Create and Rehydrate always set it.
     public string IssuedBy { get; private init; } = string.Empty;
 
     /// <summary>When the Gerät came back; null while it is still out.</summary>
@@ -152,17 +155,12 @@ public sealed record IssuedItem
             throw new ArgumentException($"{label} darf nicht leer sein.", paramName);
         }
 
-        return Optional(value, max, label, paramName) ?? string.Empty;
+        var trimmed = value.Trim();
+        return trimmed.Length > max
+            ? throw new ArgumentException($"{label} ist länger als das Limit von {max} Zeichen.", paramName)
+            : trimmed;
     }
 
-    private static string? Optional(string? value, int max, string label, string paramName)
-    {
-        var trimmed = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-        if (trimmed is { Length: var length } && length > max)
-        {
-            throw new ArgumentException($"{label} ist länger als das Limit von {max} Zeichen.", paramName);
-        }
-
-        return trimmed;
-    }
+    private static string? Optional(string? value, int max, string label, string paramName) =>
+        string.IsNullOrWhiteSpace(value) ? null : Required(value, max, label, paramName);
 }

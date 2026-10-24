@@ -94,7 +94,45 @@ public class IssuedItemAggregateTests
         Assert.Throws<KeyNotFoundException>(() => incident.UpdateIssuedItem(unknown, "AED", "Max", null, null, null));
         Assert.Throws<KeyNotFoundException>(() => incident.ReturnIssuedItem(clock, op, unknown));
         Assert.Throws<KeyNotFoundException>(() => incident.UndoIssuedItemReturn(unknown));
-        Assert.Throws<KeyNotFoundException>(() => incident.RemoveIssuedItem(unknown));
+        var ex = Assert.Throws<KeyNotFoundException>(() => incident.RemoveIssuedItem(unknown));
+        Assert.Equal($"Ausgabe {unknown} nicht gefunden.", ex.Message);
+    }
+
+    [Fact]
+    public void Rehydrate_restores_the_ausgabeliste_in_order()
+    {
+        var (seed, clock, op) = NewIncident();
+        var first = seed.IssueItem(clock, op, "AED", "Max Beispiel", null, null, null);
+        seed.IssueItem(clock, op, "Fernglas", "Erika Beispiel", null, null, null);
+        seed.ReturnIssuedItem(clock, op, first.Id);
+
+        var restored = Incident.Rehydrate(
+            seed.Id,
+            seed.StartedAt,
+            seed.State,
+            seed.IncidentNumber,
+            seed.Keyword,
+            seed.Street,
+            seed.District,
+            seed.Status,
+            seed.ClosedAt,
+            seed.ClosedBy,
+            seed.Checklists,
+            seed.Journal,
+            seed.Roles,
+            seed.Forces,
+            seed.ScbaTrupps,
+            seed.Audit,
+            seed.Timers,
+            seed.Files,
+            seed.Tasks,
+            seed.Buildings,
+            seed.Dwellings,
+            seed.InvolvedParties,
+            issuedItems: seed.IssuedItems);
+
+        Assert.Equal(seed.IssuedItems, restored.IssuedItems);
+        Assert.Equal(1, restored.ItemsOut);
     }
 
     [Fact]

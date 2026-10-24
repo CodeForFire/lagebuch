@@ -60,6 +60,42 @@ public class IssuedItemTests
         Assert.Throws<ArgumentException>(() => IssuedItem.Create(T0, "AED", "Max", null, null, remark, Op));
     }
 
+    // The message names the field the Lagebuchführer has to fix, and ParamName the argument.
+    [Theory]
+    [InlineData("device", "Gerät darf nicht leer sein.")]
+    [InlineData("issuedTo", "Ausgegeben an darf nicht leer sein.")]
+    public void A_blank_required_field_is_named_in_the_message(string param, string message)
+    {
+        var ex = Assert.Throws<ArgumentException>(() => IssuedItem.Create(
+            T0, param == "device" ? " " : "AED", param == "issuedTo" ? " " : "Max", null, null, null, Op));
+
+        Assert.Equal(param, ex.ParamName);
+        Assert.StartsWith(message, ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("device", "Gerät", IssuedItem.MaxDeviceLength)]
+    [InlineData("issuedTo", "Ausgegeben an", IssuedItem.MaxIssuedToLength)]
+    [InlineData("phone", "Telefon", IssuedItem.MaxPhoneLength)]
+    [InlineData("details", "Organisation / Kontakt", IssuedItem.MaxDetailsLength)]
+    [InlineData("remark", "Bemerkung", IssuedItem.MaxRemarkLength)]
+    public void An_oversized_field_is_named_in_the_message(string param, string label, int max)
+    {
+        string Value(string name, string fallback) => name == param ? new string('1', max + 1) : fallback;
+
+        var ex = Assert.Throws<ArgumentException>(() => IssuedItem.Create(
+            T0,
+            Value("device", "AED"),
+            Value("issuedTo", "Max"),
+            param == "phone" ? Value("phone", string.Empty) : null,
+            param == "details" ? Value("details", string.Empty) : null,
+            param == "remark" ? Value("remark", string.Empty) : null,
+            Op));
+
+        Assert.Equal(param, ex.ParamName);
+        Assert.StartsWith($"{label} ist länger als das Limit von {max} Zeichen.", ex.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Fields_exactly_at_their_cap_are_accepted()
     {
