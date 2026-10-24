@@ -76,14 +76,15 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
         PersonOptions = [.. masterData.Personnel.Select(p => p.DisplayName)];
         CallSignOptions = masterData.RadioCallSigns;
 
-        var label = session.Incident.CommandNodes.FirstOrDefault(n => n.Id == nodeId)?.Name ?? string.Empty;
+        var node = session.Incident.CommandNodes.FirstOrDefault(n => n.Id == nodeId);
+        var label = node?.Name ?? string.Empty;
         (Title, PrimaryText) = (slot, nodeId) switch
         {
-            (RoleSlot.Leiter, null) => ("Einsatzleiter festlegen", "FESTLEGEN"),
-            (RoleSlot.Leiter, _) => ($"Leiter festlegen – {label}", "FESTLEGEN"),
+            (RoleSlot.Leiter, null) => ($"{LeiterLabels.Of(null)} festlegen", "FESTLEGEN"),
+            (RoleSlot.Leiter, _) => ($"{LeiterLabels.Of(node?.Kind)} festlegen – {label}", "FESTLEGEN"),
             (RoleSlot.Melder, null) => ("Melder festlegen – Einsatzleitung", "FESTLEGEN"),
             (RoleSlot.Melder, _) => ($"Melder festlegen – {label}", "FESTLEGEN"),
-            (RoleSlot.Fuehrungsassistent, _) => ("Führungsassistenz hinzufügen", "HINZUFÜGEN"),
+            (RoleSlot.Fuehrungsassistent, _) => ("FüAss hinzufügen", "HINZUFÜGEN"),
             (RoleSlot.Fachberater, _) => ("Fachberater hinzufügen", "HINZUFÜGEN"),
             _ => ($"Funktion hinzufügen – {label}", "HINZUFÜGEN"),
         };

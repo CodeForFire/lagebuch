@@ -387,7 +387,7 @@ public class AutomationPropertiesTests
         Assert.Equal(2, grips.Count);
         Assert.All(grips, g => Assert.Equal("Einheit verschieben", Name(g)));
         Assert.Equal("Führungsstufe wählen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "StufeButton")));
-        Assert.Equal("Einsatzleiter festlegen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElButton")));
+        Assert.Equal("EL festlegen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElButton")));
         Assert.Equal(
             "Melder der Einsatzleitung festlegen",
             Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElMelderButton")));

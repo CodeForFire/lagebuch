@@ -763,7 +763,7 @@ public class IncidentWorkspaceViewModelTests
         vm.Leadership.El.SetLeiterCommand.Execute(null);
 
         Assert.NotNull(vm.PendingLeadershipPersonDialog);
-        Assert.Equal("Einsatzleiter festlegen", vm.PendingLeadershipPersonDialog!.Title);
+        Assert.Equal("EL festlegen", vm.PendingLeadershipPersonDialog!.Title);
 
         vm.PendingLeadershipPersonDialog.Role = "EL";
         vm.PendingLeadershipPersonDialog.PersonName = "Mustermann, Max";

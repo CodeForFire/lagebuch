@@ -32,6 +32,27 @@ public class LeadershipViewModelTests
     }
 
     [Fact]
+    public void Each_node_card_names_its_leiter_the_way_the_kind_of_node_says_it()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        AddNode(session, CommandNodeKind.Unterabschnitt, "Dach", nord);
+        AddNode(session, CommandNodeKind.Bereitstellung, "Marktplatz");
+        AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+
+        using var vm = NewVm(session);
+
+        var abschnitt = vm.Sections.Single(c => c.Kind == CommandNodeKind.Abschnitt);
+        Assert.Equal(("EAL", "EAL festlegen"), (abschnitt.LeiterLabel, abschnitt.SetLeiterTip));
+        var unterabschnitt = abschnitt.Children.Single();
+        Assert.Equal(("UAL", "UAL festlegen"), (unterabschnitt.LeiterLabel, unterabschnitt.SetLeiterTip));
+        var bereitstellung = vm.Sections.Single(c => c.Kind == CommandNodeKind.Bereitstellung);
+        Assert.Equal(("LEITER", "Leiter festlegen"), (bereitstellung.LeiterLabel, bereitstellung.SetLeiterTip));
+        var partner = vm.Partners.Single();
+        Assert.Equal(("EL", "EL festlegen"), (partner.LeiterLabel, partner.SetLeiterTip));
+    }
+
+    [Fact]
     public void The_dispatch_centre_name_comes_from_the_Stammdaten()
     {
         var masterData = MasterDataSet.Empty with

@@ -249,11 +249,11 @@
           </StackPanel>
 
           <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
-            <TextBlock Grid.Column="0" Classes="field-label" Text="EINSATZLEITER" />
+            <TextBlock Grid.Column="0" Classes="field-label" Text="EL" />
             <TextBlock Grid.Column="1" Classes="field-value" x:Name="ElLeiterText"
                        Text="{Binding Leiter.Text, FallbackValue='—', TargetNullValue='—'}" />
             <Button Grid.Column="2" x:Name="LeadershipSetElButton" Classes="board-action" Content="FESTLEGEN"
-                    ToolTip.Tip="Einsatzleiter festlegen" AutomationProperties.Name="Einsatzleiter festlegen"
+                    ToolTip.Tip="EL festlegen" AutomationProperties.Name="EL festlegen"
                     Command="{Binding SetLeiterCommand}" />
           </Grid>
 
@@ -267,14 +267,15 @@
           </Grid>
 
           <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
-            <TextBlock Grid.Column="0" Classes="field-label" Text="ASSISTENZ" VerticalAlignment="Top" Margin="0,4,0,0" />
+            <TextBlock Grid.Column="0" Classes="field-label" Text="FüAss" VerticalAlignment="Top" Margin="0,4,0,0" />
             <StackPanel Grid.Column="1" Spacing="4">
               <TextBlock Classes="field-value" Text="—"
                          IsVisible="{Binding !Assistants.Count}" />
               <ItemsControl ItemsSource="{Binding Assistants}" ItemTemplate="{StaticResource PersonRowTemplate}" />
             </StackPanel>
-            <Button Grid.Column="2" Classes="board-action" Content="+ ASSISTENZ" VerticalAlignment="Top"
-                    ToolTip.Tip="Führungsassistenz hinzufügen" Command="{Binding AddAssistantCommand}" />
+            <Button Grid.Column="2" Classes="board-action" Content="+ FüAss" VerticalAlignment="Top"
+                    ToolTip.Tip="FüAss hinzufügen" AutomationProperties.Name="FüAss hinzufügen"
+                    Command="{Binding AddAssistantCommand}" />
           </Grid>
 
           <!-- A second Leiter or Melder typed on FUNKTIONEN without an Abschnitt (an EAL beside the
@@ -398,11 +399,11 @@
 
 
           <Grid ColumnDefinitions="76,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6">
-            <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="LEITER" />
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="{Binding LeiterLabel}" />
             <TextBlock Grid.Row="0" Grid.Column="1" Classes="field-value"
                        Text="{Binding Leiter.Text, FallbackValue='—', TargetNullValue='—'}" />
             <Button Grid.Row="0" Grid.Column="2" Classes="board-action" Content="FESTLEGEN"
-                    ToolTip.Tip="Leiter festlegen" AutomationProperties.Name="Leiter festlegen"
+                    ToolTip.Tip="{Binding SetLeiterTip}" AutomationProperties.Name="{Binding SetLeiterTip}"
                     Command="{Binding SetLeiterCommand}" />
             <TextBlock Grid.Row="1" Grid.Column="0" Classes="field-label" Text="MELDER" />
             <TextBlock Grid.Row="1" Grid.Column="1" Classes="field-value"

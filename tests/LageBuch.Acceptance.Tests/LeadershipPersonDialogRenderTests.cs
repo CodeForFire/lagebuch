@@ -81,7 +81,7 @@ public class LeadershipPersonDialogRenderTests
         vm.PersonName = "Mustermann, Max";
         var (window, _) = Show(vm, 560, 560);
 
-        Assert.Equal("Leiter festlegen – Abschnitt 1 Nord", Find<TextBlock>(window, "PersonDialogTitle").Text);
+        Assert.Equal("EAL festlegen – Abschnitt 1 Nord", Find<TextBlock>(window, "PersonDialogTitle").Text);
         Assert.Equal("Abschnittsleiter", Find<AutoCompleteBox>(window, "PersonDialogRoleBox").Text);
         Assert.Equal("Florian Emmering 11/1", Find<AutoCompleteBox>(window, "PersonDialogCallSignBox").Text);
         Assert.Equal("0151 2345678", Find<TextBox>(window, "PersonDialogPhoneBox").Text);

@@ -27,7 +27,7 @@ public class LeadershipBoardPersonTests
         card.AddMemberCommand.Execute(null);
 
         Assert.Equal(
-            ["Leiter festlegen – Nord", "Melder festlegen – Nord", "Funktion hinzufügen – Nord"],
+            ["EAL festlegen – Nord", "Melder festlegen – Nord", "Funktion hinzufügen – Nord"],
             opened.Select(d => d.Title));
         opened[2].Role = "GF";
         opened[2].PersonName = "Mustermann, Max";
@@ -47,7 +47,7 @@ public class LeadershipBoardPersonTests
 
         vm.Sections.Single().Children.Single().SetLeiterCommand.Execute(null);
 
-        Assert.Equal("Leiter festlegen – Dach", opened.Single().Title);
+        Assert.Equal("UAL festlegen – Dach", opened.Single().Title);
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class LeadershipBoardPersonTests
         vm.AddFachberaterCommand.Execute(null);
 
         Assert.Equal(
-            ["Einsatzleiter festlegen", "Melder festlegen – Einsatzleitung", "Führungsassistenz hinzufügen", "Fachberater hinzufügen"],
+            ["EL festlegen", "Melder festlegen – Einsatzleitung", "FüAss hinzufügen", "Fachberater hinzufügen"],
             opened.Select(d => d.Title));
     }
 

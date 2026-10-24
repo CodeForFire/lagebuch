@@ -61,6 +61,8 @@ public sealed partial class BoardNodeCard : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KindLabel))]
     [NotifyPropertyChangedFor(nameof(IsAbschnitt))]
+    [NotifyPropertyChangedFor(nameof(LeiterLabel))]
+    [NotifyPropertyChangedFor(nameof(SetLeiterTip))]
     private CommandNodeKind _kind;
 
     [ObservableProperty]
@@ -105,6 +107,12 @@ public sealed partial class BoardNodeCard : ObservableObject
 
     /// <summary>What the card says the node is; a partner's node is an Einsatzleitung.</summary>
     public string KindLabel => CommandNodeKindLabels.Of(Kind);
+
+    /// <summary>The Leiter row's label, as said for this kind of node: EAL, UAL, EL or LEITER.</summary>
+    public string LeiterLabel => LeiterLabels.Of(Kind).ToUpperInvariant();
+
+    /// <summary>The Leiter button's tooltip and automation name, e.g. "EAL festlegen".</summary>
+    public string SetLeiterTip => $"{LeiterLabels.Of(Kind)} festlegen";
 
     /// <summary>Running Funktionen in the node beside its Leiter and Melder: no post, or one held twice.</summary>
     public ObservableCollection<BoardPersonRow> Members { get; } = [];

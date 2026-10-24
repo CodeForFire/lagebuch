@@ -33,7 +33,7 @@ public static class FuehrungsstufeAdvisor
 
         if (incident.Roles.Any(r => r.To is null && r.Slot == RoleSlot.Fuehrungsassistent))
         {
-            return new FuehrungsstufeSuggestion(Fuehrungsstufe.C, "Führungsassistenz besetzt");
+            return new FuehrungsstufeSuggestion(Fuehrungsstufe.C, "FüAss besetzt");
         }
 
         if (abschnitte >= 3)

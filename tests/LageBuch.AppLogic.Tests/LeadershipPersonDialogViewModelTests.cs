@@ -56,14 +56,27 @@ public class LeadershipPersonDialogViewModelTests
 
         var vm = Open(session, nord, RoleSlot.Leiter);
 
-        Assert.Equal("Leiter festlegen – Nord", vm.Title);
+        Assert.Equal("EAL festlegen – Nord", vm.Title);
         Assert.Equal("FESTLEGEN", vm.PrimaryText);
     }
 
     [Theory]
-    [InlineData(RoleSlot.Leiter, "Einsatzleiter festlegen", "FESTLEGEN")]
+    [InlineData(CommandNodeKind.Unterabschnitt, "UAL festlegen – Dach")]
+    [InlineData(CommandNodeKind.Partner, "EL festlegen – Dach")]
+    [InlineData(CommandNodeKind.Bereitstellung, "Leiter festlegen – Dach")]
+    public void The_leiter_title_uses_the_short_form_for_the_kind_of_node(CommandNodeKind kind, string title)
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var dach = AddNode(session, kind, "Dach", kind == CommandNodeKind.Unterabschnitt ? nord : null);
+
+        Assert.Equal(title, Open(session, dach, RoleSlot.Leiter).Title);
+    }
+
+    [Theory]
+    [InlineData(RoleSlot.Leiter, "EL festlegen", "FESTLEGEN")]
     [InlineData(RoleSlot.Melder, "Melder festlegen – Einsatzleitung", "FESTLEGEN")]
-    [InlineData(RoleSlot.Fuehrungsassistent, "Führungsassistenz hinzufügen", "HINZUFÜGEN")]
+    [InlineData(RoleSlot.Fuehrungsassistent, "FüAss hinzufügen", "HINZUFÜGEN")]
     [InlineData(RoleSlot.Fachberater, "Fachberater hinzufügen", "HINZUFÜGEN")]
     public void At_the_einsatzleitung_the_title_and_button_follow_the_slot(RoleSlot slot, string title, string primary)
     {
