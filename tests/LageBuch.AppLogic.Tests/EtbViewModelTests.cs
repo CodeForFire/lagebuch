@@ -4,6 +4,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
+using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -986,5 +987,120 @@ public class EtbViewModelTests
         session.SendSituationReport(session.Incident.SituationReports[1].Id, "ILS");
 
         Assert.Equal(["LM 2", "LM 1"], vm.Entries.Select(e => e.SituationReportLabel));
+    }
+
+    // A joined client: the journal entry can arrive in one snapshot and the report's link to it in
+    // the next. The marker has to catch up on the row that is already there.
+    // The session holds an unsent draft; the two incidents are what the host's send looks like,
+    // first without the report's link to its entry, then with it.
+    private static (SnapshotRoundTrippingSession Session, Incident Unlinked, Incident Linked) SentLagemeldungInTwoSteps()
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Müller", "ELW 1");
+        var source = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            op,
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        source.AddJournalEntry(EtbDirection.Outgoing, "Rückmeldung an ILS", "ELW 1", "ILS");
+        source.AddSituationReport("ELW 1", "Blumenstraße 13", "Schuppen im Vollbrand", null, null, null);
+        var session = new SnapshotRoundTrippingSession(source);
+
+        // The host sends on its own copy; this session hears nothing until Replace.
+        var host = SnapshotMapper.FromSnapshot(SnapshotMapper.ToSnapshot(source.Incident));
+        host.SendSituationReport(clock, op, host.SituationReports[0].Id, "ILS");
+        var linked = SnapshotMapper.ToSnapshot(host);
+        var unlinked = linked with
+        {
+            SituationReports = linked.SituationReports!.Select(r => r with { EtbEntryId = null }).ToList(),
+        };
+        return (session, SnapshotMapper.FromSnapshot(unlinked), SnapshotMapper.FromSnapshot(linked));
+    }
+
+    [Fact]
+    public void A_lagemeldung_linked_in_a_later_snapshot_is_marked_on_the_row_already_there()
+    {
+        var (session, unlinked, linked) = SentLagemeldungInTwoSteps();
+        var vm = new EtbViewModel(session, new FixedClock(T0), MasterDataSet.Empty, () => { });
+        session.Replace(unlinked);
+        var row = vm.Entries.Single(e => e.Text.StartsWith("Lagemeldung Nr. 1:", StringComparison.Ordinal));
+        Assert.Null(row.SituationReportNumber);
+
+        session.Replace(linked);
+
+        Assert.Same(row, vm.Entries.Single(e => e.Id == row.Id));
+        Assert.Equal("LM 1", row.SituationReportLabel);
+        Assert.Single(vm.Entries, e => e.SituationReportNumber is not null);
+    }
+
+    [Fact]
+    public void Nur_lagemeldungen_shows_a_row_once_a_later_snapshot_links_it()
+    {
+        var (session, unlinked, linked) = SentLagemeldungInTwoSteps();
+        var vm = new EtbViewModel(session, new FixedClock(T0), MasterDataSet.Empty, () => { });
+        session.Replace(unlinked);
+        vm.ShowOnlySituationReports = true;
+        Assert.Empty(vm.Entries);
+
+        session.Replace(linked);
+
+        Assert.Equal("LM 1", Assert.Single(vm.Entries).SituationReportLabel);
+    }
+
+    [Fact]
+    public void Linking_a_row_while_the_filter_is_off_leaves_the_list_alone()
+    {
+        var (session, unlinked, linked) = SentLagemeldungInTwoSteps();
+        var vm = new EtbViewModel(session, new FixedClock(T0), MasterDataSet.Empty, () => { });
+        session.Replace(unlinked);
+        var before = vm.Entries.ToList();
+        var changes = 0;
+        vm.Entries.CollectionChanged += (_, _) => changes++;
+
+        session.Replace(linked);
+
+        Assert.Equal(before, vm.Entries);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void Setting_a_rows_lagemeldung_number_announces_its_label_once()
+    {
+        var (_, vm) = WithSentLagemeldung();
+        var row = vm.Entries.First(e => e.SituationReportNumber is null);
+        var changed = new List<string?>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        row.SituationReportNumber = 7;
+        row.SituationReportNumber = 7;
+
+        Assert.Equal("LM 7", row.SituationReportLabel);
+        Assert.Equal(
+            [nameof(EtbEntryRow.SituationReportNumber), nameof(EtbEntryRow.SituationReportLabel)],
+            changed);
+    }
+
+    [Fact]
+    public void Buchstabieren_opens_the_helper_only_where_the_workspace_offers_one()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "ELW 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var opened = 0;
+
+        var without = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var offered = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, openSpellingHelper: () => opened++);
+        offered.OpenSpellingHelperCommand.Execute(null);
+
+        Assert.False(without.OpenSpellingHelperCommand.CanExecute(null));
+        Assert.True(offered.OpenSpellingHelperCommand.CanExecute(null));
+        Assert.Equal(1, opened);
     }
 }

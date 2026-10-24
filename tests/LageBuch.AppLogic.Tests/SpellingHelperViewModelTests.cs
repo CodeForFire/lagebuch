@@ -32,6 +32,20 @@ public class SpellingHelperViewModelTests
         Assert.Contains(nameof(SpellingHelperViewModel.IsTraditional), changed);
     }
 
+    [Theory]
+    [InlineData(SpellingAlphabetKind.Traditional, true, false, false)]
+    [InlineData(SpellingAlphabetKind.Din5009, false, true, false)]
+    [InlineData(SpellingAlphabetKind.Nato, false, false, true)]
+    public void Exactly_one_radio_button_is_ticked_for_the_alphabet_in_use(
+        SpellingAlphabetKind kind, bool traditional, bool din5009, bool nato)
+    {
+        var vm = new SpellingHelperViewModel { Alphabet = kind };
+
+        Assert.Equal(traditional, vm.IsTraditional);
+        Assert.Equal(din5009, vm.IsDin5009);
+        Assert.Equal(nato, vm.IsNato);
+    }
+
     [Fact]
     public void Unticking_a_radio_button_does_not_change_the_alphabet()
     {

@@ -489,6 +489,46 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void Ctrl_l_does_nothing_once_the_einsatz_is_closed()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        Assert.Null(vm.PendingConfirm);
+        var before = vm.SelectedNavItem;
+
+        Assert.False(vm.TryRunShortcut(new KeyChord(ShortcutKey.L, Ctrl: true)));
+        Assert.Same(before, vm.SelectedNavItem);
+        Assert.Equal(EtbTabsViewModel.JournalTab, vm.EtbTabs.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void A_rebuild_announces_the_new_etb_tabs_and_lagemeldung()
+    {
+        var vm = NewWorkspace(out _, out _);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.EtbTabs), changed);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.SituationReports), changed);
+    }
+
+    [Fact]
+    public void The_buchstabier_helfer_overlay_opens_from_the_etb_and_closes_again()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.Etb.OpenSpellingHelperCommand.Execute(null);
+        Assert.NotNull(vm.PendingSpellingHelper);
+
+        vm.PendingSpellingHelper.CloseCommand.Execute(null);
+        Assert.Null(vm.PendingSpellingHelper);
+    }
+
+    [Fact]
     public void Ctrl_l_does_nothing_on_a_read_only_incident()
     {
         var vm = ReadOnlyWorkspace(out _, closed: true);

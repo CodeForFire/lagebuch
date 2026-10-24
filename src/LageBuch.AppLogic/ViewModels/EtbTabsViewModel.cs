@@ -26,6 +26,8 @@ public sealed partial class EtbTabsViewModel : ObservableObject, INarrowAware
 
         Journal = journal;
         SituationReports = situationReports;
+
+        // Stryker disable once Equality : JournalTab is 0 and also the fallback, so 0 lands on it either way.
         _selectedTabIndex = selectedTabIndex is >= JournalTab and <= SituationReportTab ? selectedTabIndex : JournalTab;
     }
 

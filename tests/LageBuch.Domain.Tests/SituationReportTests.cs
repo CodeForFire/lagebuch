@@ -50,6 +50,26 @@ public class SituationReportTests
         Assert.Throws<ArgumentException>(() => SituationReport.Create(T0, null, null, tooLong, null, null, null, Op));
     }
 
+    // The message names the field and its cap, so the Lagebuchführer knows which box to shorten.
+    [Theory]
+    [InlineData(0, "Meldender ist länger als das Limit von 100 Zeichen.", "reporter")]
+    [InlineData(1, "Einsatzstelle ist länger als das Limit von 300 Zeichen.", "location")]
+    [InlineData(2, "Lage ist länger als das Limit von 600 Zeichen.", "situation")]
+    [InlineData(3, "Maßnahmen ist länger als das Limit von 600 Zeichen.", "measures")]
+    [InlineData(4, "Einheiten ist länger als das Limit von 600 Zeichen.", "units")]
+    [InlineData(5, "Nachforderungen ist länger als das Limit von 600 Zeichen.", "requests")]
+    public void A_field_over_its_cap_is_named_in_the_refusal(int field, string message, string paramName)
+    {
+        var parts = new string?[6];
+        parts[field] = new string('x', 601);
+
+        var error = Assert.Throws<ArgumentException>(() =>
+            SituationReport.Create(T0, parts[0], parts[1], parts[2], parts[3], parts[4], parts[5], Op));
+
+        Assert.StartsWith(message, error.Message, StringComparison.Ordinal);
+        Assert.Equal(paramName, error.ParamName);
+    }
+
     [Fact]
     public void The_longest_possible_funkspruch_still_fits_one_etb_entry()
     {

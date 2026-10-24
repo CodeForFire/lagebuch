@@ -119,4 +119,94 @@ public class SituationReportAggregateTests
         Assert.Throws<IncidentClosedException>(() => Draft(incident, clock, op));
         Assert.Throws<IncidentClosedException>(() => incident.SendSituationReport(clock, op, draft.Id, "ILS"));
     }
+
+    [Fact]
+    public void A_closed_incident_refuses_a_correction_a_discard_and_a_send_before_looking_at_the_draft()
+    {
+        var (incident, clock, op) = NewIncident();
+        var draft = Draft(incident, clock, op);
+        var empty = incident.AddSituationReport(clock, op, "ELW 1", null, null, null, null, null);
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(() => incident.UpdateSituationReport(draft.Id, null, null, "anders", null, null, null));
+        Assert.Throws<IncidentClosedException>(() => incident.RemoveSituationReport(draft.Id));
+
+        // Closed comes first: an empty draft or an unknown id must not decide the answer.
+        Assert.Throws<IncidentClosedException>(() => incident.SendSituationReport(clock, op, empty.Id, "ILS"));
+        Assert.Throws<IncidentClosedException>(() => incident.SendSituationReport(clock, op, Guid.NewGuid(), "ILS"));
+        Assert.Equal(2, incident.SituationReports.Count);
+    }
+
+    [Fact]
+    public void The_leitstelle_name_may_be_as_long_as_a_meldender_but_no_longer()
+    {
+        var (incident, clock, op) = NewIncident();
+        var first = Draft(incident, clock, op);
+        var second = Draft(incident, clock, op);
+        var longest = new string('L', SituationReport.MaxReporterLength);
+
+        var sent = incident.SendSituationReport(clock, op, first.Id, $"  {longest}  ");
+        var error = Assert.Throws<ArgumentException>(() => incident.SendSituationReport(clock, op, second.Id, longest + "L"));
+
+        Assert.Equal(longest, incident.Journal.Single(e => e.Id == sent.EtbEntryId).To);
+        Assert.StartsWith("Der Name der Leitstelle ist zu lang.", error.Message, StringComparison.Ordinal);
+        Assert.Equal("dispatchCentreName", error.ParamName);
+    }
+
+    [Fact]
+    public void Each_refusal_says_why_in_german()
+    {
+        var (incident, clock, op) = NewIncident();
+        var sent = Draft(incident, clock, op);
+        incident.SendSituationReport(clock, op, sent.Id, "ILS");
+        var empty = incident.AddSituationReport(clock, op, "ELW 1", null, null, null, null, null);
+        var unknown = Guid.NewGuid();
+
+        Assert.StartsWith(
+            "Die Lagemeldung ist leer.",
+            Assert.Throws<ArgumentException>(() => incident.SendSituationReport(clock, op, empty.Id, "ILS")).Message,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            $"Lagemeldung {unknown} nicht gefunden.",
+            Assert.Throws<KeyNotFoundException>(() => incident.RemoveSituationReport(unknown)).Message);
+        Assert.Equal(
+            "Eine gesendete Lagemeldung kann nicht mehr geändert werden.",
+            Assert.Throws<InvalidOperationException>(() => incident.RemoveSituationReport(sent.Id)).Message);
+    }
+
+    [Fact]
+    public void Rehydrate_restores_the_lagemeldungen_in_order()
+    {
+        var (seed, clock, op) = NewIncident();
+        var first = Draft(seed, clock, op);
+        seed.SendSituationReport(clock, op, first.Id, "ILS");
+        Draft(seed, clock, op, "Feuer aus");
+
+        var restored = Incident.Rehydrate(
+            seed.Id,
+            seed.StartedAt,
+            seed.State,
+            seed.IncidentNumber,
+            seed.Keyword,
+            seed.Street,
+            seed.District,
+            seed.Status,
+            seed.ClosedAt,
+            seed.ClosedBy,
+            seed.Checklists,
+            seed.Journal,
+            seed.Roles,
+            seed.Forces,
+            seed.ScbaTrupps,
+            seed.Audit,
+            seed.Timers,
+            seed.Files,
+            seed.Tasks,
+            seed.Buildings,
+            seed.Dwellings,
+            seed.InvolvedParties,
+            situationReports: seed.SituationReports);
+
+        Assert.Equal(seed.SituationReports, restored.SituationReports);
+    }
 }

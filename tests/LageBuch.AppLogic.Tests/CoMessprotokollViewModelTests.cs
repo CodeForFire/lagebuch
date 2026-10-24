@@ -1132,6 +1132,14 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public Incident Incident { get; private set; }
 
+    /// <summary>Delivers <paramref name="incident"/> the way a host broadcast would, so a test can
+    /// play a snapshot that lands in two steps.</summary>
+    public void Replace(Incident incident)
+    {
+        Incident = incident;
+        Changed?.Invoke();
+    }
+
     public SessionOperator? Operator => _inner.Operator;
 
     public bool IsReadOnly => _inner.IsReadOnly;

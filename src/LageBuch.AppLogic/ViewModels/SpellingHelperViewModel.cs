@@ -62,8 +62,11 @@ public sealed partial class SpellingHelperViewModel : ObservableObject
 
     /// <summary>Spells a text taken from elsewhere — a field of the Lagemeldung.</summary>
     [RelayCommand]
-    private void Spell(string? text) =>
+    private void Spell(string? text)
+    {
+        // Stryker disable once Equality : a text exactly MaxInputLength long is the same whether it is cut or not.
         Input = text is { Length: > MaxInputLength } ? text[..MaxInputLength] : text;
+    }
 
     [RelayCommand]
     private void Clear() => Input = null;

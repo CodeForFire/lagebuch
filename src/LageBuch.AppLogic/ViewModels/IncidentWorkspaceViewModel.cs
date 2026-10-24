@@ -1108,11 +1108,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // whichever the ETB had open last.
     private bool ShowEtbTab(int tab, bool toStartField = false)
     {
+        // Stryker disable all : NavigationLayout.Resolve always keeps the ETB in the rail, so this
+        // guard only covers the moment between two sessions, when the rail is empty.
         if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, EtbTabs)) is not { } etb)
         {
             return false;
         }
 
+        // Stryker restore all
         EtbTabs.SelectedTabIndex = tab;
         return ShowNavItem(etb, toStartField);
     }

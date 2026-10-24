@@ -161,6 +161,8 @@ public static class SpellingAlphabet
             var c = trimmed[i];
             if (char.IsWhiteSpace(c))
             {
+                // Stryker disable once Equality : the text is trimmed, so a run of whitespace always
+                // ends on a letter before the end; i never reaches trimmed.Length here.
                 while (i < trimmed.Length && char.IsWhiteSpace(trimmed[i]))
                 {
                     i++;

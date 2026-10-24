@@ -298,4 +298,335 @@ public class SituationReportsViewModelTests
         Assert.True(text.Length <= SituationReportsViewModel.MaxFieldLength);
         Assert.EndsWith("0/0/9/9 …", text, StringComparison.Ordinal);
     }
+
+    // A draft with a Lage, saved, then opened read-only the way a closed Einsatz is reopened.
+    private static LocalIncidentSession ReadOnlySessionWithADraft()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var seed = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Muster", "Florian Musterstadt 11/1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        seed.AddSituationReport("ELW 1", null, "Schuppen im Vollbrand", null, null, null);
+        seed.Close();
+        return LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
+    }
+
+    [Fact]
+    public void Without_stammdaten_there_is_nothing_to_suggest()
+    {
+        var (session, _) = NewSession();
+
+        using var vm = NewVm(session);
+
+        Assert.Empty(vm.CallSignOptions);
+        Assert.Empty(vm.LocationOptions);
+    }
+
+    [Fact]
+    public void Opening_the_tab_with_only_sent_reports_shows_the_last_one_sent()
+    {
+        var (session, _) = NewSession();
+        session.AddSituationReport(null, null, "erste", null, null, null);
+        session.SendSituationReport(session.Incident.SituationReports[0].Id, "ILS");
+        session.AddSituationReport(null, null, "zweite", null, null, null);
+        session.SendSituationReport(session.Incident.SituationReports[1].Id, "ILS");
+
+        using var vm = NewVm(session);
+
+        Assert.Equal("zweite", vm.Situation);
+        Assert.Equal("LAGEMELDUNG NR. 2", vm.EditorHeader);
+    }
+
+    [Fact]
+    public void Opening_the_tab_prefers_an_older_draft_over_a_newer_sent_report()
+    {
+        var (session, _) = NewSession();
+        session.AddSituationReport(null, null, "Entwurf", null, null, null);
+        session.AddSituationReport(null, null, "gesendet", null, null, null);
+        session.SendSituationReport(session.Incident.SituationReports[1].Id, "ILS");
+
+        using var vm = NewVm(session);
+
+        Assert.Equal("Entwurf", vm.Situation);
+        Assert.Equal("LAGEMELDUNG · ENTWURF", vm.EditorHeader);
+    }
+
+    [Fact]
+    public void Opening_the_tab_on_no_report_selects_nothing()
+    {
+        var (session, _) = NewSession();
+
+        using var vm = NewVm(session);
+
+        Assert.Null(vm.SelectedReport);
+        Assert.False(vm.HasSelection);
+        Assert.False(vm.HasReports);
+        Assert.Equal(string.Empty, vm.EditorHeader);
+    }
+
+    [Fact]
+    public void The_list_shows_the_newest_report_first_and_announces_that_it_has_reports()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "älter";
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "neuer";
+        vm.CommitCommand.Execute(null);
+
+        Assert.True(vm.HasReports);
+        Assert.Contains(nameof(SituationReportsViewModel.HasReports), changed);
+        Assert.Equal(["neuer", "älter"], vm.Reports.Select(r => r.Summary));
+    }
+
+    [Fact]
+    public void A_new_report_saves_the_draft_being_typed_first()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "noch nicht gespeichert";
+
+        vm.NewReportCommand.Execute(null);
+
+        Assert.Equal("noch nicht gespeichert", session.Incident.SituationReports[0].Situation);
+    }
+
+    [Fact]
+    public void A_refresh_from_elsewhere_does_not_save_the_typing_in_progress()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        vm.Reports.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                vm.SelectedReport = null;
+            }
+        };
+
+        vm.Measures = "C-Rohr vor";
+        session.AddJournalEntry(EtbDirection.Internal, "Notiz von einem anderen Gerät");
+
+        // Saved when the field is left, not because someone else wrote to the Einsatz.
+        Assert.Null(session.Incident.SituationReports[0].Measures);
+    }
+
+    [Fact]
+    public void A_field_changed_elsewhere_shows_the_new_value_and_keeps_the_typing_in_the_others()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        var id = session.Incident.SituationReports[0].Id;
+        vm.Measures = "C-Rohr vor";
+
+        session.UpdateSituationReport(id, "Florian Musterstadt 11/1", null, "Feuer aus", null, null, null);
+
+        Assert.Equal("Feuer aus", vm.Situation);
+        Assert.Equal("C-Rohr vor", vm.Measures);
+    }
+
+    [Fact]
+    public void A_report_sent_elsewhere_locks_the_editor_and_announces_it()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Schuppen im Vollbrand";
+        vm.CommitCommand.Execute(null);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        var send = 0;
+        var delete = 0;
+        var refresh = 0;
+        vm.SendCommand.CanExecuteChanged += (_, _) => send++;
+        vm.DeleteDraftCommand.CanExecuteChanged += (_, _) => delete++;
+        vm.RefreshUnitsCommand.CanExecuteChanged += (_, _) => refresh++;
+
+        session.SendSituationReport(session.Incident.SituationReports[0].Id, "ILS");
+
+        Assert.False(vm.IsEditable);
+        Assert.Equal("LAGEMELDUNG NR. 1", vm.EditorHeader);
+        Assert.Equal("Gesendet 14:00 von Muster (Florian Musterstadt 11/1)", vm.SentInfo);
+        Assert.Contains(nameof(SituationReportsViewModel.SentInfo), changed);
+        Assert.Contains(nameof(SituationReportsViewModel.IsEditable), changed);
+        Assert.Contains(nameof(SituationReportsViewModel.EditorHeader), changed);
+        Assert.True(send > 0);
+        Assert.True(delete > 0);
+        Assert.True(refresh > 0);
+        Assert.False(vm.SendCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Choosing_a_row_whose_report_is_gone_empties_the_editor_and_saves_nothing()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Schuppen im Vollbrand";
+        vm.CommitCommand.Execute(null);
+        var stale = vm.SelectedReport!;
+        session.RemoveSituationReport(stale.Id);
+
+        vm.SelectedReport = stale;
+        vm.CommitCommand.Execute(null);
+
+        Assert.Null(vm.Situation);
+        Assert.Empty(session.Incident.SituationReports);
+    }
+
+    [Fact]
+    public void Send_without_a_change_since_the_last_save_still_asks_to_send()
+    {
+        var (session, _) = NewSession();
+        var asked = 0;
+        using var vm = NewVm(session, (_, _, _) => asked++);
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Schuppen im Vollbrand";
+        vm.CommitCommand.Execute(null);
+
+        vm.SendCommand.Execute(null);
+
+        Assert.Equal(1, asked);
+    }
+
+    [Fact]
+    public void Send_with_an_overlong_field_explains_it_and_does_not_ask()
+    {
+        var (session, _) = NewSession();
+        var asked = 0;
+        using var vm = NewVm(session, (_, _, _) => asked++);
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Schuppen im Vollbrand";
+        vm.Measures = new string('x', SituationReportsViewModel.MaxFieldLength + 1);
+
+        vm.SendCommand.Execute(null);
+
+        Assert.Equal(0, asked);
+        Assert.Equal($"Maßnahmen ist zu lang (höchstens {SituationReportsViewModel.MaxFieldLength} Zeichen)", vm.Error);
+    }
+
+    [Fact]
+    public void A_field_exactly_at_its_cap_is_fine()
+    {
+        Assert.Null(SituationReportsViewModel.Validate(
+            new string('x', SituationReportsViewModel.MaxReporterLength),
+            new string('x', SituationReportsViewModel.MaxLocationLength),
+            new string('x', SituationReportsViewModel.MaxFieldLength),
+            null,
+            null,
+            null));
+    }
+
+    [Fact]
+    public void A_read_only_incident_offers_no_new_report_and_never_writes()
+    {
+        var session = ReadOnlySessionWithADraft();
+        using var vm = NewVm(session);
+        vm.Situation = "geändert";
+
+        vm.CommitCommand.Execute(null);
+        vm.OpenNewestDraft();
+
+        Assert.False(vm.NewReportCommand.CanExecute(null));
+        Assert.False(vm.IsEditable);
+        Assert.Equal("Schuppen im Vollbrand", session.Incident.SituationReports[0].Situation);
+        Assert.Single(session.Incident.SituationReports);
+    }
+
+    [Fact]
+    public void The_helper_opens_and_closes_on_a_phone_and_is_always_there_when_wide()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        Assert.True(vm.ShowHelper);
+        Assert.False(vm.ShowHelperButton);
+
+        vm.IsNarrow = true;
+        Assert.False(vm.ShowHelper);
+        Assert.True(vm.ShowHelperButton);
+
+        vm.OpenHelperCommand.Execute(null);
+        Assert.True(vm.ShowHelper);
+        Assert.False(vm.ShowHelperButton);
+
+        vm.CloseHelperCommand.Execute(null);
+        Assert.False(vm.ShowHelper);
+        Assert.True(vm.ShowHelperButton);
+    }
+
+    [Fact]
+    public void No_kraefte_means_no_eingesetzte_einheiten()
+    {
+        Assert.Null(SituationReportsViewModel.DescribeUnits([]));
+    }
+
+    [Fact]
+    public void Units_exactly_as_long_as_the_field_are_not_cut()
+    {
+        // 290 + " 0/0/9/9" + ", " + 292 + " 0/0/9/9" = 600 characters.
+        ForceUnit[] forces = [ForceUnit.Create(new string('A', 290), 9), ForceUnit.Create(new string('B', 292), 9)];
+
+        var text = SituationReportsViewModel.DescribeUnits(forces);
+
+        Assert.Equal(SituationReportsViewModel.MaxFieldLength, text?.Length);
+        Assert.EndsWith("B 0/0/9/9", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_cut_never_leaves_the_text_longer_than_the_field()
+    {
+        // The second separator sits at 599, just past where a cut may still start.
+        ForceUnit[] forces =
+        [
+            ForceUnit.Create(new string('A', 291), 9),
+            ForceUnit.Create(new string('B', 290), 9),
+            ForceUnit.Create("C", 9),
+        ];
+
+        var text = SituationReportsViewModel.DescribeUnits(forces);
+
+        Assert.NotNull(text);
+        Assert.True(text.Length <= SituationReportsViewModel.MaxFieldLength, $"{text.Length} characters");
+        Assert.Equal(new string('A', 291) + " 0/0/9/9 …", text);
+    }
+
+    [Fact]
+    public void A_single_unit_longer_than_the_field_is_cut_inside_its_name()
+    {
+        var text = SituationReportsViewModel.DescribeUnits([ForceUnit.Create(new string('A', 700), 9)]);
+
+        Assert.Equal(new string('A', SituationReportsViewModel.MaxFieldLength - 2) + " …", text);
+    }
+
+    [Fact]
+    public void A_row_shows_when_it_was_sent_or_else_when_it_was_started()
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Muster", "ELW 1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var draft = incident.AddSituationReport(clock, op, "ELW 1", null, null, null, null, null);
+        var report = incident.AddSituationReport(clock, op, "ELW 1", null, "Feuer aus", null, null, null);
+        clock.Now = T0.AddMinutes(12);
+        var sent = incident.SendSituationReport(clock, op, report.Id, "ILS");
+
+        var draftRow = new SituationReportRow(draft);
+        var sentRow = new SituationReportRow(sent);
+
+        Assert.Equal("14:00", draftRow.TimeText);
+        Assert.Equal("— noch leer —", draftRow.Summary);
+        Assert.Equal("14:12", sentRow.TimeText);
+        Assert.Equal("Feuer aus", sentRow.Summary);
+    }
 }

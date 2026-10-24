@@ -69,6 +69,8 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         // Open on what is most likely next: the newest draft, else the last report sent.
         var reports = session.Incident.SituationReports;
         var initial = reports.LastOrDefault(r => !r.IsSent) ?? (reports.Count > 0 ? reports[^1] : null);
+
+        // Stryker disable once Linq : the rows were just built from these reports, so the row is always there.
         SelectedReport = initial is null ? null : Reports.First(row => row.Id == initial.Id);
         _session.Changed += Refresh;
     }
@@ -333,6 +335,8 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         if (text.Length > SituationReport.MaxFieldLength)
         {
             var cut = text.LastIndexOf(", ", SituationReport.MaxFieldLength - 2, StringComparison.Ordinal);
+
+            // Stryker disable once Equality : a unit's label is never empty, so the text never starts with ", " and cut is never 0.
             text = (cut > 0 ? text[..cut] : text[..(SituationReport.MaxFieldLength - 2)]) + " …";
         }
 

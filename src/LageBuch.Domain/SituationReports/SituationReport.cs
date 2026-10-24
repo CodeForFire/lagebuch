@@ -52,6 +52,7 @@ public sealed record SituationReport
     /// <summary>Nachforderungen.</summary>
     public string? Requests { get; private init; }
 
+    // Stryker disable once String : only satisfies nullability; Create and Rehydrate always set it.
     public string CreatedBy { get; private init; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; private init; }
