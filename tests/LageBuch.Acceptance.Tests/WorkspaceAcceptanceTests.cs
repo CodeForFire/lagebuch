@@ -446,9 +446,63 @@ public class WorkspaceAcceptanceTests
         window.MouseDown(center, Avalonia.Input.MouseButton.Left);
         window.MouseUp(center, Avalonia.Input.MouseButton.Left);
 
+        // The row toggles on a click outside the box; a click on the box must not toggle twice.
+        Dispatcher.UIThread.RunJobs();
         Assert.True(checkBox.IsChecked);
         Assert.True(FirstChecklist(vm).Items[0].IsDone);
         Assert.True(session.Incident.Checklists[0].Items[0].IsDone);
+    }
+
+    // The box is a small target in an ELW, often on a touch screen; the whole row ticks the item.
+    [AvaloniaFact]
+    public void Clicking_the_checklist_item_text_ticks_it()
+    {
+        var vm = BuildWorkspace(out var session);
+        var (window, text) = ShowChecklist(vm);
+
+        ClickCentre(window, text, clicks: 1);
+
+        Assert.True(FirstChecklist(vm).Items[0].IsDone);
+        Assert.True(session.Incident.Checklists[0].Items[0].IsDone);
+
+        ClickCentre(window, text, clicks: 1);
+
+        Assert.False(FirstChecklist(vm).Items[0].IsDone);
+    }
+
+    // A fast second click arrives as DoubleTapped rather than Tapped; the row must still count it,
+    // the way the CheckBox counts every click.
+    [AvaloniaFact]
+    public void Double_clicking_the_checklist_item_text_toggles_it_twice()
+    {
+        var vm = BuildWorkspace(out var session);
+        var (window, text) = ShowChecklist(vm);
+
+        ClickCentre(window, text, clicks: 2);
+
+        Assert.False(FirstChecklist(vm).Items[0].IsDone);
+        Assert.False(session.Incident.Checklists[0].Items[0].IsDone);
+    }
+
+    private static (Window Window, TextBlock Text) ShowChecklist(IncidentWorkspaceViewModel vm)
+    {
+        var view = new ChecklistView { DataContext = FirstChecklist(vm) };
+        var window = new Window { Content = view, Width = 600, Height = 400 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var text = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "Blaulicht aus?");
+        return (window, text);
+    }
+
+    private static void ClickCentre(Window window, Visual target, int clicks)
+    {
+        var centre = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), window)!.Value;
+        for (var click = 0; click < clicks; click++)
+        {
+            window.MouseDown(centre, Avalonia.Input.MouseButton.Left);
+            window.MouseUp(centre, Avalonia.Input.MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+        }
     }
 
     // The AUFBAU/ABBAU tab headers carry a status dot: red while a mandatory item is still open,

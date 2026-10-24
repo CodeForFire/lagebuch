@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 using LageBuch.Domain;
 using LageBuch.Sync;
@@ -150,10 +151,13 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
         _suppressWriteback = false;
     }
 
-    // Driven by the two-way IsChecked binding on the CheckBox. The binding is the single
-    // source of truth for IsDone; the owning list reconciles the domain model and persists.
-    // Using a separate Command in addition to the binding would toggle the state twice per
-    // click and the visible value would revert, so the checkbox never appeared to persist.
+    // A click on the row outside the CheckBox. The view never routes a click on the box itself
+    // here: the box already toggled through its binding, and a second toggle would revert it.
+    [RelayCommand]
+    private void ToggleDone() => IsDone = !IsDone;
+
+    // Driven by the two-way IsChecked binding on the CheckBox, or by ToggleDone for the rest of
+    // the row. The owning list reconciles the domain model and persists.
     partial void OnIsDoneChanged(bool value)
     {
         if (IsReadOnly || _suppressWriteback)
