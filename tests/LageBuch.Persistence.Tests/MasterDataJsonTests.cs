@@ -931,9 +931,12 @@ public class MasterDataJsonTests
             set.Premises);
     }
 
-    [Fact]
-    public void Parse_treats_a_missing_premises_key_as_no_objekte() =>
-        Assert.Empty(Parse("""{ "roles": ["EL"] }""").Premises);
+    [Theory]
+    [InlineData("""{ "roles": ["EL"] }""")]
+    [InlineData("""{ "premises": { "name": "Haus A" } }""")]
+    [InlineData("""{ "premises": null }""")]
+    public void Parse_treats_a_missing_or_non_array_premises_key_as_no_objekte(string json) =>
+        Assert.Empty(Parse(json).Premises);
 
     [Fact]
     public void Parse_clamps_an_objekt_structure_a_haus_cannot_have_and_drops_labels_outside_it()

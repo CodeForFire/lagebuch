@@ -784,6 +784,8 @@ public sealed class MasterDataStore
 
         return Premises.Normalize(list);
 
+        // Stryker disable Block : without the catch block the method returns null, which
+        // Premises.Normalize reads as no labels too -- the same outcome, so an equivalent mutant.
         static Dictionary<string, string?> Labels(string json)
         {
             try
@@ -795,6 +797,8 @@ public sealed class MasterDataStore
                 return new Dictionary<string, string?>();
             }
         }
+
+        // Stryker restore Block
     }
 
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)

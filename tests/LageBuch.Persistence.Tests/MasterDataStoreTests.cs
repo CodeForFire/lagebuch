@@ -889,6 +889,16 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Saving_again_replaces_the_objekte_rather_than_adding_to_them()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Premises = AnonymizedExampleData.Premises });
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Premises = new[] { new Premises("Haus B") } });
+
+        Assert.Equal(new[] { new Premises("Haus B") }, MasterDataStore.GetOrCreate(_path).Premises);
+    }
+
+    [Fact]
     public void An_objekt_edited_outside_the_app_reads_back_clamped_and_without_unreadable_labels()
     {
         MasterDataStore.GetOrCreate(_path);

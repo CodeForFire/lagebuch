@@ -493,7 +493,7 @@ public sealed record Premises(
         var result = new List<Premises>();
         foreach (var p in premises)
         {
-            var name = (p.Name ?? string.Empty).Trim();
+            var name = p.Name.Trim();
             if (name.Length == 0 || !seen.Add(name))
             {
                 continue;
@@ -505,10 +505,10 @@ public sealed record Premises(
             result.Add(p with
             {
                 Name = name,
-                Street = (p.Street ?? string.Empty).Trim(),
-                HouseNumber = (p.HouseNumber ?? string.Empty).Trim(),
-                PostalCode = (p.PostalCode ?? string.Empty).Trim(),
-                Place = (p.Place ?? string.Empty).Trim(),
+                Street = p.Street.Trim(),
+                HouseNumber = p.HouseNumber.Trim(),
+                PostalCode = p.PostalCode.Trim(),
+                Place = p.Place.Trim(),
                 FloorCount = floors,
                 ApartmentsPerFloor = apartments,
                 UndergroundFloorCount = underground,
@@ -788,6 +788,8 @@ public static class AnonymizedExampleData
     };
 
     // Objekte (#420) in the same invented Musterstadt as the sample Stammdaten's Straßen.
+    // Stryker disable all : fixture data; every test reads these values back through the fixture
+    // itself, so any other invented value is an equally good fixture, not a defect.
     public static readonly IReadOnlyList<Premises> Premises = new[]
     {
         new Premises("Wohnanlage Lindenallee", "Lindenallee", "12", "12345", "Musterstadt", 4, 3, 1)
@@ -802,6 +804,8 @@ public static class AnonymizedExampleData
         },
         new Premises(BuildingName, "Hauptstraße", "5", "12345", "Musterstadt", 3, 2, 0),
     };
+
+    // Stryker restore all
 }
 
 /// <summary>
@@ -1247,7 +1251,9 @@ public static class MasterDataJson
             }));
 
         static string Text(JsonElement e, string prop) =>
-            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? string.Empty : string.Empty;
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String && v.GetString() is { } text
+                ? text
+                : string.Empty;
 
         static int Number(JsonElement e, string prop, int fallback) =>
             e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : fallback;
