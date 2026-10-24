@@ -579,6 +579,23 @@ public class LeadershipBoardRenderTests
             .Select(n => n.Name)];
 
     [AvaloniaFact]
+    public void Polizei_and_rettungsdienst_are_offered_once_and_weitere_always()
+    {
+        var empty = Show(filled: false);
+        Assert.True(empty.View.GetControl<Button>("AddPolizeiButton").IsEffectivelyEnabled);
+        Assert.True(empty.View.GetControl<Button>("AddRettungsdienstButton").IsEffectivelyEnabled);
+
+        var board = Show();
+        var polizei = board.View.GetControl<Button>("AddPolizeiButton");
+
+        Assert.False(polizei.IsEffectivelyEnabled);
+        Assert.False(board.View.GetControl<Button>("AddRettungsdienstButton").IsEffectivelyEnabled);
+        Assert.True(board.View.GetControl<Button>("AddPartnerButton").IsEffectivelyEnabled);
+        Assert.Equal("Einsatzleitung Polizei ist bereits eingetragen", ToolTip.GetTip(polizei));
+        Assert.True(ToolTip.GetShowOnDisabled(polizei));
+    }
+
+    [AvaloniaFact]
     public void The_drop_strips_show_only_while_a_card_is_dragged()
     {
         var board = Show();

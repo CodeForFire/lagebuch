@@ -84,6 +84,44 @@ public class LeadershipBoardDialogTests
         Assert.Equal(expected, opened[0].Name);
     }
 
+    // Polizei and Rettungsdienst are added once; their buttons then switch off and say why. A
+    // second one could not be saved anyway: names are unique at the top level.
+    [Fact]
+    public void A_preset_partner_can_be_added_once_and_its_button_then_says_why_it_is_off()
+    {
+        var session = NewSession();
+        using var vm = NewVmOpening(session, []);
+        Assert.True(vm.AddPartnerCommand.CanExecute("Polizei"));
+        Assert.Equal("Einsatzleitung Polizei bilden", vm.PolizeiTip);
+        var notified = 0;
+        vm.AddPartnerCommand.CanExecuteChanged += (_, _) => notified++;
+
+        AddNode(session, CommandNodeKind.Partner, "polizei");
+
+        Assert.True(notified > 0);
+        Assert.False(vm.AddPartnerCommand.CanExecute("Polizei"));
+        Assert.Equal("Einsatzleitung Polizei ist bereits eingetragen", vm.PolizeiTip);
+        Assert.True(vm.AddPartnerCommand.CanExecute("Rettungsdienst"));
+        Assert.Equal("Einsatzleitung Rettungsdienst bilden", vm.RettungsdienstTip);
+        Assert.True(vm.AddPartnerCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Dissolving_or_renaming_the_polizei_turns_its_button_back_on()
+    {
+        var session = NewSession();
+        var polizei = AddNode(session, CommandNodeKind.Partner, "Polizei");
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        using var vm = NewVmOpening(session, []);
+
+        session.DissolveCommandNode(polizei);
+        session.UpdateCommandNode(rd, "Rettungsdienst FFB", null, null, null, null, null);
+
+        Assert.True(vm.AddPartnerCommand.CanExecute("Polizei"));
+        Assert.True(vm.AddPartnerCommand.CanExecute("Rettungsdienst"));
+        Assert.Equal("Einsatzleitung Rettungsdienst bilden", vm.RettungsdienstTip);
+    }
+
     [Fact]
     public void A_nodes_edit_command_opens_the_edit_dialog_for_that_node()
     {

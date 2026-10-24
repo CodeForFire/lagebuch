@@ -529,10 +529,10 @@
 
       <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
         <Button x:Name="AddRettungsdienstButton" Classes="board-action" Content="+ RETTUNGSDIENST"
-                ToolTip.Tip="Einsatzleitung Rettungsdienst bilden"
+                ToolTip.Tip="{Binding RettungsdienstTip}" ToolTip.ShowOnDisabled="True"
                 Command="{Binding AddPartnerCommand}" CommandParameter="Rettungsdienst" />
         <Button x:Name="AddPolizeiButton" Classes="board-action" Content="+ POLIZEI"
-                ToolTip.Tip="Einsatzleitung Polizei bilden"
+                ToolTip.Tip="{Binding PolizeiTip}" ToolTip.ShowOnDisabled="True"
                 Command="{Binding AddPartnerCommand}" CommandParameter="Polizei" />
         <Button x:Name="AddPartnerButton" Classes="board-action" Content="+ WEITERE"
                 ToolTip.Tip="Einsatzleitung einer weiteren Organisation bilden"

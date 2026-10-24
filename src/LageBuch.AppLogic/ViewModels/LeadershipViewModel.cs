@@ -99,6 +99,14 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
     public bool IsDraggingNode => DraggingNodeId is not null;
 
+    /// <summary>What + RETTUNGSDIENST says it does, or why it is off.</summary>
+    [ObservableProperty]
+    private string _rettungsdienstTip = string.Empty;
+
+    /// <summary>What + POLIZEI says it does, or why it is off.</summary>
+    [ObservableProperty]
+    private string _polizeiTip = string.Empty;
+
     /// <summary>The Leitstelle the Einsatzleitung reports to, from the Stammdaten (default "ILS").</summary>
     public string DispatchCentreName { get; }
 
@@ -181,6 +189,15 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
         HasPartners = Partners.Count > 0;
         HasFachberater = Fachberater.Count > 0;
+
+        // The tips change exactly when a preset's button turns on or off; a refresh that changed
+        // neither raises nothing.
+        var tips = (PartnerTip("Rettungsdienst"), PartnerTip("Polizei"));
+        if (tips != (RettungsdienstTip, PolizeiTip))
+        {
+            (RettungsdienstTip, PolizeiTip) = tips;
+            AddPartnerCommand.NotifyCanExecuteChanged();
+        }
 
         List<object> top = [El, .. Partners];
         if (HasFachberater)
@@ -354,9 +371,21 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         OpenCreate(CommandNodeKind.Bereitstellung, null, SuggestName("Bereitstellung", alwaysNumbered: false));
 
     /// <param name="preset">The organisation's name ("Rettungsdienst", "Polizei"), or blank for "Weitere".</param>
-    [RelayCommand(CanExecute = nameof(CanAdd))]
+    [RelayCommand(CanExecute = nameof(CanAddPartner))]
     private void AddPartner(string? preset) =>
         OpenCreate(CommandNodeKind.Partner, null, preset ?? string.Empty);
+
+    // A preset organisation is added once: a second could not be saved under its name anyway, so
+    // its button switches off rather than open a dialog bound to fail. "Weitere" stays on.
+    private bool CanAddPartner(string? preset) =>
+        CanAdd && (string.IsNullOrWhiteSpace(preset) || !HasLivePartner(preset));
+
+    private bool HasLivePartner(string name) =>
+        _incident.CommandNodes.Any(n =>
+            n.IsLive && n.Kind == CommandNodeKind.Partner && string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    private string PartnerTip(string preset) =>
+        HasLivePartner(preset) ? $"Einsatzleitung {preset} ist bereits eingetragen" : $"Einsatzleitung {preset} bilden";
 
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private void AddFachberater() => OpenPerson(null, RoleSlot.Fachberater);
