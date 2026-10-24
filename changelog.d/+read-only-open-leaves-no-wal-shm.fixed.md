@@ -1,0 +1,1 @@
+Opening or listing a closed Einsatz no longer leaves an empty `-wal` and `-shm` file beside the `.lagebuch` for good, which also stopped the test suite from piling tens of thousands of them into the temp folder.
