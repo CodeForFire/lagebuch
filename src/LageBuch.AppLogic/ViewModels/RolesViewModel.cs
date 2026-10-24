@@ -209,7 +209,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     }
 
     // The add form refuses a second holder of a unique Funktion, but it cannot refuse one that is
-    // already recorded: an older Einsatzdatei, an imported .fwincident or a joined device running
+    // already recorded: an older Einsatzdatei, an imported .lagebuch or a joined device running
     // other Stammdaten can each bring one, and an Einsatz has to keep working. So such a row is
     // marked instead — on both rows, since either could be the one to hand over, and a marker that
     // picked a winner would be naming a culprit in a record of what happened.

@@ -2,7 +2,7 @@
 # Build a .deb from a published self-contained Lagebuch. Reproducible on any Linux box with
 # dpkg-deb, so the CI leg and a local smoke test run the exact same steps.
 #
-#   build-deb.sh <version> <publish-dir> <icon-png> <icon-svg> <out-dir>
+#   build-deb.sh <version> <publish-dir> <icon-png> <icon-svg> <document-png> <out-dir>
 #
 # <version> is the semver spelling, e.g. 0.6.0 or 0.6.0-rc.2. The two spellings a .deb needs are
 # derived from it here rather than by the caller, so the file name and the control field cannot
@@ -24,7 +24,8 @@ DEB_VERSION="${VERSION//-/\~}"
 PUBLISH_DIR="$2"
 ICON_PNG="$3"
 ICON_SVG="$4"
-OUT_DIR="$5"
+DOCUMENT_PNG="$5"
+OUT_DIR="$6"
 
 PKG="lagebuch"
 ROOT="$(mktemp -d)"
@@ -79,6 +80,21 @@ for size in $ICON_SIZES; do
     chmod 644 "$DEST"
 done
 
+# The Einsatzdatei's document icon, under the name the MIME type below gives it. From the PNG
+# master only, as there is no vector one, so this is the one icon rsvg-convert cannot render.
+case "$RENDERER" in
+    magick|convert) ;;
+    *) echo "error: need magick or convert to render the document icon" >&2
+       echo "       Debian/Ubuntu: apt-get install -y imagemagick" >&2
+       exit 1 ;;
+esac
+for size in $ICON_SIZES; do
+    DEST="$ROOT/usr/share/icons/hicolor/${size}x${size}/mimetypes/application-x-lagebuch.png"
+    install -d "$(dirname "$DEST")"
+    "$RENDERER" "$DOCUMENT_PNG" -filter Lanczos -resize "${size}x${size}" -strip "PNG32:$DEST"
+    chmod 644 "$DEST"
+done
+
 # The vector master too: KDE prefers scalable, and a size hicolor does not declare (40, 80, ...)
 # renders from this instead of upscaling a PNG.
 install -Dm644 "$ICON_SVG" "$ROOT/usr/share/icons/hicolor/scalable/apps/$PKG.svg"
@@ -95,6 +111,28 @@ install -Dm644 "$ICON_SVG" "$ROOT/usr/share/icons/hicolor/scalable/apps/$PKG.svg
 # newest spec that added a key used here (Keywords); everything else predates it. Declaring 1.5
 # would be a hard error in desktop-file-validate <= 0.26 (Debian 12, Ubuntu 22.04), which knows
 # no version above 1.4 and fails on anything it does not recognise.
+# --- Einsatzdatei MIME type --------------------------------------------------------------------
+# What makes a file manager show the document icon for an Einsatzdatei and offer Lagebuch to open
+# it. .fwincident is what the app saved before .lagebuch and stays a glob of the same type, so an
+# older Einsatz opens the same way. An Einsatzdatei is a SQLite database, and shared-mime-info's
+# magic sniffs it as application/vnd.sqlite3; declaring the type a subclass of that is what lets
+# the glob decide instead of the two conflicting.
+install -d "$ROOT/usr/share/mime/packages"
+cat > "$ROOT/usr/share/mime/packages/$PKG.xml" <<'MIME'
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-lagebuch">
+    <comment>Lagebuch incident</comment>
+    <comment xml:lang="de">Lagebuch-Einsatz</comment>
+    <sub-class-of type="application/vnd.sqlite3"/>
+    <icon name="application-x-lagebuch"/>
+    <glob pattern="*.lagebuch"/>
+    <glob pattern="*.fwincident"/>
+  </mime-type>
+</mime-info>
+MIME
+chmod 644 "$ROOT/usr/share/mime/packages/$PKG.xml"
+
 install -d "$ROOT/usr/share/applications"
 cat > "$ROOT/usr/share/applications/$PKG.desktop" <<DESKTOP
 [Desktop Entry]
@@ -103,12 +141,13 @@ Type=Application
 Name=Lagebuch
 GenericName=Einsatzdokumentation
 Comment=Einsatztagebuch, Atemschutzüberwachung und Einsatzberichte für den ELW
-Exec=$PKG
+Exec=$PKG %f
 Icon=$PKG
 Terminal=false
 StartupNotify=false
 StartupWMClass=LageBuch.App
 Categories=Office;
+MimeType=application/x-lagebuch;
 Keywords=Einsatz;Einsatztagebuch;ETB;Feuerwehr;ELW;Atemschutz;Einsatzdokumentation;Lagedarstellung;
 DESKTOP
 
@@ -171,8 +210,11 @@ fi
 # carries "interest-noawait /usr/share/icons/hicolor", and dpkg activates file triggers for
 # third-party packages exactly as for archive ones — so depending on it is also what refreshes
 # the icon cache, and a postinst doing it by hand would only duplicate the work.
-# desktop-file-utils is deliberately not listed: it builds mimeinfo.cache, which is only read for
-# MIME-type association, and this entry declares no MimeType key. Menus parse .desktop directly.
+# shared-mime-info and desktop-file-utils carry the Einsatzdatei association the same way: the first
+# owns update-mime-database, which compiles mime/packages/lagebuch.xml into the database file
+# managers read, the second update-desktop-database, which indexes this entry's MimeType key in
+# mimeinfo.cache. Both run from their own file triggers on /usr/share/mime/packages and
+# /usr/share/applications, so here too a postinst would only duplicate the work.
 SIZE_KB=$(du -sk "$ROOT/usr" | cut -f1)
 install -d "$ROOT/DEBIAN"
 cat > "$ROOT/DEBIAN/control" <<CONTROL
@@ -186,7 +228,7 @@ Depends: libc6 (>= 2.34), libstdc++6 (>= 6), libgcc-s1, zlib1g,
  libicu76 | libicu74 | libicu72 | libicu70,
  libssl3 | libssl3t64,
  libx11-6, libxext6, libxi6, libice6, libsm6,
- hicolor-icon-theme,
+ hicolor-icon-theme, shared-mime-info, desktop-file-utils,
  alsa-utils
 Recommends: libxrandr2, libxcursor1, libgl1, xdg-utils
 Maintainer: CodeForFire <noreply@github.com>

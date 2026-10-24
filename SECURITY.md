@@ -41,7 +41,7 @@ address the issue before any public disclosure.
   whole brigade, across every incident), unlike the incident payload, which is
   a single event — so a compromised PIN exposes something with a longer useful
   life than the operation the PIN was issued for. `masterdata.db` and each
-  incident's `.fwincident` file otherwise live in local application data.
+  incident's `.lagebuch` file otherwise live in local application data.
 - **The full data-protection picture** — every category of personal data, all
   storage locations, what the sync transmits, the split of technical and
   organizational measures, and the deletion checklist — is documented in
@@ -171,9 +171,10 @@ one note on why the trust model around the middle two is where it is.
   behind goes on the next start, except a copy still open in a viewer, which
   waits for a later one. Until then both are plaintext copies of personal
   data, so both stay on the German page's deletion checklist.
-- **The file format is not frozen before 1.0.** Older `.fwincident` files are
-  migrated forward on open, and the guarantee that a file stays readable
-  indefinitely starts at 1.0, not now.
+- **The file format is not frozen before 1.0.** Older `.lagebuch` files, and
+  the `.fwincident` files older versions saved, are migrated forward on open,
+  and the guarantee that a file stays readable indefinitely starts at 1.0, not
+  now.
 - **There are no log files.** Good for data protection — no second place on
   disk accumulates personal data — and bad for diagnosis. The one exception is
   a crash report: an unhandled exception leaves a small file under `crashes/`

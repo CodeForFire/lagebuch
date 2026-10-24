@@ -23,7 +23,7 @@ public class RolesCardTests
             new FakeStore(),
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AssignRole("EL", AnonymizedExampleData.OperatorSurname, from: clock.Now.AddMinutes(-40), to: clock.Now.AddMinutes(-10));

@@ -19,7 +19,7 @@ public class LinkFailureTests
         new InMemoryStore(),
         clock,
         new SessionOperator("Host", "FFB 1"),
-        "/x.fwincident",
+        "/x.lagebuch",
         Array.Empty<(string, bool)>(),
         Array.Empty<(string, bool)>());
 

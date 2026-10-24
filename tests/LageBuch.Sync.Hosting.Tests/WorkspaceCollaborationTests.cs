@@ -24,7 +24,7 @@ public class WorkspaceCollaborationTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Punkt A", false) },
             Array.Empty<(string, bool)>());
 

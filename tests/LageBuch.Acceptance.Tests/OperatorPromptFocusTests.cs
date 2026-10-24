@@ -27,10 +27,10 @@ public class OperatorPromptFocusTests
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
 
@@ -70,7 +70,7 @@ public class OperatorPromptFocusTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(session, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());

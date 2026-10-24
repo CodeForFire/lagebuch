@@ -57,7 +57,7 @@ public class ForcesOffCatalogueStatusTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddForceUnit("FF Musterstadt", 6, "FFB 40/1", status: status, notes: null);

@@ -5,7 +5,7 @@ using LageBuch.Sync;
 namespace LageBuch.AppLogic.Services;
 
 /// <summary>
-/// PDF export for a joined client (#465), which has no .fwincident of its own. The report is built
+/// PDF export for a joined client (#465), which has no .lagebuch of its own. The report is built
 /// from the synced <see cref="IIncidentSession.Incident"/>; every attachment's bytes come through
 /// <see cref="IIncidentSession.GetFileBytesAsync"/>, which reads the client's attachment cache and
 /// only falls back to pulling from the host. The host keeps using

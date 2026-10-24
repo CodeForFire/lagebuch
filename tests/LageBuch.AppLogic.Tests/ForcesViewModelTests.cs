@@ -24,7 +24,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
@@ -285,7 +285,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
@@ -349,7 +349,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
@@ -383,7 +383,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
@@ -425,7 +425,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), masterData, () => { });
@@ -523,7 +523,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
@@ -550,7 +550,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
@@ -605,7 +605,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
@@ -637,7 +637,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => changes++)
@@ -674,7 +674,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         string? confirmTitle = null;
@@ -715,13 +715,13 @@ public class ForcesViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9);
         seed.Close();
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new ForcesViewModel(ro, new FixedClock(T0), Md(), () => { });
 
         var row = Assert.Single(vm.Forces);
@@ -738,7 +738,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
@@ -767,13 +767,13 @@ public class ForcesViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9);
         seed.Close();
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new ForcesViewModel(ro, new FixedClock(T0), Md(), () => { });
 
         var row = Assert.Single(vm.Forces);
@@ -814,7 +814,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
@@ -843,7 +843,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
@@ -867,7 +867,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
@@ -903,7 +903,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
@@ -935,7 +935,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
@@ -1010,7 +1010,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         return new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
@@ -1027,7 +1027,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddForceUnit("FFB", 6, "FFB 40/1", status: "Einsatzbereit am Standort", notes: null);
@@ -1046,7 +1046,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddForceUnit("FFB", 6, "FFB 40/1", status: "Im Einsatz", notes: null);
@@ -1063,7 +1063,7 @@ public class ForcesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddForceUnit("FFB Wache 1", 9, "FFB 11/1", "Alarmiert", "erste Meldung");

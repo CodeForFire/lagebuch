@@ -12,7 +12,7 @@ The one hard date below is not ours to move.
 ## Where we are
 
 Version 0.9.1, with a release every one to two weeks. The app is in real use,
-but the `.fwincident` file format can still change between versions. That caveat
+but the `.lagebuch` file format can still change between versions. That caveat
 is what 1.0 removes.
 
 ## v0.6 — Field fixes and verifiable releases — **released**
@@ -146,7 +146,7 @@ suggestions in the Einsatzdaten.
 This used to be v0.11, behind i18n. It moved ahead after 0.9.0 for two reasons.
 These are what the people using the app today are asking for, and an
 architecture release would have made them wait for work they cannot see. And
-every one of them adds or changes something the `.fwincident` file stores, so
+every one of them adds or changes something the `.lagebuch` file stores, so
 they are cheapest before the freeze below, after which each costs a forward
 migration that has to keep working for good. The German wording they add is
 written inline like all the rest and extracted with it in v0.11.
@@ -193,7 +193,7 @@ already published in
 [lagebuch-regions](https://github.com/CodeForFire/lagebuch-regions).
 
 It used to sit beyond 1.0. It moved forward because it adds tables to the
-`.fwincident` file, and like the modules above that is cheap before the freeze
+`.lagebuch` file, and like the modules above that is cheap before the freeze
 and a permanent forward migration after it.
 
 Issues: #87, #150, #584, #585, #586, #587

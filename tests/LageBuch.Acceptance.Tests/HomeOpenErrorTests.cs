@@ -36,9 +36,9 @@ public class HomeOpenErrorTests
     {
         private readonly List<string> _list = new()
         {
-            "/home/operator/Einsaetze/Einsatz-1234.fwincident",
-            "/home/operator/Einsaetze/Einsatz-6666.fwincident",
-            "/home/operator/Einsaetze/Einsatz5.fwincident",
+            "/home/operator/Einsaetze/Einsatz-1234.lagebuch",
+            "/home/operator/Einsaetze/Einsatz-6666.lagebuch",
+            "/home/operator/Einsaetze/Einsatz5.lagebuch",
         };
 
         public IReadOnlyList<string> GetRecent() => _list;
@@ -106,7 +106,7 @@ public class HomeOpenErrorTests
             lastCrashReport: lastCrashReport);
         if (triggerError)
         {
-            vm.OpenRecentCommand.Execute("/home/operator/Einsaetze/Einsatz-1234.fwincident");
+            vm.OpenRecentCommand.Execute("/home/operator/Einsaetze/Einsatz-1234.lagebuch");
         }
 
         // Hosted in a "Shell" container like MainView's root, so HomeView's phone query applies.
@@ -358,6 +358,6 @@ public class HomeOpenErrorTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(Banner(window).IsVisible);
-        Assert.DoesNotContain(vm.RecentFiles, f => f.Path == "/home/operator/Einsaetze/Einsatz-1234.fwincident");
+        Assert.DoesNotContain(vm.RecentFiles, f => f.Path == "/home/operator/Einsaetze/Einsatz-1234.lagebuch");
     }
 }

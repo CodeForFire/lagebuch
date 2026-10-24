@@ -1,7 +1,7 @@
 namespace LageBuch.Persistence.Sqlite;
 
 /// <summary>
-/// Thrown when a .fwincident file carries a schema version this build does not know yet, i.e. it
+/// Thrown when a .lagebuch file carries a schema version this build does not know yet, i.e. it
 /// was last written by a newer version of the app.
 ///
 /// Distinct from a generic failure on purpose: the file is intact and the user's answer is "open

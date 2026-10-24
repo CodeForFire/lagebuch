@@ -78,7 +78,7 @@ public class RolesColumnOrderTests
             new FakeStore(),
             clock,
             new SessionOperator("Huber", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AssignRole("EL", "Mayr", callSign: "FFB 12/1", section: "Abschnitt Nord", phone: "0171 2345678");

@@ -44,7 +44,7 @@ Markdown.
 ## Warum Lagebuch?
 
 - **Läuft offline – wirklich.** Kein Internet, kein Konto, kein Server. Jeder
-  Einsatz ist eine einzelne `.fwincident`-Datei, die euch gehört und die ihr
+  Einsatz ist eine einzelne `.lagebuch`-Datei, die euch gehört und die ihr
   archivieren, kopieren oder weitergeben könnt.
 - **Keine Daten verlassen den ELW.** Stammdaten, Namen und Handynummern
   liegen nur auf euren Geräten. Die optionale Mehrgeräte-Verbindung läuft im
@@ -120,8 +120,8 @@ Alle Beispieldaten sind frei erfunden.
    Jetzt kennen die Dropdowns zwei Wachen, sieben Fahrzeuge, ein paar Namen,
    Checklisten und Links.
 3. **Übungseinsatz öffnen** –
-   [`uebung.fwincident`](docs/samples/uebung.fwincident) herunterladen
-   ([Direktlink](https://github.com/CodeForFire/lagebuch/raw/main/docs/samples/uebung.fwincident)),
+   [`uebung.lagebuch`](docs/samples/uebung.lagebuch) herunterladen
+   ([Direktlink](https://github.com/CodeForFire/lagebuch/raw/main/docs/samples/uebung.lagebuch)),
    in Lagebuch **ÖFFNEN** wählen. Der Einsatz „B 3 – Zimmerbrand“ hat schon
    ETB-Einträge, vier Fahrzeuge, einen Angriffstrupp unter Atemschutz mit
    zugeordnetem Sicherheitstrupp, Aufgaben und ein CO-Messprotokoll, in dem
@@ -261,7 +261,7 @@ Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
 ## For developers
 
 Lagebuch is an offline-first incident documentation app for fire brigades:
-.NET 10 + Avalonia (desktop and Android), SQLite storage (one `.fwincident`
+.NET 10 + Avalonia (desktop and Android), SQLite storage (one `.lagebuch`
 file per incident), SignalR sync with TLS trust-on-first-use, and
 [QuestPDF](https://www.questpdf.com/) reports. The code and its documentation
 are in English, as are issues, pull requests and commit messages; the UI is
@@ -298,7 +298,7 @@ make run              # the desktop app
 make apk              # build an installable APK in Docker
 make run-android      # boot the emulator, install and launch
 make package-linux    # build a local .deb
-make samples          # regenerate docs/samples/uebung.fwincident
+make samples          # regenerate docs/samples/uebung.lagebuch
 make screenshots      # regenerate docs/screenshots/*.png (headless Skia harness)
 make demo-gif         # rebuild docs/demo/einsatz-flow.gif from the screenshots
 ```

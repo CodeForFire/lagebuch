@@ -33,7 +33,7 @@ public class EnterOnDropdownTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
         return new ScbaViewModel(session, Md(), clock, new NoopTicker(), new NoopAlarmService(), () => { });

@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace LageBuch.Persistence;
 
 /// <summary>
-/// Stores an attached file's bytes on disk in a sibling folder next to its <c>.fwincident</c>
+/// Stores an attached file's bytes on disk in a sibling folder next to its <c>.lagebuch</c>
 /// file, keeping large binary content out of <see cref="IncidentRepository"/>'s full-rewrite-
 /// per-save SQLite tables. Only the metadata row (see <c>incident_files</c>) lives in SQLite.
 /// </summary>

@@ -32,13 +32,13 @@ public class HomeLayoutTests
     // not arrange, is what matters here: TextTrimming ellipsizes on arrange but the TextBlock
     // still reports the full untrimmed width when it is measured.
     private const string LongPath =
-        "/home/operator/Development/arbeit/traeger/feuerwehr/lagebuch/docs/samples/uebung-mit-langem-namen.fwincident";
+        "/home/operator/Development/arbeit/traeger/feuerwehr/lagebuch/docs/samples/uebung-mit-langem-namen.lagebuch";
 
     private static readonly string[] ShortPaths =
     {
-        "/home/operator/Einsaetze/20260906-1344.fwincident",
-        "/home/operator/Einsaetze/20260906-1224.fwincident",
-        "/home/operator/Einsaetze/20260831-1519.fwincident",
+        "/home/operator/Einsaetze/20260906-1344.lagebuch",
+        "/home/operator/Einsaetze/20260906-1224.lagebuch",
+        "/home/operator/Einsaetze/20260831-1519.lagebuch",
     };
 
     private sealed class Md : IMasterDataProvider
@@ -140,7 +140,7 @@ public class HomeLayoutTests
     public void Recent_list_does_not_scroll_on_its_own()
     {
         var paths = Enumerable.Range(0, 10)
-            .Select(i => $"/home/operator/Einsaetze/2026090{i}-1200.fwincident")
+            .Select(i => $"/home/operator/Einsaetze/2026090{i}-1200.lagebuch")
             .ToArray();
         var window = ShowHome(paths);
 

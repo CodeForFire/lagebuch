@@ -13,7 +13,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// #470: a duplicate the app cannot refuse -- an older Einsatzdatei, an imported .fwincident, or a
+// #470: a duplicate the app cannot refuse -- an older Einsatzdatei, an imported .lagebuch, or a
 // joined device running other Stammdaten -- is neither blocked nor hidden. The hint under the add
 // form names the holder, and the warning glyph marks the row that has to be handed over.
 public class RolesDuplicateHintTests
@@ -110,7 +110,7 @@ public class RolesDuplicateHintTests
         new FakeStore(),
         new FixedClock(),
         new SessionOperator(Holder, "FFB 12/1"),
-        "/x.fwincident",
+        "/x.lagebuch",
         Array.Empty<(string, bool)>(),
         Array.Empty<(string, bool)>());
 

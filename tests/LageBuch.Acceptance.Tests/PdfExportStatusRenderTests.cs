@@ -35,7 +35,7 @@ public class PdfExportStatusRenderTests
 
         public ExportDialogs(string exportPath) => _exportPath = exportPath;
 
-        public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+        public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
@@ -67,7 +67,7 @@ public class PdfExportStatusRenderTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(

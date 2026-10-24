@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   WiX v5 authoring for the Lagebuch MSI. Built in CI with:
-    wix build packaging/windows/Lagebuch.wxs -arch x64 -d Version=<v> -d PublishDir=<dir> -d IconFile=<ico> -o out.msi
+    wix build packaging/windows/Lagebuch.wxs -arch x64 -d Version=<v> -d PublishDir=<dir> -d IconFile=<ico>
+      -d DocumentIconFile=<ico> -o out.msi
 
   The UpgradeCode is fixed forever: it is what lets a new version replace the old one instead of
   installing side by side. The ProductCode is auto-generated per build (Package/@Id defaults to "*").
@@ -42,6 +43,7 @@
       <!-- Auto-harvest the entire published output into INSTALLFOLDER (WiX v5's heat replacement). -->
       <Files Include="$(PublishDir)\**" Directory="INSTALLFOLDER" />
       <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="FileAssociation" />
     </Feature>
 
     <!-- Start-menu shortcut. A shortcut component needs its own keypath, hence the HKCU value. -->
@@ -55,5 +57,29 @@
       <RegistryValue Root="HKCU" Key="Software\CodeForFire\Lagebuch"
                      Name="installed" Type="integer" Value="1" KeyPath="yes" />
     </Component>
+
+    <!--
+      Einsatzdateien open in Lagebuch on a double-click and show their own document icon. .lagebuch
+      is what the app saves; .fwincident is what it saved before, and stays registered so an
+      Einsatz from an older version still opens the same way. Both share one ProgId and so one
+      icon and one open command.
+
+      The ProgId is not advertised, so WiX writes it as plain registry values under
+      HKLM\Software\Classes (perMachine) that this component owns and uninstall removes. The verb
+      has to name the exe through a property: <Files> harvests the exe without an Id that a
+      TargetFile could reference.
+    -->
+    <Component Id="FileAssociation" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="DocumentIcon" Source="$(DocumentIconFile)" Name="lagebuch-document.ico" KeyPath="yes" />
+      <ProgId Id="Lagebuch.Einsatz" Description="Lagebuch-Einsatz" Icon="DocumentIcon" IconIndex="0">
+        <Extension Id="lagebuch" ContentType="application/x-lagebuch">
+          <Verb Id="open" TargetProperty="LAGEBUCHEXE" Argument="&quot;%1&quot;" />
+        </Extension>
+        <Extension Id="fwincident" ContentType="application/x-lagebuch">
+          <Verb Id="open" TargetProperty="LAGEBUCHEXE" Argument="&quot;%1&quot;" />
+        </Extension>
+      </ProgId>
+    </Component>
+    <SetProperty Id="LAGEBUCHEXE" Value="[INSTALLFOLDER]LageBuch.App.exe" After="CostFinalize" Sequence="execute" />
   </Package>
 </Wix>

@@ -21,7 +21,7 @@ internal static class SnapshotFixture
             new InMemoryStore(),
             new FixedClock(),
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         return SnapshotMapper.ToSnapshot(session.Incident) with { Epoch = Guid.NewGuid() };

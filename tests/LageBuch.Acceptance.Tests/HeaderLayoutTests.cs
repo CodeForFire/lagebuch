@@ -65,7 +65,7 @@ public class HeaderLayoutTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Maximilian Mustermann-Beispiel", "FFB 1/12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             [("Aufstellort ELW weit genug weg um nicht zu behindern?", true)],
             [("Fahrzeug abgerüstet und einsatzbereit?", true)]);
         var vm = new IncidentWorkspaceViewModel(
@@ -131,7 +131,7 @@ public class HeaderLayoutTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Maximilian Mustermann-Beispiel", "FFB 1/12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             [("Aufstellort ELW weit genug weg um nicht zu behindern?", true)],
             [("Fahrzeug abgerüstet und einsatzbereit?", true)]);
         var vm = new IncidentWorkspaceViewModel(

@@ -11,7 +11,7 @@ namespace LageBuch.Persistence.Tests;
 // or under none -- so each rule gets its own test.
 public class ChecklistListMigrationTests : IDisposable
 {
-    private readonly string _path = Path.Join(Path.GetTempPath(), $"mig22-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"mig22-{Guid.NewGuid():N}.lagebuch");
 
     public void Dispose()
     {

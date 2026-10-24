@@ -24,7 +24,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(
@@ -75,7 +75,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(
@@ -260,7 +260,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, new SessionOperator("Müller", "FFB 12/1"), "brand.jpg", "image/jpeg", 10);
@@ -354,7 +354,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         using var vm = new IncidentWorkspaceViewModel(
@@ -383,7 +383,7 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(
@@ -406,7 +406,7 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         if (closed)
@@ -414,7 +414,7 @@ public class IncidentWorkspaceViewModelTests
             seed.Close();
         }
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         return new IncidentWorkspaceViewModel(
             ro,
             clock,
@@ -472,7 +472,7 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", true) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -547,7 +547,7 @@ public class IncidentWorkspaceViewModelTests
         vm.IncidentNumberInput = "B 4242";
 
         Assert.Equal(before, store.SaveCount);
-        Assert.Null(store.Load("/x.fwincident").IncidentNumber);
+        Assert.Null(store.Load("/x.lagebuch").IncidentNumber);
     }
 
     [Fact]
@@ -559,12 +559,12 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         seed.Incident.SetIncidentNumber(new Domain.ValueObjects.IncidentNumber("B 99"));
         seed.Save();
-        var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
+        var reopened = LocalIncidentSession.Open(store, clock, "/x.lagebuch", new SessionOperator("Müller"));
 
         var vm = new IncidentWorkspaceViewModel(
             reopened,
@@ -588,7 +588,7 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>(),
             number,
@@ -661,11 +661,11 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         seed.SetAddress("Hauptstr. 12", "FFB");
-        var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
+        var reopened = LocalIncidentSession.Open(store, clock, "/x.lagebuch", new SessionOperator("Müller"));
 
         var vm = new IncidentWorkspaceViewModel(
             reopened,
@@ -712,7 +712,7 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("Hauptstr. 12, FFB", vm.AddressDisplay);
         Assert.True(vm.ShowAddressLine);
         Assert.NotNull(vm.LastSavedAt);
-        Assert.Equal("B 1.2 260715 123", store.Load("/x.fwincident").IncidentNumber!.Value);
+        Assert.Equal("B 1.2 260715 123", store.Load("/x.lagebuch").IncidentNumber!.Value);
     }
 
     [Fact]
@@ -727,7 +727,7 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.Null(vm.PendingIncidentDataDialog);
         Assert.Equal("B3P", vm.HeroText);
-        Assert.Equal("B3P", store.Load("/x.fwincident").Keyword);
+        Assert.Equal("B3P", store.Load("/x.lagebuch").Keyword);
     }
 
     [Fact]
@@ -834,7 +834,7 @@ public class IncidentWorkspaceViewModelTests
 
     // The Einsatznummer is usually unknown until ILS calls back (#69), so falling back to it for
     // the suggested export name meant most exports proposed the literal "Einsatz.pdf" -- the
-    // incident already has a name (its own .fwincident file), so the export should reuse that.
+    // incident already has a name (its own .lagebuch file), so the export should reuse that.
     [Fact]
     public async Task ExportPdf_suggests_the_incidents_own_file_name()
     {
@@ -950,7 +950,7 @@ public class IncidentWorkspaceViewModelTests
                 new FakeStore(),
                 clock,
                 new SessionOperator("Müller"),
-                "/x.fwincident",
+                "/x.lagebuch",
                 new[] { ("A?", false) },
                 Array.Empty<(string, bool)>()),
             clock,
@@ -985,7 +985,7 @@ public class IncidentWorkspaceViewModelTests
                 new FakeStore(),
                 new FixedClock(T0),
                 new SessionOperator("Müller"),
-                "/x.fwincident",
+                "/x.lagebuch",
                 new[] { ("A?", false) },
                 Array.Empty<(string, bool)>()),
             new FixedClock(T0),
@@ -1013,7 +1013,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -1046,7 +1046,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var lastExportStore = new FakeLastPdfExportStore();
@@ -1077,7 +1077,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var lastExportStore = new FakeLastPdfExportStore(new LastPdfExport("/einsaetze/alt.pdf", T0.AddHours(-1)));
@@ -1108,7 +1108,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -1140,7 +1140,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(
@@ -1217,7 +1217,7 @@ public class IncidentWorkspaceViewModelTests
         vm.ExportPdfCommand.Execute(null);
         await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
 
-        // No .fwincident on a client, so the name comes from the start time, formatted the way
+        // No .lagebuch on a client, so the name comes from the start time, formatted the way
         // HomeViewModel names a new incident's file.
         Assert.Equal("20260622-0900.pdf", dialogs.LastSuggestedExportName);
         var bytes = await File.ReadAllBytesAsync(exportPath);
@@ -1276,7 +1276,7 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("Schmidt (FFB 12/2)", vm.OperatorDisplay);
         Assert.Contains(nameof(IncidentWorkspaceViewModel.OperatorDisplay), changes);
         var entry = Assert.Single(
-            store.Load("/x.fwincident").Journal,
+            store.Load("/x.lagebuch").Journal,
             e => e.Text == "Lagebuchführerwechsel: Müller → Schmidt (FFB 12/2)");
         Assert.Equal("Schmidt (FFB 12/2)", entry.EnteredBy);
     }
@@ -1285,14 +1285,14 @@ public class IncidentWorkspaceViewModelTests
     public void Cancelling_the_handover_keeps_the_operator()
     {
         var vm = NewWorkspace(out var store, out _);
-        var entries = store.Load("/x.fwincident").Journal.Count;
+        var entries = store.Load("/x.lagebuch").Journal.Count;
 
         vm.ChangeOperatorCommand.Execute(null);
         vm.CancelPendingPrompt();
 
         Assert.Null(vm.PendingPrompt);
         Assert.Equal("Müller", vm.OperatorDisplay);
-        Assert.Equal(entries, store.Load("/x.fwincident").Journal.Count);
+        Assert.Equal(entries, store.Load("/x.lagebuch").Journal.Count);
     }
 
     [Fact]
@@ -1334,10 +1334,10 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new IncidentWorkspaceViewModel(
             ro,
             clock,
@@ -1419,7 +1419,7 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var ticker = new FakeTicker();
@@ -1460,10 +1460,10 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
-        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new IncidentWorkspaceViewModel(
             session,
             clock,
@@ -1507,7 +1507,7 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var ticker = new FakeTicker();
@@ -1549,10 +1549,10 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
-        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var ticker = new FakeTicker();
         var vm = new IncidentWorkspaceViewModel(
             session,
@@ -1633,7 +1633,7 @@ public class IncidentWorkspaceViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(
@@ -1783,7 +1783,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -1888,7 +1888,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -1920,7 +1920,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -1998,7 +1998,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -2154,7 +2154,7 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public string? LastSuggestedExportName { get; private set; }
 
-    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 

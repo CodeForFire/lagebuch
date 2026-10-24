@@ -20,7 +20,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => changes++)
@@ -49,7 +49,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "  " };
@@ -85,7 +85,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Close();
@@ -107,7 +107,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (text, _) => created.Add(text));
@@ -134,7 +134,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
@@ -159,7 +159,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
@@ -186,7 +186,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
@@ -217,7 +217,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Erste" };
@@ -252,7 +252,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
@@ -279,7 +279,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
@@ -406,7 +406,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { HideSystemEntries = false };
@@ -427,7 +427,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
@@ -450,7 +450,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var entry = session.Incident.AddJournalEntry(clock, session.Operator!, EtbDirection.Incoming, "Lagemeldung");
@@ -521,7 +521,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         string? capturedText = null;
@@ -551,7 +551,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
@@ -798,7 +798,7 @@ public class EtbViewModelTests
         new FakeStore(),
         clock,
         new SessionOperator("Müller", "FFB 12/1"),
-        "/x.fwincident",
+        "/x.lagebuch",
         Array.Empty<(string, bool)>(),
         Array.Empty<(string, bool)>());
 
@@ -816,7 +816,7 @@ public class EtbViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         return new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });

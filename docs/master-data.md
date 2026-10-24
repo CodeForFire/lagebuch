@@ -106,7 +106,7 @@ any file you pass on.
 
 [`samples/demo-stammdaten.json`](samples/demo-stammdaten.json) is a complete,
 fictional set (two Wachen, seven vehicles, a small roster, checklists, links)
-for trying the app out. [`samples/uebung.fwincident`](samples/uebung.fwincident)
+for trying the app out. [`samples/uebung.lagebuch`](samples/uebung.lagebuch)
 is a matching fictional incident. Both are regenerated with `make samples`;
 the round-trip test in `tests/LageBuch.Persistence.Tests/DemoIncidentTests.cs`
 keeps them valid as the schema evolves.

@@ -22,7 +22,7 @@ public class CoMatrixKeyboardTests
             new FakeStore(),
             clock,
             new SessionOperator("Huber", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddCoBuilding("Haus A", 2, 3); // EG plus two Obergeschosse

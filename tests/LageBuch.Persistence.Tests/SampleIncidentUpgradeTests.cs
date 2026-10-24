@@ -3,7 +3,7 @@ using Microsoft.Data.Sqlite;
 
 namespace LageBuch.Persistence.Tests;
 
-// docs/samples/uebung.fwincident is a whole Einsatzdatei rather than a fixture assembled in a
+// docs/samples/uebung.lagebuch is a whole Einsatzdatei rather than a fixture assembled in a
 // test, so this is the end-to-end check that the shipped sample actually opens and still carries
 // its Checklisten. It was a V21 file while this branch was written, which is how the V23 upgrade
 // was first exercised against something a released build had produced; `make samples` has since
@@ -13,7 +13,7 @@ namespace LageBuch.Persistence.Tests;
 // schema_version onto a tracked file is exactly what AGENTS.md warns never to do.
 public class SampleIncidentUpgradeTests : IDisposable
 {
-    private readonly string _copy = Path.Join(Path.GetTempPath(), $"sample-{Guid.NewGuid():N}.fwincident");
+    private readonly string _copy = Path.Join(Path.GetTempPath(), $"sample-{Guid.NewGuid():N}.lagebuch");
 
     public SampleIncidentUpgradeTests() => File.Copy(SamplePath(), _copy, overwrite: true);
 
@@ -40,7 +40,7 @@ public class SampleIncidentUpgradeTests : IDisposable
             dir?.FullName ?? throw new InvalidOperationException("LageBuch.sln not found"),
             "docs",
             "samples",
-            "uebung.fwincident");
+            "uebung.lagebuch");
     }
 
     [Fact]

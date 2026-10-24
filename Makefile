@@ -293,7 +293,8 @@ package-linux: ## Build a local .deb (VERSION=x.y.z)
 	$(DOTNET) publish $(APP) -r linux-x64 $(PUBLISH_FLAGS) -p:Version=$(VERSION) -o publish
 	packaging/linux/build-deb.sh "$(VERSION)" publish \
 	  src/LageBuch.App.Shared/Assets/icon-1024.png \
-	  src/LageBuch.App/Assets/icon.svg dist
+	  src/LageBuch.App/Assets/icon.svg \
+	  src/LageBuch.App/Assets/document-1024.png dist
 
 play-listing-check: ## Check the Play Store listing text against the Console's limits
 	packaging/play/check-listing.sh
@@ -318,7 +319,7 @@ logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs Ima
 
 ## Docs (README samples, screenshots, demo GIF)
 
-samples: ## Regenerate docs/samples/uebung.fwincident (DemoIncidentTests with SAMPLES_OUT)
+samples: ## Regenerate docs/samples/uebung.lagebuch (DemoIncidentTests with SAMPLES_OUT)
 	SAMPLES_OUT=$(CURDIR)/docs/samples $(DOTNET) test tests/LageBuch.Persistence.Tests -c $(CONFIG) \
 	  --filter FullyQualifiedName~DemoIncidentTests
 

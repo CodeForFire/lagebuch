@@ -25,7 +25,7 @@ public class ForcesTabRenderTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -50,7 +50,7 @@ public class ForcesTabRenderTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         vm = new IncidentWorkspaceViewModel(
@@ -348,7 +348,7 @@ public class ForcesTabRenderTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(

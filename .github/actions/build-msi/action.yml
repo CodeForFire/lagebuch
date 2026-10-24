@@ -50,4 +50,5 @@ runs:
         -d "Version=$env:MSI_VERSION"
         -d "PublishDir=$env:GITHUB_WORKSPACE\publish"
         -d "IconFile=$env:GITHUB_WORKSPACE\src\LageBuch.App\Assets\icon.ico"
+        -d "DocumentIconFile=$env:GITHUB_WORKSPACE\src\LageBuch.App\Assets\document.ico"
         -o "$env:FILE_NAME"

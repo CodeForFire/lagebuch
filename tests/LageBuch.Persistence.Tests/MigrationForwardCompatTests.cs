@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Tests;
 
 public class MigrationForwardCompatTests : IDisposable
 {
-    private readonly string _path = Path.Join(Path.GetTempPath(), $"fwd-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"fwd-{Guid.NewGuid():N}.lagebuch");
 
     public void Dispose()
     {

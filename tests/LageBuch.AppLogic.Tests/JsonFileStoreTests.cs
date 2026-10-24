@@ -44,10 +44,10 @@ public class JsonFileStoreTests : IDisposable
     [Fact]
     public void A_written_value_reads_back()
     {
-        new JsonFileStore<string>(_path).Write("/einsatz/2026-09-15.fwincident");
+        new JsonFileStore<string>(_path).Write("/einsatz/2026-09-15.lagebuch");
 
         Assert.True(new JsonFileStore<string>(_path).TryRead(out var value));
-        Assert.Equal("/einsatz/2026-09-15.fwincident", value);
+        Assert.Equal("/einsatz/2026-09-15.lagebuch", value);
     }
 
     [Fact]

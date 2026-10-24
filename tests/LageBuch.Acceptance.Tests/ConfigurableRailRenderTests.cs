@@ -48,7 +48,7 @@ public class ConfigurableRailRenderTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[]
             {
                 Seed(ChecklistDefaults.AufbauListId, "Aufbau", ("Aufstellort ELW frei?", true)),
@@ -135,7 +135,7 @@ public class ConfigurableRailRenderTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<ChecklistSeed>());
         var vm = new IncidentWorkspaceViewModel(
             session,

@@ -30,6 +30,7 @@ mark_r=262
 out_docs="$repo_root/docs/logo"
 out_app="$repo_root/src/LageBuch.App.Shared/Assets"
 out_pdf="$repo_root/src/LageBuch.Documents/Assets"
+out_app_desktop="$repo_root/src/LageBuch.App/Assets"
 out_play="$repo_root/docs/play"
 
 # The app's flat background colour, shared by the social preview and both Play Store assets,
@@ -77,6 +78,38 @@ echo "==> src/LageBuch.Documents/Assets/lagebuch-mark.png (PDF header, 256)"
 # Keeps its dark disc field on purpose: the helmet is white, so a background-free cutout
 # would be invisible on a white PDF page.
 cut_disc "$mark_cx" "$mark_cy" "$mark_r" 256 "$out_pdf/lagebuch-mark.png"
+
+# --- Einsatzdatei document icon ------------------------------------------------------------
+#
+# What Explorer, Finder and the Linux file managers show for a .lagebuch file. A page with a
+# folded corner, so it reads as a document and not as a second copy of the app, with the
+# text-free emblem on it. The emblem keeps its dark disc field for the same reason as the PDF
+# mark: the helmet is white, and so is the page. The page edge gets a grey outline so it does not
+# dissolve into a white Explorer window. The installers render their own sizes from the 1024
+# master (build-deb.sh, build-dmg.sh); only Windows needs a ready-made .ico, so that one is
+# committed here next to icon.ico.
+
+echo "==> src/LageBuch.App/Assets/document-1024.png (document icon master, 1024)"
+doc="$out_app_desktop/document-1024.png"
+cut_disc "$mark_cx" "$mark_cy" "$mark_r" 640 "$out_app_desktop/.doc-mark.tmp.png"
+# Page from x=160 to 864, y=40 to 984; the top-right corner folds down 200 px. The outline is
+# 32 px so that it is still about one pixel wide in the 16 px frame.
+magick -size 1024x1024 xc:none \
+    -fill "#FFFFFF" -stroke "#8A919C" -strokewidth 32 -draw "stroke-linejoin round" \
+    -draw "polygon 160,40 664,40 864,240 864,984 160,984" \
+    -fill "#D5D9DF" \
+    -draw "polygon 664,40 664,240 864,240" \
+    \( "$out_app_desktop/.doc-mark.tmp.png" \) -gravity center -geometry +0+80 -compose over -composite \
+    "PNG32:$doc"
+rm -f "$out_app_desktop/.doc-mark.tmp.png"
+# Not shrink(): the .ico and every installer size is downscaled from this file, so it stays
+# truecolour rather than a 256-colour palette that each downscale would then dither.
+
+echo "==> src/LageBuch.App/Assets/document.ico (Windows document icon, 16-256)"
+# Lanczos for the same reason build-deb.sh uses it: the default filter blurs the emblem at
+# 16-32 px, which is the size Explorer's details view shows.
+magick "$doc" -filter Lanczos -define icon:auto-resize=256,48,32,24,16 \
+    "$out_app_desktop/document.ico"
 
 echo "==> docs/logo/lagebuch-social-preview.png (GitHub social preview, 1280x640)"
 # Flat AppBgColor rather than the app's background *gradient*: a near-black gradient visibly
@@ -150,6 +183,7 @@ echo
 echo "Done. Generated:"
 for f in "$out_docs/lagebuch-logo.png" "$out_docs/lagebuch-social-preview.png" \
          "$out_app/lagebuch-logo.png" "$out_pdf/lagebuch-mark.png" \
+         "$out_app_desktop/document-1024.png" "$out_app_desktop/document.ico" \
          "$out_play/icon-512.png" "$out_play/feature-graphic-1024x500.png"; do
-    printf '  %-58s %s\n' "${f#"$repo_root/"}" "$(magick identify -format '%wx%h %B bytes' "$f")"
+    printf '  %-58s %s\n' "${f#"$repo_root/"}" "$(magick identify -format '%wx%h %B bytes' "$f[0]")"
 done

@@ -157,6 +157,7 @@ jobs:
             publish \
             src/LageBuch.App.Shared/Assets/icon-1024.png \
             src/LageBuch.App/Assets/icon.svg \
+            src/LageBuch.App/Assets/document-1024.png \
             dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -375,6 +376,7 @@ jobs:
             "${{ needs.version.outputs.version }}" \
             publish \
             src/LageBuch.App.Shared/Assets/icon-1024.png \
+            src/LageBuch.App/Assets/document-1024.png \
             dist
       # Always downloadable from the run; also attach to the matching release if one exists.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

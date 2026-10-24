@@ -13,7 +13,7 @@ public class ChecklistViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             aufbau ?? new[] { ("A?", false) },
             abbau ?? Array.Empty<(string, bool)>());
 
@@ -61,7 +61,7 @@ public class ChecklistViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         session.Close();

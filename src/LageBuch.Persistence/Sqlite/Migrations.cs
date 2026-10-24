@@ -503,7 +503,7 @@ public static class Migrations
     }
 
     // Adds the metadata store for attached files (#62). Only metadata lives here — the actual
-    // bytes sit in a sibling ".files" folder next to the .fwincident file, kept out of this
+    // bytes sit in a sibling ".files" folder next to the .lagebuch file, kept out of this
     // full-rewrite-per-save table set so an unrelated edit never rewrites attachment content.
     private static void ApplyV10(SqliteConnection cn, SqliteTransaction tx)
     {

@@ -13,7 +13,7 @@ public class InvolvedPartiesViewModelTests
             store ?? new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Muster", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
@@ -255,7 +255,7 @@ public class InvolvedPartiesViewModelTests
         seed.AddInvolvedParty("Erika Beispiel", "0171 0000001", null);
         seed.Close();
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new InvolvedPartiesViewModel(ro, () => { });
 
         var row = Assert.Single(vm.Parties);

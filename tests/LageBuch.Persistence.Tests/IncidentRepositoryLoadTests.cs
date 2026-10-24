@@ -3,11 +3,11 @@ using Microsoft.Data.Sqlite;
 namespace LageBuch.Persistence.Tests;
 
 // Load is a read path, so it must not bring a file into existence. A recent-files entry whose
-// .fwincident has been moved or deleted is the everyday case: opening it used to create an empty
+// .lagebuch has been moved or deleted is the everyday case: opening it used to create an empty
 // database at that path and only then fail, quietly littering the incident folder.
 public class IncidentRepositoryLoadTests : IDisposable
 {
-    private readonly string _path = Path.Join(Path.GetTempPath(), $"load-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"load-{Guid.NewGuid():N}.lagebuch");
 
     public void Dispose()
     {

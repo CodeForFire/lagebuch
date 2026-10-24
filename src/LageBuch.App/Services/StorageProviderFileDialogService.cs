@@ -8,8 +8,16 @@ namespace LageBuch.App.Services;
 
 internal sealed class StorageProviderFileDialogService : IFileDialogService
 {
+    // Opening takes both extensions, so an Einsatz saved before the rename still opens; saving offers
+    // only the current one, so a new file never comes out under the old name.
     private static readonly FilePickerFileType Incident =
-        new("Einsatzdokumentation") { Patterns = new[] { "*.fwincident" } };
+        new("Einsatzdokumentation")
+        {
+            Patterns = new[] { "*" + IncidentFileExtension.Current, "*" + IncidentFileExtension.Legacy },
+        };
+
+    private static readonly FilePickerFileType NewIncident =
+        new("Einsatzdokumentation") { Patterns = new[] { "*" + IncidentFileExtension.Current } };
 
     private static readonly FilePickerFileType Pdf =
         new("PDF-Dokument") { Patterns = new[] { "*.pdf" } };
@@ -36,8 +44,8 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
         {
             Title = "Einsatz speichern",
             SuggestedFileName = suggestedFileName,
-            DefaultExtension = "fwincident",
-            FileTypeChoices = new[] { Incident },
+            DefaultExtension = IncidentFileExtension.Current.TrimStart('.'),
+            FileTypeChoices = new[] { NewIncident },
             SuggestedStartLocation = await ResolveStartLocation(top, initialFolder),
         });
         return file?.TryGetLocalPath();

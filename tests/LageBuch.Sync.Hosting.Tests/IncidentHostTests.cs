@@ -37,7 +37,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -64,7 +64,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var first = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -93,7 +93,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var first = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -122,7 +122,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var first = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -145,7 +145,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -165,7 +165,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Punkt A", false) },
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -213,7 +213,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -235,7 +235,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -275,7 +275,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
@@ -300,7 +300,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Close();
@@ -332,7 +332,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -360,7 +360,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -402,7 +402,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -455,7 +455,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -499,7 +499,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -528,7 +528,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -563,7 +563,7 @@ public class IncidentHostTests
             store,
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var dispatcher = new RecordingUiDispatcher();
@@ -609,7 +609,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -632,7 +632,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -653,7 +653,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -810,7 +810,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var host = new IncidentHost(
@@ -858,7 +858,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -880,7 +880,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -913,7 +913,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -948,7 +948,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         using var ui = new SerialUiDispatcher();
@@ -974,7 +974,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -1018,7 +1018,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -1047,7 +1047,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -1071,7 +1071,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
@@ -1104,7 +1104,7 @@ public class IncidentHostTests
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");

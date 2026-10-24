@@ -24,7 +24,7 @@ public class CoMessprotokollEditorSurvivesRefreshTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(

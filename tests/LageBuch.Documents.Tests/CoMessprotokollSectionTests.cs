@@ -128,7 +128,7 @@ public class CoMessprotokollSectionTests
         Assert.Contains("Legende:", text, StringComparison.Ordinal);
     }
 
-    // An .fwincident from elsewhere is hostile input: a Wohnung naming a Haus the file does not
+    // An .lagebuch from elsewhere is hostile input: a Wohnung naming a Haus the file does not
     // hold must drop out of the list, not abort the export mid-Einsatz.
     [Fact]
     public void An_affected_unit_of_a_missing_building_is_left_out_rather_than_failing_the_export()

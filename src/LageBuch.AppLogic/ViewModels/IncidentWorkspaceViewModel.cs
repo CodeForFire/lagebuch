@@ -23,7 +23,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IIncidentSession _session;
 
     // The concrete local session, or null on a joined client. Guards what only exists on the device
-    // that owns the .fwincident file: resuming a read-only file, and exporting straight from its disk.
+    // that owns the .lagebuch file: resuming a read-only file, and exporting straight from its disk.
     private readonly LocalIncidentSession? _local;
     private readonly IClock _clock;
     private readonly ITicker _ticker;
@@ -1276,7 +1276,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public void CancelPendingPrompt() => PendingPrompt = null;
 
-    // The host renders from its own .fwincident; a joined client renders the synced state with
+    // The host renders from its own .lagebuch; a joined client renders the synced state with
     // attachments from its cache (#465, SessionPdfExport). Either way it needs a platform that can
     // actually render one -- QuestPDF doesn't support Android (QuestPDF/QuestPDF#1432), so that head
     // supplies NoopIncidentPdfExporter and hides the button.
@@ -1327,7 +1327,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Justification = "Export can fail in several ways (disk full, exporter throwing, etc.); surfaces in the status line.")]
     private async Task<string?> RunExportAsync(IncidentPdfSections sections)
     {
-        // Reuse the incident's own name -- its .fwincident file's base name (date+time, see
+        // Reuse the incident's own name -- its .lagebuch file's base name (date+time, see
         // HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually still
         // unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf". A
         // joined client has no file, so it names the PDF the same way from the incident's start.
@@ -1470,7 +1470,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Justification = "Host start can fail in several ways (port in use etc.); surfaces in the status line.")]
     private async Task ToggleSharing()
     {
-        // Hosting exposes the local .fwincident, so it needs the concrete local session. The toggle is
+        // Hosting exposes the local .lagebuch, so it needs the concrete local session. The toggle is
         // only shown when CanHost (a hostable platform with a local session), so _local is non-null here.
         if (_local is null)
         {

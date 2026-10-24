@@ -102,7 +102,7 @@ public class MeldungenHeaderTests
             new FakeStore(),
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         var ticker = new ManualTicker();

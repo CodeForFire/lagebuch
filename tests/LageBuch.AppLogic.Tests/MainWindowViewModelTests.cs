@@ -156,7 +156,7 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
@@ -177,7 +177,7 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
@@ -197,7 +197,7 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
@@ -218,12 +218,12 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        TestSession.StartNew(store, clock, new SessionOperator("Schmidt"), "/y.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs("/y.fwincident"), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Schmidt"), "/y.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs("/y.lagebuch"), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
-        await vm.OpenRecent("/x.fwincident");
+        await vm.OpenRecent("/x.lagebuch");
         var firstWorkspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
 
         await vm.RequestOpenFileCommand.ExecuteAsync(null);
@@ -242,11 +242,11 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
-        await vm.OpenRecent("/x.fwincident");
+        await vm.OpenRecent("/x.lagebuch");
 
         Assert.Null(vm.PendingPrompt);
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
@@ -475,10 +475,10 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
-        await vm.OpenRecent("/x.fwincident");
+        await vm.OpenRecent("/x.lagebuch");
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
         Assert.True(workspace.IsReadOnly);
 
@@ -615,7 +615,7 @@ internal sealed class OpenPathDialogs : IFileDialogService
 {
     private readonly string _path;
 
-    public OpenPathDialogs(string path = "/x.fwincident") => _path = path;
+    public OpenPathDialogs(string path = "/x.lagebuch") => _path = path;
 
     public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>(_path);
 

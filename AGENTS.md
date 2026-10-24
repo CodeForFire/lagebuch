@@ -68,7 +68,7 @@ diagnostic-only and should not be committed unless they double as a real test.
 The README's screenshots and demo GIF come from one such test,
 `DemoFlowRenderTests` — regenerate them with `make screenshots` and
 `make demo-gif` whenever a view they show changes; `make samples` refreshes
-the fictional `docs/samples/uebung.fwincident` after a schema change. Cutting a
+the fictional `docs/samples/uebung.lagebuch` after a schema change. Cutting a
 release re-renders them all anyway ([docs/releasing.md](docs/releasing.md#cutting-a-release)),
 so a pull request that forgets one is caught at the next tag rather than shipped
 for weeks.
@@ -97,7 +97,7 @@ Any migration that adds a column must also declare it in
 An incident stores the **values** it takes from the Stammdaten, never a
 **reference** into them. The Stammdaten are global (`masterdata.db`) and edited
 freely: a status is renamed, a vehicle is sold, a Haus is deleted. An
-`.fwincident` has to survive all of that and still read the way it did on the
+`.lagebuch` has to survive all of that and still read the way it did on the
 day, on another Feuerwehr's machine, for years. Decided in #337.
 
 - **Copy at the moment of use.** When something from the Stammdaten enters the
@@ -354,7 +354,7 @@ memory. The rules below are the ones this app has learned the hard way.
 **Threat model.** Three kinds of input arrive from outside:
 
 - a sync peer on a shared LAN;
-- an `.fwincident` file someone handed over;
+- a `.lagebuch` file someone handed over;
 - a Stammdaten JSON import.
 
 Treat all three as hostile. The data inside them is personal data about people

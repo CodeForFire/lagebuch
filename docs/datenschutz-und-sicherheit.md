@@ -14,7 +14,7 @@ ausdrücklich **keine Rechtsberatung**.
 
 - **Kein Konto, keine Cloud, kein Server.** Lagebuch meldet sich nirgends an und
   überträgt von sich aus nichts.
-- **Ein Einsatz ist eine Datei.** Die `.fwincident`-Datei liegt dort, wo sie
+- **Ein Einsatz ist eine Datei.** Die `.lagebuch`-Datei liegt dort, wo sie
   gespeichert wurde, und gehört der Wehr.
 - **Keine Telemetrie, keine automatisch versandten Absturzberichte, keine Updateprüfung.** Es gibt im
   gesamten Programm keinen Aufruf, der Nutzungsdaten irgendwohin sendet.
@@ -86,7 +86,7 @@ Konvention. Einzelheiten zur Stammdatenpflege stehen in
 
 ### Die Einsatzdatei
 
-Eine `.fwincident`-Datei ist eine **SQLite-Datenbank ohne Verschlüsselung**. Sie
+Eine `.lagebuch`-Datei ist eine **SQLite-Datenbank ohne Verschlüsselung**. Sie
 liegt dort, wo sie beim Speichern abgelegt wurde – Lagebuch gibt keinen Ort vor.
 Neben der Datei können betriebsbedingt Hilfsdateien mit den Endungen `-wal` und
 `-shm` entstehen.
@@ -95,7 +95,7 @@ Neben der Datei können betriebsbedingt Hilfsdateien mit den Endungen `-wal` und
 der denselben Namen trägt wie die Einsatzdatei, ergänzt um die Endung `.files`:
 
 ```
-Einsatz-20260917.fwincident     ← Einsatzdaten, ETB, Atemschutz, CO-Messung …
+Einsatz-20260917.lagebuch     ← Einsatzdaten, ETB, Atemschutz, CO-Messung …
 Einsatz-20260917.files/         ← die angehängten Fotos und PDFs
 ```
 
@@ -353,9 +353,9 @@ abgearbeitet sind.
 
 **Windows, Linux, macOS**
 
-1. Jede `.fwincident`-Datei, an allen Orten, an denen Einsätze gespeichert
-   wurden (Anhaltspunkte liefern `recent.json` und `last-save-folder.json`),
-   samt etwaiger `-wal`- und `-shm`-Dateien.
+1. Jede `.lagebuch`-Datei (ältere Versionen speicherten `.fwincident`), an
+   allen Orten, an denen Einsätze gespeichert wurden (Anhaltspunkte liefern
+   `recent.json` und `last-save-folder.json`), samt etwaiger `-wal`- und `-shm`-Dateien.
 2. Zu jeder Einsatzdatei den gleichnamigen `.files`-Ordner.
 3. Aus dem Programmordner (`%AppData%\Lagebuch\` beziehungsweise
    `~/.config/Lagebuch/`):
