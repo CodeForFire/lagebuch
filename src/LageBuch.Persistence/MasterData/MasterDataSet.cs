@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Persistence.MasterData;
 
@@ -39,6 +40,10 @@ public sealed record MasterDataSet(
     // Vehicles per Wache with their seat count (#76).
     IReadOnlyList<Vehicle> Vehicles,
 
+    // Textbausteine: phrases called up by typing ::kürzel, each offered in the areas it is ticked
+    // for. Inserting one copies its text into the entry (#337); nothing points back here.
+    IReadOnlyList<TextSnippet> TextSnippets,
+
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
     IncidentSettings Settings)
@@ -60,6 +65,7 @@ public sealed record MasterDataSet(
         Array.Empty<TruppType>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
+        Array.Empty<TextSnippet>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -80,7 +86,8 @@ public sealed record MasterDataSet(
         && Links.Count == 0 && ChecklistTemplates.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0
-        && Vehicles.Count == 0;
+        && Vehicles.Count == 0
+        && TextSnippets.Count == 0;
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -118,6 +125,79 @@ public sealed record MasterDataSet(
 [SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 [SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 public sealed record Link(string Name, string Url, string Group = "");
+
+/// <summary>
+/// A Textbaustein: a phrase called up by typing <c>::</c> and its <see cref="Shortcut"/> in a text
+/// field, e.g. <c>::stl</c> for "Stromleitung beschädigt, Bereich abgesperrt, EVU alarmiert".
+/// <c>[…]</c> in the text marks a gap the Funker fills in; the field selects the first one.
+/// <see cref="Category"/> is a free-text heading shown beside the suggestion.
+/// <para>
+/// One list serves every area, and each flag says whether one area offers the Textbaustein:
+/// <see cref="ForEtb"/> the ETB fields, <see cref="ForTasks"/> the Aufgabe fields. A Rückmeldung
+/// is rarely an Aufgabe, so most are ticked for one; a phrase both use is kept once. A further
+/// area is one more flag. A Textbaustein ticked for none is kept, just offered nowhere.
+/// </para>
+/// </summary>
+public sealed record TextSnippet(
+    string Shortcut,
+    string Text,
+    string Category = "",
+    bool ForEtb = true,
+    bool ForTasks = true)
+{
+    /// <summary>
+    /// The longest text a Textbaustein may carry: what an Aufgabe may hold, the shorter of the two
+    /// fields it is typed into. Anything longer only fails when the entry is saved.
+    /// </summary>
+    public const int MaxTextLength = IncidentTask.MaxTextLength;
+
+    /// <summary>The longest Kürzel; it is typed, so it is short by nature.</summary>
+    public const int MaxShortcutLength = 12;
+
+    /// <summary>
+    /// The Kürzel as it is matched: lower case, letters and digits only, at most
+    /// <see cref="MaxShortcutLength"/>. "::STL", " stl " and "s-t-l" all become "stl", so a
+    /// hand-edited file cannot hold a Kürzel nobody can type.
+    /// </summary>
+    public static string NormalizeShortcut(string? shortcut)
+    {
+        var letters = new string((shortcut ?? string.Empty)
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+        return letters.Length > MaxShortcutLength ? letters[..MaxShortcutLength] : letters;
+    }
+
+    /// <summary>Trims the text and cuts it to <see cref="MaxTextLength"/>.</summary>
+    public static string CapText(string? text)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        return trimmed.Length > MaxTextLength ? trimmed[..MaxTextLength].TrimEnd() : trimmed;
+    }
+
+    /// <summary>
+    /// Brings a list to the shape every consumer may rely on: Kürzel normalized, text capped,
+    /// entries without either dropped, and each Kürzel once -- the first wins, as it would in the
+    /// suggestion list. The import, a sync host's payload and the store all go through this.
+    /// </summary>
+    public static IReadOnlyList<TextSnippet> Normalize(IEnumerable<TextSnippet> snippets)
+    {
+        ArgumentNullException.ThrowIfNull(snippets);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<TextSnippet>();
+        foreach (var s in snippets)
+        {
+            var shortcut = NormalizeShortcut(s.Shortcut);
+            var text = CapText(s.Text);
+            if (shortcut.Length > 0 && text.Length > 0 && seen.Add(shortcut))
+            {
+                result.Add(s with { Shortcut = shortcut, Text = text, Category = (s.Category ?? string.Empty).Trim() });
+            }
+        }
+
+        return result;
+    }
+}
 
 /// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's
 /// Checklisten are seeded from at start.</summary>
@@ -733,6 +813,7 @@ public static class MasterDataJson
             ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
+            ParseTextSnippets(root),
             ParseSettings(root));
     }
 
@@ -873,6 +954,38 @@ public static class MasterDataJson
             s.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number
                 ? v.GetInt32()
                 : fallback);
+    }
+
+    /// <summary>
+    /// Reads the optional <c>textSnippets</c> array: one object per Textbaustein with
+    /// <c>shortcut</c>, <c>text</c>, an optional <c>category</c> and the areas it is offered in,
+    /// <c>etb</c> and <c>tasks</c>. Normalized like everything else that crosses this boundary, see
+    /// <see cref="TextSnippet.Normalize"/>; a null shortcut or text is a malformed document.
+    /// </summary>
+    /// <remarks>
+    /// Only an explicit <c>false</c> unticks an area: a hand-written entry that names no area means
+    /// "offer this", and one that silently showed up nowhere would look like a broken import.
+    /// </remarks>
+    private static IReadOnlyList<TextSnippet> ParseTextSnippets(JsonElement root)
+    {
+        if (!root.TryGetProperty("textSnippets", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<TextSnippet>();
+        }
+
+        return TextSnippet.Normalize(arr.EnumerateArray().Select(x => new TextSnippet(
+            Required(x, "shortcut"),
+            Required(x, "text"),
+            x.TryGetProperty("category", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() ?? string.Empty : string.Empty,
+            Area(x, "etb"),
+            Area(x, "tasks"))));
+
+        static bool Area(JsonElement e, string prop) =>
+            !e.TryGetProperty(prop, out var v) || v.ValueKind != JsonValueKind.False;
+
+        static string Required(JsonElement e, string prop) =>
+            e.GetProperty(prop).GetString()
+            ?? throw new JsonException($"Textbaustein: \"{prop}\" darf nicht null sein.");
     }
 
     /// <summary>
@@ -1038,6 +1151,14 @@ public static class MasterDataJson
                 isOwn = p.IsOwn,
                 email = p.Email,
                 note = p.Note,
+            }),
+            textSnippets = set.TextSnippets.Select(t => new
+            {
+                shortcut = t.Shortcut,
+                text = t.Text,
+                category = t.Category,
+                etb = t.ForEtb,
+                tasks = t.ForTasks,
             }),
             settings = new
             {

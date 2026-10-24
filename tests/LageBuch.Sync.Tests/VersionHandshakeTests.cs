@@ -129,7 +129,16 @@ public class VersionHandshakeTests
     {
         // 13 adds entryId to addJournalEntry and sourceEntryId to addTask and the snapshot's tasks.
         // A peer at 12 ignores both and the Aufgabe is simply unlinked, so it stays joinable.
-        Assert.Equal(13, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 13, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 12, int.MaxValue);
+    }
+
+    [Fact]
+    public void Textbausteine_raise_the_protocol_to_fourteen_but_not_the_floor()
+    {
+        // 14 adds textSnippets to the Stammdaten payload. A peer at 12 or 13 skips the key and
+        // simply offers no :: suggestions, so it stays joinable.
+        Assert.Equal(14, SyncProtocol.ProtocolVersion);
         Assert.Equal(12, SyncProtocol.MinimumProtocolVersion);
     }
 }

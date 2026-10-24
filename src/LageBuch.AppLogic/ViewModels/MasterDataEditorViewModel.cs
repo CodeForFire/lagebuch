@@ -37,6 +37,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     private NavigationSection _navigation = null!;
     private LinksSection _links = null!;
+    private TextSnippetsSection _textSnippets = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
     private StreetsSection _streets = null!;
@@ -219,6 +220,9 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
                 RequestConfirm),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty, RequestConfirm),
             _links = new LinksSection("Links", set.Links, MarkDirty, RequestConfirm),
+
+            // One list for every area; each row ticks the areas that offer it.
+            _textSnippets = new TextSnippetsSection("Textbausteine", set.TextSnippets, MarkDirty, RequestConfirm),
             _personnel = new PersonnelSection("Personal", set.Personnel, OnPersonnelChanged, RequestConfirm),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
@@ -322,6 +326,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         Streets = _streets.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),
+        TextSnippets = _textSnippets.ToValues(),
         ChecklistTemplates = ChecklistTemplatesFromSections(),
         Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),

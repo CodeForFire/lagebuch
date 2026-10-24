@@ -66,6 +66,15 @@ public class MasterDataEditorRenderTests
                 new Link("Wetterdienst", "https://dwd.de"),
                 new Link("Kartendienst", "https://example.org/karte", "Karten"),
             },
+            TextSnippets = new[]
+            {
+                new TextSnippet("stl", "Stromleitung beschädigt, Bereich abgesperrt, EVU alarmiert", "Sonderfall", ForTasks: false),
+                new TextSnippet("lgb", "Lage bestätigt: [X]", "Erkundung", ForTasks: false),
+                new TextSnippet("lga", "Abweichende Lage zur Meldung: [X]", "Erkundung", ForTasks: false),
+                new TextSnippet("evu", "Energieversorger informieren", "Versorger", ForEtb: false),
+                new TextSnippet("kon", "[X] kontrollieren", "Erkundung", ForEtb: false),
+                new TextSnippet("pol", "Polizei verständigen", "Nachforderung"),
+            },
             Personnel = new[]
             {
                 new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
@@ -97,8 +106,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 9 data categories, and this fixture's 2.
-        Assert.Equal(11, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 11 data categories, and this fixture's 2.
+        Assert.Equal(12, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -302,6 +311,44 @@ public class MasterDataEditorRenderTests
         Assert.Contains("Fürstenfeldbruck", texts);
     }
 
+    [AvaloniaFact]
+    public void Textbausteine_section_renders_its_areas_and_names_a_duplicate_kuerzel()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = Assert.IsType<TextSnippetsSection>(vm.Sections.Single(s => s.Title == "Textbausteine"));
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var conflicts = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "TextSnippetConflicts");
+        Assert.False(conflicts.IsVisible);
+
+        // One checkbox per area and row, ticked as the Stammdaten say: stl ETB only, evu Aufgaben
+        // only, pol both.
+        bool?[] Ticked(string area) => view.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) == area)
+            .Select(c => c.IsChecked)
+            .ToArray();
+        Assert.Equal(new bool?[] { true, true, true, false, false, true }, Ticked("Im ETB anbieten"));
+        Assert.Equal(new bool?[] { false, false, false, true, true, true }, Ticked("In Aufgaben anbieten"));
+
+        // A second row typed with a Kürzel already in use: named on screen, not dropped silently.
+        section.Rows[2].Shortcut = "LGB";
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-textbausteine.png"));
+        }
+
+        Assert.True(conflicts.IsVisible);
+        Assert.Equal("Doppelte Kürzel: lgb", conflicts.Text);
+    }
+
     // #470: a Funktion carries how often it may be held, so the Rollen editor is a typed section
     // with a picker per row rather than the single-string EditableListSection the simple
     // categories use -- the same move #398 made for Trupp-Typen.
@@ -412,10 +459,11 @@ public class MasterDataEditorRenderTests
     // Issue #698: manual sorting was rarely needed and awkward to use, so only Navigation, whose
     // order IS the Einsatz sidebar's, the Checklisten, whose order is the sequence of steps, and
     // the Links, whose order is the Einsatz's link list, keep their up/down buttons -- and, since
-    // #715, the Einheiten-Status, whose order is the STATUS picker's in the Kräfte. Every other
-    // category keeps the order its entries already have, and a new entry goes to the end.
+    // #715, the Einheiten-Status, whose order is the STATUS picker's in the Kräfte, and the
+    // Textbausteine, whose order is the one :: offers them in. Every other category keeps the
+    // order its entries already have, and a new entry goes to the end.
     [AvaloniaFact]
-    public void Only_navigation_einheiten_status_checklisten_and_links_offer_moving_rows_up_and_down()
+    public void Only_ordered_categories_offer_moving_rows_up_and_down()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         var view = new MasterDataEditorView { DataContext = vm };
@@ -433,7 +481,7 @@ public class MasterDataEditorRenderTests
             var moveButtons = Buttons("Nach oben", "Nach unten");
             var removeButtons = Buttons("Entfernen");
 
-            if (section is NavigationSection or EditableListSection or ChecklistTemplateSection or LinksSection)
+            if (section is NavigationSection or EditableListSection or ChecklistTemplateSection or LinksSection or TextSnippetsSection)
             {
                 Assert.True(moveButtons > 0, $"{section.Title} lost its up/down buttons");
             }
@@ -683,7 +731,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(11, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(12, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -743,7 +791,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(11, rows.Length);
+        Assert.Equal(12, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";

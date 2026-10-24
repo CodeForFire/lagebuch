@@ -788,4 +788,55 @@ public class MasterDataStoreTests : IDisposable
 
         return list;
     }
+
+    [Fact]
+    public void Save_round_trips_textbausteine_in_stammdaten_order_with_their_areas()
+    {
+        var snippets = new[]
+        {
+            new TextSnippet("stl", "Stromleitung beschädigt, EVU alarmiert", "Sonderfall", ForEtb: true, ForTasks: false),
+            new TextSnippet("evu", "Energieversorger informieren", ForEtb: false, ForTasks: true),
+            new TextSnippet("lgb", "Lage bestätigt: [X]", "Erkundung"),
+            new TextSnippet("alt", "Abgelegt", ForEtb: false, ForTasks: false),
+        };
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { TextSnippets = snippets });
+
+        Assert.Equal(snippets, MasterDataStore.GetOrCreate(_path).TextSnippets);
+    }
+
+    [Fact]
+    public void A_textbausteine_table_without_area_columns_is_repaired_and_offers_every_row_everywhere()
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_text_snippets (shortcut TEXT NOT NULL, text TEXT NOT NULL, category TEXT NOT NULL DEFAULT '');
+                INSERT INTO md_text_snippets (shortcut, text) VALUES ('stl', 'Stromleitung beschädigt');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(new TextSnippet("stl", "Stromleitung beschädigt"), Assert.Single(MasterDataStore.GetOrCreate(_path).TextSnippets));
+    }
+
+    [Fact]
+    public void A_store_edited_outside_the_app_reads_back_normalized()
+    {
+        MasterDataStore.GetOrCreate(_path);
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "INSERT INTO md_text_snippets (shortcut, text) VALUES ('STL', ' Erste '), ('stl', 'Zweite'), ('', 'Ohne');";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(new TextSnippet("stl", "Erste"), Assert.Single(MasterDataStore.GetOrCreate(_path).TextSnippets));
+    }
 }

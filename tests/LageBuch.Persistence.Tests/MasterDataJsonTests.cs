@@ -804,4 +804,87 @@ public class MasterDataJsonTests
         Assert.Contains("name", ex.Message, StringComparison.Ordinal);
         Assert.Contains("null", ex.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Serialize_round_trips_textbausteine_in_order_with_their_areas()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TextSnippets = new[]
+            {
+                new TextSnippet("stl", "Stromleitung beschädigt, EVU alarmiert", "Sonderfall", ForEtb: true, ForTasks: false),
+                new TextSnippet("evu", "Energieversorger informieren", ForEtb: false, ForTasks: true),
+                new TextSnippet("pol", "Polizei verständigen", "Nachforderung"),
+                new TextSnippet("alt", "Abgelegt", ForEtb: false, ForTasks: false),
+            },
+        };
+
+        var reparsed = Parse(MasterDataJson.Serialize(original));
+
+        Assert.Equal(original.TextSnippets, reparsed.TextSnippets);
+    }
+
+    [Fact]
+    public void A_textbaustein_that_names_no_area_is_offered_in_every_area()
+    {
+        // A hand-written import: only an explicit false unticks an area.
+        var set = Parse("""
+            {
+              "textSnippets": [
+                { "shortcut": "pol", "text": "Polizei verständigen" },
+                { "shortcut": "evu", "text": "Energieversorger informieren", "etb": false },
+                { "shortcut": "ank", "text": "Einsatzstelle erreicht", "tasks": "nein" }
+              ]
+            }
+            """);
+
+        Assert.Equal(
+            new[] { (true, true), (false, true), (true, true) },
+            set.TextSnippets.Select(s => (s.ForEtb, s.ForTasks)));
+    }
+
+    [Fact]
+    public void Parse_normalizes_a_kuerzel_nobody_could_type()
+    {
+        var set = Parse("""{ "textSnippets": [{ "shortcut": " ::S-T-L ", "text": " Stromleitung beschädigt " }] }""");
+
+        Assert.Equal(new TextSnippet("stl", "Stromleitung beschädigt"), Assert.Single(set.TextSnippets));
+    }
+
+    [Fact]
+    public void Parse_drops_incomplete_textbausteine_and_keeps_the_first_of_a_duplicate_kuerzel()
+    {
+        var set = Parse("""
+            {
+              "textSnippets": [
+                { "shortcut": "stl", "text": "Erste" },
+                { "shortcut": "", "text": "Ohne Kürzel" },
+                { "shortcut": "--", "text": "Kürzel ohne Buchstaben" },
+                { "shortcut": "leer", "text": "  " },
+                { "shortcut": "STL", "text": "Zweite" }
+              ]
+            }
+            """);
+
+        Assert.Equal(new TextSnippet("stl", "Erste"), Assert.Single(set.TextSnippets));
+    }
+
+    [Fact]
+    public void Parse_cuts_an_oversized_textbaustein_and_kuerzel()
+    {
+        // A hostile sync host or a doctored import: the text lands in an Aufgabe field, which
+        // refuses anything longer than IncidentTask.MaxTextLength when it is saved.
+        var huge = new string('x', TextSnippet.MaxTextLength * 4);
+        var set = Parse($$"""{ "textSnippets": [{ "shortcut": "abcdefghijklmnopqrstuvwxyz", "text": "{{huge}}" }] }""");
+
+        var snippet = Assert.Single(set.TextSnippets);
+        Assert.Equal(TextSnippet.MaxShortcutLength, snippet.Shortcut.Length);
+        Assert.Equal(TextSnippet.MaxTextLength, snippet.Text.Length);
+    }
+
+    [Theory]
+    [InlineData("""{ "textSnippets": [{ "shortcut": null, "text": "x" }] }""")]
+    [InlineData("""{ "textSnippets": [{ "shortcut": "x", "text": null }] }""")]
+    public void Parse_refuses_a_textbaustein_with_a_null_field(string json) =>
+        Assert.Throws<JsonException>(() => Parse(json));
 }

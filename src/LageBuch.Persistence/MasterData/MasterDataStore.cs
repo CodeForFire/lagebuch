@@ -102,6 +102,23 @@ public sealed class MasterDataStore
                 });
         }
 
+        Run(cn, tx, "DELETE FROM md_text_snippets;", _ => { });
+        foreach (var t in set.TextSnippets)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_text_snippets (shortcut, text, category, in_etb, in_tasks) VALUES ($s,$t,$c,$e,$a);",
+                p =>
+                {
+                    p("$s", t.Shortcut);
+                    p("$t", t.Text);
+                    p("$c", t.Category);
+                    p("$e", t.ForEtb ? 1 : 0);
+                    p("$a", t.ForTasks ? 1 : 0);
+                });
+        }
+
         Run(cn, tx, "DELETE FROM md_vehicles;", _ => { });
         foreach (var v in set.Vehicles)
         {
@@ -291,6 +308,13 @@ public sealed class MasterDataStore
                 email TEXT,
                 note TEXT
             );
+            CREATE TABLE IF NOT EXISTS md_text_snippets (
+                shortcut TEXT NOT NULL,
+                text TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT '',
+                in_etb INTEGER NOT NULL DEFAULT 1,
+                in_tasks INTEGER NOT NULL DEFAULT 1
+            );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS md_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """;
@@ -322,6 +346,13 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "phone", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "email", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "note", "TEXT");
+
+        // md_text_snippets arrived complete, so these repair nothing a release wrote; they are here
+        // because #397's sweep holds every repairable column to the same rule. A Textbaustein that
+        // gains an area column is offered there, as an import that names no area is.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "category", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "in_etb", "INTEGER NOT NULL DEFAULT 1");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "in_tasks", "INTEGER NOT NULL DEFAULT 1");
 
         // Widen an md_links that predates link groups (#518): every link already there is ungrouped.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_links", "group_name", "TEXT NOT NULL DEFAULT ''");
@@ -512,6 +543,7 @@ public sealed class MasterDataStore
             ReadTruppTypes(cn),
             ReadPersonnel(cn),
             ReadVehicles(cn),
+            ReadTextSnippets(cn),
             ReadSettings(cn));
     }
 
@@ -663,6 +695,22 @@ public sealed class MasterDataStore
         }
 
         return list;
+    }
+
+    // Normalized on the way out too, like the Trupp-Typen: the columns are only typed, so a store
+    // edited outside the app could otherwise hold a Kürzel nobody can type or a duplicate one.
+    private static IReadOnlyList<TextSnippet> ReadTextSnippets(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT shortcut, text, category, in_etb, in_tasks FROM md_text_snippets ORDER BY rowid;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<TextSnippet>();
+        while (r.Read())
+        {
+            list.Add(new TextSnippet(r.GetString(0), r.GetString(1), r.GetString(2), r.GetInt32(3) != 0, r.GetInt32(4) != 0));
+        }
+
+        return TextSnippet.Normalize(list);
     }
 
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)

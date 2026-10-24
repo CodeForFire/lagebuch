@@ -24,6 +24,41 @@ person's call sign) becomes a call-sign suggestion. Maintaining the vehicle
 list is all that is needed; every field still accepts free text for anything
 not in it (a Leitstelle, a mutual-aid unit).
 
+## Textbausteine
+
+`textSnippets` is one list, **Textbausteine** in the Stammdaten editor. Each
+Textbaustein says which areas offer it, with one checkbox per area:
+
+| Checkbox | JSON | Offered in |
+|---|---|---|
+| ETB | `etb` | the ETB entry, the ETB edit panel |
+| AUFGABEN | `tasks` | the Aufgaben dock, the Aufgabe dialog, the Aufgabe edit panel |
+
+What a Funker reports ("Einsatzstelle erreicht, Erkundung läuft") is usually
+ticked for the ETB only, and what the Lagebuchführer gives out ("Energieversorger
+informieren") for Aufgaben only. A phrase both use ("Polizei verständigen") is
+ticked for both and kept once. A missing `etb` or `tasks` reads as `true`, so a
+hand-written entry that names no area is offered everywhere. One ticked for
+neither is kept but offered nowhere. More areas will come as further keys.
+
+Each entry has a `shortcut` (the Kürzel), a `text` and an optional `category`.
+Typing `::` in a field lists the Textbausteine ticked for its area; the letters
+after `::` narrow the list — Kürzel first, then any whose text or Kategorie
+contains them. ↑/↓ choose, Enter or Tab insert, Esc closes the list and leaves
+the typed text alone. A tap inserts on a phone.
+
+`[…]` in a text marks a gap: after inserting, the first one is selected, so
+`::lgb` followed by `Zimmerbrand 2. OG` reads `Lage bestätigt: Zimmerbrand 2. OG`.
+(On Android the caret simply follows the text, because the soft keyboard and
+a programmatic selection do not get along.)
+
+A Kürzel is stored lower case, letters and digits only, at most 12 characters;
+`::STL`, `stl` and `s-t-l` are the same Kürzel. Each Kürzel exists once in the
+list, whichever areas it is ticked for. The editor names a duplicate instead of
+saving it, and an import keeps the first.
+A text is cut to 1000 characters, what an Aufgabe may hold. The inserted text
+is plain text in the entry: changing a Textbaustein later changes no entry.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the

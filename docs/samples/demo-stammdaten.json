@@ -59,6 +59,20 @@
     { "name": "Hydrantenplan", "url": "https://example.org/hydranten", "group": "Karten" },
     { "name": "ILS Musterstadt", "url": "https://example.org/ils" }
   ],
+  "textSnippets": [
+    { "shortcut": "ank", "text": "Einsatzstelle erreicht, Erkundung läuft", "category": "Ankunft", "etb": true, "tasks": false },
+    { "shortcut": "lgb", "text": "Lage bestätigt: [X]", "category": "Erkundung", "etb": true, "tasks": false },
+    { "shortcut": "lga", "text": "Abweichende Lage zur Meldung: [X], keine Gefahr für Personen", "category": "Erkundung", "etb": true, "tasks": false },
+    { "shortcut": "nac", "text": "Benötigt Unterstützung durch [X], Nachforderung über Leitstelle", "category": "Arbeit", "etb": true, "tasks": false },
+    { "shortcut": "stl", "text": "Stromleitung beschädigt, Bereich abgesperrt, EVU alarmiert", "category": "Sonderfall", "etb": true, "tasks": false },
+    { "shortcut": "abg", "text": "Einsatzstelle abgearbeitet, an Eigentümer übergeben", "category": "Abgeschlossen", "etb": true, "tasks": false },
+    { "shortcut": "rd", "text": "Rettungsdienst nachfordern", "category": "Nachforderung", "etb": false, "tasks": true },
+    { "shortcut": "pol", "text": "Polizei verständigen", "category": "Nachforderung", "etb": true, "tasks": true },
+    { "shortcut": "evu", "text": "Energieversorger informieren", "category": "Versorger", "etb": false, "tasks": true },
+    { "shortcut": "thw", "text": "THW anfordern", "category": "Nachforderung", "etb": false, "tasks": true },
+    { "shortcut": "kon", "text": "[X] kontrollieren", "category": "Erkundung", "etb": false, "tasks": true },
+    { "shortcut": "spe", "text": "Bereich [X] absperren", "category": "Sicherung", "etb": true, "tasks": true }
+  ],
   "vehicles": [
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 3, "hasZugfuehrer": true },
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 40/1", "seats": 9, "hasZugfuehrer": false },
