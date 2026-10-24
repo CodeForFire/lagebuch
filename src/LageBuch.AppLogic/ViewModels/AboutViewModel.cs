@@ -16,16 +16,24 @@ public sealed partial class AboutViewModel : ObservableObject
 {
     private const string RepoUrl = "https://github.com/CodeForFire/lagebuch";
 
+    // Seven taps on the badge within three seconds open the easter egg: deliberate, and never by
+    // accident while someone is reading the card.
+    private const int EasterEggTaps = 7;
+    private static readonly TimeSpan EasterEggWindow = TimeSpan.FromSeconds(3);
+
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService? _alarm;
     private readonly AlarmMute? _alarmMute;
+    private readonly TimeProvider _time;
+    private readonly Queue<DateTimeOffset> _badgeTaps = new();
 
-    public AboutViewModel(IFileDialogService dialogs, string version, IAlarmService? alarm = null, AlarmMute? alarmMute = null)
+    public AboutViewModel(IFileDialogService dialogs, string version, IAlarmService? alarm = null, AlarmMute? alarmMute = null, TimeProvider? time = null)
     {
         _dialogs = dialogs;
         Version = version;
         _alarm = alarm;
         _alarmMute = alarmMute;
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Whether this device has a mute switch to offer; the checkbox is hidden otherwise.</summary>
@@ -118,6 +126,26 @@ public sealed partial class AboutViewModel : ObservableObject
 
     [RelayCommand]
     private void Close() => Closed?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raised on the seventh quick tap on the badge; the host swaps this card for the game.</summary>
+    public event EventHandler? EasterEggRequested;
+
+    [RelayCommand]
+    private void BadgeTapped()
+    {
+        var now = _time.GetUtcNow();
+        _badgeTaps.Enqueue(now);
+        while (now - _badgeTaps.Peek() > EasterEggWindow)
+        {
+            _badgeTaps.Dequeue();
+        }
+
+        if (_badgeTaps.Count >= EasterEggTaps)
+        {
+            _badgeTaps.Clear();
+            EasterEggRequested?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     // The URL is on screen in the About card, so it is what the error names.
     [RelayCommand]

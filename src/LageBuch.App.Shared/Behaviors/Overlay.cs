@@ -53,6 +53,13 @@ public static class Overlay
     // The control that had focus when the overlay was shown: the one focus goes back to.
     private static readonly ConditionalWeakTable<Control, IInputElement> Openers = new();
 
+    // The opener an overlay that just closed is about to hand focus back to, until that happens.
+    // An overlay that replaces it in the same breath (About giving way to its easter egg) opens
+    // while focus still sits on a control that has left the tree, and takes this opener over.
+    // Only ever touched on the UI thread. Not keyed by TopLevel: a closing overlay is already
+    // detached and no longer finds its own.
+    private static IInputElement? _handingBack;
+
     static Overlay()
     {
         CancelCommandProperty.Changed.AddClassHandler<Control>((root, e) =>
@@ -165,7 +172,13 @@ public static class Overlay
     private static void Opened(Control root)
     {
         Openers.Remove(root);
-        if (TopLevel.GetTopLevel(root)?.FocusManager?.GetFocusedElement() is { } opener && !IsWithin(root, opener))
+        var focused = TopLevel.GetTopLevel(root)?.FocusManager?.GetFocusedElement();
+        if (!(focused is Visual visual && visual.IsAttachedToVisualTree()))
+        {
+            focused = _handingBack;
+        }
+
+        if (focused is { } opener && !IsWithin(root, opener))
         {
             Openers.Add(root, opener);
         }
@@ -255,8 +268,11 @@ public static class Overlay
     {
         Openers.Remove(root);
         var fallback = GetFallbackFocus(root);
+        _handingBack = opener;
         Dispatcher.UIThread.Post(() =>
         {
+            _handingBack = null;
+
             // Another overlay may have opened in the same breath (a confirm chaining into the PDF
             // options); focus stays with it.
             if (topLevel?.FocusManager?.GetFocusedElement() is Visual focused && IsInOverlay(focused))
