@@ -191,11 +191,129 @@ public class FireGameViewModelTests
 
         Assert.Equal("Vollbrand! 3 Punkte – Anwärter:in. Neuer Bestwert!", game.ResultText);
 
+        // Equalling the best is not beating it.
         game.StartCommand.Execute(null);
+        game.Windows[0].ExtinguishCommand.Execute(null);
         time.Tick(FireGameViewModel.RoundSteps);
 
-        Assert.Equal("Vollbrand! 0 Punkte – Anwärter:in.", game.ResultText);
+        Assert.Equal("Vollbrand! 3 Punkte – Anwärter:in.", game.ResultText);
         Assert.Equal(3, game.BestScore);
+    }
+
+    [Theory]
+    [InlineData(19, "Anwärter:in")]
+    [InlineData(20, "Truppführer:in")]
+    [InlineData(49, "Truppführer:in")]
+    [InlineData(50, "Gruppenführer:in")]
+    [InlineData(89, "Gruppenführer:in")]
+    [InlineData(90, "Zugführer:in")]
+    public void The_rank_rises_with_the_score(int score, string rank) =>
+        Assert.Equal(rank, FireGameViewModel.Rank(score));
+
+    [Fact]
+    public void Before_the_first_round_the_clock_shows_a_full_minute_and_the_start_panel()
+    {
+        var game = New(out _);
+
+        Assert.Equal(60, game.RemainingSeconds);
+        Assert.True(game.IsIdle);
+
+        game.StartCommand.Execute(null);
+        Assert.False(game.IsIdle);
+    }
+
+    [Fact]
+    public void Vollbrand_strikes_at_exactly_six_burning_windows()
+    {
+        var game = New(out var time);
+        game.StartCommand.Execute(null);
+
+        while (game.IsRunning)
+        {
+            Assert.True(game.Windows.Count(w => w.IsBurning) < FireGameViewModel.VollbrandWindows);
+            time.Tick();
+        }
+
+        Assert.True(game.Windows.Count(w => w.IsBurning) >= FireGameViewModel.VollbrandWindows);
+    }
+
+    [Fact]
+    public void Starting_again_mid_round_clears_the_house_and_keeps_one_clock()
+    {
+        var game = New(out var time);
+        game.StartCommand.Execute(null);
+        time.Tick(3 * FireGameViewModel.StepsPerStage);
+        game.Windows[0].ExtinguishCommand.Execute(null);
+
+        game.StartCommand.Execute(null);
+
+        Assert.Equal(1, time.ActiveTimers);
+        Assert.Equal(0, game.Score);
+        Assert.Equal(1, game.Windows.Count(w => w.IsBurning));
+        Assert.Equal(1, game.Windows[0].Stage);
+    }
+
+    [Fact]
+    public void Starting_again_after_a_round_clears_the_result()
+    {
+        var game = New(out var time);
+        game.StartCommand.Execute(null);
+        time.Tick(FireGameViewModel.RoundSteps);
+        Assert.True(game.IsOver);
+
+        game.StartCommand.Execute(null);
+
+        Assert.False(game.IsOver);
+    }
+
+    [Fact]
+    public void A_fire_in_the_middle_spreads_left_right_up_or_down_only()
+    {
+        // The first fire lands in window 5, the middle of the second floor. Spawns take windows
+        // 1 and 2, so of its neighbours 2, 4, 6 and 8 the first dark one is 4.
+        var time = new ManualTimeProvider();
+        var game = new FireGameViewModel(time, new FirstChoiceRandom(first: 4));
+        game.StartCommand.Execute(null);
+
+        time.Tick((2 * FireGameViewModel.StepsPerStage) + FireGameViewModel.StepsBeforeSpread);
+
+        Assert.Equal(1, game.Windows[3].Stage);
+        Assert.Equal(0, game.Windows[5].Stage);
+        Assert.Equal(0, game.Windows[7].Stage);
+    }
+
+    [Fact]
+    public void A_fire_in_the_corner_spreads_inside_the_house()
+    {
+        // Window 12, bottom right: its only neighbours are 9 above and 11 to the left.
+        var time = new ManualTimeProvider();
+        var game = new FireGameViewModel(time, new FirstChoiceRandom(first: 11));
+        game.StartCommand.Execute(null);
+
+        time.Tick((2 * FireGameViewModel.StepsPerStage) + FireGameViewModel.StepsBeforeSpread);
+
+        Assert.Equal(1, game.Windows[8].Stage);
+        Assert.Equal(0, game.Windows[10].Stage);
+    }
+
+    [Fact]
+    public void A_window_shows_one_size_of_fire_at_a_time()
+    {
+        var game = New(out var time);
+        var window = game.Windows[0];
+        Assert.False(window.IsSmall || window.IsMedium || window.IsLarge);
+
+        game.StartCommand.Execute(null);
+        Assert.True(window.IsSmall);
+        Assert.False(window.IsMedium || window.IsLarge);
+
+        time.Tick(FireGameViewModel.StepsPerStage);
+        Assert.True(window.IsMedium);
+        Assert.False(window.IsSmall || window.IsLarge);
+
+        time.Tick(FireGameViewModel.StepsPerStage);
+        Assert.True(window.IsLarge);
+        Assert.False(window.IsSmall || window.IsMedium);
     }
 
     [Fact]
@@ -231,8 +349,16 @@ public class FireGameViewModelTests
         }
     }
 
-    private sealed class FirstChoiceRandom : Random
+    // Always the first choice, except optionally for the very first pick.
+    private sealed class FirstChoiceRandom(int first = 0) : Random
     {
-        public override int Next(int maxValue) => 0;
+        private int _first = first;
+
+        public override int Next(int maxValue)
+        {
+            var pick = _first;
+            _first = 0;
+            return pick;
+        }
     }
 }

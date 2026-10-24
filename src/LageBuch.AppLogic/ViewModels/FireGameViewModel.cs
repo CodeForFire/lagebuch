@@ -190,7 +190,7 @@ public sealed partial class FireGameViewModel : ObservableObject, IDisposable
         ResultText = $"{reason} {Score} Punkte – {Rank(Score)}." + (record ? " Neuer Bestwert!" : string.Empty);
     }
 
-    private static string Rank(int score) => score switch
+    internal static string Rank(int score) => score switch
     {
         < 20 => "Anwärter:in",
         < 50 => "Truppführer:in",

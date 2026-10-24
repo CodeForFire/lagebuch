@@ -190,6 +190,41 @@ public class AboutViewModelTests
     }
 
     [Fact]
+    public void Seven_taps_spread_over_exactly_three_seconds_still_count()
+    {
+        var time = new ManualTimeProvider();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", time: time);
+        var requests = 0;
+        vm.EasterEggRequested += (_, _) => requests++;
+
+        for (var i = 0; i < 7; i++)
+        {
+            vm.BadgeTappedCommand.Execute(null);
+            time.Advance(TimeSpan.FromMilliseconds(500));
+        }
+
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
+    public void An_eighth_tap_starts_counting_again()
+    {
+        var time = new ManualTimeProvider();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", time: time);
+        var requests = 0;
+        vm.EasterEggRequested += (_, _) => requests++;
+
+        for (var i = 0; i < 13; i++)
+        {
+            vm.BadgeTappedCommand.Execute(null);
+        }
+
+        Assert.Equal(1, requests);
+        vm.BadgeTappedCommand.Execute(null);
+        Assert.Equal(2, requests);
+    }
+
+    [Fact]
     public void Slow_logo_taps_do_not_request_the_easter_egg()
     {
         var time = new ManualTimeProvider();
