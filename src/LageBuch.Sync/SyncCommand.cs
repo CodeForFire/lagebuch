@@ -57,6 +57,10 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(RemoveInvolvedPartyCommand), "removeInvolvedParty")]
 [JsonDerivedType(typeof(SetInvolvedPartyDwellingCommand), "setInvolvedPartyDwelling")]
 [JsonDerivedType(typeof(SetInvolvedPartyWhereaboutsCommand), "setInvolvedPartyWhereabouts")]
+[JsonDerivedType(typeof(AddSituationReportCommand), "addSituationReport")]
+[JsonDerivedType(typeof(UpdateSituationReportCommand), "updateSituationReport")]
+[JsonDerivedType(typeof(RemoveSituationReportCommand), "removeSituationReport")]
+[JsonDerivedType(typeof(SendSituationReportCommand), "sendSituationReport")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -181,6 +185,32 @@ public sealed record SetInvolvedPartyDwellingCommand(Guid PartyId, Guid? Dwellin
 /// <summary>Where a Beteiligte/r is now; a null or blank Whereabouts clears it. No time on the
 /// wire: the host stamps it with its own clock, as it does an ETB entry.</summary>
 public sealed record SetInvolvedPartyWhereaboutsCommand(Guid PartyId, string? Whereabouts) : SyncCommand;
+
+// The Lagemeldungen (#592). A draft's correction or discard writes no ETB line and records no
+// author, like the Beteiligte; the send carries the operator because it writes the ETB entry, and
+// the Leitstelle's name because that comes from the sender's Stammdaten. The domain caps every
+// field, so an oversized value from a peer is refused on the host.
+public sealed record AddSituationReportCommand(
+    OperatorDto Operator,
+    string? Reporter,
+    string? Location,
+    string? Situation,
+    string? Measures,
+    string? Units,
+    string? Requests) : SyncCommand;
+
+public sealed record UpdateSituationReportCommand(
+    Guid ReportId,
+    string? Reporter,
+    string? Location,
+    string? Situation,
+    string? Measures,
+    string? Units,
+    string? Requests) : SyncCommand;
+
+public sealed record RemoveSituationReportCommand(Guid ReportId) : SyncCommand;
+
+public sealed record SendSituationReportCommand(OperatorDto Operator, Guid ReportId, string DispatchCentreName) : SyncCommand;
 
 // No operator on the wire: a task correction is a silent edit (no ETB entry), like RenameFileCommand.
 public sealed record UpdateTaskCommand(

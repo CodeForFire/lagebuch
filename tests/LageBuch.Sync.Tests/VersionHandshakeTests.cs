@@ -147,7 +147,16 @@ public class VersionHandshakeTests
     {
         // 15 adds phone to the Stammdaten payload's vehicles. A peer at 12 to 14 skips the key and
         // lists no Fahrzeugtelefon, so it stays joinable.
-        Assert.Equal(15, SyncProtocol.ProtocolVersion);
-        Assert.Equal(12, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 15, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 12, int.MaxValue);
+    }
+
+    [Fact]
+    public void Sending_a_Lagemeldung_raises_the_floor_to_protocol_sixteen()
+    {
+        // 16 lets a client send the four Lagemeldung commands (#592). A host at 15 has none of them in
+        // its command allowlist and would reject the report, so a 15 and a 16 must not connect.
+        Assert.Equal(16, SyncProtocol.ProtocolVersion);
+        Assert.Equal(16, SyncProtocol.MinimumProtocolVersion);
     }
 }

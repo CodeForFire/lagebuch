@@ -216,6 +216,20 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetInvolvedPartyWhereabouts(Guid partyId, string? whereabouts) =>
         Mutate(() => Incident.SetInvolvedPartyWhereabouts(_clock, partyId, whereabouts));
 
+    public void AddSituationReport(
+        string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        Mutate(() => Incident.AddSituationReport(_clock, RequireOperator(), reporter, location, situation, measures, units, requests));
+
+    public void UpdateSituationReport(
+        Guid reportId, string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        Mutate(() => Incident.UpdateSituationReport(reportId, reporter, location, situation, measures, units, requests));
+
+    public void RemoveSituationReport(Guid reportId) =>
+        Mutate(() => Incident.RemoveSituationReport(reportId));
+
+    public void SendSituationReport(Guid reportId, string dispatchCentreName) =>
+        Mutate(() => Incident.SendSituationReport(_clock, RequireOperator(), reportId, dispatchCentreName));
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Mutate(() => Incident.UpdateTask(taskId, text, assignee, importance, urgency));
 
