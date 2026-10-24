@@ -126,25 +126,57 @@ public class IncidentFileStoreTests : IDisposable
         Assert.Equal(0, BlobRowCount());
     }
 
-    [Fact]
-    public async Task Deleted_attachment_bytes_are_not_left_in_the_incident_file()
+    private static readonly byte[] SecretMarker = System.Text.Encoding.ASCII.GetBytes("LAGEBUCH-SECRET-");
+
+    private static byte[] MarkerPayload(byte[] marker)
     {
-        var marker = System.Text.Encoding.ASCII.GetBytes("LAGEBUCH-SECRET-");
         var payload = new byte[marker.Length * 4096];
         for (var i = 0; i < 4096; i++)
         {
             marker.CopyTo(payload, i * marker.Length);
         }
 
-        await _store.SaveBytesAsync(_incidentPath, "secret.bin", payload);
-        await _store.DeleteBytesAsync(_incidentPath, "secret.bin");
+        return payload;
+    }
 
+    private async Task AssertMarkerIsGoneAsync(byte[] marker)
+    {
         Assert.Equal(-1, (await File.ReadAllBytesAsync(_incidentPath)).AsSpan().IndexOf(marker));
         var wal = _incidentPath + "-wal";
         if (File.Exists(wal))
         {
             Assert.Equal(-1, (await File.ReadAllBytesAsync(wal)).AsSpan().IndexOf(marker));
         }
+    }
+
+    [Fact]
+    public async Task Deleted_attachment_bytes_are_not_left_in_the_incident_file()
+    {
+        await _store.SaveBytesAsync(_incidentPath, "secret.bin", MarkerPayload(SecretMarker));
+        await _store.DeleteBytesAsync(_incidentPath, "secret.bin");
+
+        await AssertMarkerIsGoneAsync(SecretMarker);
+    }
+
+    [Fact]
+    public async Task Replaced_attachment_bytes_are_not_left_in_the_incident_file()
+    {
+        await _store.SaveBytesAsync(_incidentPath, "secret.bin", MarkerPayload(SecretMarker));
+        await _store.SaveBytesAsync(_incidentPath, "secret.bin", MarkerPayload(System.Text.Encoding.ASCII.GetBytes("another-payload!")));
+
+        await AssertMarkerIsGoneAsync(SecretMarker);
+    }
+
+    [Fact]
+    public async Task Saving_runs_off_the_callers_thread()
+    {
+        var callerThread = Environment.CurrentManagedThreadId;
+        using var source = new ThreadRecordingStream([1, 2, 3]);
+
+        await _store.SaveStreamAsync(_incidentPath, "t.bin", source);
+
+        Assert.NotEqual(0, source.ReadThreadId);
+        Assert.NotEqual(callerThread, source.ReadThreadId);
     }
 
     [Fact]
@@ -180,6 +212,17 @@ public class IncidentFileStoreTests : IDisposable
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset Now { get; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class ThreadRecordingStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public int ReadThreadId { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            ReadThreadId = Environment.CurrentManagedThreadId;
+            return base.Read(buffer, offset, count);
+        }
     }
 
     private sealed class NonSeekableStream(byte[] bytes) : MemoryStream(bytes)

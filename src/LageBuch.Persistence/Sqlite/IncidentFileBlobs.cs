@@ -39,6 +39,33 @@ internal static class IncidentFileBlobs
     }
 
     /// <summary>
+    /// The one way to open the incident file for a write that frees blob pages -- a delete, or a
+    /// replace of an existing row. <c>secure_delete</c> makes SQLite zero the freed pages instead
+    /// of leaving the old bytes readable inside a file that gets handed on. It is per connection
+    /// and not persisted, so it is set here rather than once at migration. Also ensures the table.
+    /// </summary>
+    public static SqliteConnection OpenForWrite(string incidentPath)
+    {
+        var cn = SqliteConnectionFactory.OpenExisting(incidentPath);
+        try
+        {
+            using (var pragma = cn.CreateCommand())
+            {
+                pragma.CommandText = "PRAGMA secure_delete = ON;";
+                pragma.ExecuteNonQuery();
+            }
+
+            EnsureTable(cn, null);
+            return cn;
+        }
+        catch
+        {
+            cn.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Stores <paramref name="length"/> bytes from <paramref name="source"/> under
     /// <paramref name="storageName"/>, replacing any earlier row. A <c>zeroblob</c> reserves the
     /// row and the bytes are then streamed into it, so the attachment is never held in memory whole.

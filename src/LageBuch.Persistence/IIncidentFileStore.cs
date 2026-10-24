@@ -42,13 +42,19 @@ public sealed class IncidentFileStore : IIncidentFileStore
 {
     private const int CopyBufferSize = 81920;
 
+    // Every operation hands its SQLite work to the thread pool: the callers await these from the UI
+    // thread, and 25 MB of WAL writes plus an fsync (or a SQLITE_BUSY wait behind IncidentStore's
+    // writer) must never freeze it (#167 P0). Each operation owns its connection, so this is safe.
     public Task SaveBytesAsync(string incidentPath, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(bytes);
-        cancellationToken.ThrowIfCancellationRequested();
-        using var source = new MemoryStream(bytes, writable: false);
-        Store(incidentPath, storageFileName, source, bytes.Length);
-        return Task.CompletedTask;
+        return Task.Run(
+            () =>
+            {
+                using var source = new MemoryStream(bytes, writable: false);
+                Store(incidentPath, storageFileName, source, bytes.Length);
+            },
+            cancellationToken);
     }
 
     public async Task SaveStreamAsync(string incidentPath, string storageFileName, Stream source, CancellationToken cancellationToken = default)
@@ -56,8 +62,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
         ArgumentNullException.ThrowIfNull(source);
         if (source.CanSeek)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            Store(incidentPath, storageFileName, source, source.Length - source.Position);
+            await Task.Run(() => Store(incidentPath, storageFileName, source, source.Length - source.Position), cancellationToken);
             return;
         }
 
@@ -83,7 +88,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
         }
 
         spool.Position = 0;
-        Store(incidentPath, storageFileName, spool, spool.Length);
+        await Task.Run(() => Store(incidentPath, storageFileName, spool, spool.Length), cancellationToken);
     }
 
     [SuppressMessage(
@@ -92,15 +97,20 @@ public sealed class IncidentFileStore : IIncidentFileStore
         Justification = "Try-read: an unreadable attachment degrades to null, never fails incident load.")]
     public Task<byte[]?> TryReadBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(Read(incidentPath, storageFileName));
-        }
-        catch
-        {
-            return Task.FromResult<byte[]?>(null);
-        }
+        return Task.Run(
+            () =>
+            {
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return Read(incidentPath, storageFileName);
+                }
+                catch
+                {
+                    return null;
+                }
+            },
+            CancellationToken.None);
     }
 
     public string ResolveDiskPath(string incidentPath, string storageFileName) =>
@@ -108,9 +118,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
 
     public Task DeleteBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        Remove(incidentPath, storageFileName);
-        return Task.CompletedTask;
+        return Task.Run(() => Remove(incidentPath, storageFileName), cancellationToken);
     }
 
     private static byte[]? Read(string incidentPath, string storageFileName)
@@ -124,14 +132,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
 
     private static void Remove(string incidentPath, string storageFileName)
     {
-        using var cn = SqliteConnectionFactory.OpenExisting(incidentPath);
-        IncidentFileBlobs.EnsureTable(cn, null);
-        using (var pragma = cn.CreateCommand())
-        {
-            pragma.CommandText = "PRAGMA secure_delete = ON;";
-            pragma.ExecuteNonQuery();
-        }
-
+        using var cn = IncidentFileBlobs.OpenForWrite(incidentPath);
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "DELETE FROM " + IncidentFileBlobs.Table + " WHERE storage_name = $name;";
         cmd.Parameters.AddWithValue("$name", storageFileName);
@@ -140,8 +141,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
 
     private static void Store(string incidentPath, string storageFileName, Stream source, long length)
     {
-        using var cn = SqliteConnectionFactory.OpenExisting(incidentPath);
-        IncidentFileBlobs.EnsureTable(cn, null);
+        using var cn = IncidentFileBlobs.OpenForWrite(incidentPath);
         using var tx = cn.BeginTransaction();
         IncidentFileBlobs.Write(cn, tx, storageFileName, source, length);
         tx.Commit();
