@@ -412,8 +412,14 @@ public sealed record Person(
 /// and older Stammdaten payloads keep working unchanged. IsOwn tells the brigade's own vehicles
 /// from those of a neighbouring one (#458); defaulted to own for the same reason, which is the
 /// opposite of HasZugfuehrer's default -- a missing flag must not turn a whole fleet foreign.
+/// Phone is the Fahrzeugtelefon, optional and trailing for the same reason; a vehicle that has
+/// one is listed in the Kontakte tab next to the roster.
 /// </summary>
-public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false, bool IsOwn = true);
+public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false, bool IsOwn = true, string? Phone = null)
+{
+    /// <inheritdoc cref="Person.HasPhone"/>
+    public bool HasPhone => !string.IsNullOrWhiteSpace(Phone);
+}
 
 /// <summary>
 /// One street of the Gemeinde (#461), with the Ortsteil, PLZ and Ort it lies in where those are
@@ -797,7 +803,8 @@ public static class MasterDataJson
                         x.GetProperty("callSign").GetString()!,
                         x.TryGetProperty("seats", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0,
                         x.TryGetProperty("hasZugfuehrer", out var hz) && hz.ValueKind == JsonValueKind.True,
-                        IsOwn(x)))
+                        IsOwn(x),
+                        Opt(x, "phone")))
                     .ToList()
                 : Array.Empty<Vehicle>();
 
@@ -1092,10 +1099,11 @@ public static class MasterDataJson
                 Opt(p, "email"),
                 Opt(p, "note")))
             .ToList();
-
-        static string? Opt(JsonElement e, string prop) =>
-            e.TryGetProperty(prop, out var v) && v.ValueKind is not JsonValueKind.Null ? v.GetString() : null;
     }
+
+    /// <summary>An optional string field of a vehicle or a person: absent or null reads as null.</summary>
+    private static string? Opt(JsonElement e, string prop) =>
+        e.TryGetProperty(prop, out var v) && v.ValueKind is not JsonValueKind.Null ? v.GetString() : null;
 
     /// <summary>
     /// A link's optional group (#518), trimmed. Absent — every file and sync host from before the
@@ -1140,7 +1148,7 @@ public static class MasterDataJson
             checklists = ChecklistsForExport(set),
             navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url, group = l.Group }),
-            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn }),
+            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone }),
             personnel = set.Personnel.Select(p => new
             {
                 lastName = p.LastName,

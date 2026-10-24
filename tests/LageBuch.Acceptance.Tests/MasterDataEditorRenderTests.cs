@@ -144,6 +144,29 @@ public class MasterDataEditorRenderTests
         Assert.True(grids.Single(g => g.Name == "PersonnelHeader").IsEffectivelyVisible);
     }
 
+    // The Fahrzeuge half of the same promise: on an ELW screen a vehicle is one row under the
+    // column header, Fahrzeugtelefon included, and the stacked phone card stays out of sight.
+    [AvaloniaFact]
+    public void A_wide_editor_keeps_the_wide_vehicle_rows_with_the_phone_column()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Fahrzeuge");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var descendants = view.GetVisualDescendants().ToList();
+        var wide = descendants.OfType<Grid>().Where(g => g.Classes.Contains("vehicle-wide")).ToList();
+        Assert.NotEmpty(wide);
+        Assert.All(wide, g => Assert.True(g.IsEffectivelyVisible));
+        Assert.All(descendants.OfType<Border>().Where(b => b.Classes.Contains("vehicle-narrow")), b => Assert.False(b.IsEffectivelyVisible));
+        Assert.True(descendants.OfType<Grid>().Single(g => g.Name == "VehiclesHeader").IsEffectivelyVisible);
+        Assert.Contains(
+            wide[0].GetVisualDescendants().OfType<TextBox>(),
+            t => t.IsEffectivelyVisible && AutomationProperties.GetName(t) == "Telefon");
+    }
+
     // The ETB's checkbox being disabled is a promise the UI makes, not just a view-model flag:
     // it is the legally relevant record and every Systemmeldung lands there. The resolver ignores
     // a hidden ETB anyway, but this is where an operator is told why they cannot switch it off.

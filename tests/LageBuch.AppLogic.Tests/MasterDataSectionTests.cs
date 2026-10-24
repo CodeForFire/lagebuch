@@ -221,7 +221,7 @@ public class MasterDataSectionTests
     public void VehicleRow_HasZugfuehrer_change_flags_a_change()
     {
         var changes = 0;
-        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
         row.HasZugfuehrer = true;
 
@@ -233,12 +233,41 @@ public class MasterDataSectionTests
     public void VehicleRow_IsOwn_change_flags_a_change()
     {
         var changes = 0;
-        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
         row.IsOwn = false;
 
         Assert.Equal(1, changes);
         Assert.False(row.IsOwn);
+    }
+
+    [Fact]
+    public void VehicleRow_Phone_change_flags_a_change()
+    {
+        var changes = 0;
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+
+        row.Phone = "01 71 / 1 23 45 67";
+
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Vehicles_ToValues_trims_the_phone_number_and_stores_a_blank_one_as_none()
+    {
+        var s = new VehiclesSection(
+            "Fahrzeuge",
+            new[] { new Vehicle("Wache 1", "ELW 1", 4), new Vehicle("Wache 1", "LF 1", 9) },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            () => { });
+
+        s.Rows[0].Phone = "  01 71 / 1 23 45 67 ";
+        s.Rows[1].Phone = "   ";
+
+        Assert.Equal(
+            new[] { new Vehicle("Wache 1", "ELW 1", 4, Phone: "01 71 / 1 23 45 67"), new Vehicle("Wache 1", "LF 1", 9) },
+            s.ToValues());
     }
 
     [Fact]

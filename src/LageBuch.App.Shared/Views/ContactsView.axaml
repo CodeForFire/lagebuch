@@ -121,7 +121,7 @@
     </Border>
 
     <TextBlock DockPanel.Dock="Top" x:Name="EmptyText"
-               Text="Keine Kontakte hinterlegt — Personal steht in den Stammdaten."
+               Text="Keine Kontakte hinterlegt — Personal und Fahrzeugtelefone stehen in den Stammdaten."
                Foreground="{StaticResource TextSecondaryBrush}"
                IsVisible="{Binding !Contacts.Count}" />
 
@@ -160,9 +160,9 @@
                         <TextBlock x:Name="ContactName" FontSize="15" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
                                    b:HighlightedText.Segments="{Binding NameSegments}" />
-                        <TextBlock Text="{Binding Person.Role}" VerticalAlignment="Center"
+                        <TextBlock Text="{Binding Entry.Caption}" VerticalAlignment="Center"
                                    Foreground="{StaticResource TextSecondaryBrush}" />
-                        <TextBlock Classes="mono" Text="{Binding Person.CallSign}" VerticalAlignment="Center" />
+                        <TextBlock Classes="mono" Text="{Binding Entry.CallSign}" VerticalAlignment="Center" />
                         <!-- #458: somebody from a neighbouring brigade. A quiet tag, not a colour: it
                              explains a surprise ("why can't I pick them as Lagebuchführer?") rather
                              than warning about anything. -->
@@ -170,6 +170,13 @@
                                 BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
                                 CornerRadius="{StaticResource RadiusSm}" Padding="6,1">
                           <TextBlock Text="fremd" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                        </Border>
+                        <!-- A Fahrzeugtelefon among the people: the same quiet tag, so a Funkrufname
+                             in the name slot is not read as somebody's name. -->
+                        <Border x:Name="VehicleTag" IsVisible="{Binding Entry.IsVehicle}" VerticalAlignment="Center"
+                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+                                CornerRadius="{StaticResource RadiusSm}" Padding="6,1">
+                          <TextBlock Text="Fahrzeug" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                         </Border>
                       </WrapPanel>
   
@@ -195,11 +202,11 @@
                         <Panel DockPanel.Dock="Right" Classes="contact-mail-slot" Margin="4,0,0,0"
                                KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
                           <Button Classes="icon-btn contact-mail"
-                                  IsVisible="{Binding Person.HasEmail}"
+                                  IsVisible="{Binding Entry.HasEmail}"
                                   Command="{ReflectionBinding $parent[ItemsControl].DataContext.MailCommand}"
-                                  CommandParameter="{Binding Person}"
-                                  ToolTip.Tip="{Binding Person.Email, StringFormat='E-Mail an {0} verfassen'}"
-                                  AutomationProperties.Name="{Binding Person.Email, StringFormat='E-Mail an {0} verfassen'}">
+                                  CommandParameter="{Binding Entry}"
+                                  ToolTip.Tip="{Binding Entry.Email, StringFormat='E-Mail an {0} verfassen'}"
+                                  AutomationProperties.Name="{Binding Entry.Email, StringFormat='E-Mail an {0} verfassen'}">
                             <PathIcon Width="16" Height="16"
                                       Data="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
                           </Button>
@@ -216,7 +223,7 @@
                                 IsVisible="{Binding CanDial}"
                                 AutomationProperties.Name="{Binding PhoneDisplay, StringFormat='{}{0} wählen'}"
                                 Command="{ReflectionBinding $parent[ItemsControl].DataContext.CallCommand}"
-                                CommandParameter="{Binding Person}"
+                                CommandParameter="{Binding Entry}"
                                 ToolTip.Tip="In der Telefon-App wählen — verlässt Lagebuch">
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <PathIcon Width="13" Height="13" VerticalAlignment="Center"

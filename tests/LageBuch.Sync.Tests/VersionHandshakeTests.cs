@@ -138,7 +138,16 @@ public class VersionHandshakeTests
     {
         // 14 adds textSnippets to the Stammdaten payload. A peer at 12 or 13 skips the key and
         // simply offers no :: suggestions, so it stays joinable.
-        Assert.Equal(14, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 14, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 12, int.MaxValue);
+    }
+
+    [Fact]
+    public void A_vehicle_phone_number_raises_the_protocol_to_fifteen_but_not_the_floor()
+    {
+        // 15 adds phone to the Stammdaten payload's vehicles. A peer at 12 to 14 skips the key and
+        // lists no Fahrzeugtelefon, so it stays joinable.
+        Assert.Equal(15, SyncProtocol.ProtocolVersion);
         Assert.Equal(12, SyncProtocol.MinimumProtocolVersion);
     }
 }

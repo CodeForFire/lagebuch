@@ -1,0 +1,1 @@
+Stammdaten: a Fahrzeug can carry a phone number, and every vehicle that has one is listed in the Kontakte tab to search and dial, while the Fahrzeuge editor gains a stacked form on a phone like the Personal one.

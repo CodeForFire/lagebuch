@@ -30,18 +30,18 @@ public sealed partial class VehiclesSection : EditorSection
         _wacheOptions = wacheOptions;
         _callSignOptions = callSignOptions;
         Rows = new ObservableCollection<VehicleRow>(
-            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer, v.IsOwn)));
+            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer, v.IsOwn, v.Phone)));
     }
 
     public ObservableCollection<VehicleRow> Rows { get; }
 
-    private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer, bool isOwn) =>
-        new(wache, callSign, seats, hasZugfuehrer, isOwn, _wacheOptions, _callSignOptions, _onChanged);
+    private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer, bool isOwn, string? phone) =>
+        new(wache, callSign, seats, hasZugfuehrer, isOwn, phone, _wacheOptions, _callSignOptions, _onChanged);
 
     [RelayCommand]
     private void Add()
     {
-        var row = NewRow(string.Empty, string.Empty, 0, false, isOwn: true);
+        var row = NewRow(string.Empty, string.Empty, 0, false, isOwn: true, phone: null);
         Rows.Add(row);
         _onChanged();
         OnRowAdded(row);
@@ -55,7 +55,7 @@ public sealed partial class VehiclesSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign), () =>
+        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign, row.Phone), () =>
         {
             if (Rows.Remove(row))
             {
@@ -64,7 +64,10 @@ public sealed partial class VehiclesSection : EditorSection
         });
     }
 
-    /// <summary>Rows with a non-blank Wache and Funkrufname; trimmed, seats as entered.</summary>
+    /// <summary>
+    /// Rows with a non-blank Wache and Funkrufname; trimmed, seats as entered, a blank
+    /// Fahrzeugtelefon stored as none.
+    /// </summary>
     public IReadOnlyList<Vehicle> ToValues()
     {
         var result = new List<Vehicle>();
@@ -74,7 +77,8 @@ public sealed partial class VehiclesSection : EditorSection
             var callSign = row.CallSign?.Trim() ?? string.Empty;
             if (wache.Length > 0 && callSign.Length > 0)
             {
-                result.Add(new Vehicle(wache, callSign, row.Seats, row.HasZugfuehrer, row.IsOwn));
+                var phone = string.IsNullOrWhiteSpace(row.Phone) ? null : row.Phone.Trim();
+                result.Add(new Vehicle(wache, callSign, row.Seats, row.HasZugfuehrer, row.IsOwn, phone));
             }
         }
 
