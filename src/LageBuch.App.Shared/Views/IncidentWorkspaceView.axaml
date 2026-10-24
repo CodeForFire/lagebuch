@@ -38,8 +38,9 @@
       </Style>
       <!-- The rail is 172px of a 411dp screen. Its TabItems go; the TabControl stays, so it
            still hosts the content and still owns SelectedItem — which is what keeps every
-           render test's WorkspaceRenderHelper.SelectTab working. PhoneNavBar drives it now. -->
-      <Style Selector="Panel#WorkspaceRoot.narrow TabItem">
+           render test's WorkspaceRenderHelper.SelectTab working. PhoneNavBar drives it now.
+           Only the rail's own TabItems: a module's own tabs (module-tabs) stay. -->
+      <Style Selector="Panel#WorkspaceRoot.narrow TabControl#ModuleTabs > TabItem">
         <Setter Property="IsVisible" Value="False" />
       </Style>
       <Style Selector="Panel#WorkspaceRoot.narrow Border#PhoneNavBar">

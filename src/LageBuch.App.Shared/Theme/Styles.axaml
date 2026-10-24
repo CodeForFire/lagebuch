@@ -895,6 +895,47 @@
   </Style>
 
   <!-- =========================================================
+       MODULE TABS — tabs inside one rail entry
+       =========================================================
+       Everything above is the rail. A module's own TabControl lays its tabs out across the top
+       and marks the open one the way the rail does, turned on its side: a red bar under the
+       label instead of beside it. Its template elements carry their own names, so the rail's
+       Border#Root and Border#Rail rules above never reach them. Declared after the rail's
+       TabItem styles, because the later style wins. -->
+  <Style Selector="TabControl.module-tabs">
+    <Setter Property="TabStripPlacement" Value="Top" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TabControl.module-tabs /template/ ContentPresenter#PART_SelectedContentHost">
+    <Setter Property="Margin" Value="0,14,0,0" />
+  </Style>
+  <Style Selector="TabControl.module-tabs > TabItem">
+    <Setter Property="Width" Value="NaN" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="TabRoot" Background="{TemplateBinding Background}"
+                BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1">
+          <DockPanel>
+            <Border Name="Underline" DockPanel.Dock="Bottom" Height="3" Background="Transparent" />
+            <ContentPresenter Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                              Margin="{TemplateBinding Padding}"
+                              VerticalAlignment="Center" />
+          </DockPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="TabControl.module-tabs > TabItem:pointerover /template/ Border#TabRoot">
+    <Setter Property="Background" Value="#161E2A" />
+  </Style>
+  <Style Selector="TabControl.module-tabs > TabItem:selected /template/ Border#Underline">
+    <Setter Property="Background" Value="{StaticResource SignalBrush}" />
+  </Style>
+
+  <!-- =========================================================
        ROW CARDS — one record per card, the narrow layout's DataGrid
        =========================================================
        A seven-column grid budgeted for a 1920px ELW monitor cannot be squeezed into 412dp, so the
