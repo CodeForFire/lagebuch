@@ -488,6 +488,55 @@ public class MainWindowViewModelTests
         Assert.Null(workspace.PendingConfirm);
     }
 
+    // NEUER EINSATZ closes whatever Einsatz is loaded, so it asks even for a read-only one.
+    [Fact]
+    public async Task New_incident_from_a_read_only_incident_asks_first()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+        await vm.OpenRecent("/x.lagebuch");
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        Assert.True(workspace.IsReadOnly);
+
+        await vm.RequestNewIncidentCommand.ExecuteAsync(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Equal("Einsatz verlassen?", workspace.PendingConfirm!.Title);
+        Assert.Null(vm.PendingPrompt);
+    }
+
+    // The old Einsatz is off the screen before the new one is asked for: a cancelled operator
+    // prompt or save picker must not leave the left, unsubscribed workspace showing.
+    [Fact]
+    public async Task Confirming_new_incident_closes_the_current_one_before_the_prompt()
+    {
+        var (vm, ticker) = NewWithTicker();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.RequestNewIncidentCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+        Assert.Equal(0, ticker.SubscriberCount); // disposed
+        Assert.NotNull(vm.PendingPrompt);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_leave_prompt_keeps_the_current_incident()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.RequestNewIncidentCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.CancelCommand.Execute(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Null(vm.PendingPrompt);
+    }
+
     [Fact]
     public async Task Show_master_data_while_sharing_asks_like_any_exit_and_ends_sharing()
     {

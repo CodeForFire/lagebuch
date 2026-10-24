@@ -98,8 +98,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // to #280) -- otherwise the command bar's ÜBERSICHT/STAMMDATEN/ÖFFNEN/NEUER EINSATZ/VERBINDEN
     // buttons (unlike the workspace's own "ZUR STARTSEITE", which already routes through
     // GoHomeRequested -> LeaveAsync) would drop the old workspace from CurrentView while it stayed
-    // subscribed forever.
-    private async Task NavigateAwayAsync(Action proceed)
+    // subscribed forever. askEvenIfReadOnly makes a read-only incident ask too: NEUER EINSATZ
+    // closes whatever is loaded, so it is confirmed whatever the mode.
+    private async Task NavigateAwayAsync(Action proceed, bool askEvenIfReadOnly = false)
     {
         if (ReferenceEquals(CurrentView, _editor))
         {
@@ -119,7 +120,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 return; // a prompt is already up — don't stack a second one
             }
 
-            if (!ws.IsReadOnly)
+            if (!ws.IsReadOnly || askEvenIfReadOnly)
             {
                 // Fire-and-forget like GoHomeRequested: a failed final save surfaces through the
                 // store's SaveFailed, not through this task.
@@ -139,12 +140,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         proceed();
     }
 
+    // The old Einsatz goes off the screen (and is disposed) before the new one is asked for, so a
+    // cancelled operator prompt or save picker lands on Home rather than on the left workspace.
     [RelayCommand]
-    private Task RequestNewIncident() => NavigateAwayAsync(() =>
-    {
-        _pending = PendingAction.New;
-        PendingPrompt = new OperatorPromptViewModel(callSignOptions: _home.CallSignOptions, personnel: _home.Personnel);
-    });
+    private Task RequestNewIncident() => NavigateAwayAsync(
+        () =>
+        {
+            CurrentView = _home;
+            _pending = PendingAction.New;
+            PendingPrompt = new OperatorPromptViewModel(callSignOptions: _home.CallSignOptions, personnel: _home.Personnel);
+        },
+        askEvenIfReadOnly: true);
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
     [RelayCommand]
