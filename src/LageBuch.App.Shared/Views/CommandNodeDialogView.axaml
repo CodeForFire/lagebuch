@@ -27,6 +27,22 @@
               <TextBox x:Name="CommandNodeNameBox" Text="{Binding Name}" MaxLength="200"
                        AutomationProperties.Name="Name" />
             </HeaderedContentControl>
+            <!-- Where the node stands: its Abschnitt (an Unterabschnitt) or on its own (an Abschnitt),
+                 and its place among its siblings. The board's picker idiom, a flyout of commands. -->
+            <HeaderedContentControl Classes="field" Header="LIEGT IN" IsVisible="{Binding ShowParent}">
+              <StackPanel Spacing="4">
+                <ctrl:NodeChoicePicker x:Name="CommandNodeParentPicker" PickerName="Liegt in"
+                                       Choices="{Binding ParentChoices}" Label="{Binding ParentLabel}" />
+                <TextBlock x:Name="CommandNodeParentHint" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           Text="{Binding ParentHint}"
+                           IsVisible="{Binding ParentHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="EINORDNEN VOR" IsVisible="{Binding ShowPosition}">
+              <ctrl:NodeChoicePicker x:Name="CommandNodePositionPicker" PickerName="Einordnen vor"
+                                     Choices="{Binding PositionChoices}" Label="{Binding PositionLabel}" />
+            </HeaderedContentControl>
             <HeaderedContentControl Classes="field" Header="AUFTRAG" IsVisible="{Binding ShowAuftrag}">
               <TextBox x:Name="CommandNodeAuftragBox" Text="{Binding Auftrag}" MaxLength="1000"
                        AutomationProperties.Name="Auftrag"

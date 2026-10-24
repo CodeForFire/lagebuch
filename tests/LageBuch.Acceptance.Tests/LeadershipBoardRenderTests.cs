@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -556,6 +557,145 @@ public class LeadershipBoardRenderTests
         Assert.Equal("Stufe D", Named<TextBlock>(board.View, "StufeText").Text);
         Assert.DoesNotContain("mismatch", Named<TextBlock>(board.View, "StufeSuggestionText").Classes);
         Assert.False(((Flyout)stufe.Flyout).IsOpen);
+    }
+
+    private static DataTransfer DraggingNode(Guid id)
+    {
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.Create(LeadershipView.NodeDragFormat, id.ToString()));
+        return transfer;
+    }
+
+    // The card's own: an Abschnitt's card holds its Unterabschnitte' cards, each with its own head and strip.
+    private static Border HeaderOf(Border card) =>
+        card.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeCardHeader" && b.DataContext == card.DataContext);
+
+    private static Border IntoStripOf(Border card) =>
+        card.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeIntoStrip" && b.DataContext == card.DataContext);
+
+    private static string[] TopLevelOrder(LocalIncidentSession session) =>
+        [.. session.Incident.CommandNodes
+            .Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, null))
+            .Select(n => n.Name)];
+
+    [AvaloniaFact]
+    public void The_drop_strips_show_only_while_a_card_is_dragged()
+    {
+        var board = Show();
+        var nord = Card(board.View, "Abschnitt 1 Nord");
+        var end = board.View.GetControl<Border>("NodeEndStrip");
+
+        Assert.False(end.IsEffectivelyVisible);
+        Assert.False(IntoStripOf(nord).IsEffectivelyVisible);
+
+        board.Vm.BeginNodeDrag(NodeId(board.Session!, "Abschnitt 2 Süd"));
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(end.IsEffectivelyVisible);
+        Assert.True(IntoStripOf(nord).IsEffectivelyVisible);
+        Assert.False(IntoStripOf(Card(board.View, "Dach")).IsEffectivelyVisible);
+        Assert.False(IntoStripOf(Card(board.View, "Bereitstellung Marktplatz")).IsEffectivelyVisible);
+
+        board.Vm.EndNodeDrag();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(end.IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public void Every_card_but_a_partners_has_a_grip_to_move_it()
+    {
+        var board = Show();
+
+        Border GripOf(string name) =>
+            Card(board.View, name).GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeGrip");
+
+        Assert.True(GripOf("Abschnitt 1 Nord").IsEffectivelyVisible);
+        Assert.True(GripOf("Dach").IsEffectivelyVisible);
+        Assert.True(GripOf("Bereitstellung Marktplatz").IsEffectivelyVisible);
+        Assert.False(GripOf("Rettungsdienst").IsEffectivelyVisible);
+        Assert.Equal("Abschnitt verschieben", AutomationProperties.GetName(GripOf("Dach")));
+    }
+
+    [AvaloniaFact]
+    public void Dropping_a_card_on_another_cards_head_places_it_before_that_card()
+    {
+        var board = Show();
+        var session = board.Session!;
+        var sued = NodeId(session, "Abschnitt 2 Süd");
+        var nordHead = HeaderOf(Card(board.View, "Abschnitt 1 Nord"));
+        using var transfer = DraggingNode(sued);
+        board.Vm.BeginNodeDrag(sued);
+        Dispatcher.UIThread.RunJobs();
+
+        var over = Over(transfer, nordHead);
+        Assert.Equal(DragDropEffects.Move, over.DragEffects);
+        Assert.Contains("drop-target", nordHead.Classes);
+        Capture(board.Window, "fuehrung-board-move.png");
+        Drop(transfer, nordHead);
+        board.Vm.EndNodeDrag();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(["Bereitstellung Marktplatz", "Abschnitt 2 Süd", "Abschnitt 1 Nord"], TopLevelOrder(session));
+        Assert.Equal("Abschnitt 2 Süd", board.Vm.Sections[1].Name);
+    }
+
+    [AvaloniaFact]
+    public void Dropping_an_abschnitt_on_another_ones_strip_makes_it_an_unterabschnitt()
+    {
+        var board = Show();
+        var session = board.Session!;
+        var sued = NodeId(session, "Abschnitt 2 Süd");
+        using var transfer = DraggingNode(sued);
+        board.Vm.BeginNodeDrag(sued);
+        Dispatcher.UIThread.RunJobs();
+        var strip = IntoStripOf(Card(board.View, "Abschnitt 1 Nord"));
+
+        Assert.Equal(DragDropEffects.Move, Over(transfer, strip).DragEffects);
+        Drop(transfer, strip);
+        board.Vm.EndNodeDrag();
+        Dispatcher.UIThread.RunJobs();
+
+        var moved = session.Incident.FindCommandNode(sued)!;
+        Assert.Equal((CommandNodeKind.Unterabschnitt, NodeId(session, "Abschnitt 1 Nord")), (moved.Kind, moved.ParentId));
+        var card = Card(board.View, "Abschnitt 2 Süd");
+        Assert.Contains("UAL", card.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("field-label")).Select(t => t.Text));
+    }
+
+    [AvaloniaFact]
+    public void Dropping_an_unterabschnitt_on_the_end_strip_makes_it_the_last_abschnitt()
+    {
+        var board = Show();
+        var session = board.Session!;
+        var dach = NodeId(session, "Dach");
+        using var transfer = DraggingNode(dach);
+        board.Vm.BeginNodeDrag(dach);
+        Dispatcher.UIThread.RunJobs();
+        var end = board.View.GetControl<Border>("NodeEndStrip");
+
+        Assert.Equal(DragDropEffects.Move, Over(transfer, end).DragEffects);
+        Drop(transfer, end);
+        board.Vm.EndNodeDrag();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(["Bereitstellung Marktplatz", "Abschnitt 1 Nord", "Abschnitt 2 Süd", "Dach"], TopLevelOrder(session));
+        Assert.Equal(CommandNodeKind.Abschnitt, session.Incident.FindCommandNode(dach)!.Kind);
+    }
+
+    [AvaloniaFact]
+    public void An_abschnitt_leading_unterabschnitte_cannot_be_dropped_into_another()
+    {
+        var board = Show();
+        var session = board.Session!;
+        var nord = NodeId(session, "Abschnitt 1 Nord");
+        using var transfer = DraggingNode(nord);
+        board.Vm.BeginNodeDrag(nord);
+        Dispatcher.UIThread.RunJobs();
+        var strip = IntoStripOf(Card(board.View, "Abschnitt 2 Süd"));
+
+        Assert.Equal(DragDropEffects.None, Over(transfer, strip).DragEffects);
+        Assert.DoesNotContain("drop-target", strip.Classes);
+        Drop(transfer, strip);
+
+        Assert.Null(session.Incident.FindCommandNode(nord)!.ParentId);
     }
 
     private static void Capture(Window window, string name)

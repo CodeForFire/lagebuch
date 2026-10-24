@@ -17,6 +17,10 @@ public partial class NodeChoicePicker : UserControl
     public static readonly StyledProperty<string?> LabelProperty =
         AvaloniaProperty.Register<NodeChoicePicker, string?>(nameof(Label));
 
+    /// <summary>What a screen reader calls the picker; two on one form need telling apart.</summary>
+    public static readonly StyledProperty<string> PickerNameProperty =
+        AvaloniaProperty.Register<NodeChoicePicker, string>(nameof(PickerName), "Abschnitt wählen");
+
     public NodeChoicePicker() => InitializeComponent();
 
     public IReadOnlyList<NodeChoice>? Choices
@@ -29,6 +33,12 @@ public partial class NodeChoicePicker : UserControl
     {
         get => GetValue(LabelProperty);
         set => SetValue(LabelProperty, value);
+    }
+
+    public string PickerName
+    {
+        get => GetValue(PickerNameProperty);
+        set => SetValue(PickerNameProperty, value);
     }
 
     // A Button inside a Flyout does not dismiss it, and the row owning the picker is kept across

@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using LageBuch.App.Shared.Controls;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.ViewModels;
@@ -85,6 +86,39 @@ public class CommandNodeDialogRenderTests
         Assert.Equal(1000, Find<TextBox>(window, "CommandNodeAuftragBox").MaxLength);
         Assert.Equal(50, Find<TextBox>(window, "CommandNodeTelefonBox").MaxLength);
         Capture(window, "abschnitt-dialog.png");
+    }
+
+    // An Abschnitt's BEARBEITEN dialog says where it stands and lets it move: LIEGT IN and EINORDNEN VOR.
+    [AvaloniaTheory]
+    [InlineData(560, "abschnitt-dialog-verschieben.png")]
+    [InlineData(360, "abschnitt-dialog-verschieben-narrow.png")]
+    public void Edit_dialog_offers_where_the_abschnitt_lies_and_its_place(double width, string shot)
+    {
+        var session = Session();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Abschnitt 2 Süd");
+        var sued = session.Incident.CommandNodes[^1].Id;
+        session.AddCommandNode(CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz");
+
+        var (window, _) = Show(CommandNodeDialogViewModel.ForEdit(session, MasterData(), sued), width, 820);
+
+        var parent = Find<NodeChoicePicker>(window, "CommandNodeParentPicker");
+        var position = Find<NodeChoicePicker>(window, "CommandNodePositionPicker");
+        Assert.True(parent.IsEffectivelyVisible);
+        Assert.True(position.IsEffectivelyVisible);
+        Assert.Equal(CommandNodeDialogViewModel.OwnAbschnittLabel, parent.Label);
+        Assert.Equal("Bereitstellung Marktplatz", position.Label);
+        Assert.Equal("Liegt in", AutomationProperties.GetName(parent.GetVisualDescendants().OfType<Button>().First()));
+        Assert.True(Find<Border>(window, "CommandNodeDialogCard").Bounds.Width <= width - 32 + 1);
+        Capture(window, shot);
+    }
+
+    [AvaloniaFact]
+    public void Create_dialog_shows_neither_place_picker()
+    {
+        var (window, _) = Show(Filled(Session()), 560, 760);
+
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<NodeChoicePicker>(), p => p.IsEffectivelyVisible);
     }
 
     [AvaloniaFact]

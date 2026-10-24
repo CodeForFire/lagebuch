@@ -67,6 +67,34 @@
       <Setter Property="Padding" Value="9,7" />
     </Style>
 
+    <!-- Moving a card: a cyan line above the head it would land before, and two strips that show
+         only while a card is dragged (into an Abschnitt, last at the top level). -->
+    <Style Selector="Border.node-drop-before">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0,3,0,0" />
+    </Style>
+    <Style Selector="Border.node-drop-before.drop-target">
+      <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
+    </Style>
+    <Style Selector="Border.node-drop-strip">
+      <Setter Property="IsVisible" Value="False" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="Padding" Value="8,6" />
+    </Style>
+    <Style Selector="StackPanel#BoardRoot.dragging-node Border.node-drop-end">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="StackPanel#BoardRoot.dragging-node Border.node-drop-into.abschnitt">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Border.node-drop-strip.drop-target">
+      <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
+    </Style>
+
     <Style Selector="TextBlock.card-name">
       <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
       <Setter Property="FontSize" Value="16" />
@@ -362,6 +390,17 @@
     <DataTemplate DataType="vm:BoardNodeCard" x:DataType="vm:BoardNodeCard">
       <Border Classes="board-card" x:Name="NodeCard">
         <StackPanel Spacing="8">
+          <!-- The card's head is also where a dragged card lands to be placed before this one; the
+               grip picks the card itself up (a partner's has none: disabled, so the grip style hides it). -->
+          <Border x:Name="NodeCardHeader" Classes="node-drop-before">
+          <DockPanel>
+          <Border DockPanel.Dock="Left" Classes="unit-grip node-grip" x:Name="NodeGrip" Margin="0,2,6,0"
+                  VerticalAlignment="Top" IsEnabled="{Binding IsMovable}"
+                  ToolTip.Tip="Ziehen, um den Abschnitt zu verschieben"
+                  AutomationProperties.Name="Abschnitt verschieben">
+            <PathIcon Width="9" Height="14" Foreground="{StaticResource TextSecondaryBrush}"
+                      Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
+          </Border>
           <!-- Auflösen sits apart from the other actions, at the card's head: it ends the node. -->
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <StackPanel Grid.Column="0" Spacing="1">
@@ -394,6 +433,8 @@
                     Command="{Binding DissolveCommand}"
                     ToolTip.Tip="{Binding DissolveBlockedReason}" ToolTip.ShowOnDisabled="True" />
           </Grid>
+          </DockPanel>
+          </Border>
           <TextBlock x:Name="DissolveBlockedText" Classes="dissolve-reason" Text="{Binding DissolveBlockedReason}"
                      Classes.blocked="{Binding DissolveBlockedReason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
@@ -448,6 +489,11 @@
             </ItemsControl.ItemsPanel>
           </ItemsControl>
 
+          <!-- Shown on an Abschnitt only while a card is dragged: drop here to hang it underneath. -->
+          <Border x:Name="NodeIntoStrip" Classes="node-drop-strip node-drop-into" Classes.abschnitt="{Binding IsAbschnitt}">
+            <TextBlock Classes="secondary" FontSize="11" Text="hier als Unterabschnitt einordnen" />
+          </Border>
+
           <TextBlock Classes="board-hint" Text="{Binding Hint}"
                      IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
@@ -464,7 +510,7 @@
   </UserControl.DataTemplates>
 
   <ScrollViewer x:Name="BoardScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <StackPanel x:Name="BoardRoot" Spacing="14" Background="Transparent"
+    <StackPanel x:Name="BoardRoot" Spacing="14" Background="Transparent" Classes.dragging-node="{Binding IsDraggingNode}"
                 IsEnabled="{Binding !IsReadOnly}" DragDrop.AllowDrop="{Binding !IsReadOnly}">
 
       <!-- Why the last board command was refused (a peer dissolved the node a moment ago). -->
@@ -508,6 +554,11 @@
       <!-- Bereitstellungen and Abschnitte, Unterabschnitte inside their Abschnitt. -->
       <ItemsControl x:Name="SectionCards" Classes="board-wrap" ItemsSource="{Binding Sections}"
                     IsVisible="{Binding Sections.Count}" />
+
+      <!-- Shown only while a card is dragged: drop here to put it last, as an Abschnitt of its own. -->
+      <Border x:Name="NodeEndStrip" Classes="node-drop-strip node-drop-end">
+        <TextBlock Classes="secondary" FontSize="11" Text="hier als letzten Abschnitt einordnen" />
+      </Border>
 
       <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
         <Button x:Name="LeadershipAddAbschnittButton" Classes="signal board-action" Content="+ ABSCHNITT"

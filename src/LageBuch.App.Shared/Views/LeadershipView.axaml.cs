@@ -13,6 +13,9 @@ public partial class LeadershipView : UserControl
     /// <summary>What a dragged unit carries: its id, as text.</summary>
     public static readonly DataFormat<string> UnitDragFormat = DataFormat.CreateStringApplicationFormat("lagebuch-einheit");
 
+    /// <summary>What a dragged card carries: its node's id, as text.</summary>
+    public static readonly DataFormat<string> NodeDragFormat = DataFormat.CreateStringApplicationFormat("lagebuch-abschnitt");
+
     // The card or strip a drop would land in, for the highlight only; whether it may is the view model's.
     private Border? _dropTarget;
 
@@ -39,10 +42,11 @@ public partial class LeadershipView : UserControl
 
     private async void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        // The nearest grip: a unit's sits inside its card, so it wins over the card's own.
         if (!StartsDrag(e.Pointer.Type)
             || e.Source is not Control source
             || source.GetSelfAndVisualAncestors().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("unit-grip"))
-                is not { DataContext: BoardUnitRow row }
+                is not { DataContext: BoardUnitRow or BoardNodeCard } grip
             || ViewModel is not { IsReadOnly: false } vm
             || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
@@ -50,8 +54,17 @@ public partial class LeadershipView : UserControl
         }
 
         using var data = new DataTransfer();
-        data.Add(DataTransferItem.Create(UnitDragFormat, row.Id.ToString()));
-        vm.BeginDrag(row.Id);
+        if (grip.DataContext is BoardNodeCard card)
+        {
+            data.Add(DataTransferItem.Create(NodeDragFormat, card.Id.ToString()));
+            vm.BeginNodeDrag(card.Id);
+        }
+        else if (grip.DataContext is BoardUnitRow row)
+        {
+            data.Add(DataTransferItem.Create(UnitDragFormat, row.Id.ToString()));
+            vm.BeginDrag(row.Id);
+        }
+
         try
         {
             await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
@@ -59,12 +72,46 @@ public partial class LeadershipView : UserControl
         finally
         {
             vm.EndDrag();
+            vm.EndNodeDrag();
             SetDropTarget(null);
         }
     }
 
     private static Guid? DraggedId(DragEventArgs e) =>
         e.DataTransfer.TryGetValue(UnitDragFormat) is { } text && Guid.TryParse(text, out var id) ? id : null;
+
+    private static Guid? DraggedNodeId(DragEventArgs e) =>
+        e.DataTransfer.TryGetValue(NodeDragFormat) is { } text && Guid.TryParse(text, out var id) ? id : null;
+
+    // Where a dragged card would land: before the card whose head is under the pointer (as its
+    // sibling), into the Abschnitt whose strip is, or last at the top level. False over anything else.
+    private static bool TryNodeTargetUnder(
+        DragEventArgs e, [NotNullWhen(true)] out Border? target, out Guid? parentId, out Guid? beforeNodeId)
+    {
+        foreach (var border in ((e.Source as Control)?.GetSelfAndVisualAncestors() ?? []).OfType<Border>())
+        {
+            if (border.Name == "NodeEndStrip")
+            {
+                (target, parentId, beforeNodeId) = (border, null, null);
+                return true;
+            }
+
+            if (border.Classes.Contains("node-drop-into") && border.DataContext is BoardNodeCard into)
+            {
+                (target, parentId, beforeNodeId) = (border, into.Id, null);
+                return true;
+            }
+
+            if (border.Classes.Contains("node-drop-before") && border.DataContext is BoardNodeCard before)
+            {
+                (target, parentId, beforeNodeId) = (border, before.ParentId, before.Id);
+                return true;
+            }
+        }
+
+        (target, parentId, beforeNodeId) = (null, null, null);
+        return false;
+    }
 
     // The place under the pointer: the innermost card (an Unterabschnitt beats its Abschnitt), or the
     // Nicht-zugeordnet strip, which stands for no node. False when the pointer is over neither.
@@ -98,6 +145,12 @@ public partial class LeadershipView : UserControl
         {
             highlight = target;
         }
+        else if (DraggedNodeId(e) is { } draggedNode
+            && TryNodeTargetUnder(e, out var nodeTarget, out var parentId, out var beforeNodeId)
+            && ViewModel?.CanMoveNode(draggedNode, parentId, beforeNodeId) == true)
+        {
+            highlight = nodeTarget;
+        }
 
         e.DragEffects = highlight is null ? DragDropEffects.None : DragDropEffects.Move;
         SetDropTarget(highlight);
@@ -110,6 +163,10 @@ public partial class LeadershipView : UserControl
         if (DraggedId(e) is { } dragged && TryTargetUnder(e, out _, out var nodeId))
         {
             ViewModel?.MoveUnit(dragged, nodeId);
+        }
+        else if (DraggedNodeId(e) is { } draggedNode && TryNodeTargetUnder(e, out _, out var parentId, out var beforeNodeId))
+        {
+            ViewModel?.MoveNode(draggedNode, parentId, beforeNodeId);
         }
 
         e.Handled = true;

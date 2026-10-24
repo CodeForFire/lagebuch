@@ -384,8 +384,12 @@ public class AutomationPropertiesTests
 
         AssertEveryTextlessControlIsNamed(view);
         var grips = view.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("unit-grip")).ToList();
-        Assert.Equal(2, grips.Count);
-        Assert.All(grips, g => Assert.Equal("Einheit verschieben", Name(g)));
+        var unitGrips = grips.Where(g => !g.Classes.Contains("node-grip")).ToList();
+        var cardGrips = grips.Where(g => g.Classes.Contains("node-grip")).ToList();
+        Assert.Equal(2, unitGrips.Count);
+        Assert.All(unitGrips, g => Assert.Equal("Einheit verschieben", Name(g)));
+        Assert.Equal(3, cardGrips.Count);
+        Assert.All(cardGrips, g => Assert.Equal("Abschnitt verschieben", Name(g)));
         Assert.Equal("Führungsstufe wählen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "StufeButton")));
         Assert.Equal("EL festlegen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElButton")));
         Assert.Equal(

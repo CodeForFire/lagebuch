@@ -63,7 +63,15 @@ public sealed partial class BoardNodeCard : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsAbschnitt))]
     [NotifyPropertyChangedFor(nameof(LeiterLabel))]
     [NotifyPropertyChangedFor(nameof(SetLeiterTip))]
+    [NotifyPropertyChangedFor(nameof(IsMovable))]
     private CommandNodeKind _kind;
+
+    /// <summary>The Abschnitt an Unterabschnitt lies in; null for every other card. A drop before this card lands here too.</summary>
+    [ObservableProperty]
+    private Guid? _parentId;
+
+    /// <summary>Whether the card can be picked up and moved; a partner's Einsatzleitung has a row of its own.</summary>
+    public bool IsMovable => Kind != CommandNodeKind.Partner;
 
     [ObservableProperty]
     private string _name = string.Empty;
@@ -154,6 +162,7 @@ public sealed partial class BoardNodeCard : ObservableObject
 
         _isReadOnly = isReadOnly;
         Kind = node.Kind;
+        ParentId = node.ParentId;
         Name = node.Name;
         Auftrag = node.Auftrag;
         Funkgruppe = node.Funkgruppe;

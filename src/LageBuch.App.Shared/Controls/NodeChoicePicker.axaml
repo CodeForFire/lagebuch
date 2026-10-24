@@ -11,7 +11,7 @@
        at a glance on the ELW's dimmed screen. -->
   <Button x:Name="PickerButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
           Padding="8,4" FontSize="12"
-          ToolTip.Tip="{Binding Label, ElementName=Root}" AutomationProperties.Name="Abschnitt wählen">
+          ToolTip.Tip="{Binding Label, ElementName=Root}" AutomationProperties.Name="{Binding PickerName, ElementName=Root}">
     <TextBlock Text="{Binding Label, ElementName=Root}" TextTrimming="CharacterEllipsis" />
     <Button.Flyout>
       <Flyout Placement="BottomEdgeAlignedLeft">
