@@ -1,5 +1,6 @@
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
+using LageBuch.Domain.Equipment;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
@@ -25,6 +26,7 @@ public sealed class Incident
     private readonly List<Dwelling> _dwellings = new();
     private readonly List<InvolvedParty> _involvedParties = new();
     private readonly List<SituationReport> _situationReports = new();
+    private readonly List<IssuedItem> _issuedItems = new();
 
     private Incident()
     {
@@ -88,6 +90,12 @@ public sealed class Incident
 
     /// <summary>The Lagemeldungen (#592) — drafts and sent ones — in creation order.</summary>
     public IReadOnlyList<SituationReport> SituationReports => _situationReports;
+
+    /// <summary>The Ausgabeliste: every Gerät handed out, in the order it was issued.</summary>
+    public IReadOnlyList<IssuedItem> IssuedItems => _issuedItems;
+
+    /// <summary>How many Geräte are still out, i.e. not yet given back.</summary>
+    public int ItemsOut => _issuedItems.Count(i => i.IsOut);
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -160,7 +168,8 @@ public sealed class Incident
         string? houseNumber = null,
         string? postalCode = null,
         string? place = null,
-        IEnumerable<SituationReport>? situationReports = null)
+        IEnumerable<SituationReport>? situationReports = null,
+        IEnumerable<IssuedItem>? issuedItems = null)
     {
         var incident = new Incident
         {
@@ -191,6 +200,7 @@ public sealed class Incident
         incident._dwellings.AddRange(dwellings);
         incident._involvedParties.AddRange(involvedParties);
         incident._situationReports.AddRange(situationReports ?? []);
+        incident._issuedItems.AddRange(issuedItems ?? []);
         return incident;
     }
 
@@ -1164,6 +1174,70 @@ public sealed class Incident
     {
         var index = _involvedParties.FindIndex(p => p.Id == partyId);
         return index >= 0 ? index : throw new KeyNotFoundException($"Beteiligte/r {partyId} nicht gefunden.");
+    }
+
+    /// <summary>
+    /// Hands a Gerät out (Ausgabeliste), stamped with the current time. Silent, like
+    /// <see cref="AddInvolvedParty"/>: the recipient's name and phone number stay in this one list
+    /// instead of being copied into the ETB.
+    /// </summary>
+    public IssuedItem IssueItem(
+        IClock clock, SessionOperator op, string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var item = IssuedItem.Create(clock.Now, device, issuedTo, issuedToPhone, issuedToDetails, remark, op);
+        _issuedItems.Add(item);
+        return item;
+    }
+
+    /// <summary>Corrects a line of the Ausgabeliste in place, keeping identity, position and any
+    /// return. An unknown id throws so a replayed command fails loudly.</summary>
+    public IssuedItem UpdateIssuedItem(
+        Guid itemId, string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark)
+    {
+        EnsureOpen();
+        var index = FindIssuedItemIndex(itemId);
+        var updated = _issuedItems[index].WithDetails(device, issuedTo, issuedToPhone, issuedToDetails, remark);
+        _issuedItems[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Records that a Gerät came back, stamped with the current time and the Lagebuchführer.</summary>
+    public IssuedItem ReturnIssuedItem(IClock clock, SessionOperator op, Guid itemId)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        EnsureOpen();
+        var index = FindIssuedItemIndex(itemId);
+        var updated = _issuedItems[index].WithReturn(clock.Now, op);
+        _issuedItems[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Takes a return back, for a ZURÜCK pressed on the wrong line.</summary>
+    public IssuedItem UndoIssuedItemReturn(Guid itemId)
+    {
+        EnsureOpen();
+        var index = FindIssuedItemIndex(itemId);
+        var updated = _issuedItems[index].WithoutReturn();
+        _issuedItems[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Takes a line of the Ausgabeliste back completely.</summary>
+    public void RemoveIssuedItem(Guid itemId)
+    {
+        EnsureOpen();
+        _issuedItems.RemoveAt(FindIssuedItemIndex(itemId));
+    }
+
+    private int FindIssuedItemIndex(Guid itemId)
+    {
+        var index = _issuedItems.FindIndex(i => i.Id == itemId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Ausgabe {itemId} nicht gefunden.");
     }
 
     /// <summary>

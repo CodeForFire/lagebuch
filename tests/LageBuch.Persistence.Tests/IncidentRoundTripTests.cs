@@ -623,6 +623,45 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void Issued_items_survive_a_round_trip_in_order_with_their_returns()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var radio = incident.IssueItem(clock, op, "Mobilteil 1", "Erika Beispiel", "0171 0000001", "THW OV Beispielstadt", "mit Ladekabel");
+        clock.Now = clock.Now.AddMinutes(4);
+        incident.IssueItem(clock, op, "AED", "Max Beispiel", null, null, null);
+        clock.Now = clock.Now.AddMinutes(20);
+        incident.ReturnIssuedItem(clock, op, radio.Id);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(incident.IssuedItems, loaded.IssuedItems);
+        Assert.Equal(clock.Now, loaded.IssuedItems[0].ReturnedAt);
+        Assert.Equal(op.Display, loaded.IssuedItems[0].ReturnedBy);
+        Assert.True(loaded.IssuedItems[1].IsOut);
+        Assert.Null(loaded.IssuedItems[1].IssuedToPhone);
+        Assert.Null(loaded.IssuedItems[1].IssuedToDetails);
+        Assert.Null(loaded.IssuedItems[1].Remark);
+    }
+
+    [Fact]
+    public void A_removed_issued_item_is_gone_after_the_next_save()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op);
+        var item = incident.IssueItem(clock, op, "AED", "Max Beispiel", null, null, null);
+        IncidentRepository.Save(_path, incident);
+
+        incident.RemoveIssuedItem(item.Id);
+        IncidentRepository.Save(_path, incident);
+
+        Assert.Empty(IncidentRepository.Load(_path).IssuedItems);
+    }
+
+    [Fact]
     public void A_tasks_source_entry_round_trips_and_a_task_without_one_stays_unlinked()
     {
         var clock = new Clock();

@@ -48,6 +48,9 @@ public sealed record MasterDataSet(
     // Objekte in the Ausrückebereich (#420), picked when a Haus is added to the CO-Messprotokoll.
     // Their structure and labels are copied into the incident (#337); nothing points back here.
     IReadOnlyList<Premises> Premises,
+    // Geräte offered in the Ausgabeliste: the Mobilteile, Westen and the AED the ELW hands out.
+    // As with the Stichwörter, only the chosen text lands in the incident.
+    IReadOnlyList<string> Devices,
 
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
@@ -72,6 +75,7 @@ public sealed record MasterDataSet(
         Array.Empty<Vehicle>(),
         Array.Empty<TextSnippet>(),
         Array.Empty<Premises>(),
+        Array.Empty<string>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -94,7 +98,8 @@ public sealed record MasterDataSet(
         && Personnel.Count == 0
         && Vehicles.Count == 0
         && TextSnippets.Count == 0
-        && Premises.Count == 0;
+        && Premises.Count == 0
+        && Devices.Count == 0;
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -956,6 +961,7 @@ public static class MasterDataJson
             vehicles,
             ParseTextSnippets(root),
             ParsePremises(root),
+            Arr(root, "devices"),
             ParseSettings(root));
     }
 
@@ -1331,6 +1337,7 @@ public static class MasterDataJson
             }),
             unitStatus = set.UnitStatus,
             keywords = set.Keywords,
+            devices = set.Devices,
             districts = set.Districts,
             streets = set.Streets.Select(t => new { name = t.Name, district = t.District, postalCode = t.PostalCode, place = t.Place }),
             truppTypes = set.TruppTypes.Select(t => new

@@ -41,6 +41,7 @@ public class MasterDataStoreTests : IDisposable
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert" },
             Keywords = new[] { "B3 Person", "THL 1" },
+            Devices = new[] { "Mobilteil 1", "Weste EAL" },
             Districts = new[] { "Puch" },
             Streets = new[] { new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"), new Street("Am Sulzbogen") },
             ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
@@ -71,6 +72,7 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplates[1].Items);
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
         Assert.Equal(new[] { "B3 Person", "THL 1" }, reopened.Keywords);
+        Assert.Equal(new[] { "Mobilteil 1", "Weste EAL" }, reopened.Devices);
         Assert.Equal(new[] { "Puch" }, reopened.Districts);
         Assert.Equal(
             new[] { new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"), new Street("Am Sulzbogen") },

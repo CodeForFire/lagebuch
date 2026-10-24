@@ -8,6 +8,7 @@
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz"],
   "keywords": ["B2", "B3", "B3 Person", "THL 1", "THL 2 VU eingeklemmt", "ABC 1"],
+  "devices": ["Mobilteil 1", "Mobilteil 2", "Digitalkamera", "GoPro", "HRT", "Weste EAL", "Weste EL", "Weste Presse", "Weste Atemschutz", "AED", "Fernglas", "Windmesser", "Sonstiges (siehe Bemerkung)"],
   "districts": ["Musterdorf", "Neudorf"],
   "streets": [
     { "name": "Bahnhofstraße", "district": "", "postalCode": "12345", "place": "Musterstadt" },

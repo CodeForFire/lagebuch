@@ -55,6 +55,7 @@ public sealed class MasterDataStore
 
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
         ReplaceList(cn, tx, "md_keywords", set.Keywords);
+        ReplaceList(cn, tx, "md_devices", set.Devices);
         ReplaceList(cn, tx, "md_districts", set.Districts);
 
         Run(cn, tx, "DELETE FROM md_streets;", _ => { });
@@ -294,6 +295,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_keywords (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_devices (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL, place TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
@@ -593,6 +595,7 @@ public sealed class MasterDataStore
             ReadVehicles(cn),
             ReadTextSnippets(cn),
             ReadPremises(cn),
+            ReadColumn(cn, "SELECT value FROM md_devices;"),
             ReadSettings(cn));
     }
 

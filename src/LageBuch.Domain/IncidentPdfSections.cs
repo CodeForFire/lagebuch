@@ -20,6 +20,7 @@ public enum IncidentPdfSections
     Files = 1 << 7,
     InvolvedParties = 1 << 8,
     SituationReports = 1 << 9,
+    IssuedItems = 1 << 10,
     All = Checklist | Etb | Roles | Forces | Tasks | Atemschutz | CoMessprotokoll | Files | InvolvedParties
-        | SituationReports,
+        | SituationReports | IssuedItems,
 }
