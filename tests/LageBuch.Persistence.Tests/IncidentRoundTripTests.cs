@@ -655,6 +655,10 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(incident.SituationReports, loaded.SituationReports);
         Assert.Equal(1, loaded.SituationReports[0].Number);
         Assert.Equal(clock.Now, loaded.SituationReports[0].SentAt);
+        Assert.Equal(
+            loaded.Journal.Single(e => e.Text.StartsWith("Lagemeldung Nr. 1:", StringComparison.Ordinal)).Id,
+            loaded.SituationReports[0].EtbEntryId);
+        Assert.Null(loaded.SituationReports[1].EtbEntryId);
         Assert.Null(loaded.SituationReports[1].Number);
         Assert.Null(loaded.SituationReports[1].Location);
         Assert.Null(loaded.SituationReports[1].SentAt);

@@ -180,7 +180,8 @@ public sealed record SituationReportDto(
     string CreatedBy,
     DateTimeOffset CreatedAt,
     DateTimeOffset? SentAt,
-    string? SentBy);
+    string? SentBy,
+    Guid? EtbEntryId = null);
 
 /// <summary>One Beteiligte/r on the wire; mirrors <see cref="LageBuch.Domain.Involved.InvolvedParty"/>.</summary>
 public sealed record InvolvedPartyDto(

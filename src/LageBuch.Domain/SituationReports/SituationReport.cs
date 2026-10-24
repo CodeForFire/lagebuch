@@ -60,6 +60,10 @@ public sealed record SituationReport
 
     public string? SentBy { get; private init; }
 
+    /// <summary>The ETB entry the send wrote, so the journal can mark it as this Lagemeldung even
+    /// after its text has been corrected. Null while a draft.</summary>
+    public Guid? EtbEntryId { get; private init; }
+
     public bool IsSent => SentAt is not null;
 
     /// <summary>
@@ -100,7 +104,8 @@ public sealed record SituationReport
         string createdBy,
         DateTimeOffset createdAt,
         DateTimeOffset? sentAt,
-        string? sentBy)
+        string? sentBy,
+        Guid? etbEntryId = null)
         => new()
         {
             Id = id,
@@ -115,6 +120,7 @@ public sealed record SituationReport
             CreatedAt = createdAt,
             SentAt = sentAt,
             SentBy = sentBy,
+            EtbEntryId = etbEntryId,
         };
 
     /// <summary>
@@ -149,11 +155,11 @@ public sealed record SituationReport
             Requests = Checked(requests, MaxFieldLength, "Nachforderungen", nameof(requests)),
         };
 
-    /// <summary>Returns the sent copy, stamped with its Nr.</summary>
-    public SituationReport AsSent(int number, DateTimeOffset sentAt, SessionOperator @operator)
+    /// <summary>Returns the sent copy, stamped with its Nr. and the ETB entry it was written as.</summary>
+    public SituationReport AsSent(int number, DateTimeOffset sentAt, SessionOperator @operator, Guid etbEntryId)
     {
         ArgumentNullException.ThrowIfNull(@operator);
-        return this with { Number = number, SentAt = sentAt, SentBy = @operator.Display };
+        return this with { Number = number, SentAt = sentAt, SentBy = @operator.Display, EtbEntryId = etbEntryId };
     }
 
     private static string? Checked(string? value, int maxLength, string label, string paramName)

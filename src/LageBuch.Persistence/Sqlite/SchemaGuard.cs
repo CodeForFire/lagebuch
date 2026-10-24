@@ -123,6 +123,7 @@ internal static class SchemaGuard
         new("situation_reports", "requests", "TEXT", false, null),
         new("situation_reports", "sent_at", "TEXT", false, null),
         new("situation_reports", "sent_by", "TEXT", false, null),
+        new("situation_reports", "etb_entry_id", "TEXT", false, null),
     ];
 
     /// <summary>Every column this build can repair, in the order it is declared above.</summary>

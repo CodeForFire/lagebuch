@@ -458,7 +458,7 @@ public sealed class IncidentRepository
             var report = incident.SituationReports[i];
             Run(
                 inserts,
-                "INSERT INTO situation_reports (id, ordinal, number, reporter, location, situation, measures, units, requests, created_by, created_at, sent_at, sent_by) VALUES ($id,$o,$nr,$rep,$loc,$sit,$mea,$uni,$req,$by,$cat,$sat,$sby);",
+                "INSERT INTO situation_reports (id, ordinal, number, reporter, location, situation, measures, units, requests, created_by, created_at, sent_at, sent_by, etb_entry_id) VALUES ($id,$o,$nr,$rep,$loc,$sit,$mea,$uni,$req,$by,$cat,$sat,$sby,$eid);",
                 p =>
                 {
                     p("$id", report.Id.ToString());
@@ -474,6 +474,7 @@ public sealed class IncidentRepository
                     p("$cat", report.CreatedAt.ToString(Iso));
                     p("$sat", (object?)report.SentAt?.ToString(Iso) ?? DBNull.Value);
                     p("$sby", (object?)report.SentBy ?? DBNull.Value);
+                    p("$eid", (object?)report.EtbEntryId?.ToString() ?? DBNull.Value);
                 });
         }
     }
@@ -839,7 +840,7 @@ public sealed class IncidentRepository
 
         var situationReports = ReadAll(
             cn,
-            "SELECT id, number, reporter, location, situation, measures, units, requests, created_by, created_at, sent_at, sent_by FROM situation_reports ORDER BY ordinal;",
+            "SELECT id, number, reporter, location, situation, measures, units, requests, created_by, created_at, sent_at, sent_by, etb_entry_id FROM situation_reports ORDER BY ordinal;",
             r => Domain.SituationReports.SituationReport.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 NullableInt(r, 1),
@@ -852,7 +853,8 @@ public sealed class IncidentRepository
                 r.GetString(8),
                 ParseDate(r.GetString(9)),
                 NullableDate(r, 10),
-                Str(r, 11)));
+                Str(r, 11),
+                NullableGuid(r, 12)));
 
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the

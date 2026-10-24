@@ -111,7 +111,8 @@ public static class SnapshotMapper
                 r.CreatedBy,
                 r.CreatedAt,
                 r.SentAt,
-                r.SentBy)).ToList());
+                r.SentBy,
+                r.EtbEntryId)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -205,7 +206,8 @@ public static class SnapshotMapper
                 r.CreatedBy,
                 r.CreatedAt,
                 r.SentAt,
-                r.SentBy)));
+                r.SentBy,
+                r.EtbEntryId)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(
