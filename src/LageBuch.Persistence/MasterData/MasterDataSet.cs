@@ -48,6 +48,7 @@ public sealed record MasterDataSet(
     // Objekte in the Ausrückebereich (#420), picked when a Haus is added to the CO-Messprotokoll.
     // Their structure and labels are copied into the incident (#337); nothing points back here.
     IReadOnlyList<Premises> Premises,
+
     // Geräte offered in the Ausgabeliste: the Mobilteile, Westen and the AED the ELW hands out.
     // As with the Stichwörter, only the chosen text lands in the incident.
     IReadOnlyList<string> Devices,
