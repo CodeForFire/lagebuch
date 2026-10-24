@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.EtbTabsView"
+             x:DataType="vm:EtbTabsViewModel">
+  <!-- The ETB: the journal and the Lagemeldung (#592) as one rail entry. The tab names what the
+       journal's heading used to say, so that heading is gone. The strip is the module-tabs style in
+       Theme/Styles.axaml, not the rail's: it stays visible on a phone, where the bottom bar only
+       says ETB. -->
+  <TabControl x:Name="EtbTabStrip" Classes="module-tabs" TabStripPlacement="Top"
+              SelectedIndex="{Binding SelectedTabIndex}">
+    <TabItem x:Name="JournalTab" Header="EINSATZTAGEBUCH" AutomationProperties.Name="Einsatztagebuch"
+             Content="{Binding Journal}" />
+    <TabItem x:Name="SituationReportTab" Header="LAGEMELDUNG" AutomationProperties.Name="Lagemeldung"
+             Content="{Binding SituationReports}" />
+  </TabControl>
+</UserControl>

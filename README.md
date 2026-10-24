@@ -62,6 +62,7 @@ Markdown.
 |---|---|
 | **Einsatzdaten** | Stichwort, bayerische Einsatznummer (`B 1.2 JJMMTT lfd.Nr.`) und Adresse – nachtragbar, sobald die ILS zurückruft |
 | **ETB** | Einsatztagebuch mit Richtung (Eingang/Ausgang/intern), automatischen Systemeinträgen und nachträglicher Korrektur mit Historie |
+| **Lagemeldung** | Zweiter Reiter im ETB (Strg+L): Meldender, Einsatzstelle, Lage, Maßnahmen, Einheiten und Nachforderungen – vorbefüllt aus dem Einsatz, als Funkspruch zum Vorlesen; SENDEN schreibt sie als „LM n“ ins ETB, startet die Rückmeldung an die ILS neu und nummeriert sie für den PDF-Bericht. Dazu ein Buchstabier-Helfer (Anton/Berta, DIN 5009, NATO), auch aus dem Einsatztagebuch erreichbar |
 | **Kräfte** | Fahrzeuge aus den Stammdaten, Stärke als ZF/GF/Mann, AGT-Zahl, Status und Bemerkung; Gesamtstärke immer im Blick |
 | **Aufgaben** | Aufträge mit Wichtigkeit, Dringlichkeit, Zuständigem und Timer – mit Sprachansage, wenn sie fällig werden; direkt aus einem ETB-Eintrag anlegbar |
 | **Funktionen** | EL, Abschnittsleiter und weitere Rollen mit von/bis, Übergabe und Handynummer; jede Rolle in den Stammdaten als einmal je Einsatz, einmal je Abschnitt oder beliebig oft einrichtbar |

@@ -24,6 +24,19 @@
     <Style Selector="StackPanel#DockFields">
       <Setter Property="Orientation" Value="Horizontal" />
     </Style>
+    <!-- A sent Lagemeldung's Nr. on its ETB row (#592): quiet, outlined, the same weight as a time. -->
+    <Style Selector="Border.lm-badge">
+      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="5,1" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.lm-badge > TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
     <Style Selector="StackPanel#EditFields">
       <Setter Property="Orientation" Value="Horizontal" />
     </Style>
@@ -46,11 +59,6 @@
     <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#EditFields">
       <Setter Property="Orientation" Value="Vertical" />
     </Style>
-    <!-- The bottom bar already says ETB; the heading would only cost the checkbox its width. -->
-    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#EtbTitle">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
-
     <!-- Six columns budgeted for an ELW monitor cannot be made to fit 412dp, so the phone
          reads the same rows as cards instead. -->
     <Style Selector="Panel#WorkspaceRoot.narrow Border#EtbGridPanel">
@@ -88,13 +96,24 @@
        back up to the row buttons at the list's right edge. Each child is its own tab group, ranked
        by TabIndex in the order it appears on screen. -->
   <DockPanel KeyboardNavigation.TabNavigation="Local">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14"
-          KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
-      <TextBlock Grid.Column="0" x:Name="EtbTitle" Text="EINSATZTAGEBUCH" Classes="overline" VerticalAlignment="Top" />
-      <CheckBox Grid.Column="1" x:Name="HideSystemCheckBox"
+    <!-- No EINSATZTAGEBUCH heading: the ETB's tab names it. A WrapPanel rather than fixed
+         columns, so on a phone the three controls take two lines instead of overflowing. -->
+    <WrapPanel DockPanel.Dock="Top" x:Name="EtbHeaderActions" Orientation="Horizontal" HorizontalAlignment="Right"
+               ItemSpacing="12" LineSpacing="6" Margin="0,0,0,14"
+               KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
+      <!-- The Buchstabier-Helfer (#592), for a name that has to be spelled over the radio. Up here
+           rather than in the dock: it is wanted while reading the journal too, and the dock's row
+           is already as wide as a desktop window allows. -->
+      <Button x:Name="OpenSpellingHelperButton" Classes="ghost" Content="BUCHSTABIEREN"
+              VerticalAlignment="Center"
+              Command="{Binding OpenSpellingHelperCommand}" />
+      <CheckBox x:Name="OnlySituationReportsCheckBox"
+                Content="Nur Lagemeldungen"
+                IsChecked="{Binding ShowOnlySituationReports}" />
+      <CheckBox x:Name="HideSystemCheckBox"
                 Content="Systemmeldungen ausblenden"
                 IsChecked="{Binding HideSystemEntries}" />
-    </Grid>
+    </WrapPanel>
 
     <!-- The phone's way in to the dock. Full width and at the bottom edge of the list, where the
          thumb already is; on a wide window the dock is simply always open and this never shows. -->
@@ -264,7 +283,12 @@
                           IsVisible="{Binding HasTasks}" IsTabStop="False"
                           Content="{Binding TaskBadge}" Command="{Binding ShowTasksCommand}"
                           ToolTip.Tip="Die Aufgaben zu diesem Eintrag zeigen" />
-                    <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Border Classes="lm-badge" IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <TextBlock Text="{Binding SituationReportLabel}" />
+                      </Border>
+                      <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                    </StackPanel>
                   </DockPanel>
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
@@ -328,6 +352,10 @@
                         </MultiBinding>
                       </TextBlock.Text>
                     </TextBlock>
+                    <Border Classes="lm-badge" HorizontalAlignment="Left"
+                            IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <TextBlock Text="{Binding SituationReportLabel}" />
+                    </Border>
                     <TextBlock Text="{Binding Text}" TextWrapping="Wrap"
                                Foreground="{StaticResource TextPrimaryBrush}" />
                     <Button Classes="badge" Classes.open="{Binding HasOpenTasks}"

@@ -923,4 +923,68 @@ public class EtbViewModelTests
         Assert.Empty(raised);
         Assert.Equal(1, canExecuteChanged);
     }
+
+    private static (LocalIncidentSession Session, EtbViewModel Vm) WithSentLagemeldung()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "ELW 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddJournalEntry(EtbDirection.Outgoing, "Rückmeldung an ILS", "ELW 1", "ILS");
+        session.AddSituationReport("ELW 1", "Blumenstraße 13", "Schuppen im Vollbrand", null, null, null);
+        session.SendSituationReport(session.Incident.SituationReports[0].Id, "ILS");
+        return (session, new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }));
+    }
+
+    [Fact]
+    public void A_sent_lagemeldung_carries_its_number_on_its_etb_row()
+    {
+        var (_, vm) = WithSentLagemeldung();
+
+        var row = Assert.Single(vm.Entries, e => e.SituationReportNumber is not null);
+        Assert.Equal("LM 1", row.SituationReportLabel);
+        Assert.StartsWith("Lagemeldung Nr. 1:", row.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_marker_survives_a_correction_of_the_entry_text()
+    {
+        var (session, vm) = WithSentLagemeldung();
+        var entryId = vm.Entries.Single(e => e.SituationReportNumber is not null).Id;
+
+        session.EditJournalEntry(entryId, "Lagemeldung, berichtigt");
+
+        Assert.Equal(1, vm.Entries.Single(e => e.Id == entryId).SituationReportNumber);
+    }
+
+    [Fact]
+    public void Nur_lagemeldungen_shows_only_the_sent_reports_and_switching_it_off_brings_the_rest_back()
+    {
+        var (_, vm) = WithSentLagemeldung();
+        var before = vm.Entries.Count;
+
+        vm.ShowOnlySituationReports = true;
+
+        Assert.Equal("LM 1", Assert.Single(vm.Entries).SituationReportLabel);
+
+        vm.ShowOnlySituationReports = false;
+
+        Assert.Equal(before, vm.Entries.Count);
+    }
+
+    [Fact]
+    public void A_lagemeldung_sent_while_the_filter_is_on_appears_in_the_filtered_journal()
+    {
+        var (session, vm) = WithSentLagemeldung();
+        vm.ShowOnlySituationReports = true;
+
+        session.AddSituationReport("ELW 1", null, "Feuer aus", null, null, null);
+        session.SendSituationReport(session.Incident.SituationReports[1].Id, "ILS");
+
+        Assert.Equal(["LM 2", "LM 1"], vm.Entries.Select(e => e.SituationReportLabel));
+    }
 }

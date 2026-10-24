@@ -38,6 +38,15 @@ public class ShortcutRegistryTests
     }
 
     [Fact]
+    public void Ctrl_l_writes_a_lagemeldung()
+    {
+        var shortcut = ShortcutRegistry.Find(new KeyChord(ShortcutKey.L, Ctrl: true));
+
+        Assert.Equal(ShortcutAction.OpenSituationReport, shortcut?.Action);
+        Assert.Equal("Lagemeldung schreiben", shortcut?.Description);
+    }
+
+    [Fact]
     public void No_shortcut_takes_a_text_editing_key()
     {
         // Ctrl+A/C/V/X/Z/Y belong to the text boxes. The enum cannot even name them, so this

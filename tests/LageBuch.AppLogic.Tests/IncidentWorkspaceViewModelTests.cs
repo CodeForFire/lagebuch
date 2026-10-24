@@ -397,6 +397,84 @@ public class IncidentWorkspaceViewModelTests
             new TestPdfExporter());
     }
 
+    [Fact]
+    public void The_etb_rail_entry_holds_the_journal_and_the_lagemeldung_as_tabs()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.NotNull(NavItemFor(vm, vm.EtbTabs));
+        Assert.Null(NavItemFor(vm, vm.Etb));
+        Assert.Null(NavItemFor(vm, vm.SituationReports));
+        Assert.Same(vm.Etb, vm.EtbTabs.Journal);
+        Assert.Same(vm.SituationReports, vm.EtbTabs.SituationReports);
+        Assert.Equal(EtbTabsViewModel.JournalTab, vm.EtbTabs.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void Ctrl_l_opens_the_lagemeldung_tab_and_starts_a_draft_when_there_is_none()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.True(vm.TryRunShortcut(new KeyChord(ShortcutKey.L, Ctrl: true)));
+
+        Assert.Same(NavItemFor(vm, vm.EtbTabs), vm.SelectedNavItem);
+        Assert.Equal(EtbTabsViewModel.SituationReportTab, vm.EtbTabs.SelectedTabIndex);
+        var draft = Assert.Single(vm.SituationReports.Reports);
+        Assert.False(draft.IsSent);
+        Assert.Same(draft, vm.SituationReports.SelectedReport);
+    }
+
+    [Fact]
+    public void Ctrl_l_goes_back_to_the_newest_draft_rather_than_starting_another()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.SituationReports.NewReportCommand.Execute(null);
+        var draft = vm.SituationReports.SelectedReport;
+        vm.SituationReports.SelectedReport = null;
+
+        vm.TryRunShortcut(new KeyChord(ShortcutKey.L, Ctrl: true));
+
+        Assert.Single(vm.SituationReports.Reports);
+        Assert.Equal(draft?.Id, vm.SituationReports.SelectedReport?.Id);
+    }
+
+    [Fact]
+    public void Ctrl_n_switches_the_etb_back_to_the_journal()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.TryRunShortcut(new KeyChord(ShortcutKey.L, Ctrl: true));
+
+        Assert.True(vm.TryRunShortcut(new KeyChord(ShortcutKey.N, Ctrl: true)));
+
+        Assert.Equal(EtbTabsViewModel.JournalTab, vm.EtbTabs.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void The_open_etb_tab_survives_a_rebuild()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.TryRunShortcut(new KeyChord(ShortcutKey.L, Ctrl: true));
+        var before = vm.EtbTabs;
+
+        // Closing goes read-only, which rebuilds every rail entry.
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.NotSame(before, vm.EtbTabs);
+        Assert.Equal(EtbTabsViewModel.SituationReportTab, vm.EtbTabs.SelectedTabIndex);
+        Assert.Same(NavItemFor(vm, vm.EtbTabs), vm.SelectedNavItem);
+    }
+
+    [Fact]
+    public void Ctrl_l_does_nothing_on_a_read_only_incident()
+    {
+        var vm = ReadOnlyWorkspace(out _, closed: true);
+
+        Assert.False(vm.TryRunShortcut(new KeyChord(ShortcutKey.L, Ctrl: true)));
+        Assert.False(vm.OpenSituationReportCommand.CanExecute(null));
+        Assert.Empty(vm.SituationReports.Reports);
+    }
+
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
     private static IncidentWorkspaceViewModel ReadOnlyWorkspace(out FixedClock clock, bool closed = false, IIncidentHostController? host = null)
     {
@@ -1483,7 +1561,9 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingConfirm!.ConfirmCommand.Execute(null);
         var afterSecondRebuild = ChangedSubscriberCount(session);
 
-        Assert.Equal(afterFirstRebuild, afterSecondRebuild);
+        // One fewer, not equal: closing goes read-only, and a read-only workspace builds no ILS
+        // reminder, so the reminder's own subscription (#592) is rightly gone. A leak only adds.
+        Assert.Equal(afterFirstRebuild - 1, afterSecondRebuild);
     }
 
     private static int ChangedSubscriberCount(LocalIncidentSession session)
@@ -1744,7 +1824,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var vm = EditableWorkspace(new FakeHostController());
         StartATrupp(vm);
-        vm.SelectedNavItem = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = NavItemFor(vm, vm.EtbTabs);
 
         vm.Scba.ShowMostUrgentControlCommand.Execute(null);
 
@@ -1765,7 +1845,7 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingConfirm!.ConfirmCommand.Execute(null);
         Assert.NotSame(replaced, vm.Scba);
 
-        var etb = NavItemFor(vm, vm.Etb);
+        var etb = NavItemFor(vm, vm.EtbTabs);
         vm.SelectedNavItem = etb;
         replaced.ShowMostUrgentControlCommand.Execute(null);
 
@@ -1795,7 +1875,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeAlarmService(),
             new FakeHostController());
         StartATrupp(vm);
-        var etb = NavItemFor(vm, vm.Etb);
+        var etb = NavItemFor(vm, vm.EtbTabs);
         vm.SelectedNavItem = etb;
 
         vm.Scba.ShowMostUrgentControlCommand.Execute(null);
@@ -2020,7 +2100,7 @@ public class IncidentWorkspaceViewModelTests
     public void Showing_a_task_moves_the_rail_to_the_aufgaben_tab()
     {
         var vm = WorkspaceWithAnOverdueTask(Md());
-        vm.SelectedNavItem = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = NavItemFor(vm, vm.EtbTabs);
 
         vm.Tasks.ShowMostOverdueTaskCommand.Execute(null);
 
@@ -2038,7 +2118,7 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingConfirm!.ConfirmCommand.Execute(null);
         Assert.NotSame(replaced, vm.Tasks);
 
-        var etb = NavItemFor(vm, vm.Etb);
+        var etb = NavItemFor(vm, vm.EtbTabs);
         vm.SelectedNavItem = etb;
         replaced.ShowMostOverdueTaskCommand.Execute(null);
 
@@ -2050,7 +2130,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var vm = WorkspaceWithAnOverdueTask(
             Md() with { Navigation = new[] { new NavEntry(NavModules.Tasks, null, false) } });
-        var etb = NavItemFor(vm, vm.Etb);
+        var etb = NavItemFor(vm, vm.EtbTabs);
         vm.SelectedNavItem = etb;
 
         vm.Tasks.ShowMostOverdueTaskCommand.Execute(null);
