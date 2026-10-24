@@ -27,7 +27,7 @@ public class CoMessprotokollCoValueInputTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddCoBuilding("Haus A", 1, 1); // EG + 1.OG, one apartment each

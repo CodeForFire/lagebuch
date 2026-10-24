@@ -26,7 +26,7 @@ public class IncidentStoreTests
         });
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        store.Save("/x.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/x.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
         sw.Stop();
 
         Assert.True(started.Wait(TimeSpan.FromSeconds(1)), "write never started");
@@ -42,10 +42,10 @@ public class IncidentStoreTests
         var written = new List<string>();
         var store = new IncidentStore((path, incident) => written.Add(path));
 
-        store.Save("/x.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/x.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
         await store.FlushAsync();
 
-        Assert.Equal(new[] { "/x.fwincident" }, written);
+        Assert.Equal(new[] { "/x.lagebuch" }, written);
     }
 
     [Fact]
@@ -56,12 +56,12 @@ public class IncidentStoreTests
 
         for (var i = 0; i < 5; i++)
         {
-            store.Save($"/{i}.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+            store.Save($"/{i}.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
         }
 
         await store.FlushAsync();
 
-        Assert.Equal(new[] { "/0.fwincident", "/1.fwincident", "/2.fwincident", "/3.fwincident", "/4.fwincident" }, written);
+        Assert.Equal(new[] { "/0.lagebuch", "/1.lagebuch", "/2.lagebuch", "/3.lagebuch", "/4.lagebuch" }, written);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class IncidentStoreTests
         var goodWrites = new List<string>();
         var store = new IncidentStore((path, incident) =>
         {
-            if (path == "/bad.fwincident")
+            if (path == "/bad.lagebuch")
             {
                 throw new InvalidOperationException("disk full");
             }
@@ -80,13 +80,13 @@ public class IncidentStoreTests
         Exception? failure = null;
         store.SaveFailed += ex => failure = ex;
 
-        store.Save("/bad.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
-        store.Save("/good.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/bad.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/good.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
         await store.FlushAsync();
 
         Assert.NotNull(failure);
         Assert.Equal("disk full", failure!.Message);
-        Assert.Equal(new[] { "/good.fwincident" }, goodWrites);
+        Assert.Equal(new[] { "/good.lagebuch" }, goodWrites);
     }
 
     // Issue #290: a burst of edits used to queue one full rewrite per edit. While the writer is
@@ -105,12 +105,12 @@ public class IncidentStoreTests
         });
         var incident = Incident.Start(new FixedClock(T0), new SessionOperator("Müller"), keyword: "B1");
 
-        store.Save("/x.fwincident", incident);
+        store.Save("/x.lagebuch", incident);
         Assert.True(started.Wait(TimeSpan.FromSeconds(1)), "write never started");
         foreach (var keyword in new[] { "B2", "B3", "B4" })
         {
             incident.SetKeyword(keyword);
-            store.Save("/x.fwincident", incident);
+            store.Save("/x.lagebuch", incident);
         }
 
         release.Set();
@@ -132,16 +132,16 @@ public class IncidentStoreTests
             written.Add(path);
         });
 
-        store.Save("/a.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/a.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
         Assert.True(started.Wait(TimeSpan.FromSeconds(1)), "write never started");
-        store.Save("/b.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
-        store.Save("/c.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
-        store.Save("/b.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/b.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/c.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/b.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
 
         release.Set();
         await store.FlushAsync();
 
-        Assert.Equal(new[] { "/a.fwincident", "/b.fwincident", "/c.fwincident" }, written);
+        Assert.Equal(new[] { "/a.lagebuch", "/b.lagebuch", "/c.lagebuch" }, written);
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public class IncidentStoreTests
         var succeeded = false;
         store.SaveSucceeded += () => succeeded = true;
 
-        store.Save("/x.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/x.lagebuch", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
         await store.FlushAsync();
 
         Assert.True(succeeded);
@@ -160,7 +160,7 @@ public class IncidentStoreTests
     [Fact]
     public async Task The_real_writer_round_trips_through_IncidentRepository()
     {
-        var path = Path.Join(Path.GetTempPath(), $"store-{Guid.NewGuid():N}.fwincident");
+        var path = Path.Join(Path.GetTempPath(), $"store-{Guid.NewGuid():N}.lagebuch");
         try
         {
             var store = new IncidentStore();

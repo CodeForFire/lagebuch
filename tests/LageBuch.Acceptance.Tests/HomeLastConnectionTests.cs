@@ -15,7 +15,7 @@ namespace LageBuch.Acceptance.Tests;
 // The Home card naming where this device was last joined to (#464), and its way back in.
 public class HomeLastConnectionTests
 {
-    private const string RecentPath = "/home/user/Lagebuch/20260924-1405.fwincident";
+    private const string RecentPath = "/home/user/Lagebuch/20260924-1405.lagebuch";
 
     private static readonly DateTimeOffset T0 = new(2026, 9, 24, 14, 5, 0, TimeSpan.FromHours(2));
 
@@ -177,7 +177,7 @@ public class HomeLastConnectionTests
         var (window, _) = ShowHome(new LastConnection("elw-1", "B3 Wohnung", T0), recent: RecentPath);
 
         var host = LeftX(ByName<TextBlock>(window, "LastConnectionHost"), window);
-        var fileName = LeftX(RecentText(window, "20260924-1405.fwincident"), window);
+        var fileName = LeftX(RecentText(window, "20260924-1405.lagebuch"), window);
 
         Assert.True(Math.Abs(host - fileName) <= 1.0, $"host starts at x={host}, file name at x={fileName}");
     }

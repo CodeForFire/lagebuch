@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using LageBuch.App.Services;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
@@ -63,7 +65,7 @@ internal static class Program
             desktopLifetime.Exit += (_, _) => alarms.Dispose();
         }
 
-        return LageBuch.App.Shared.CompositionRoot.CreateMainWindowViewModel(
+        var mainViewModel = LageBuch.App.Shared.CompositionRoot.CreateMainWindowViewModel(
             store,
             new MasterDataProvider(AppPaths.MasterDataDbPath),
             new JsonRecentFilesStore(AppPaths.RecentFilesJsonPath),
@@ -84,6 +86,36 @@ internal static class Program
             mailComposer: new OsMailComposer(),
             lastCrashReport: CrashReports.TakePending(AppPaths.Root),
             alarmMute: new AlarmMute(AppPaths.AlarmMuteJsonPath));
+        OpenLaunchedFile(mainViewModel);
+        return mainViewModel;
+    }
+
+    // A double-clicked Einsatzdatei. Windows and Linux pass it as an argument, macOS as an
+    // open-document event. Both go through the Home screen's own open, so a missing, locked or
+    // too-new file surfaces in its error banner like one picked from the recent list.
+    private static void OpenLaunchedFile(MainWindowViewModel mainViewModel)
+    {
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        if (IncidentFileExtension.StartupFile(lifetime?.Args ?? []) is { } path)
+        {
+            // Posted rather than run now: this is still framework initialisation, before the main
+            // window exists. The post runs once the main loop has shown it.
+            Dispatcher.UIThread.Post(() => _ = mainViewModel.OpenRecent(path));
+        }
+
+        // Subscribed here, before anything awaits, because the event that launched the app fires
+        // right after framework initialisation and a later subscriber misses it.
+        if (Avalonia.Application.Current?.TryGetFeature<IActivatableLifetime>() is { } activatable)
+        {
+            activatable.Activated += (_, e) =>
+            {
+                if (e is FileActivatedEventArgs fileArgs
+                    && fileArgs.Files.Select(f => f.TryGetLocalPath()).OfType<string>().FirstOrDefault(IncidentFileExtension.IsIncidentFile) is { } activated)
+                {
+                    _ = mainViewModel.OpenRecent(activated);
+                }
+            };
+        }
     }
 
     private static string AppVersion => typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";

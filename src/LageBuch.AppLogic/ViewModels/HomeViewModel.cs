@@ -301,11 +301,11 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
-        // Date + time, e.g. "20260819-2217.fwincident". Neither the Einsatznummer (#69) nor the
+        // Date + time, e.g. "20260819-2217.lagebuch". Neither the Einsatznummer (#69) nor the
         // Stichwort is known at creation -- both are entered later through the workspace's
         // Einsatzdaten dialog -- so nothing but the timestamp is available to name the file.
         var timestamp = _clock.Now.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
-        var suggestedName = $"{timestamp}.fwincident";
+        var suggestedName = $"{timestamp}{IncidentFileExtension.Current}";
         var path = await _dialogs.PickSaveAsync(suggestedName, _lastSaveFolder?.GetLastFolder());
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -337,7 +337,7 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private void OpenRecent(string path) => TryOpen(path);
 
-    // Only the list entry goes; the .fwincident file is never touched, so nothing is lost and no
+    // Only the list entry goes; the .lagebuch file is never touched, so nothing is lost and no
     // confirmation is asked for -- the header's ÖFFNEN brings it back.
     [RelayCommand]
     private void RemoveRecent(string path)
@@ -383,7 +383,7 @@ public sealed partial class HomeViewModel : ObservableObject
     /// Opens a file, turning any failure into a banner rather than an unhandled exception.
     ///
     /// The catch is deliberately broad. Every everyday reason an open fails -- the file was moved,
-    /// truncated, written by a newer build, or was never a .fwincident at all -- surfaces here as a
+    /// truncated, written by a newer build, or was never a .lagebuch at all -- surfaces here as a
     /// different exception type, and on the Home screen they all have the same answer: tell the
     /// user which file and why, and leave the app standing. Letting any of them escape kills the
     /// process, which during an Einsatz is the worst possible outcome.

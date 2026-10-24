@@ -20,7 +20,7 @@ public class TaskDialogRenderTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var masterData = MasterDataSet.Empty with { Vehicles = AnonymizedExampleData.Vehicles };

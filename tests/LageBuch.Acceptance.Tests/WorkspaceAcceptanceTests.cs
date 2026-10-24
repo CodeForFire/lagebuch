@@ -83,7 +83,7 @@ internal sealed class FakeStore : IIncidentStore
 
 internal sealed class FakeDialogs : IFileDialogService
 {
-    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
@@ -125,7 +125,7 @@ internal sealed class AttachmentDialogs : IFileDialogService
 
     public string? LastPhoneNumber { get; private set; }
 
-    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
@@ -223,7 +223,7 @@ public class WorkspaceAcceptanceTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
@@ -238,7 +238,7 @@ public class WorkspaceAcceptanceTests
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
         if (closed)
@@ -246,7 +246,7 @@ public class WorkspaceAcceptanceTests
             seed.Close();
         }
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
 
@@ -514,7 +514,7 @@ public class WorkspaceAcceptanceTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", true) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -648,7 +648,7 @@ public class WorkspaceAcceptanceTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(

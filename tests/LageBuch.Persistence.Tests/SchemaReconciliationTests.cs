@@ -10,7 +10,7 @@ namespace LageBuch.Persistence.Tests;
 /// </summary>
 public class SchemaReconciliationTests : IDisposable
 {
-    private readonly string _path = Path.Join(Path.GetTempPath(), $"guard-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"guard-{Guid.NewGuid():N}.lagebuch");
 
     public static TheoryData<string, string> RepairableColumns()
     {

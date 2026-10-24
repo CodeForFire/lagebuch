@@ -25,7 +25,7 @@ public sealed class IncidentWorkspaceMailTests : IDisposable
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         session.Incident.SetKeyword("B3 Wohnungsbrand");

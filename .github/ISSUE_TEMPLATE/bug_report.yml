@@ -54,4 +54,4 @@ body:
     id: attachments
     attributes:
       label: Screenshots / files
-      description: Attach screenshots (fictional data only!) or the affected `.fwincident` file if it helps and contains no real data.
+      description: Attach screenshots (fictional data only!) or the affected `.lagebuch` file if it helps and contains no real data.

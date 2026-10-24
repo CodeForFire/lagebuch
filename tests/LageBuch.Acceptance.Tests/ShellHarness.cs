@@ -56,7 +56,7 @@ internal sealed record ShellHarness(Window Window, HomeViewModel Home, MainWindo
     // FakeDialogs, but the PDF save picker answers with a real path the export can write to.
     private sealed class PdfDialogs(string? pdfPath) : IFileDialogService
     {
-        public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+        public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 

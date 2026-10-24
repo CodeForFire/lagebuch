@@ -18,7 +18,7 @@ public class IncidentDataDialogViewModelTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>(),
             number,
@@ -54,7 +54,7 @@ public class IncidentDataDialogViewModelTests
         vm.District = "FFB";
         vm.SaveCommand.Execute(null);
 
-        var saved = store.Load("/x.fwincident");
+        var saved = store.Load("/x.lagebuch");
         Assert.Equal("B3P", saved.Keyword);
         Assert.Equal("B 1.2 260715 123", saved.IncidentNumber!.Value);
         Assert.Equal("Hauptstr. 12", saved.Street);
@@ -76,7 +76,7 @@ public class IncidentDataDialogViewModelTests
         vm.District = "Puch";
         vm.SaveCommand.Execute(null);
 
-        var saved = store.Load("/x.fwincident");
+        var saved = store.Load("/x.lagebuch");
         Assert.Equal("12", saved.HouseNumber);
         Assert.Equal("82256", saved.PostalCode);
         Assert.Equal("Fürstenfeldbruck", saved.Place);
@@ -95,7 +95,7 @@ public class IncidentDataDialogViewModelTests
 
         Assert.True(vm.HasChanges);
         vm.SaveCommand.Execute(null);
-        Assert.Equal("Hauptstr. 12, Puch, 82256 Fürstenfeldbruck", Formatting.Address(store.Load("/x.fwincident")));
+        Assert.Equal("Hauptstr. 12, Puch, 82256 Fürstenfeldbruck", Formatting.Address(store.Load("/x.lagebuch")));
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public class IncidentDataDialogViewModelTests
         vm.Keyword = " b3 person ";
         vm.SaveCommand.Execute(null);
 
-        Assert.Equal("B3 Person", store.Load("/x.fwincident").Keyword);
+        Assert.Equal("B3 Person", store.Load("/x.lagebuch").Keyword);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class IncidentDataDialogViewModelTests
         vm.Keyword = "Ölspur";
         vm.SaveCommand.Execute(null);
 
-        Assert.Equal("Ölspur", store.Load("/x.fwincident").Keyword);
+        Assert.Equal("Ölspur", store.Load("/x.lagebuch").Keyword);
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class IncidentDataDialogViewModelTests
         vm.District = " ";
         vm.SaveCommand.Execute(null);
 
-        var saved = store.Load("/x.fwincident");
+        var saved = store.Load("/x.lagebuch");
         Assert.Null(saved.Keyword);
         Assert.Null(saved.IncidentNumber);
         Assert.Null(saved.Street);
@@ -163,7 +163,7 @@ public class IncidentDataDialogViewModelTests
         vm.Street = "Hauptstr. 12";
 
         Assert.Equal(before, store.SaveCount);
-        Assert.Null(store.Load("/x.fwincident").Keyword);
+        Assert.Null(store.Load("/x.lagebuch").Keyword);
     }
 
     [Fact]
@@ -226,7 +226,7 @@ public class IncidentDataDialogViewModelTests
         Assert.Equal(1, closed);
         Assert.False(vm.IsDiscardConfirmOpen);
         Assert.Equal(before, store.SaveCount);
-        Assert.Equal("B3P", store.Load("/x.fwincident").Keyword);
+        Assert.Equal("B3P", store.Load("/x.lagebuch").Keyword);
     }
 
     [Fact]
@@ -308,7 +308,7 @@ public class IncidentDataDialogViewModelTests
         vm.SaveCommand.Execute(null);
 
         Assert.Equal(before + 1, store.SaveCount);
-        Assert.Equal("Hauptstr. 12", store.Load("/x.fwincident").Street);
+        Assert.Equal("Hauptstr. 12", store.Load("/x.lagebuch").Street);
     }
 
     [Fact]
@@ -316,7 +316,7 @@ public class IncidentDataDialogViewModelTests
     {
         var store = new FakeStore();
         NewSession(store);
-        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.lagebuch");
 
         var vm = new IncidentDataDialogViewModel(ro, () => { });
 
@@ -372,7 +372,7 @@ public class IncidentDataDialogViewModelTests
         vm.District = "puch";
         vm.SaveCommand.Execute(null);
 
-        var saved = store.Load("/x.fwincident");
+        var saved = store.Load("/x.lagebuch");
         Assert.Equal("Hauptstraße", saved.Street);
         Assert.Equal("Puch", saved.District);
         Assert.Equal("82256", saved.PostalCode);
@@ -452,6 +452,6 @@ public class IncidentDataDialogViewModelTests
 
         Assert.Null(vm.District);
         Assert.Null(vm.PostalCode);
-        Assert.Equal("Feldweg am Weiher", store.Load("/x.fwincident").Street);
+        Assert.Equal("Feldweg am Weiher", store.Load("/x.lagebuch").Street);
     }
 }

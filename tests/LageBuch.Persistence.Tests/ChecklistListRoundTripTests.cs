@@ -12,7 +12,7 @@ namespace LageBuch.Persistence.Tests;
 // every save re-inserted the whole history, which no test caught.
 public class ChecklistListRoundTripTests : IDisposable
 {
-    private readonly string _path = Path.Join(Path.GetTempPath(), $"cl-rt-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"cl-rt-{Guid.NewGuid():N}.lagebuch");
 
     private static readonly Guid Nachbereitung = new("44444444-4444-4444-4444-444444444444");
     private static readonly Guid Fahrzeug = new("55555555-5555-5555-5555-555555555555");

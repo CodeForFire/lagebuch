@@ -26,7 +26,7 @@ public class PersistenceErrorBannerTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>(),
             keyword: "B3P");

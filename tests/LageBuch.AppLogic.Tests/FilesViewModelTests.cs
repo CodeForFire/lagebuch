@@ -18,7 +18,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var path = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
@@ -54,7 +54,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new FilesViewModel(session, new FakeDialogs { AttachmentPath = null }, () => { });
@@ -73,7 +73,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var path = Path.Join(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
@@ -101,7 +101,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var path = Path.Join(Path.GetTempPath(), $"riesig-{Guid.NewGuid():N}.jpg");
@@ -141,7 +141,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var path1 = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
@@ -175,7 +175,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var path1 = Path.Join(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
@@ -209,7 +209,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var goodPath = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
@@ -244,7 +244,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var path1 = Path.Join(Path.GetTempPath(), $"riesig1-{Guid.NewGuid():N}.jpg");
@@ -284,7 +284,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
@@ -306,7 +306,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Close();
@@ -334,7 +334,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var path = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
@@ -364,7 +364,7 @@ public class FilesViewModelTests
         new FakeStore(),
         clock,
         new SessionOperator("Müller"),
-        "/x.fwincident",
+        "/x.lagebuch",
         Array.Empty<(string, bool)>(),
         Array.Empty<(string, bool)>());
 
@@ -455,7 +455,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Close();
@@ -473,7 +473,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
@@ -505,7 +505,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
@@ -544,7 +544,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await session.AddFileAsync("../../evil.png", "image/png", new byte[] { 9, 9, 9 });
@@ -577,9 +577,9 @@ public class FilesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        store.Save("/x.fwincident", IncidentWithFile(IncidentFile.Rehydrate(
+        store.Save("/x.lagebuch", IncidentWithFile(IncidentFile.Rehydrate(
             Guid.NewGuid(), "Einsatzplan.hta", "Einsatzplan", "image/png", 3, T0, "Müller")));
-        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var dialogs = new FakeDialogs();
         var vm = new FilesViewModel(session, dialogs, () => { });
         var row = Assert.Single(vm.Files);
@@ -645,7 +645,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var file = session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
@@ -670,7 +670,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
@@ -717,7 +717,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
@@ -735,7 +735,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var file = session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
@@ -755,7 +755,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
@@ -780,7 +780,7 @@ public class FilesViewModelTests
             store,
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Incident.AddFile(clock, op, "vorab.pdf", "application/pdf", 10);
@@ -801,7 +801,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
@@ -843,7 +843,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
@@ -866,7 +866,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
@@ -890,13 +890,13 @@ public class FilesViewModelTests
             store,
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 10);
         seed.Close();
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new FilesViewModel(ro, new FakeDialogs(), () => { });
 
         var row = Assert.Single(vm.Files);
@@ -917,7 +917,7 @@ public class FilesViewModelTests
             new FakeStore(),
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var kept = session.Incident.AddFile(clock, op, "vorab.pdf", "application/pdf", 10);
@@ -954,7 +954,7 @@ public class FilesViewModelTests
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new FilesViewModel(session, new ThrowingPickerDialogs(), () => { });

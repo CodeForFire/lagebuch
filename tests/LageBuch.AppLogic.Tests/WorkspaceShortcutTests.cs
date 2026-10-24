@@ -33,7 +33,7 @@ public class WorkspaceShortcutTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false) },
             new[] { ("B?", false) });
         var vm = new IncidentWorkspaceViewModel(

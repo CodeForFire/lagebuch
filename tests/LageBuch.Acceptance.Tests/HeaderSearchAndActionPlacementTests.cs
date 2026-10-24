@@ -39,7 +39,7 @@ public class HeaderSearchAndActionPlacementTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("Blaulicht aus?", false) },
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
@@ -240,7 +240,7 @@ public class HeaderSearchAndActionPlacementTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var window = Show(new TaskDialogView
@@ -263,7 +263,7 @@ public class HeaderSearchAndActionPlacementTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var window = Show(new IncidentDataDialogView { DataContext = new IncidentDataDialogViewModel(session, () => { }) });

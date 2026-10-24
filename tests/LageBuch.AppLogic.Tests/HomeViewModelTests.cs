@@ -104,7 +104,7 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var recent = new FakeRecent();
-        var dialogs = new FakeDialogs(); // PickSaveAsync returns "/x.fwincident"
+        var dialogs = new FakeDialogs(); // PickSaveAsync returns "/x.lagebuch"
         var vm = new HomeViewModel(store, new FakeMasterData(), recent, dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
         IncidentWorkspaceViewModel? opened = null;
@@ -114,7 +114,7 @@ public class HomeViewModelTests
 
         Assert.NotNull(opened);
         Assert.False(opened!.IsReadOnly);
-        Assert.Contains("/x.fwincident", recent.GetRecent());
+        Assert.Contains("/x.lagebuch", recent.GetRecent());
         Assert.Equal("A?", FirstChecklist(opened).Items[0].Text); // checklist template seeded
     }
 
@@ -132,10 +132,10 @@ public class HomeViewModelTests
 
         // Neither the Einsatznummer nor the Stichwort is known at creation (#69) -- both are
         // entered later through the Einsatzdaten dialog -- so the filename is date + time only.
-        Assert.Equal("20260622-0900.fwincident", dialogs.LastSuggestedName);
+        Assert.Equal("20260622-0900.lagebuch", dialogs.LastSuggestedName);
         Assert.NotNull(opened);
         Assert.Equal("Unbenannter Einsatz", opened!.HeroText);
-        Assert.Null(store.Load("/x.fwincident").Keyword);
+        Assert.Null(store.Load("/x.lagebuch").Keyword);
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public class HomeViewModelTests
     [Fact]
     public void NewIncident_remembers_the_folder_it_saved_to()
     {
-        var dialogs = new CapturingSaveDialogs { ReturnPath = "/einsaetze/2027/20260622-0900-B3P.fwincident" };
+        var dialogs = new CapturingSaveDialogs { ReturnPath = "/einsaetze/2027/20260622-0900-B3P.lagebuch" };
         var lastFolder = new FakeLastSaveFolderStore();
         var vm = new HomeViewModel(
             new FakeStore(),
@@ -189,19 +189,19 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var recent = new FakeRecent();
-        recent.Add("/20260101-0900-A.fwincident");
-        recent.Add("/20260301-0900-B.fwincident");
-        recent.Add("/20260201-0900-C.fwincident");
+        recent.Add("/20260101-0900-A.lagebuch");
+        recent.Add("/20260301-0900-B.lagebuch");
+        recent.Add("/20260201-0900-C.lagebuch");
 
         var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
         Assert.Equal(
-            new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" },
+            new[] { "20260301-0900-B.lagebuch", "20260201-0900-C.lagebuch", "20260101-0900-A.lagebuch" },
             vm.RecentFiles.Select(f => f.FileName));
     }
 
@@ -210,20 +210,20 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var recent = new FakeRecent();
-        recent.Add("/20260101-0900-A.fwincident");
-        recent.Add("/20260301-0900-B.fwincident");
+        recent.Add("/20260101-0900-A.lagebuch");
+        recent.Add("/20260301-0900-B.lagebuch");
 
         var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        vm.OpenRecentCommand.Execute("/20260201-0900-C.fwincident");
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        vm.OpenRecentCommand.Execute("/20260201-0900-C.lagebuch");
 
         Assert.Equal(
-            new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" },
+            new[] { "20260301-0900-B.lagebuch", "20260201-0900-C.lagebuch", "20260101-0900-A.lagebuch" },
             vm.RecentFiles.Select(f => f.FileName));
     }
 
@@ -231,22 +231,22 @@ public class HomeViewModelTests
     public void Reopening_a_listed_incident_keeps_a_single_row_for_it()
     {
         var store = new FakeStore();
-        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/a.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent("/a.fwincident"), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/a.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent("/a.lagebuch"), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
-        vm.OpenRecentCommand.Execute("/a.fwincident");
+        vm.OpenRecentCommand.Execute("/a.lagebuch");
 
-        Assert.Equal(new[] { "/a.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+        Assert.Equal(new[] { "/a.lagebuch" }, vm.RecentFiles.Select(f => f.Path));
     }
 
     [Fact]
     public void Opening_a_closed_incident_lists_it_as_closed()
     {
         var store = new FakeStore();
-        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>()).Close();
+        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/closed.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>()).Close();
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
-        vm.OpenRecentCommand.Execute("/closed.fwincident");
+        vm.OpenRecentCommand.Execute("/closed.lagebuch");
 
         Assert.True(Assert.Single(vm.RecentFiles).IsClosed);
     }
@@ -256,19 +256,19 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var closed = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var closed = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/closed.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         closed.Close();
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/open.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/open.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var recent = new FakeRecent();
-        recent.Add("/open.fwincident");
-        recent.Add("/closed.fwincident");
+        recent.Add("/open.lagebuch");
+        recent.Add("/closed.lagebuch");
 
         var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
-        Assert.True(vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").IsClosed);
-        Assert.False(vm.RecentFiles.Single(f => f.Path == "/open.fwincident").IsClosed);
-        Assert.Equal("closed.fwincident", vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").FileName);
+        Assert.True(vm.RecentFiles.Single(f => f.Path == "/closed.lagebuch").IsClosed);
+        Assert.False(vm.RecentFiles.Single(f => f.Path == "/open.lagebuch").IsClosed);
+        Assert.Equal("closed.lagebuch", vm.RecentFiles.Single(f => f.Path == "/closed.lagebuch").FileName);
     }
 
     // #291: the probes open each file's database, so they run after the list is up. Capturing the
@@ -276,13 +276,13 @@ public class HomeViewModelTests
     [Fact]
     public void RecentFiles_is_populated_and_sorted_before_any_state_probe_runs()
     {
-        var store = new StateProbeStore { ["/20260101-0900-A.fwincident"] = IncidentState.Closed };
-        var recent = new FakeRecent("/20260101-0900-A.fwincident", "/20260301-0900-B.fwincident", "/20260201-0900-C.fwincident");
+        var store = new StateProbeStore { ["/20260101-0900-A.lagebuch"] = IncidentState.Closed };
+        var recent = new FakeRecent("/20260101-0900-A.lagebuch", "/20260301-0900-B.lagebuch", "/20260201-0900-C.lagebuch");
         Action? probe = null;
 
         var vm = HomeWithRecent(recent, store, runInBackground: work => probe = work);
 
-        var expectedOrder = new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" };
+        var expectedOrder = new[] { "20260301-0900-B.lagebuch", "20260201-0900-C.lagebuch", "20260101-0900-A.lagebuch" };
         Assert.Equal(expectedOrder, vm.RecentFiles.Select(f => f.FileName));
         Assert.All(vm.RecentFiles, f => Assert.False(f.IsClosed));
         Assert.Equal(0, store.Probes);
@@ -291,33 +291,33 @@ public class HomeViewModelTests
         probe();
 
         Assert.Equal(expectedOrder, vm.RecentFiles.Select(f => f.FileName));
-        Assert.True(vm.RecentFiles.Single(f => f.Path == "/20260101-0900-A.fwincident").IsClosed);
-        Assert.False(vm.RecentFiles.Single(f => f.Path == "/20260301-0900-B.fwincident").IsClosed);
+        Assert.True(vm.RecentFiles.Single(f => f.Path == "/20260101-0900-A.lagebuch").IsClosed);
+        Assert.False(vm.RecentFiles.Single(f => f.Path == "/20260301-0900-B.lagebuch").IsClosed);
     }
 
     [Fact]
     public void A_state_probe_that_throws_leaves_the_row_unmarked()
     {
-        var store = new StateProbeStore { ["/closed.fwincident"] = IncidentState.Closed };
-        store.Throws.Add("/broken.fwincident");
+        var store = new StateProbeStore { ["/closed.lagebuch"] = IncidentState.Closed };
+        store.Throws.Add("/broken.lagebuch");
 
-        var vm = HomeWithRecent(new FakeRecent("/broken.fwincident", "/closed.fwincident"), store);
+        var vm = HomeWithRecent(new FakeRecent("/broken.lagebuch", "/closed.lagebuch"), store);
 
-        Assert.False(vm.RecentFiles.Single(f => f.Path == "/broken.fwincident").IsClosed);
-        Assert.True(vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").IsClosed);
+        Assert.False(vm.RecentFiles.Single(f => f.Path == "/broken.lagebuch").IsClosed);
+        Assert.True(vm.RecentFiles.Single(f => f.Path == "/closed.lagebuch").IsClosed);
     }
 
     [Fact]
     public void A_late_state_probe_does_not_bring_back_a_removed_row()
     {
-        var store = new StateProbeStore { ["/closed.fwincident"] = IncidentState.Closed };
+        var store = new StateProbeStore { ["/closed.lagebuch"] = IncidentState.Closed };
         Action? probe = null;
-        var vm = HomeWithRecent(new FakeRecent("/open.fwincident", "/closed.fwincident"), store, runInBackground: work => probe = work);
+        var vm = HomeWithRecent(new FakeRecent("/open.lagebuch", "/closed.lagebuch"), store, runInBackground: work => probe = work);
 
-        vm.RemoveRecentCommand.Execute("/closed.fwincident");
+        vm.RemoveRecentCommand.Execute("/closed.lagebuch");
         probe!();
 
-        Assert.Equal(new[] { "/open.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+        Assert.Equal(new[] { "/open.lagebuch" }, vm.RecentFiles.Select(f => f.Path));
     }
 
     [Fact]
@@ -325,7 +325,7 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Close();
 
         var recent = new FakeRecent();
@@ -333,7 +333,7 @@ public class HomeViewModelTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        vm.OpenRecentCommand.Execute("/x.fwincident");
+        vm.OpenRecentCommand.Execute("/x.lagebuch");
 
         Assert.NotNull(opened);
         Assert.True(opened!.IsReadOnly);
@@ -345,13 +345,13 @@ public class HomeViewModelTests
         // Previously double-tapping a recent OPEN incident dead-ended (no workspace opened).
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        vm.OpenRecentCommand.Execute("/x.fwincident");
+        vm.OpenRecentCommand.Execute("/x.lagebuch");
 
         Assert.NotNull(opened);
         Assert.True(opened!.IsReadOnly);
@@ -363,7 +363,7 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         // Dialog returns the seeded path so OpenFile has something to open.
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenReturningDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
@@ -394,11 +394,11 @@ public class HomeViewModelTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        vm.OpenRecentCommand.Execute("/gone.fwincident");
+        vm.OpenRecentCommand.Execute("/gone.lagebuch");
 
         Assert.Null(opened);
         Assert.NotNull(vm.OpenError);
-        Assert.Contains("gone.fwincident", vm.OpenError!, StringComparison.Ordinal);
+        Assert.Contains("gone.lagebuch", vm.OpenError!, StringComparison.Ordinal);
         Assert.Contains("Datei kaputt.", vm.OpenError!, StringComparison.Ordinal);
     }
 
@@ -441,10 +441,10 @@ public class HomeViewModelTests
             new NoopIncidentHostController(),
             "1.0.0");
 
-        vm.OpenRecentCommand.Execute("/gone.fwincident");
+        vm.OpenRecentCommand.Execute("/gone.lagebuch");
 
         Assert.Empty(recent.GetRecent());
-        Assert.DoesNotContain(vm.RecentFiles, f => f.Path == "/gone.fwincident");
+        Assert.DoesNotContain(vm.RecentFiles, f => f.Path == "/gone.lagebuch");
     }
 
     [Fact]
@@ -452,13 +452,13 @@ public class HomeViewModelTests
     {
         var store = new SelectivelyThrowingStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        vm.OpenRecentCommand.Execute("/gone.fwincident");
+        vm.OpenRecentCommand.Execute("/gone.lagebuch");
         Assert.NotNull(vm.OpenError);
 
-        vm.OpenRecentCommand.Execute("/x.fwincident");
+        vm.OpenRecentCommand.Execute("/x.lagebuch");
 
         Assert.Null(vm.OpenError);
     }
@@ -481,25 +481,25 @@ public class HomeViewModelTests
     [Fact]
     public void Removing_an_entry_the_list_no_longer_shows_leaves_the_list_alone()
     {
-        var recent = new FakeRecent("/a.fwincident");
+        var recent = new FakeRecent("/a.lagebuch");
         var vm = HomeWithRecent(recent);
 
-        vm.RemoveRecentCommand.Execute("/b.fwincident");
+        vm.RemoveRecentCommand.Execute("/b.lagebuch");
 
-        Assert.Equal(new[] { "/a.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+        Assert.Equal(new[] { "/a.lagebuch" }, vm.RecentFiles.Select(f => f.Path));
         Assert.Null(vm.RecentFilesError);
     }
 
     [Fact]
     public void Removing_a_recent_entry_drops_it_from_the_list_and_the_store()
     {
-        var recent = new FakeRecent("/b.fwincident", "/a.fwincident");
+        var recent = new FakeRecent("/b.lagebuch", "/a.lagebuch");
         var vm = HomeWithRecent(recent);
 
-        vm.RemoveRecentCommand.Execute("/a.fwincident");
+        vm.RemoveRecentCommand.Execute("/a.lagebuch");
 
-        Assert.Equal(new[] { "/b.fwincident" }, recent.GetRecent());
-        Assert.Equal(new[] { "/b.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+        Assert.Equal(new[] { "/b.lagebuch" }, recent.GetRecent());
+        Assert.Equal(new[] { "/b.lagebuch" }, vm.RecentFiles.Select(f => f.Path));
         Assert.Null(vm.RecentFilesError);
     }
 
@@ -507,7 +507,7 @@ public class HomeViewModelTests
     [Fact]
     public void Removing_a_recent_entry_leaves_the_incident_file_on_disk()
     {
-        var path = Path.Join(Path.GetTempPath(), $"remove-{Guid.NewGuid():N}.fwincident");
+        var path = Path.Join(Path.GetTempPath(), $"remove-{Guid.NewGuid():N}.lagebuch");
         File.WriteAllText(path, "Einsatz");
         try
         {
@@ -528,9 +528,9 @@ public class HomeViewModelTests
     [Fact]
     public void A_recent_entry_that_cannot_be_removed_stays_listed_with_the_reason()
     {
-        var vm = HomeWithRecent(new FakeRecent("/a.fwincident") { FailRemove = true });
+        var vm = HomeWithRecent(new FakeRecent("/a.lagebuch") { FailRemove = true });
 
-        vm.RemoveRecentCommand.Execute("/a.fwincident");
+        vm.RemoveRecentCommand.Execute("/a.lagebuch");
 
         Assert.Single(vm.RecentFiles);
         Assert.Equal("Nicht entfernt: Zugriff verweigert.", vm.RecentFilesError);
@@ -539,12 +539,12 @@ public class HomeViewModelTests
     [Fact]
     public void A_listed_entry_that_fails_to_open_offers_removal_in_the_banner()
     {
-        var vm = HomeWithRecent(new FakeRecent("/gone.fwincident"), new ThrowingStore("Datei kaputt."));
+        var vm = HomeWithRecent(new FakeRecent("/gone.lagebuch"), new ThrowingStore("Datei kaputt."));
 
-        vm.OpenRecentCommand.Execute("/gone.fwincident");
+        vm.OpenRecentCommand.Execute("/gone.lagebuch");
 
         Assert.NotNull(vm.OpenError);
-        Assert.Equal("/gone.fwincident", vm.FailedRecentPath);
+        Assert.Equal("/gone.lagebuch", vm.FailedRecentPath);
     }
 
     // A file picked through the dialog was never on the list, so there is nothing to take off it.
@@ -562,28 +562,28 @@ public class HomeViewModelTests
     [Fact]
     public void Removing_the_entry_that_failed_to_open_clears_the_banner()
     {
-        var recent = new FakeRecent("/gone.fwincident", "/other.fwincident");
+        var recent = new FakeRecent("/gone.lagebuch", "/other.lagebuch");
         var vm = HomeWithRecent(recent, new ThrowingStore("Datei kaputt."));
-        vm.OpenRecentCommand.Execute("/gone.fwincident");
+        vm.OpenRecentCommand.Execute("/gone.lagebuch");
 
         vm.RemoveRecentCommand.Execute(vm.FailedRecentPath);
 
         Assert.Null(vm.OpenError);
         Assert.Null(vm.FailedRecentPath);
-        Assert.Equal(new[] { "/other.fwincident" }, recent.GetRecent());
+        Assert.Equal(new[] { "/other.lagebuch" }, recent.GetRecent());
     }
 
     // The banner is about a different file, so taking some other row off leaves it standing.
     [Fact]
     public void Removing_another_entry_keeps_the_banner()
     {
-        var vm = HomeWithRecent(new FakeRecent("/gone.fwincident", "/other.fwincident"), new ThrowingStore("Datei kaputt."));
-        vm.OpenRecentCommand.Execute("/gone.fwincident");
+        var vm = HomeWithRecent(new FakeRecent("/gone.lagebuch", "/other.lagebuch"), new ThrowingStore("Datei kaputt."));
+        vm.OpenRecentCommand.Execute("/gone.lagebuch");
 
-        vm.RemoveRecentCommand.Execute("/other.fwincident");
+        vm.RemoveRecentCommand.Execute("/other.lagebuch");
 
         Assert.NotNull(vm.OpenError);
-        Assert.Equal("/gone.fwincident", vm.FailedRecentPath);
+        Assert.Equal("/gone.lagebuch", vm.FailedRecentPath);
     }
 
     [Fact]
@@ -591,11 +591,11 @@ public class HomeViewModelTests
     {
         var store = new CountingStore();
         var clock = new FixedClock(T0);
-        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         store.ResetLoadCount();
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        vm.OpenRecentCommand.Execute("/x.fwincident");
+        vm.OpenRecentCommand.Execute("/x.lagebuch");
 
         Assert.Equal(1, store.LoadCount);
     }
@@ -752,9 +752,9 @@ internal sealed class FakeLastSaveFolderStore : ILastSaveFolderStore
 // PickOpenAsync that returns a real path (the base FakeDialogs returns null).
 internal sealed class OpenReturningDialogs : IFileDialogService
 {
-    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
-    public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.lagebuch");
 
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 
@@ -784,7 +784,7 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
 
     public string? LastInitialFolder { get; private set; }
 
-    public string ReturnPath { get; set; } = "/x.fwincident";
+    public string ReturnPath { get; set; } = "/x.lagebuch";
 
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
     {

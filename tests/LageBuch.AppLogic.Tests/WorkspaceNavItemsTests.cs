@@ -26,7 +26,7 @@ public class WorkspaceNavItemsTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             seeds);
         return new IncidentWorkspaceViewModel(
             session,

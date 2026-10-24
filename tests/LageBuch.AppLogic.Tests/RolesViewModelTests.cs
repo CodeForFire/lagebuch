@@ -46,7 +46,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         return new RolesViewModel(session, clock, md, onChanged ?? (() => { }));
@@ -61,7 +61,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new RolesViewModel(session, clock, Md(), () => changes++)
@@ -152,7 +152,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Close();
@@ -262,13 +262,13 @@ public class RolesViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", from: T0);
         seed.Save();
 
-        var vm = new RolesViewModel(LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident"), clock, Md(), () => { });
+        var vm = new RolesViewModel(LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch"), clock, Md(), () => { });
 
         var row = Assert.Single(vm.Roles);
         Assert.True(row.IsRunning);
@@ -285,7 +285,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new RolesViewModel(session, clock, Md(), () => changes++)
@@ -313,13 +313,13 @@ public class RolesViewModelTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", phone: "0171", from: T0);
         seed.Save();
 
-        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new RolesViewModel(session, clock, Md(), () => { });
 
         Assert.Single(vm.Roles).Phone = "0172";
@@ -336,7 +336,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var ended = session.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", from: T0);
@@ -784,7 +784,7 @@ public class RolesViewModelTests
 
     // --- A duplicate that arrived from elsewhere (#470) ---
     // The add form refuses a second holder, but it cannot refuse one that is already recorded: an
-    // older Einsatzdatei, an imported .fwincident or a joined device on other Stammdaten can all
+    // older Einsatzdatei, an imported .lagebuch or a joined device on other Stammdaten can all
     // bring one. Seeded through the domain, which is the only way one can arrive.
     private static RolesViewModel VmOverSeededDuplicate(
         RoleUniqueness uniqueness, string? firstSection = null, string? secondSection = null)
@@ -795,7 +795,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AssignRole(clock, op, "EL", "Müller", from: T0, section: firstSection);
@@ -814,7 +814,7 @@ public class RolesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        store.Save("/x.fwincident", Incident.Rehydrate(
+        store.Save("/x.lagebuch", Incident.Rehydrate(
             Guid.NewGuid(),
             T0,
             IncidentState.Open,
@@ -842,7 +842,7 @@ public class RolesViewModelTests
             Array.Empty<Dwelling>(),
             Array.Empty<InvolvedParty>()));
 
-        var session = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
+        var session = LocalIncidentSession.Open(store, clock, "/x.lagebuch", new SessionOperator("Müller"));
         return new RolesViewModel(session, clock, MdWithRoles(uniqueness), () => { });
     }
 
@@ -919,7 +919,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var handedOver = session.Incident.AssignRole(clock, op, "EL", "Müller", from: T0);
@@ -942,7 +942,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AssignRole("EL", "Müller", from: clock.Now, phone: "0171 1");
@@ -1071,7 +1071,7 @@ public class RolesViewModelTests
             new FakeStore(),
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var first = session.Incident.AssignRole(clock, op, "EL", "Müller", from: T0);

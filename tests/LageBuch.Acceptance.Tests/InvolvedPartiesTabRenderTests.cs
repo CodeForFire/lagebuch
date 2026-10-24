@@ -24,7 +24,7 @@ public class InvolvedPartiesTabRenderTests
             new FakeStore(),
             clock,
             new SessionOperator("Muster", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddInvolvedParty("Beispiel, Erika", "0171 0000001", "Hauseigentümerin, Schlüssel an EL übergeben");

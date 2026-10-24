@@ -24,23 +24,23 @@ public class JsonRecentFilesStoreTests : IDisposable
     [Fact]
     public void Add_puts_most_recent_first_and_persists()
     {
-        new JsonRecentFilesStore(_path).Add("/a.fwincident");
-        new JsonRecentFilesStore(_path).Add("/b.fwincident");
+        new JsonRecentFilesStore(_path).Add("/a.lagebuch");
+        new JsonRecentFilesStore(_path).Add("/b.lagebuch");
 
         var recent = new JsonRecentFilesStore(_path).GetRecent();
-        Assert.Equal(new[] { "/b.fwincident", "/a.fwincident" }, recent);
+        Assert.Equal(new[] { "/b.lagebuch", "/a.lagebuch" }, recent);
     }
 
     [Fact]
     public void Add_existing_path_moves_it_to_front_without_duplicating()
     {
         var store = new JsonRecentFilesStore(_path);
-        store.Add("/a.fwincident");
-        store.Add("/b.fwincident");
-        store.Add("/a.fwincident");
+        store.Add("/a.lagebuch");
+        store.Add("/b.lagebuch");
+        store.Add("/a.lagebuch");
 
         var recent = new JsonRecentFilesStore(_path).GetRecent();
-        Assert.Equal(new[] { "/a.fwincident", "/b.fwincident" }, recent);
+        Assert.Equal(new[] { "/a.lagebuch", "/b.lagebuch" }, recent);
     }
 
     [Fact]
@@ -49,26 +49,26 @@ public class JsonRecentFilesStoreTests : IDisposable
         var store = new JsonRecentFilesStore(_path);
         for (var i = 0; i < 15; i++)
         {
-            store.Add($"/file{i}.fwincident");
+            store.Add($"/file{i}.lagebuch");
         }
 
         var recent = store.GetRecent();
         Assert.Equal(10, recent.Count);
-        Assert.Equal("/file14.fwincident", recent[0]);
+        Assert.Equal("/file14.lagebuch", recent[0]);
     }
 
     [Fact]
     public void Remove_drops_the_entry_and_keeps_the_rest_in_order()
     {
         var store = new JsonRecentFilesStore(_path);
-        store.Add("/a.fwincident");
-        store.Add("/b.fwincident");
-        store.Add("/c.fwincident");
+        store.Add("/a.lagebuch");
+        store.Add("/b.lagebuch");
+        store.Add("/c.lagebuch");
 
-        store.Remove("/b.fwincident");
+        store.Remove("/b.lagebuch");
 
         var recent = new JsonRecentFilesStore(_path).GetRecent();
-        Assert.Equal(new[] { "/c.fwincident", "/a.fwincident" }, recent);
+        Assert.Equal(new[] { "/c.lagebuch", "/a.lagebuch" }, recent);
     }
 
     // Add already treats paths differing only in case as one entry; Remove must find that entry
@@ -77,9 +77,9 @@ public class JsonRecentFilesStoreTests : IDisposable
     public void Remove_matches_the_path_case_insensitively_like_add()
     {
         var store = new JsonRecentFilesStore(_path);
-        store.Add("/Einsatz.fwincident");
+        store.Add("/Einsatz.lagebuch");
 
-        store.Remove("/einsatz.fwincident");
+        store.Remove("/einsatz.lagebuch");
 
         Assert.Empty(new JsonRecentFilesStore(_path).GetRecent());
     }
@@ -88,17 +88,17 @@ public class JsonRecentFilesStoreTests : IDisposable
     public void Removing_an_unlisted_path_leaves_the_list_unchanged()
     {
         var store = new JsonRecentFilesStore(_path);
-        store.Add("/a.fwincident");
+        store.Add("/a.lagebuch");
 
-        store.Remove("/b.fwincident");
+        store.Remove("/b.lagebuch");
 
-        Assert.Equal(new[] { "/a.fwincident" }, new JsonRecentFilesStore(_path).GetRecent());
+        Assert.Equal(new[] { "/a.lagebuch" }, new JsonRecentFilesStore(_path).GetRecent());
     }
 
     [Fact]
     public void Removing_from_a_missing_file_creates_none()
     {
-        new JsonRecentFilesStore(_path).Remove("/a.fwincident");
+        new JsonRecentFilesStore(_path).Remove("/a.lagebuch");
 
         Assert.False(File.Exists(_path));
     }

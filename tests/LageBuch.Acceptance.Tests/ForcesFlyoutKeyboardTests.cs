@@ -28,7 +28,7 @@ public class ForcesFlyoutKeyboardTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddForceUnit("FFB Wache 1", 6, null, "Alarmiert", null);

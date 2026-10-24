@@ -18,7 +18,7 @@ public class IncidentSessionTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             new[] { ("A?", false), ("B?", false) },
             Array.Empty<(string, bool)>());
 
@@ -35,12 +35,12 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Save();
         Assert.Equal(2, store.SaveCount); // start + explicit save
-        Assert.Equal(session.Incident.Id, store.Load("/x.fwincident").Id);
+        Assert.Equal(session.Incident.Id, store.Load("/x.lagebuch").Id);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class IncidentSessionTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         clock.Now = T0.AddHours(1);
@@ -71,7 +71,7 @@ public class IncidentSessionTests
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var savesBefore = store.SaveCount;
@@ -97,7 +97,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
@@ -118,7 +118,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
@@ -133,7 +133,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var raised = false;
@@ -153,12 +153,12 @@ public class IncidentSessionTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Close();
 
-        var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", op: null);
+        var reopened = LocalIncidentSession.Open(store, clock, "/x.lagebuch", op: null);
         Assert.True(reopened.IsReadOnly);
     }
 
@@ -170,11 +170,11 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        Assert.Throws<InvalidOperationException>(() => LocalIncidentSession.Open(store, new FixedClock(T0), "/x.fwincident", op: null));
+        Assert.Throws<InvalidOperationException>(() => LocalIncidentSession.Open(store, new FixedClock(T0), "/x.lagebuch", op: null));
     }
 
     [Fact]
@@ -185,11 +185,11 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.lagebuch");
 
         Assert.True(ro.IsReadOnly);
         Assert.Null(ro.Operator);
@@ -205,12 +205,12 @@ public class IncidentSessionTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Close();
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         Assert.True(ro.IsReadOnly);
     }
 
@@ -222,10 +222,10 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.lagebuch");
 
         ro.ContinueEditing(new SessionOperator("Schmidt"));
 
@@ -242,11 +242,11 @@ public class IncidentSessionTests
             store,
             clock,
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         seed.Close();
-        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
 
         Assert.Throws<InvalidOperationException>(
             () => ro.ContinueEditing(new SessionOperator("Schmidt")));
@@ -260,7 +260,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
@@ -277,7 +277,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var saves = store.SaveCount;
@@ -303,7 +303,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller", "FFB 1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var entries = session.Incident.Journal.Count;
@@ -323,10 +323,10 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.lagebuch");
 
         Assert.Throws<InvalidOperationException>(() => ro.ChangeOperator(new SessionOperator("Schmidt")));
     }
@@ -339,10 +339,10 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.lagebuch");
 
         ro.ContinueEditing(new SessionOperator("Schmidt", "FFB 1"));
 
@@ -358,12 +358,12 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         Assert.False(editable.IsReadOnly); // has operator
 
-        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.lagebuch");
         Assert.True(ro.IsReadOnly); // no operator
     }
 
@@ -375,7 +375,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var bytes = await session.ExportPdfAsync(new TestPdfExporter());
@@ -394,7 +394,7 @@ public class IncidentSessionTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/y.fwincident",
+            "/y.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 

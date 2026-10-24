@@ -23,7 +23,7 @@ public sealed class CrashReportsTests : IDisposable
     {
         var crash = Caught(() => throw new InvalidOperationException(
             "Müller, Hauptstraße 5",
-            new IOException("/home/mueller/einsatz.fwincident")));
+            new IOException("/home/mueller/einsatz.lagebuch")));
 
         var report = CrashReports.Format(crash, "1.2.3", T0);
 
@@ -32,7 +32,7 @@ public sealed class CrashReportsTests : IDisposable
         Assert.Contains("System.IO.IOException", report, StringComparison.Ordinal);
         Assert.Contains(nameof(A_report_names_the_exception_types_and_stack_but_never_a_message), report, StringComparison.Ordinal);
         Assert.DoesNotContain("Müller", report, StringComparison.Ordinal);
-        Assert.DoesNotContain("einsatz.fwincident", report, StringComparison.Ordinal);
+        Assert.DoesNotContain("einsatz.lagebuch", report, StringComparison.Ordinal);
     }
 
     [Fact]

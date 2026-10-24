@@ -1,0 +1,1 @@
+New Einsätze are saved as `.lagebuch` files, which the Windows, Linux and macOS installers register with their own document icon so a double-click opens them in Lagebuch; existing `.fwincident` files keep opening the same way.

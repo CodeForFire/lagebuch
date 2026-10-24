@@ -96,7 +96,7 @@ public class AutomationPropertiesTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddForceUnit("FFB Wache 1", 9, null, "Alarmiert", null);
@@ -148,7 +148,7 @@ public class AutomationPropertiesTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(
@@ -232,7 +232,7 @@ public class AutomationPropertiesTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>(),
             keyword: "B3P");
@@ -291,7 +291,7 @@ public class AutomationPropertiesTests
             new FakeStore(),
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 10);
@@ -314,7 +314,7 @@ public class AutomationPropertiesTests
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             aufbau,
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(

@@ -66,7 +66,7 @@ internal static class WorkspaceRenderHelper
             new FakeStore(),
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             checklistAufbau,
             checklistAbbau,
             new IncidentNumber("B 1.2 260715 123"),

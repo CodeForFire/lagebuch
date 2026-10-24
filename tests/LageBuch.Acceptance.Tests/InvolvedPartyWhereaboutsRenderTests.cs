@@ -23,7 +23,7 @@ public class InvolvedPartyWhereaboutsRenderTests
             new FakeStore(),
             clock,
             new SessionOperator("Muster", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddCoBuilding("Hauptstr. 12", 1, 2);

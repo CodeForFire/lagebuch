@@ -11,7 +11,7 @@ namespace LageBuch.Persistence.Tests;
 
 public class IncidentRoundTripTests : IDisposable
 {
-    private readonly string _path = Path.Join(Path.GetTempPath(), $"rt-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"rt-{Guid.NewGuid():N}.lagebuch");
 
     private sealed class Clock : IClock
     {
@@ -402,7 +402,7 @@ public class IncidentRoundTripTests : IDisposable
     [Fact]
     public void A_file_row_written_before_display_name_existed_falls_back_to_the_file_name()
     {
-        // Simulates a .fwincident saved by a build before this column existed: no code path in this
+        // Simulates a .lagebuch saved by a build before this column existed: no code path in this
         // build ever writes a NULL display_name, so the only way to reproduce that state is a raw
         // UPDATE against the column directly, mirroring how a genuinely older file would look.
         var clock = new Clock();

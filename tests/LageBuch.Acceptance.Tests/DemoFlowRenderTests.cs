@@ -33,9 +33,9 @@ public class DemoFlowRenderTests
     {
         private readonly List<string> _list = new()
         {
-            "/home/elw/Einsaetze/20260622-0900.fwincident",
-            "/home/elw/Einsaetze/20260619-1432.fwincident",
-            "/home/elw/Einsaetze/uebung.fwincident",
+            "/home/elw/Einsaetze/20260622-0900.lagebuch",
+            "/home/elw/Einsaetze/20260619-1432.lagebuch",
+            "/home/elw/Einsaetze/uebung.lagebuch",
         };
 
         public IReadOnlyList<string> GetRecent() => _list;
@@ -163,7 +163,7 @@ public class DemoFlowRenderTests
             new FakeStore(),
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, Elw),
-            "/home/elw/Einsaetze/uebung.fwincident",
+            "/home/elw/Einsaetze/uebung.lagebuch",
             md.ChecklistTemplates.Select(t => new ChecklistSeed(
                 t.Id, t.Title, t.Items.Select(i => (i.Text, i.IsMandatory)).ToList())).ToList(),
             new IncidentNumber("B 1.2 260622 0042"),

@@ -7,7 +7,7 @@ public class IncidentFileStoreTests : IDisposable
     private readonly IncidentFileStore _store = new();
 
     public IncidentFileStoreTests() =>
-        _incidentPath = Path.Join(_dir, "20260622-0900-B.fwincident");
+        _incidentPath = Path.Join(_dir, "20260622-0900-B.lagebuch");
 
     public void Dispose()
     {

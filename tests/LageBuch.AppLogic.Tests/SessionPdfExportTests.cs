@@ -16,7 +16,7 @@ public class SessionPdfExportTests
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
-            "/y.fwincident",
+            "/y.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         return (host, store);
@@ -57,7 +57,7 @@ public class SessionPdfExportTests
 
         // Neither cached nor deliverable: GetFileBytesAsync comes back null, as it does on a client
         // whose host has gone away before the attachment was ever opened.
-        await store.DeleteFileBytesAsync("/y.fwincident", IncidentFile.StorageFileName(file.Id, file.FileName));
+        await store.DeleteFileBytesAsync("/y.lagebuch", IncidentFile.StorageFileName(file.Id, file.FileName));
         var client = new SnapshotRoundTrippingSession(host);
 
         var result = await SessionPdfExport.ExportAsync(client, new TestPdfExporter(), new FixedClock(T0));

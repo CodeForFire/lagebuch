@@ -115,11 +115,11 @@ public class WorkspacePromptHandoverTests
             store,
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        var readOnly = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var readOnly = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
         var vm = new IncidentWorkspaceViewModel(
             readOnly,
             clock,

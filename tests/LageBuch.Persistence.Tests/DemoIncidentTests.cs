@@ -16,10 +16,10 @@ namespace LageBuch.Persistence.Tests;
 // repository, and parses both master-data files with the real importer -- so a schema change that
 // would break either of them breaks CI first.
 //
-// Set SAMPLES_OUT=<dir> to also write docs/samples/uebung.fwincident (`make samples`).
+// Set SAMPLES_OUT=<dir> to also write docs/samples/uebung.lagebuch (`make samples`).
 public class DemoIncidentTests : IDisposable
 {
-    private readonly string _path = Path.Join(Path.GetTempPath(), $"demo-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"demo-{Guid.NewGuid():N}.lagebuch");
 
     private sealed class Clock : IClock
     {
@@ -268,7 +268,7 @@ public class DemoIncidentTests : IDisposable
         }
 
         Directory.CreateDirectory(dir);
-        var target = Path.Join(dir, "uebung.fwincident");
+        var target = Path.Join(dir, "uebung.lagebuch");
         foreach (var stale in new[] { target, target + "-wal", target + "-shm" })
         {
             if (File.Exists(stale))

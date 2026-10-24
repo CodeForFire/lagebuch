@@ -24,7 +24,7 @@ public class CoMessprotokollMessreiheTests
             new FakeStore(),
             clock,
             new SessionOperator("Huber", "FFB 12/1"),
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddCoBuilding("Haus A", 1, 1);

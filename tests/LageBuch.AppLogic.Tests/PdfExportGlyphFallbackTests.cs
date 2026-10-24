@@ -30,7 +30,7 @@ public class PdfExportGlyphFallbackTests
             store,
             clock,
             op,
-            "/x.fwincident",
+            "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 

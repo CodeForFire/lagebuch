@@ -45,11 +45,11 @@ seed-source/
 # git worktrees (superpowers isolation)
 .worktrees/
 
-# Residue from opening the shipped sample in the app: .fwincident is SQLite in WAL
+# Residue from opening the shipped sample in the app: .lagebuch is SQLite in WAL
 # mode, and attachments land in a sibling .files/ folder. The generator asserts the
 # shipped sample is one self-contained file, so none of this belongs in the repo.
-docs/samples/*.fwincident-wal
-docs/samples/*.fwincident-shm
+docs/samples/*.lagebuch-wal
+docs/samples/*.lagebuch-shm
 docs/samples/*.files/
 
 # Scratch renders for a pull request's before/after pair (`make phone-screenshots`).
