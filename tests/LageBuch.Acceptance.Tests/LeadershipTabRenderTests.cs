@@ -1,5 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -74,6 +77,36 @@ public class LeadershipTabRenderTests
         Assert.All(strip.Items.OfType<TabItem>(), t => Assert.True(t.IsEffectivelyVisible));
         var content = WorkspaceRenderHelper.SelectedTabContent(window);
         Assert.Single(content.GetVisualDescendants().OfType<ForcesView>());
+    }
+
+    // Field report: the Führungsstufe could not be chosen on the board inside the FÜHRUNG tabs.
+    // Real presses, in the window and then in the flyout's own top level.
+    [AvaloniaFact]
+    public void A_fuehrungsstufe_can_be_picked_by_mouse_on_the_organisation_tab()
+    {
+        var window = ShowWorkspace();
+        var vm = Assert.IsType<IncidentWorkspaceViewModel>(((IncidentWorkspaceView)window.Content!).DataContext);
+        WorkspaceRenderHelper.SelectTab(window, "ORGANISATION");
+        var stufe = WorkspaceRenderHelper.SelectedTabContent(window).GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "StufeButton");
+
+        Press(stufe);
+        Assert.True(stufe.Flyout!.IsOpen);
+        Press(((Control)((Flyout)stufe.Flyout).Content!).GetVisualDescendants().OfType<Button>()
+            .Single(b => b.DataContext is StufeChoice { Label: "Stufe D" }));
+
+        Assert.Equal("Stufe D", Assert.Single(vm.Leadership.El.StufeChoices, c => c.IsCurrent).Label);
+        Assert.False(stufe.Flyout.IsOpen);
+    }
+
+    // A press and release in the control's own top level: the window, or a flyout's popup.
+    private static void Press(Control control)
+    {
+        var topLevel = TopLevel.GetTopLevel(control)!;
+        var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), topLevel)!.Value;
+        topLevel.MouseDown(centre, MouseButton.Left);
+        topLevel.MouseUp(centre, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
     }
 
     [AvaloniaFact]
