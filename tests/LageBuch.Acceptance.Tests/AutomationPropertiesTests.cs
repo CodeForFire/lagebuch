@@ -9,6 +9,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -303,6 +304,97 @@ public class AutomationPropertiesTests
 
         var removeButton = IconButtons(view).Single(b => (ToolTip.GetTip(b) as string) == "Datei entfernen");
         Assert.Equal("Datei entfernen", Name(removeButton));
+    }
+
+    // Every control a screen reader cannot name from its own text: the input fields, whose label is
+    // the field's header and so not the control's, and any button without a text Content. Template
+    // parts (an AutoCompleteBox's inner TextBox) inherit their owner's name and are skipped.
+    private static void AssertEveryTextlessControlIsNamed(Visual root)
+    {
+        var controls = root.GetVisualDescendants().OfType<Control>()
+            .Where(c => c.TemplatedParent is null && c is TextBox or AutoCompleteBox or Button)
+            .ToList();
+        Assert.NotEmpty(controls);
+        foreach (var control in controls)
+        {
+            var named = !string.IsNullOrWhiteSpace(Name(control))
+                || control is Button { Content: string { Length: > 0 } };
+            Assert.True(named, $"{control.GetType().Name} {control.Name} has neither text nor an AutomationProperties.Name");
+        }
+    }
+
+    private static LocalIncidentSession DialogSession() =>
+        TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+
+    [AvaloniaFact]
+    public void Every_field_and_button_of_the_abschnitt_dialog_is_named_for_automation()
+    {
+        var vm = CommandNodeDialogViewModel.ForCreate(DialogSession(), MasterDataSet.Empty, CommandNodeKind.Abschnitt, null, "Abschnitt 1");
+        var view = new CommandNodeDialogView { DataContext = vm };
+        var window = new Window { Content = view, Width = 560, Height = 760 };
+        window.Show();
+        vm.Standort = "Hofeinfahrt";
+        vm.CancelCommand.Execute(null); // the discard panel's buttons too
+        Dispatcher.UIThread.RunJobs();
+
+        AssertEveryTextlessControlIsNamed(view);
+        Assert.Equal("Funkgruppe", Name(view.GetControl<AutoCompleteBox>("CommandNodeFunkgruppeBox")));
+    }
+
+    [AvaloniaFact]
+    public void Every_field_and_button_of_the_person_dialog_is_named_for_automation()
+    {
+        var vm = new LeadershipPersonDialogViewModel(DialogSession(), new FixedClock(), MasterDataSet.Empty, null, RoleSlot.Fachberater);
+        var view = new LeadershipPersonDialogView { DataContext = vm };
+        var window = new Window { Content = view, Width = 560, Height = 560 };
+        window.Show();
+        vm.PersonName = "Mustermann, Max";
+        vm.CancelCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        AssertEveryTextlessControlIsNamed(view);
+        Assert.Equal("Funktion", Name(view.GetControl<AutoCompleteBox>("PersonDialogRoleBox")));
+        Assert.Equal("Handynummer", Name(view.GetControl<TextBox>("PersonDialogPhoneBox")));
+    }
+
+    // The Führung board: the drag grips and the pickers carry no text of their own.
+    [AvaloniaFact]
+    public void Every_textless_control_of_the_fuehrung_board_is_named_for_automation()
+    {
+        var session = DialogSession();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
+        var nord = session.Incident.CommandNodes[^1].Id;
+        session.AddCommandNode(CommandNodeKind.Unterabschnitt, "Dach", nord);
+        session.AddCommandNode(CommandNodeKind.Partner, "Polizei");
+        session.AddForceUnit("FF Emmering", 9, "Florian Emmering 40/1", officerCount: 1);
+        session.MoveForceUnit(session.Incident.Forces[^1].Id, nord);
+        session.AddForceUnit("FF Aich", 6, "Florian Aich 11/1");
+        session.AssignRole("Fachberater THW", "Peter Maier", slot: RoleSlot.Fachberater);
+        var vm = new LeadershipViewModel(session, new FixedClock(), MasterDataSet.Empty, () => { });
+        var view = new LeadershipView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1400, Height = 1000 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        AssertEveryTextlessControlIsNamed(view);
+        var grips = view.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("unit-grip")).ToList();
+        var unitGrips = grips.Where(g => !g.Classes.Contains("node-grip")).ToList();
+        var cardGrips = grips.Where(g => g.Classes.Contains("node-grip")).ToList();
+        Assert.Equal(2, unitGrips.Count);
+        Assert.All(unitGrips, g => Assert.Equal("Einheit verschieben", Name(g)));
+        Assert.Equal(3, cardGrips.Count);
+        Assert.All(cardGrips, g => Assert.Equal("Abschnitt verschieben", Name(g)));
+        Assert.Equal("Führungsstufe wählen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "StufeButton")));
+        Assert.Equal("EL festlegen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElButton")));
+        Assert.Equal(
+            "Melder der Einsatzleitung festlegen",
+            Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElMelderButton")));
     }
 
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) Workspace(

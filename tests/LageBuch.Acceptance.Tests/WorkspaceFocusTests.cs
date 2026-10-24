@@ -53,6 +53,22 @@ public class WorkspaceFocusTests
             .Single(t => t.DataContext is WorkspaceNavItemViewModel item && item.Header == header);
     }
 
+    // ORGANISATION, FUNKTIONEN and KRÄFTE are tabs inside FÜHRUNG: opened through the rail, then clicked.
+    private static void ClickTab(Window window, string header)
+    {
+        if (header is "ORGANISATION" or "FUNKTIONEN" or "KRÄFTE")
+        {
+            WorkspaceRenderHelper.SelectTab(window, "FÜHRUNG");
+            Click(window, FuehrungTab(window, header));
+            return;
+        }
+
+        Click(window, RailTab(window, header));
+    }
+
+    private static TabItem FuehrungTab(Window window, string header) =>
+        WorkspaceRenderHelper.LeadershipTabStrip(window).Items.OfType<TabItem>().Single(t => Equals(t.Header, header));
+
     private static TabItem SelectedRailTab(Window window)
     {
         var tabs = WorkspaceRenderHelper.Tabs(window);
@@ -110,11 +126,37 @@ public class WorkspaceFocusTests
     [AvaloniaFact]
     public void Clicking_a_rail_tab_focuses_the_module_first_field()
     {
-        var (window, _, _) = ShowWorkspace();
+        var (window, _, vm) = ShowWorkspace();
+        vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.ForcesTab;
 
-        Click(window, RailTab(window, "KRÄFTE"));
+        Click(window, RailTab(window, "FÜHRUNG"));
 
         window.AssertFocused(Named<Control>(window, "VehicleBox"));
+    }
+
+    // A click on one of Führung's own tabs asks for that tab the way a rail click asks for a module.
+    [AvaloniaFact]
+    public void Clicking_the_kraefte_tab_inside_fuehrung_focuses_its_first_field()
+    {
+        var (window, _, vm) = ShowWorkspace();
+
+        ClickTab(window, "KRÄFTE");
+
+        Assert.Equal(LeadershipTabsViewModel.ForcesTab, vm.LeadershipTabs.SelectedTabIndex);
+        window.AssertFocused(Named<Control>(window, "VehicleBox"));
+    }
+
+    // The board has no entry dock, so a click on ORGANISATION leaves focus on the tab clicked.
+    [AvaloniaFact]
+    public void Clicking_the_organisation_tab_keeps_focus_on_that_tab()
+    {
+        var (window, _, vm) = ShowWorkspace();
+        ClickTab(window, "KRÄFTE");
+
+        ClickTab(window, "ORGANISATION");
+
+        Assert.Equal(LeadershipTabsViewModel.OrganisationTab, vm.LeadershipTabs.SelectedTabIndex);
+        window.AssertFocused(FuehrungTab(window, "ORGANISATION"));
     }
 
     // Field test: the list a suggestion box used to open on focus covered the rows the
@@ -127,7 +169,7 @@ public class WorkspaceFocusTests
     {
         var (window, _, _) = ShowWorkspace();
 
-        Click(window, RailTab(window, header));
+        ClickTab(window, header);
 
         var box = Named<AutoCompleteBox>(window, firstField);
         window.AssertFocused(box);
@@ -188,8 +230,9 @@ public class WorkspaceFocusTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(vm.IsReadOnly);
-        Assert.Same(vm.Forces, vm.SelectedNavItem?.Content);
-        Assert.Equal("KRÄFTE", ((WorkspaceNavItemViewModel)SelectedRailTab(window).DataContext!).Header);
+        Assert.Same(vm.LeadershipTabs, vm.SelectedNavItem?.Content);
+        Assert.Equal(LeadershipTabsViewModel.ForcesTab, vm.LeadershipTabs.SelectedTabIndex);
+        Assert.Equal("FÜHRUNG", ((WorkspaceNavItemViewModel)SelectedRailTab(window).DataContext!).Header);
         window.AssertFocused(SelectedRailTab(window));
     }
 

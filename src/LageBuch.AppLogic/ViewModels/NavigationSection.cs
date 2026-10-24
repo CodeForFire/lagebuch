@@ -30,7 +30,8 @@ public sealed partial class NavigationSection : EditorSection
 
     /// <summary>
     /// Rebuilds the rows from a stored layout plus the Checklisten that currently exist, keeping
-    /// the layout's order and visibility and appending anything it does not mention.
+    /// the layout's order and visibility, appending a Checkliste it does not mention and placing a
+    /// module it predates after its predecessor in the default rail.
     /// </summary>
     /// <remarks>
     /// The same reconciliation <c>NavigationLayout.Resolve</c> performs for the workspace, over
@@ -42,12 +43,12 @@ public sealed partial class NavigationSection : EditorSection
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(checklists);
 
-        var effective = layout.Count == 0 ? NavLayout.Default : layout;
+        var effective = layout.Count == 0 ? NavLayout.Default : Services.NavigationLayout.FoldLegacyFuehrung(layout);
         var byId = checklists.ToDictionary(c => c.Id);
         var seenLists = new HashSet<Guid>();
         var seenModules = new HashSet<string>(StringComparer.Ordinal);
 
-        Rows.Clear();
+        var rows = new List<NavRow>();
 
         foreach (var entry in effective)
         {
@@ -59,24 +60,31 @@ public sealed partial class NavigationSection : EditorSection
                     continue;
                 }
 
-                Rows.Add(NavRow.ForChecklist(section, entry.IsVisible, _onChanged));
+                rows.Add(NavRow.ForChecklist(section, entry.IsVisible, _onChanged));
                 continue;
             }
 
             if (NavModules.IsKnown(entry.ModuleKey) && seenModules.Add(entry.ModuleKey))
             {
-                Rows.Add(NavRow.ForModule(entry.ModuleKey, entry.IsVisible, _onChanged));
+                rows.Add(NavRow.ForModule(entry.ModuleKey, entry.IsVisible, _onChanged));
             }
         }
 
         foreach (var section in checklists.Where(c => !seenLists.Contains(c.Id)))
         {
-            Rows.Add(NavRow.ForChecklist(section, isVisible: true, _onChanged));
+            rows.Add(NavRow.ForChecklist(section, isVisible: true, _onChanged));
         }
 
-        foreach (var key in NavModules.All.Where(k => !seenModules.Contains(k)))
+        Services.NavigationLayout.InsertMissingModules(
+            rows,
+            r => r.ChecklistId is null ? r.ModuleKey : null,
+            k => NavRow.ForModule(k, isVisible: true, _onChanged),
+            seenModules);
+
+        Rows.Clear();
+        foreach (var row in rows)
         {
-            Rows.Add(NavRow.ForModule(key, isVisible: true, _onChanged));
+            Rows.Add(row);
         }
     }
 
@@ -171,8 +179,7 @@ public sealed partial class NavRow : ObservableObject
         {
             [NavModules.Etb] = "ETB",
             [NavModules.Tasks] = "Aufgaben",
-            [NavModules.Roles] = "Funktionen",
-            [NavModules.Forces] = "Kräfte",
+            [NavModules.Leadership] = "Führung",
             [NavModules.InvolvedParties] = "Beteiligte",
             [NavModules.Scba] = "Atemschutz",
             [NavModules.Co] = "CO-Messung",

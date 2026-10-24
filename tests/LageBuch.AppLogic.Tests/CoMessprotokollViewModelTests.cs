@@ -1116,14 +1116,17 @@ public class CoMessprotokollViewModelTests
 internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 {
     private readonly LocalIncidentSession _inner;
+    private readonly Func<Incident, Incident> _rewrite;
 
-    public SnapshotRoundTrippingSession(LocalIncidentSession inner)
+    // rewrite lets a test turn the received snapshot into a hostile one.
+    public SnapshotRoundTrippingSession(LocalIncidentSession inner, Func<Incident, Incident>? rewrite = null)
     {
         _inner = inner;
-        Incident = Roundtrip(_inner.Incident);
+        _rewrite = rewrite ?? (incident => incident);
+        Incident = _rewrite(Roundtrip(_inner.Incident));
         _inner.Changed += () =>
         {
-            Incident = Roundtrip(_inner.Incident);
+            Incident = _rewrite(Roundtrip(_inner.Incident));
             Changed?.Invoke();
         };
     }
@@ -1183,6 +1186,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         _inner.UpdateCommandNode(nodeId, name, auftrag, standort, funkgruppe, rufname, telefon);
 
     public void DissolveCommandNode(Guid nodeId) => _inner.DissolveCommandNode(nodeId);
+
+    public void MoveCommandNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId) => _inner.MoveCommandNode(nodeId, parentId, beforeNodeId);
 
     public void MoveForceUnit(Guid unitId, Guid? nodeId) => _inner.MoveForceUnit(unitId, nodeId);
 

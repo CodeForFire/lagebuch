@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
@@ -42,6 +43,19 @@ public class RolesTabRenderTests
         Roles = new[] { new Role(AnonymizedExampleData.RoleExample), new Role("ZF") },
         Vehicles = AnonymizedExampleData.Vehicles,
     };
+
+    // The tab names the view, so the view no longer repeats it as a heading of its own.
+    [AvaloniaFact]
+    public void The_funktionen_tab_shows_funktionen_without_a_second_heading()
+    {
+        var (window, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "FUNKTIONEN");
+
+        var strip = WorkspaceRenderHelper.LeadershipTabStrip(window);
+        Assert.Equal("FUNKTIONEN", ((TabItem)strip.SelectedItem!).Header);
+        var view = WorkspaceRenderHelper.SelectedTabContent(window).GetVisualDescendants().OfType<RolesView>().Single();
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "FUNKTIONEN");
+    }
 
     [AvaloniaFact]
     public void Funktionen_tab_shows_a_running_assignment()

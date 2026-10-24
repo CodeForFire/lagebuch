@@ -77,6 +77,11 @@ public class DemoIncidentTests : IDisposable
         incident.AddForceUnit(c, elw, "FF Musterstadt", 9, callSign: "Florian Musterstadt 40/1", status: "Im Einsatz", notes: "Innenangriff", scbaCount: 4, officerCount: 1);
         incident.AddForceUnit(c, elw, "FF Musterstadt", 9, callSign: "Florian Musterstadt 41/1", status: "Im Einsatz", notes: "Wasserversorgung", scbaCount: 2, officerCount: 1);
         incident.AddForceUnit(c, elw, "FF Musterstadt", 3, callSign: "Florian Musterstadt 30/1", status: "Im Einsatz", notes: "Menschenrettung über DLK", scbaCount: 1, officerCount: 1);
+        var abschnittNord = incident.AddCommandNode(c, elw, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Innenangriff und Menschenrettung", funkgruppe: "Kanal 2");
+        var bereitstellung = incident.AddCommandNode(c, elw, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz", standort: "Marktplatz");
+        incident.MoveForceUnit(c, elw, incident.Forces[0].Id, abschnittNord.Id);
+        incident.MoveForceUnit(c, elw, incident.Forces[1].Id, abschnittNord.Id);
+        incident.MoveForceUnit(c, elw, incident.Forces[2].Id, abschnittNord.Id);
         incident.AddJournalEntry(c, elw, EtbDirection.Outgoing, "Lagemeldung: Zimmerbrand im 2. OG, Menschenrettung über DLK eingeleitet, Innenangriff mit 1 Trupp", from: "Florian Musterstadt 11/1", to: "ILS");
 
         c.Now = c.Now.AddMinutes(1);
@@ -111,6 +116,7 @@ public class DemoIncidentTests : IDisposable
 
         c.Now = c.Now.AddMinutes(2);
         incident.AddForceUnit(c, elw, "FF Musterdorf", 9, callSign: "Florian Musterdorf 42/1", status: "Auf Anfahrt", scbaCount: 4, officerCount: 1);
+        incident.MoveForceUnit(c, elw, incident.Forces[3].Id, bereitstellung.Id);
         incident.AddJournalEntry(c, elw, EtbDirection.Incoming, "Florian Musterdorf 42/1 alarmiert, ETA 8 Minuten", from: "ILS", to: "Florian Musterstadt 11/1");
         incident.SetTaskCompleted(incident.Tasks[0].Id, true, c, elw);
 

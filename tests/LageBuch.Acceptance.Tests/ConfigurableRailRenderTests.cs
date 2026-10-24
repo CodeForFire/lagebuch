@@ -30,8 +30,10 @@ public class ConfigurableRailRenderTests
             new NavEntry(NavModules.Etb, null, true),
             new NavEntry(NavModules.Checklist, Nachbereitung, true),
             new NavEntry(NavModules.Tasks, null, true),
-            new NavEntry(NavModules.Forces, null, true),
-            new NavEntry(NavModules.Roles, null, false),
+
+            // Kräfte and Funktionen, as a layout saved before they became tabs of Führung names them.
+            new NavEntry("forces", null, true),
+            new NavEntry("roles", null, false),
             new NavEntry(NavModules.InvolvedParties, null, false),
             new NavEntry(NavModules.Scba, null, false),
             new NavEntry(NavModules.Co, null, false),
@@ -80,16 +82,17 @@ public class ConfigurableRailRenderTests
     {
         var window = ShowWorkspace();
 
-        // KONTAKTE is appended rather than placed: this fixture's Stammdaten carry an explicit
-        // layout written before the module existed, and NavigationLayout.Resolve adds a module the
-        // layout never mentions after everything it does. That is the documented contract of
-        // NavLayout ("a module added in a later release appears for everyone who never touched the
-        // Navigation list") -- a brigade on the default layout sees it between LINKS and ABBAU.
+        // FÜHRUNG and KONTAKTE are placed rather than listed: this fixture's Stammdaten carry an
+        // explicit layout written before those modules existed. FÜHRUNG takes the place of the
+        // shown KRÄFTE that came first of the entries it replaces (NavigationLayout.FoldLegacyFuehrung);
+        // KONTAKTE is slotted in directly after LINKS, its predecessor in NavLayout.Default. That
+        // is the documented contract of NavLayout ("a module added in a later release appears for
+        // everyone who never touched the Navigation list").
         Assert.Equal(
             new[]
             {
-                "AUFBAU", "ETB", "NACHBEREITUNG", "AUFGABEN", "KRÄFTE",
-                "DATEIEN", "LINKS", "FAHRZEUG", "KONTAKTE",
+                "AUFBAU", "ETB", "NACHBEREITUNG", "AUFGABEN", "FÜHRUNG",
+                "DATEIEN", "LINKS", "KONTAKTE", "FAHRZEUG",
             },
             WorkspaceRenderHelper.RailHeaders(window));
     }
@@ -157,7 +160,7 @@ public class ConfigurableRailRenderTests
         Assert.Equal(
             new[]
             {
-                "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE", "BETEILIGTE", "ATEMSCHUTZ", "CO-MESSUNG",
+                "ETB", "AUFGABEN", "FÜHRUNG", "BETEILIGTE", "ATEMSCHUTZ", "CO-MESSUNG",
                 "DATEIEN", "LINKS", "KONTAKTE",
             },
             WorkspaceRenderHelper.RailHeaders(window));

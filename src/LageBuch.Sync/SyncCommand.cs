@@ -23,6 +23,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AddCommandNodeCommand), "addCommandNode")]
 [JsonDerivedType(typeof(UpdateCommandNodeCommand), "updateCommandNode")]
 [JsonDerivedType(typeof(DissolveCommandNodeCommand), "dissolveCommandNode")]
+[JsonDerivedType(typeof(MoveCommandNodeCommand), "moveCommandNode")]
 [JsonDerivedType(typeof(MoveForceUnitCommand), "moveForceUnit")]
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
 [JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
@@ -115,6 +116,9 @@ public sealed record UpdateCommandNodeCommand(
     string? Funkgruppe, string? Rufname, string? Telefon) : SyncCommand;
 
 public sealed record DissolveCommandNodeCommand(OperatorDto Operator, Guid NodeId) : SyncCommand;
+
+/// <summary>Moves a node under ParentId (null: the top level), before BeforeNodeId (null: at the end).</summary>
+public sealed record MoveCommandNodeCommand(OperatorDto Operator, Guid NodeId, Guid? ParentId, Guid? BeforeNodeId) : SyncCommand;
 
 /// <summary>Places a unit in a node, or back to "nicht zugeordnet" when NodeId is null.</summary>
 public sealed record MoveForceUnitCommand(OperatorDto Operator, Guid UnitId, Guid? NodeId) : SyncCommand;

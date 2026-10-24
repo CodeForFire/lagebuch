@@ -7,6 +7,9 @@ public static class Formatting
 {
     private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
 
+    /// <summary>A whole number the way the user reads it (de-DE grouping).</summary>
+    public static string Number(int value) => value.ToString("N0", De);
+
     public static string Timestamp(DateTimeOffset t) => t.ToString("dd.MM.yyyy HH:mm", De);
 
     /// <summary>Clock time alone, for series read within one Einsatz (a CO-Messreihe), where the

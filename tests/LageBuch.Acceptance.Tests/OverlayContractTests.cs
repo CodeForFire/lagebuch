@@ -53,6 +53,8 @@ public class OverlayContractTests
         new("Workspace.TaskDialog", typeof(IncidentWorkspaceViewModel), typeof(TaskDialogViewModel), OpenWorkspaceTaskDialog),
         new("Workspace.PdfExportOptions", typeof(IncidentWorkspaceViewModel), typeof(PdfExportOptionsViewModel), OpenWorkspacePdfExportOptions),
         new("Workspace.IncidentDataDialog", typeof(IncidentWorkspaceViewModel), typeof(IncidentDataDialogViewModel), OpenWorkspaceIncidentDataDialog),
+        new("Workspace.CommandNodeDialog", typeof(IncidentWorkspaceViewModel), typeof(CommandNodeDialogViewModel), OpenWorkspaceCommandNodeDialog),
+        new("Workspace.LeadershipPersonDialog", typeof(IncidentWorkspaceViewModel), typeof(LeadershipPersonDialogViewModel), OpenWorkspaceLeadershipPersonDialog),
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
         new("Main.About", typeof(MainWindowViewModel), typeof(AboutViewModel), OpenMainAbout),
         new("Main.ShortcutOverview", typeof(MainWindowViewModel), typeof(ShortcutOverviewViewModel), OpenMainShortcutOverview),
@@ -323,6 +325,24 @@ public class OverlayContractTests
         var opener = Named<Button>(window, "AddIncidentDataButton");
         Activate(opener);
         return new(window, opener, ViewOf<IncidentDataDialogView>(window), () => vm.PendingIncidentDataDialog is null, () => vm.PendingIncidentDataDialog?.CancelCommand.Execute(null));
+    }
+
+    private static Opened OpenWorkspaceCommandNodeDialog()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "FÜHRUNG");
+        var opener = Named<Button>(window, "LeadershipAddAbschnittButton");
+        Activate(opener);
+        return new(window, opener, ViewOf<CommandNodeDialogView>(window), () => vm.PendingCommandNodeDialog is null, () => vm.PendingCommandNodeDialog?.CancelCommand.Execute(null));
+    }
+
+    private static Opened OpenWorkspaceLeadershipPersonDialog()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "FÜHRUNG");
+        var opener = Named<Button>(window, "LeadershipSetElButton");
+        Activate(opener);
+        return new(window, opener, ViewOf<LeadershipPersonDialogView>(window), () => vm.PendingLeadershipPersonDialog is null, () => vm.PendingLeadershipPersonDialog?.CancelCommand.Execute(null));
     }
 
     // A row's own button, the way a keyboard user reaches it: Tab into the grid, then to the row.

@@ -200,7 +200,8 @@ public class ForcesTabRenderTests
 
         var grid = view.GetControl<DataGrid>("ForcesGrid");
         var actions = grid.GetVisualDescendants().OfType<Button>()
-            .Where(b => b.Content is not string text || text != "Verlauf")
+            .Where(b => (b.Content is not string text || text != "Verlauf")
+                && AutomationProperties.GetName(b) != "Abschnitt wählen")
             .ToList();
         Assert.Equal(2, actions.Count);
 
@@ -234,13 +235,23 @@ public class ForcesTabRenderTests
         var strengthButton = grid.GetVisualDescendants().OfType<Button>()
             .Single(b => AutomationProperties.GetName(b) == "Stärke korrigieren");
 
+        var abschnittButton = grid.GetVisualDescendants().OfType<Button>()
+            .Single(b => AutomationProperties.GetName(b) == "Abschnitt wählen");
+
         grid.Focus();
         Dispatcher.UIThread.RunJobs();
         window.Press(PhysicalKey.Tab);
 
+        // The ABSCHNITT picker sits left of the Stärke column, so it is the first stop in the row.
+        Assert.True(
+            abschnittButton.IsKeyboardFocusWithin,
+            "Tab from the Forces grid no longer reaches the Abschnitt picker in one press.");
+
+        window.Press(PhysicalKey.Tab);
+
         Assert.True(
             strengthButton.IsKeyboardFocusWithin,
-            "Tab from the Forces grid no longer reaches the Stärke korrigieren button in one press.");
+            "Tab from the Abschnitt picker no longer reaches the Stärke korrigieren button in one press.");
     }
 
     [AvaloniaFact]

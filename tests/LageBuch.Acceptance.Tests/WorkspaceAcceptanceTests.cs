@@ -257,8 +257,8 @@ public class WorkspaceAcceptanceTests
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
-        var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(12, tabs.Items.Count);
+        var tabs = window.GetVisualDescendants().OfType<TabControl>().Single(t => t.Name == "ModuleTabs");
+        Assert.Equal(11, tabs.Items.Count);
     }
 
     [AvaloniaFact]

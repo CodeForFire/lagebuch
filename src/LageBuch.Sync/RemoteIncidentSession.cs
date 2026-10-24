@@ -442,6 +442,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void DissolveCommandNode(Guid nodeId) =>
         Send(new DissolveCommandNodeCommand(Op(), nodeId));
 
+    public void MoveCommandNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId) =>
+        Send(new MoveCommandNodeCommand(Op(), nodeId, parentId, beforeNodeId));
+
     public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
         Send(new MoveForceUnitCommand(Op(), unitId, nodeId));
 

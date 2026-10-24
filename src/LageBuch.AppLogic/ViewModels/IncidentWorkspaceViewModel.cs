@@ -251,6 +251,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private IncidentDataDialogViewModel? _pendingIncidentDataDialog;
 
+    // The Abschnitt dialog behind the Führung board (form, edit, the Einsatzleitung's post); null while closed.
+    [ObservableProperty]
+    private CommandNodeDialogViewModel? _pendingCommandNodeDialog;
+
+    // The person dialog behind the Führung board (Leiter, Melder, Führungsassistenz, Fachberater); null while closed.
+    [ObservableProperty]
+    private LeadershipPersonDialogViewModel? _pendingLeadershipPersonDialog;
+
     // ===== Header: display projections of the incident's head data. None of these write back --
     // the only write path is the Einsatzdaten dialog (EditIncidentData), which replaced the inline
     // Einsatznummer editor of #69. They are seeded in the constructor and refreshed from the
@@ -319,6 +327,23 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // the header projections refresh through the session's Changed event.
         dialog.Closed += (_, _) => PendingIncidentDataDialog = null;
         PendingIncidentDataDialog = dialog;
+    }
+
+    private void OpenCommandNodeDialog(CommandNodeDialogViewModel dialog)
+    {
+        dialog.Closed += (_, _) => PendingCommandNodeDialog = null;
+        PendingCommandNodeDialog = dialog;
+    }
+
+    // A dialog replaced or dropped without closing (the workspace torn down under it) must stop
+    // following the session.
+    partial void OnPendingLeadershipPersonDialogChanged(
+        LeadershipPersonDialogViewModel? oldValue, LeadershipPersonDialogViewModel? newValue) => oldValue?.Detach();
+
+    private void OpenLeadershipPersonDialog(LeadershipPersonDialogViewModel dialog)
+    {
+        dialog.Closed += (_, _) => PendingLeadershipPersonDialog = null;
+        PendingLeadershipPersonDialog = dialog;
     }
 
     private void RefreshIncidentData()
@@ -426,7 +451,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
+        object?[] modules = [Etb, Tasks, LeadershipTabs, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
         return modules.OfType<INarrowAware>();
     }
 
@@ -494,6 +519,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public ForcesViewModel Forces { get; private set; } = null!;
 
     public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
+
+    public LeadershipViewModel Leadership { get; private set; } = null!;
+
+    /// <summary>The Führung rail entry, which shows <see cref="Leadership"/>, <see cref="Roles"/> and <see cref="Forces"/> as tabs.</summary>
+    public LeadershipTabsViewModel LeadershipTabs { get; private set; } = null!;
 
     public ScbaViewModel Scba { get; private set; } = null!;
 
@@ -632,7 +662,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private bool IsOverlayOpen =>
         PendingPrompt is not null || PendingConfirm is not null || PendingTaskDialog is not null
-        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null;
+        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null
+        || PendingCommandNodeDialog is not null || PendingLeadershipPersonDialog is not null;
 
     private bool StepRail(int step)
     {
@@ -794,6 +825,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         _disposed = true;
         _session.Changed -= RefreshIncidentData;
+        PendingLeadershipPersonDialog = null;
         _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
         if (_alarmMute is not null)
         {
@@ -881,6 +913,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Roles?.Dispose();
         Forces?.Dispose();
         InvolvedParties?.Dispose();
+        Leadership?.Dispose();
         if (Scba is not null)
         {
             // Not covered by Dispose: the workspace owns this subscription, and an outgoing
@@ -920,6 +953,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // A Checkliste's key is shared by every list, so its label tells them apart.
         var reopen = SelectedNavItem is { } open ? (open.ModuleKey, open.Header) : default((string Key, string Header)?);
 
+        // The same goes for the tab Führung had open.
+        var reopenTab = LeadershipTabs is { } tabs ? tabs.SelectedTabIndex : LeadershipTabsViewModel.OrganisationTab;
+
         DisposeChildren();
 
         Etb = new EtbViewModel(
@@ -933,15 +969,19 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
-        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
+        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirmDefault);
 
-        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirm);
+        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirmDefault);
+
+        Leadership = new LeadershipViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm, OpenCommandNodeDialog, OpenLeadershipPersonDialog);
+
+        LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, reopenTab);
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnHeaderSourceChanged;
 
-        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm, _clock);
+        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirmDefault, _clock);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
         Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs);
@@ -985,6 +1025,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(InvolvedParties));
+        OnPropertyChanged(nameof(Leadership));
+        OnPropertyChanged(nameof(LeadershipTabs));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
@@ -1011,8 +1053,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         {
             [NavModules.Etb] = Etb,
             [NavModules.Tasks] = Tasks,
-            [NavModules.Roles] = Roles,
-            [NavModules.Forces] = Forces,
+            [NavModules.Leadership] = LeadershipTabs,
             [NavModules.InvolvedParties] = InvolvedParties,
             [NavModules.Scba] = Scba,
             [NavModules.Co] = CoMessprotokoll,
@@ -1094,15 +1135,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         return true;
     }
 
+    private void RequestConfirmDefault(string title, string message, Action onConfirmed) =>
+        RequestConfirm(title, message, onConfirmed);
+
     /// <summary>
     /// Generic confirm-before-acting hook for children (e.g. ForcesViewModel removing a unit) that
     /// need the same destructive-action guard as <see cref="CloseIncident"/> without each owning
     /// its own ConfirmDialogViewModel wiring. The caller names what is removed in the title
-    /// (#670), as every other confirm does.
+    /// (#670), as every other confirm does; <paramref name="confirmLabel"/> is the button's text.
     /// </summary>
-    private void RequestConfirm(string title, string message, Action onConfirmed)
+    private void RequestConfirm(string title, string message, Action onConfirmed, string confirmLabel = "ENTFERNEN")
     {
-        var dialog = new ConfirmDialogViewModel(title, message, "ENTFERNEN", onConfirmed);
+        var dialog = new ConfirmDialogViewModel(title, message, confirmLabel, onConfirmed);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }
