@@ -1322,14 +1322,23 @@ public sealed class Incident
     public AtemschutzTrupp? FindScbaTruppOrDefault(Guid truppId) =>
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId);
 
-    public void AddCoBuilding(IClock clock, SessionOperator op, string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0)
+    // apartmentLabels are copied from an Objekt in the Stammdaten (#420): the Haus keeps them as
+    // its own, and nothing points back at the Objekt.
+    public void AddCoBuilding(
+        IClock clock,
+        SessionOperator op,
+        string name,
+        int floorCount,
+        int apartmentsPerFloor,
+        int undergroundFloorCount = 0,
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
         var ordinal = _buildings.Count;
-        var building = Building.Create(name, floorCount, apartmentsPerFloor, ordinal, undergroundFloorCount);
+        var building = Building.Create(name, floorCount, apartmentsPerFloor, ordinal, undergroundFloorCount, apartmentLabels);
         _buildings.Add(building);
 
         for (var floor = -undergroundFloorCount; floor <= floorCount; floor++)

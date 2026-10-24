@@ -1281,8 +1281,13 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default) =>
         _inner.RemoveFileAsync(fileId, cancellationToken);
 
-    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
-        _inner.AddCoBuilding(name, floorCount, apartmentsPerFloor, undergroundFloorCount);
+    public void AddCoBuilding(
+        string name,
+        int floorCount,
+        int apartmentsPerFloor,
+        int undergroundFloorCount = 0,
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null) =>
+        _inner.AddCoBuilding(name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels);
 
     public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         _inner.UpdateCoBuildingStructure(buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount);

@@ -185,7 +185,7 @@ public static class CommandApplier
                 incident.ExtendTaskTimer(c.TaskId, c.Minutes, clock);
                 break;
             case AddCoBuildingCommand c:
-                incident.AddCoBuilding(clock, Operator(c.Operator), c.Name, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount);
+                incident.AddCoBuilding(clock, Operator(c.Operator), c.Name, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount, c.ApartmentLabels);
                 break;
             case UpdateCoBuildingStructureCommand c:
                 incident.UpdateCoBuildingStructure(clock, Operator(c.Operator), c.BuildingId, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount);

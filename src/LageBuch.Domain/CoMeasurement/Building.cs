@@ -2,6 +2,18 @@ namespace LageBuch.Domain.CoMeasurement;
 
 public sealed record Building
 {
+    /// <summary>The structure a Haus may have. Shared with the Stammdaten's Objekte (#420) and
+    /// the dialogs, so a template can never hold a structure this record refuses.</summary>
+    public const int MinFloorCount = 1;
+    public const int MaxFloorCount = 50;
+    public const int MinApartmentsPerFloor = 1;
+    public const int MaxApartmentsPerFloor = 30;
+    public const int MaxUndergroundFloorCount = 3;
+
+    /// <summary>The longest Wohnungsbezeichnung a Haus is created with (#420). Those arrive from
+    /// a file or a sync peer rather than a keyboard, so they are capped.</summary>
+    public const int MaxApartmentLabelLength = 60;
+
     public Guid Id { get; private init; }
 
     public string Name { get; private init; } = string.Empty;
@@ -39,24 +51,33 @@ public sealed record Building
     {
     }
 
-    public static Building Create(string name, int floorCount, int apartmentsPerFloor, int ordinal, int undergroundFloorCount = 0)
+    /// <summary>A new Haus. <paramref name="apartmentLabels"/> are the Wohnungsbezeichnungen it
+    /// starts with, as an Objekt from the Stammdaten carries them (#420); any that do not fit the
+    /// structure are dropped, see <see cref="CoMeasurementLabels.LabelsWithin"/>.</summary>
+    public static Building Create(
+        string name,
+        int floorCount,
+        int apartmentsPerFloor,
+        int ordinal,
+        int undergroundFloorCount = 0,
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Hausname darf nicht leer sein.", nameof(name));
         }
 
-        if (floorCount < 1 || floorCount > 50)
+        if (floorCount < MinFloorCount || floorCount > MaxFloorCount)
         {
             throw new ArgumentOutOfRangeException(nameof(floorCount), "Obergeschosse müssen zwischen 1 und 50 liegen.");
         }
 
-        if (apartmentsPerFloor < 1 || apartmentsPerFloor > 30)
+        if (apartmentsPerFloor < MinApartmentsPerFloor || apartmentsPerFloor > MaxApartmentsPerFloor)
         {
             throw new ArgumentOutOfRangeException(nameof(apartmentsPerFloor), "Wohnungen je Geschoss müssen zwischen 1 und 30 liegen.");
         }
 
-        if (undergroundFloorCount < 0 || undergroundFloorCount > 3)
+        if (undergroundFloorCount < 0 || undergroundFloorCount > MaxUndergroundFloorCount)
         {
             throw new ArgumentOutOfRangeException(nameof(undergroundFloorCount), "Untergeschosse müssen zwischen 0 und 3 liegen.");
         }
@@ -68,6 +89,7 @@ public sealed record Building
             FloorCount = floorCount,
             UndergroundFloorCount = undergroundFloorCount,
             ApartmentsPerFloor = apartmentsPerFloor,
+            ApartmentLabels = CoMeasurementLabels.LabelsWithin(apartmentLabels, floorCount, apartmentsPerFloor, undergroundFloorCount),
             Ordinal = ordinal,
         };
     }

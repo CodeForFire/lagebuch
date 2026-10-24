@@ -879,4 +879,32 @@ public class MasterDataStoreTests : IDisposable
 
         Assert.Equal(new TextSnippet("stl", "Erste"), Assert.Single(MasterDataStore.GetOrCreate(_path).TextSnippets));
     }
+
+    [Fact]
+    public void Save_round_trips_objekte_in_stammdaten_order_with_their_labels()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Premises = AnonymizedExampleData.Premises });
+
+        Assert.Equal(AnonymizedExampleData.Premises, MasterDataStore.GetOrCreate(_path).Premises);
+    }
+
+    [Fact]
+    public void An_objekt_edited_outside_the_app_reads_back_clamped_and_without_unreadable_labels()
+    {
+        MasterDataStore.GetOrCreate(_path);
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO md_premises (value, floor_count, apartment_labels) VALUES (' Haus A ', 99, 'kein json');
+                INSERT INTO md_premises (value) VALUES ('');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(new Premises("Haus A", FloorCount: 50), Assert.Single(MasterDataStore.GetOrCreate(_path).Premises));
+    }
 }

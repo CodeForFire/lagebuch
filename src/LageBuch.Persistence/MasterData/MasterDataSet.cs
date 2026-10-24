@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Persistence.MasterData;
@@ -44,6 +45,10 @@ public sealed record MasterDataSet(
     // for. Inserting one copies its text into the entry (#337); nothing points back here.
     IReadOnlyList<TextSnippet> TextSnippets,
 
+    // Objekte in the Ausrückebereich (#420), picked when a Haus is added to the CO-Messprotokoll.
+    // Their structure and labels are copied into the incident (#337); nothing points back here.
+    IReadOnlyList<Premises> Premises,
+
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
     IncidentSettings Settings)
@@ -66,6 +71,7 @@ public sealed record MasterDataSet(
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
         Array.Empty<TextSnippet>(),
+        Array.Empty<Premises>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -87,7 +93,8 @@ public sealed record MasterDataSet(
         && TruppTypes.Count == 0
         && Personnel.Count == 0
         && Vehicles.Count == 0
-        && TextSnippets.Count == 0;
+        && TextSnippets.Count == 0
+        && Premises.Count == 0;
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -430,6 +437,113 @@ public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZ
 public sealed record Street(string Name, string District = "", string PostalCode = "", string Place = "");
 
 /// <summary>
+/// An Objekt (#420): a building in the Ausrückebereich, known long before the call. It has an
+/// address and the structure a Haus in the CO-Messprotokoll is created with: Obergeschosse,
+/// Wohnungen je Geschoss, Untergeschosse and the Wohnungsbezeichnungen, keyed like
+/// <see cref="Building.ApartmentLabels"/>. Picking it copies the structure and labels into the
+/// incident (#337). The address is not copied, because a Haus has none; it is there to tell two
+/// Objekte apart, and for #427 to hang Einsatzpläne on.
+/// <para>
+/// Like <see cref="TruppType"/>, this record does not throw on a structure a Haus cannot have.
+/// <see cref="Normalize"/> clamps it at every way in instead.
+/// </para>
+/// </summary>
+public sealed record Premises(
+    string Name,
+    string Street = "",
+    string HouseNumber = "",
+    string PostalCode = "",
+    string Place = "",
+    int FloorCount = Premises.DefaultFloorCount,
+    int ApartmentsPerFloor = Premises.DefaultApartmentsPerFloor,
+    int UndergroundFloorCount = Premises.DefaultUndergroundFloorCount)
+{
+    /// <summary>The structure a new Haus starts from, in the CO-Messprotokoll dialog and in a new
+    /// Objekt alike.</summary>
+    public const int DefaultFloorCount = 8;
+    public const int DefaultApartmentsPerFloor = 10;
+    public const int DefaultUndergroundFloorCount = 1;
+
+    /// <summary>How many Objekte a list may hold. A Gemeinde has dozens; the cap only bounds what a
+    /// file or a sync host can hand over.</summary>
+    public const int MaxCount = 500;
+
+    private static readonly IReadOnlyDictionary<string, string?> NoLabels = new Dictionary<string, string?>();
+
+    /// <summary>The Wohnungsbezeichnungen, keyed by <see cref="CoMeasurementLabels.ApartmentLabelKey"/>.</summary>
+    public IReadOnlyDictionary<string, string?> ApartmentLabels { get; init; } = NoLabels;
+
+    /// <summary>The address on one line, e.g. "Musterstraße 5, 82256 Musterstadt"; blank parts are
+    /// left out.</summary>
+    public string AddressLine =>
+        string.Join(
+            ", ",
+            new[] { $"{Street} {HouseNumber}".Trim(), $"{PostalCode} {Place}".Trim() }.Where(p => p.Length > 0));
+
+    /// <summary>
+    /// Brings a list to the shape every consumer may rely on: text trimmed, structure clamped into
+    /// what a Haus may have, labels kept only where they fit it, entries without a name dropped,
+    /// each name once (case-insensitively; the first wins) and at most <see cref="MaxCount"/>. The
+    /// import, a sync host's payload, the store and the editor all go through this.
+    /// </summary>
+    public static IReadOnlyList<Premises> Normalize(IEnumerable<Premises> premises)
+    {
+        ArgumentNullException.ThrowIfNull(premises);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<Premises>();
+        foreach (var p in premises)
+        {
+            var name = (p.Name ?? string.Empty).Trim();
+            if (name.Length == 0 || !seen.Add(name))
+            {
+                continue;
+            }
+
+            var floors = Math.Clamp(p.FloorCount, Building.MinFloorCount, Building.MaxFloorCount);
+            var apartments = Math.Clamp(p.ApartmentsPerFloor, Building.MinApartmentsPerFloor, Building.MaxApartmentsPerFloor);
+            var underground = Math.Clamp(p.UndergroundFloorCount, 0, Building.MaxUndergroundFloorCount);
+            result.Add(p with
+            {
+                Name = name,
+                Street = (p.Street ?? string.Empty).Trim(),
+                HouseNumber = (p.HouseNumber ?? string.Empty).Trim(),
+                PostalCode = (p.PostalCode ?? string.Empty).Trim(),
+                Place = (p.Place ?? string.Empty).Trim(),
+                FloorCount = floors,
+                ApartmentsPerFloor = apartments,
+                UndergroundFloorCount = underground,
+                ApartmentLabels = CoMeasurementLabels.LabelsWithin(p.ApartmentLabels, floors, apartments, underground),
+            });
+
+            if (result.Count == MaxCount)
+            {
+                break;
+            }
+        }
+
+        return result;
+    }
+
+    // A record compares a dictionary by reference; two Objekte with the same labels are the same.
+    public bool Equals(Premises? other) =>
+        other is not null
+        && string.Equals(Name, other.Name, StringComparison.Ordinal)
+        && string.Equals(Street, other.Street, StringComparison.Ordinal)
+        && string.Equals(HouseNumber, other.HouseNumber, StringComparison.Ordinal)
+        && string.Equals(PostalCode, other.PostalCode, StringComparison.Ordinal)
+        && string.Equals(Place, other.Place, StringComparison.Ordinal)
+        && FloorCount == other.FloorCount
+        && ApartmentsPerFloor == other.ApartmentsPerFloor
+        && UndergroundFloorCount == other.UndergroundFloorCount
+        && ApartmentLabels.Count == other.ApartmentLabels.Count
+        && ApartmentLabels.All(kv =>
+            other.ApartmentLabels.TryGetValue(kv.Key, out var label) && string.Equals(label, kv.Value, StringComparison.Ordinal));
+
+    public override int GetHashCode() =>
+        HashCode.Combine(Name, Street, HouseNumber, PostalCode, Place, FloorCount, ApartmentsPerFloor, UndergroundFloorCount);
+}
+
+/// <summary>
 /// One Trupp-Typ: its name, how many people it is crewed by, and the Einsatzzeit it defaults to.
 /// <para>
 /// Crew size and Einsatzzeit used to be decided by comparing the name against the compiled-in
@@ -672,6 +786,22 @@ public static class AnonymizedExampleData
         new Link("GESTIS-Stoffdatenbank", "https://example.org/gestis", LinkGroup),
         new Link("Kartendienst", "https://example.org/karte", "Karten"),
     };
+
+    // Objekte (#420) in the same invented Musterstadt as the sample Stammdaten's Straßen.
+    public static readonly IReadOnlyList<Premises> Premises = new[]
+    {
+        new Premises("Wohnanlage Lindenallee", "Lindenallee", "12", "12345", "Musterstadt", 4, 3, 1)
+        {
+            ApartmentLabels = new Dictionary<string, string?>
+            {
+                ["0:1"] = "Hausmeister",
+                ["0:3"] = "Kinderwagen",
+                ["-1:1"] = "Heizung",
+                ["-1:2"] = "Waschküche",
+            },
+        },
+        new Premises(BuildingName, "Hauptstraße", "5", "12345", "Musterstadt", 3, 2, 0),
+    };
 }
 
 /// <summary>
@@ -821,6 +951,7 @@ public static class MasterDataJson
             ParsePersonnel(root),
             vehicles,
             ParseTextSnippets(root),
+            ParsePremises(root),
             ParseSettings(root));
     }
 
@@ -1081,6 +1212,63 @@ public static class MasterDataJson
                 : string.Empty;
     }
 
+    /// <summary>
+    /// Reads the optional <c>premises</c> array (#420): one object per Objekt with <c>name</c>, the
+    /// address (<c>street</c>, <c>houseNumber</c>, <c>postalCode</c>, <c>place</c>), the structure
+    /// (<c>floors</c>, <c>apartmentsPerFloor</c>, <c>undergroundFloors</c>) and
+    /// <c>apartmentLabels</c>, an object from <c>"floor:apartment"</c> to the Bezeichnung.
+    /// </summary>
+    /// <remarks>
+    /// Tolerant like the Straßen: a row without a name is skipped, a field of the wrong kind reads
+    /// as blank or as the default, and <see cref="Premises.Normalize"/> clamps the rest. A sync
+    /// client parses this from a peer, and nothing here may throw outside the exceptions
+    /// <c>HomeViewModel.JoinDeviceAsync</c> catches.
+    /// </remarks>
+    private static IReadOnlyList<Premises> ParsePremises(JsonElement root)
+    {
+        if (!root.TryGetProperty("premises", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<Premises>();
+        }
+
+        return Premises.Normalize(arr.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.Object)
+            .Select(x => new Premises(
+                Text(x, "name"),
+                Text(x, "street"),
+                Text(x, "houseNumber"),
+                Text(x, "postalCode"),
+                Text(x, "place"),
+                Number(x, "floors", Premises.DefaultFloorCount),
+                Number(x, "apartmentsPerFloor", Premises.DefaultApartmentsPerFloor),
+                Number(x, "undergroundFloors", Premises.DefaultUndergroundFloorCount))
+            {
+                ApartmentLabels = Labels(x),
+            }));
+
+        static string Text(JsonElement e, string prop) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? string.Empty : string.Empty;
+
+        static int Number(JsonElement e, string prop, int fallback) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : fallback;
+
+        // TryAdd, not ToDictionary: a key twice in one object is valid JSON, and the
+        // ArgumentException ToDictionary throws on it escapes the join's catch filter.
+        static Dictionary<string, string?> Labels(JsonElement e)
+        {
+            var labels = new Dictionary<string, string?>(StringComparer.Ordinal);
+            if (e.TryGetProperty("apartmentLabels", out var v) && v.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var l in v.EnumerateObject().Where(l => l.Value.ValueKind == JsonValueKind.String))
+                {
+                    labels.TryAdd(l.Name, l.Value.GetString());
+                }
+            }
+
+            return labels;
+        }
+    }
+
     private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
     {
         if (!root.TryGetProperty("personnel", out var arr) || arr.ValueKind != JsonValueKind.Array)
@@ -1167,6 +1355,18 @@ public static class MasterDataJson
                 category = t.Category,
                 etb = t.ForEtb,
                 tasks = t.ForTasks,
+            }),
+            premises = set.Premises.Select(p => new
+            {
+                name = p.Name,
+                street = p.Street,
+                houseNumber = p.HouseNumber,
+                postalCode = p.PostalCode,
+                place = p.Place,
+                floors = p.FloorCount,
+                apartmentsPerFloor = p.ApartmentsPerFloor,
+                undergroundFloors = p.UndergroundFloorCount,
+                apartmentLabels = p.ApartmentLabels,
             }),
             settings = new
             {

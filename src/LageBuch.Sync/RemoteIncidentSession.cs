@@ -722,8 +722,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default) =>
         SendAsync(new RemoveFileCommand(Op(), fileId), cancellationToken);
 
-    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
-        Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor, undergroundFloorCount));
+    public void AddCoBuilding(
+        string name,
+        int floorCount,
+        int apartmentsPerFloor,
+        int undergroundFloorCount = 0,
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null) =>
+        Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels));
 
     public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         Send(new UpdateCoBuildingStructureCommand(Op(), buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount));

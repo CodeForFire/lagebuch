@@ -978,7 +978,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Links = new LinksViewModel(_masterData.Links, _dialogs);
         Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs, _masterData.Vehicles);
 
-        CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
+        CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged, _masterData.Premises);
 
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged, OfferUndo);
         Tasks.RevealRequested += OnTasksRevealRequested;

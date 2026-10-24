@@ -241,6 +241,7 @@ public class DemoIncidentTests : IDisposable
         Assert.NotEmpty(set.Personnel);
         Assert.Contains(set.TextSnippets, s => s.ForEtb);
         Assert.Contains(set.TextSnippets, s => s.ForTasks);
+        Assert.Contains(set.Premises, p => p.ApartmentLabels.Count > 0);
         Assert.NotEmpty(set.Brigades);
         Assert.NotEmpty(set.RadioCallSigns);
         Assert.Equal(15, set.Settings.IlsReminderIntervalMinutes);
