@@ -73,6 +73,27 @@ public sealed partial class BoardNodeCard : ObservableObject
     /// <summary>Whether the card can be picked up and moved; a partner's Einsatzleitung has a row of its own.</summary>
     public bool IsMovable => Kind != CommandNodeKind.Partner;
 
+    /// <summary>The SUMME row's Stärke, Zugführer / Gruppenführer / Mannschaft / Gesamt, an Abschnitt's Unterabschnitte included.</summary>
+    [ObservableProperty]
+    private string _strengthTotal = string.Empty;
+
+    /// <summary>The SUMME row's AGT.</summary>
+    [ObservableProperty]
+    private int _scbaTotal;
+
+    /// <summary>Whether any unit adds to the sum; a card without one shows no SUMME row.</summary>
+    [ObservableProperty]
+    private bool _hasStrengthTotal;
+
+    /// <summary>Takes the node's summed Stärke; see <see cref="NodeStrength"/>.</summary>
+    public void UpdateStrength(NodeStrength strength)
+    {
+        ArgumentNullException.ThrowIfNull(strength);
+        StrengthTotal = strength.Text;
+        ScbaTotal = strength.Scba;
+        HasStrengthTotal = strength.UnitCount > 0;
+    }
+
     [ObservableProperty]
     private string _name = string.Empty;
 

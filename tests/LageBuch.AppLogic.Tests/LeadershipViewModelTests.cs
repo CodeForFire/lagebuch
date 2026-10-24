@@ -53,6 +53,32 @@ public class LeadershipViewModelTests
     }
 
     [Fact]
+    public void An_abschnitts_card_sums_its_units_and_its_unterabschnitte_and_follows_a_move()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var dach = AddNode(session, CommandNodeKind.Unterabschnitt, "Dach", nord);
+        AddNode(session, CommandNodeKind.Abschnitt, "Süd");
+        AddUnit(session, "FF Emmering", "Florian Emmering 40/1", nord);
+        var dachUnit = AddUnit(session, "FF Aich", "Florian Aich 44/1", dach);
+
+        using var vm = NewVm(session);
+
+        var nordCard = vm.Sections.Single(c => c.Name == "Nord");
+        var dachCard = nordCard.Children.Single();
+        var suedCard = vm.Sections.Single(c => c.Name == "Süd");
+        Assert.Equal(("0/2/16/18", 8, true), (nordCard.StrengthTotal, nordCard.ScbaTotal, nordCard.HasStrengthTotal));
+        Assert.Equal(("0/1/8/9", 4, true), (dachCard.StrengthTotal, dachCard.ScbaTotal, dachCard.HasStrengthTotal));
+        Assert.False(suedCard.HasStrengthTotal);
+
+        session.MoveForceUnit(dachUnit, suedCard.Id);
+
+        Assert.Equal("0/1/8/9", nordCard.StrengthTotal);
+        Assert.False(dachCard.HasStrengthTotal);
+        Assert.Equal(("0/1/8/9", 4, true), (suedCard.StrengthTotal, suedCard.ScbaTotal, suedCard.HasStrengthTotal));
+    }
+
+    [Fact]
     public void The_dispatch_centre_name_comes_from_the_Stammdaten()
     {
         var masterData = MasterDataSet.Empty with

@@ -178,12 +178,12 @@ public class FuehrungsorganisationSectionTests
             "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Stufe B · Funkgruppe TMO FW_EMMERING 1000",
             "Führungsassistenz: S2 Lage Erika Musterfrau",
             "Bereitstellung Marktplatz",
-            "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppe: DMO 301_F",
+            "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppe: DMO 301_F – Stärke 0/0/9/9, AGT 0",
             "Einheiten: Florian Emmering 40/1",
             "Weitere: Gerätewart Anton Reiter",
-            "Unterabschnitt Dach",
+            "Unterabschnitt Dach – Stärke 0/0/3/3, AGT 0",
             "Einheiten: Florian Emmering 30/1",
-            "Abschnitt 2 Süd – Leiter: Josef Bauer – Funkgruppe: DMO 302_F",
+            "Abschnitt 2 Süd – Leiter: Josef Bauer – Funkgruppe: DMO 302_F – Stärke 0/0/4/4, AGT 0",
             "Einheiten: Florian Aich 44/1",
             "Einsatzleitung Rettungsdienst – Leiter: Sabine Schmid",
             "Fachberater: Fachberater THW (Peter Maier)",
@@ -205,7 +205,7 @@ public class FuehrungsorganisationSectionTests
         var bereitstellung = lines["Bereitstellung Marktplatz"];
         var nord = lines["Abschnitt 1 Nord –"];
         var nordUnits = lines["Einheiten: Florian Emmering 40/1"];
-        var dach = lines["Unterabschnitt Dach"];
+        var dach = lines["Unterabschnitt Dach – Stärke"];
         var dachUnits = lines["Einheiten: Florian Emmering 30/1"];
         var partner = lines["Einsatzleitung Rettungsdienst – Leiter:"];
 
@@ -229,7 +229,7 @@ public class FuehrungsorganisationSectionTests
         var text = Print(incident);
 
         Assert.Contains("Abschnitt 1 Nord", text, StringComparison.Ordinal);
-        foreach (var clause in new[] { "Auftrag", "Leiter:", "Melder", "Funkgruppe", "Einheiten", "Weitere", "Fachberater", "Nicht zugeordnet", "Freitext", "Stufe" })
+        foreach (var clause in new[] { "Auftrag", "Leiter:", "Melder", "Funkgruppe", "Einheiten", "Weitere", "Fachberater", "Nicht zugeordnet", "Freitext", "Stufe", "Stärke", "AGT" })
         {
             Assert.DoesNotContain(clause, text, StringComparison.Ordinal);
         }

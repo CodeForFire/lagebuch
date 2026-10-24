@@ -111,7 +111,7 @@ public static class FuehrungsorganisationSection
 
     // The Fachberater row never gets here, so a row without a node is the Einsatzleitung.
     private static string Headline(Incident incident, ReportingEntry entry) =>
-        entry.Node is { } node ? NodeHeadline(entry, node) : EinsatzleitungHeadline(incident, entry);
+        entry.Node is { } node ? NodeHeadline(incident, entry, node) : EinsatzleitungHeadline(incident, entry);
 
     private static string EinsatzleitungHeadline(Incident incident, ReportingEntry entry)
     {
@@ -143,7 +143,7 @@ public static class FuehrungsorganisationSection
         return line;
     }
 
-    private static string NodeHeadline(ReportingEntry entry, CommandNode node)
+    private static string NodeHeadline(Incident incident, ReportingEntry entry, CommandNode node)
     {
         // The Unterabschnitt's parent is the headline right above it, so its own name is enough. A
         // name that already starts with the kind ("Abschnitt 1 Nord") is not prefixed twice.
@@ -168,6 +168,12 @@ public static class FuehrungsorganisationSection
         if (!string.IsNullOrWhiteSpace(node.Funkgruppe))
         {
             text += $" – Funkgruppe: {node.Funkgruppe}";
+        }
+
+        // What the EAL leads: an Abschnitt's sum takes in its Unterabschnitte, as on the board.
+        if (NodeStrength.Of(incident, node.Id) is { UnitCount: > 0 } strength)
+        {
+            text += $" – Stärke {strength.Text}, AGT {strength.Scba}";
         }
 
         return text;

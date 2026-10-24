@@ -578,6 +578,35 @@ public class LeadershipBoardRenderTests
             .Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, null))
             .Select(n => n.Name)];
 
+    // The card's own: an Abschnitt's card holds its Unterabschnitte' cards, each with its own SUMME.
+    private static TextBlock SumOf(Border card) =>
+        card.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "NodeStrengthTotalText" && t.DataContext == card.DataContext);
+
+    [AvaloniaFact]
+    public void Each_card_sums_its_kraefte_under_its_unterabschnitte_and_in_line_with_the_columns()
+    {
+        var board = Show();
+        var nord = Card(board.View, "Abschnitt 1 Nord");
+
+        // Nord: Emmering 40/1 (0/1/8/9, AGT 4) and Aich 44/1 (0/1/8/9, AGT 2), Dach's Emmering 30/1 (0/1/2/3).
+        Assert.Equal("0/3/18/21", SumOf(nord).Text);
+        Assert.Equal("0/1/2/3", SumOf(Card(board.View, "Dach")).Text);
+        Assert.True(SumOf(nord).IsEffectivelyVisible);
+        Assert.DoesNotContain(
+            Card(board.View, "Polizei").GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Name == "NodeStrengthTotalText" && t.IsEffectivelyVisible);
+
+        // The SUMME sits below Dach's card, and its right edge lines up with the STÄRKE column.
+        var dachCard = Card(board.View, "Dach");
+        var sumTop = SumOf(nord).TranslatePoint(default, nord)!.Value.Y;
+        Assert.True(sumTop > dachCard.TranslatePoint(new Point(0, dachCard.Bounds.Height), nord)!.Value.Y);
+        var unitStrength = nord.GetVisualDescendants().OfType<TextBlock>()
+            .First(t => t.Text == "0/1/8/9" && t.DataContext is BoardUnitRow);
+        var sumRight = SumOf(nord).TranslatePoint(new Point(SumOf(nord).Bounds.Width, 0), nord)!.Value.X;
+        var unitRight = unitStrength.TranslatePoint(new Point(unitStrength.Bounds.Width, 0), nord)!.Value.X;
+        Assert.True(Math.Abs(sumRight - unitRight) <= 1.0, $"SUMME ends at {sumRight}, the units' Stärke at {unitRight}");
+    }
+
     [AvaloniaFact]
     public void Polizei_and_rettungsdienst_are_offered_once_and_weitere_always()
     {

@@ -389,7 +389,9 @@
          template, so an Unterabschnitt card is drawn inside its Abschnitt's. -->
     <DataTemplate DataType="vm:BoardNodeCard" x:DataType="vm:BoardNodeCard">
       <Border Classes="board-card" x:Name="NodeCard">
-        <StackPanel Spacing="8">
+        <!-- One shared-size scope per card, so the SUMME row under the Unterabschnitte lines up
+             with the units table above them; a nested card opens its own. -->
+        <StackPanel Spacing="8" Grid.IsSharedSizeScope="True">
           <!-- The card's head is also where a dragged card lands to be placed before this one; the
                grip picks the card itself up (a partner's has none: disabled, so the grip style hides it). -->
           <Border x:Name="NodeCardHeader" Classes="node-drop-before">
@@ -457,8 +459,9 @@
           <ItemsControl ItemsSource="{Binding Members}" ItemTemplate="{StaticResource PersonRowTemplate}"
                         IsVisible="{Binding Members.Count}" />
 
-          <!-- The units table: the columns line up across rows only within one shared-size scope. -->
-          <StackPanel Spacing="5" Grid.IsSharedSizeScope="True" IsVisible="{Binding Units.Count}">
+          <!-- The units table. Shown whenever the card has a sum, so an Abschnitt whose units all sit
+               in Unterabschnitte still heads its SUMME row with EINHEITEN / STÄRKE / AGT. -->
+          <StackPanel Spacing="5" IsVisible="{Binding HasStrengthTotal}">
             <Grid ColumnSpacing="8">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
@@ -488,6 +491,27 @@
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
           </ItemsControl>
+
+          <!-- What the card adds up to, its Unterabschnitte included: below them, so it reads as
+               the total of everything above. -->
+          <Border x:Name="NodeStrengthTotal" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0"
+                  Padding="0,5,0,0" IsVisible="{Binding HasStrengthTotal}">
+            <Grid ColumnSpacing="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardStrength" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardAgt" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="1" Classes="field-label" Text="SUMME" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" x:Name="NodeStrengthTotalText" Classes="mono" HorizontalAlignment="Right"
+                         FontWeight="SemiBold" Text="{Binding StrengthTotal}"
+                         ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt, Unterabschnitte eingerechnet" />
+              <TextBlock Grid.Column="3" x:Name="NodeScbaTotalText" Classes="mono" HorizontalAlignment="Right"
+                         MinWidth="22" TextAlignment="Right" FontWeight="SemiBold" Text="{Binding ScbaTotal}"
+                         ToolTip.Tip="davon Atemschutzgeräteträger" />
+            </Grid>
+          </Border>
 
           <!-- Shown on an Abschnitt only while a card is dragged: drop here to hang it underneath. -->
           <Border x:Name="NodeIntoStrip" Classes="node-drop-strip node-drop-into" Classes.abschnitt="{Binding IsAbschnitt}">

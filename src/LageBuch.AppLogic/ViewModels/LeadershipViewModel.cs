@@ -256,6 +256,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     {
         var hint = hints.FirstOrDefault(h => h.NodeId == e.Node.Id)?.Text;
         card.Update(e.Entry, e.Node, hint, BoardNodeCard.BlockedReason(incident, e.Node), IsReadOnly);
+        card.UpdateStrength(NodeStrength.Of(incident, e.Node.Id));
         ReconcileUnits(card.Units, e.Entry.Units, incident);
 
         // Unterabschnitte go one level deep: their own children are never asked for.
