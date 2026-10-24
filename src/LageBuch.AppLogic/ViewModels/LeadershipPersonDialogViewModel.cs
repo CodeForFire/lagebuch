@@ -429,7 +429,10 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
 
     private static string[] BuildRoleOptions(IReadOnlyList<Role> roles, RoleSlot slot)
     {
-        var options = roles.Where(r => slot == RoleSlot.None || r.Slot == slot).Select(r => r.Name).ToList();
+        // A slot no Funktion carries offers them all: Stammdaten from before the Führungstafel
+        // slot existed set none, and an empty box would suggest nothing at all.
+        var inSlot = roles.Where(r => r.Slot == slot).ToList();
+        var options = (slot == RoleSlot.None || inSlot.Count == 0 ? roles : inSlot).Select(r => r.Name).ToList();
         if (slot == RoleSlot.Fachberater)
         {
             options.AddRange(FachberaterSuggestions.Roles.Where(

@@ -112,6 +112,24 @@ public class LeadershipPersonDialogViewModelTests
         Assert.Equal(MasterData.Roles.Select(r => r.Name), Open(session, nord, RoleSlot.None).RoleOptions);
     }
 
+    // Stammdaten saved before Funktionen had a Führungstafel slot carry none at all; filtering
+    // by slot left every post's Funktion box without a single suggestion.
+    [Theory]
+    [InlineData(RoleSlot.Leiter)]
+    [InlineData(RoleSlot.Melder)]
+    [InlineData(RoleSlot.Fuehrungsassistent)]
+    public void A_slot_no_funktion_carries_offers_every_stammdaten_funktion(RoleSlot slot)
+    {
+        var unslotted = MasterDataSet.Empty with
+        {
+            Roles = [new Role("EL", RoleUniqueness.UniquePerIncident), new Role("Melder"), new Role("S2 Lage")],
+        };
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+
+        Assert.Equal(["EL", "Melder", "S2 Lage"], Open(session, nord, slot, masterData: unslotted).RoleOptions);
+    }
+
     [Fact]
     public void Fachberater_options_add_the_common_fields_without_duplicates()
     {
