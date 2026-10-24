@@ -313,4 +313,83 @@ public class SnapshotReconcileTests
         await client.DisposeAsync();
         await client.DisposeAsync();
     }
+
+    [Fact]
+    public async Task Joining_learns_how_far_the_hosts_clock_is_from_this_devices()
+    {
+        // The pass ConnectAsync runs is enough: the workspace opens on host time, not 10 s later.
+        var time = new FakeTimeProvider();
+        await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.BaseSnapshot());
+        host.HostTime = () => time.GetUtcNow() + TimeSpan.FromMinutes(3);
+
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
+
+        Assert.Equal(TimeSpan.FromMinutes(3), client.HostClockOffset);
+        Assert.Equal(time.GetUtcNow() + TimeSpan.FromMinutes(3), client.HostClock.Now);
+    }
+
+    [Fact]
+    public async Task A_host_that_does_not_tell_its_time_leaves_this_device_on_its_own_clock()
+    {
+        var time = new FakeTimeProvider();
+        await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.BaseSnapshot());
+        host.HostTime = () => null;
+
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
+
+        Assert.Equal(TimeSpan.Zero, client.HostClockOffset);
+    }
+
+    [Fact]
+    public async Task A_host_time_at_the_end_of_the_calendar_is_ignored_rather_than_crashing_the_clock()
+    {
+        // A hostile host: taken as a sample, HostClock.Now would overflow on the UI thread mid-Einsatz.
+        var time = new FakeTimeProvider();
+        await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.BaseSnapshot());
+        host.HostTime = () => DateTimeOffset.MaxValue;
+
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
+        time.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(TimeSpan.Zero, client.HostClockOffset);
+        Assert.Equal(time.GetUtcNow(), client.HostClock.Now);
+    }
+
+    [Fact]
+    public async Task A_later_pass_follows_a_host_clock_that_was_set()
+    {
+        var time = new FakeTimeProvider();
+        await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.BaseSnapshot());
+        host.HostTime = () => time.GetUtcNow() + TimeSpan.FromMinutes(3);
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
+
+        host.HostTime = () => time.GetUtcNow() - TimeSpan.FromSeconds(40);
+        var reconciled = WaitForEvent(h => client.Reconciled += h, h => client.Reconciled -= h, "the next tick to reconcile");
+        time.Advance(Interval);
+        await reconciled;
+
+        Assert.Equal(TimeSpan.FromSeconds(-40), client.HostClockOffset);
+    }
+
+    [Fact]
+    public async Task A_slow_answer_does_not_move_the_offset()
+    {
+        // The host's time could have been read anywhere inside a 2 s round trip, so it says little;
+        // the last fast sample stays.
+        var time = new FakeTimeProvider();
+        await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.BaseSnapshot());
+        host.HostTime = () => time.GetUtcNow() + TimeSpan.FromMinutes(3);
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
+
+        host.HostTime = () => time.GetUtcNow() + TimeSpan.FromHours(1);
+        host.HoldRevisionRequests();
+        var reconciled = WaitForEvent(h => client.Reconciled += h, h => client.Reconciled -= h, "the slow pass to reconcile");
+        time.Advance(Interval);
+        await host.WaitForRevisionRequestAsync();
+        time.Advance(TimeSpan.FromSeconds(2));
+        host.ReleaseRevisionRequests();
+        await reconciled;
+
+        Assert.Equal(TimeSpan.FromMinutes(3), client.HostClockOffset);
+    }
 }

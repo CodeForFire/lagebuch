@@ -1156,6 +1156,24 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void A_joined_client_warns_once_its_clock_is_half_a_minute_off_the_hosts()
+    {
+        var vm = ClientWorkspace();
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.HostClockOffset = TimeSpan.FromSeconds(29);
+        Assert.Null(vm.ClockSkewWarning);
+
+        vm.HostClockOffset = TimeSpan.FromMinutes(-3);
+        Assert.Equal("Geräteuhr geht 3 min vor", vm.ClockSkewWarning);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.ClockSkewWarning), raised);
+
+        vm.HostClockOffset = TimeSpan.Zero;
+        Assert.Null(vm.ClockSkewWarning);
+    }
+
+    [Fact]
     public void A_joined_client_shows_which_host_it_is_connected_to_until_the_link_drops()
     {
         var vm = ClientWorkspace(remoteHost: "elw-1:5859");

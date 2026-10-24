@@ -253,9 +253,10 @@ public sealed class IncidentHost : IAsyncDisposable
             await _ui.InvokeAsync(() => Results.Json(CurrentSnapshot(), SyncJson.Options)));
 
         // The poll endpoint (#295). Takes the same UI hop so _revision stays single-threaded; it reads
-        // one long, so the hop costs nothing worth saving.
+        // one long, so the hop costs nothing worth saving. The host's time rides along, so a joined
+        // client can run its countdowns on the clock that stamped them.
         app.MapGet(SyncProtocol.RevisionPath, async () =>
-            await _ui.InvokeAsync(() => Results.Json(new RevisionInfo(_revision, _epoch), SyncJson.Options)));
+            await _ui.InvokeAsync(() => Results.Json(new RevisionInfo(_revision, _epoch, _clock.Now), SyncJson.Options)));
 
         // Results.Content, not Results.Json: the payload is already serialized JSON text, and
         // Results.Json would re-encode it into a JSON string literal. MasterDataJson.Serialize uses

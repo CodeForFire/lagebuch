@@ -10,6 +10,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,6 +60,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private Task? _reconcileLoop;
     private int _disposed;
 
+    // Ticks, so the reconcile loop can write it and the UI thread read it without a lock.
+    private long _hostClockOffsetTicks;
+
     public SessionOperator? Operator { get; private set; }
 
     /// <summary>
@@ -70,6 +74,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public string HostMasterDataJson { get; }
 
     public Incident Incident => _incident;
+
+    /// <summary>
+    /// How far the host's clock is ahead of this device's (negative: behind), as learned from the last
+    /// reconcile pass that answered quickly. Zero until known, and for good against a host older than
+    /// protocol 14.
+    /// </summary>
+    public TimeSpan HostClockOffset => TimeSpan.FromTicks(Interlocked.Read(ref _hostClockOffsetTicks));
+
+    /// <summary>
+    /// This device's clock moved by <see cref="HostClockOffset"/>. Every instant in the incident was
+    /// stamped by the host, so the workspace measures countdowns against this — on its own clock, a
+    /// device three minutes slow would show a Trupp three minutes it does not have.
+    /// </summary>
+    public IClock HostClock { get; }
 
     // The client never writes locally, so it is never "read-only" in the editing sense — but a
     // closed incident rejects mutations at the host anyway, and the workspace uses this to grey out.
@@ -152,6 +170,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         _cacheRoot = cacheRoot;
         _cacheMaxBytes = cacheMaxBytes;
         HostMasterDataJson = hostMasterDataJson;
+        HostClock = new OffsetClock(this);
     }
 
     /// <summary>
@@ -1016,8 +1035,24 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         using var deadline = new CancellationTokenSource(SyncProtocol.ReconcileTimeout, _time);
         using var pass = CancellationTokenSource.CreateLinkedTokenSource(ct, deadline.Token);
 
-        var host = SyncPosition.Of(SyncJson.Deserialize<RevisionInfo>(
-            await _http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute), pass.Token)));
+        var sent = _time.GetTimestamp();
+        var info = SyncJson.Deserialize<RevisionInfo>(
+            await _http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute), pass.Token));
+        var roundTrip = _time.GetElapsedTime(sent);
+
+        // A time within a year of either end of DateTimeOffset's range is no clock, and HostClock would
+        // overflow adding it to this device's time; the host is outside the trust boundary.
+        if (info.HostTime is { } hostTime
+            && roundTrip <= SyncProtocol.MaxClockSampleRoundTrip
+            && hostTime > DateTimeOffset.MinValue.AddYears(1)
+            && hostTime < DateTimeOffset.MaxValue.AddYears(-1))
+        {
+            // The host read its clock somewhere in the round trip; the midpoint is the best guess.
+            var offset = hostTime - (_time.GetUtcNow() - (roundTrip / 2));
+            Interlocked.Exchange(ref _hostClockOffsetTicks, offset.Ticks);
+        }
+
+        var host = SyncPosition.Of(info);
 
         SyncPosition applied;
         lock (_applyGate)
@@ -1032,6 +1067,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
         ApplySnapshot(SyncJson.Deserialize<IncidentSnapshot>(
             await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), pass.Token)));
+    }
+
+    private sealed class OffsetClock(RemoteIncidentSession session) : IClock
+    {
+        public DateTimeOffset Now => session._time.GetLocalNow() + session.HostClockOffset;
     }
 
     // .NET wraps an exception thrown inside ServerCertificateCustomValidationCallback in an

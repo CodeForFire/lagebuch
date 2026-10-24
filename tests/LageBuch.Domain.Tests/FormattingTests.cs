@@ -19,6 +19,18 @@ public class FormattingTests
     }
 
     [Theory]
+    [InlineData(180, "Geräteuhr geht 3 min nach")]
+    [InlineData(-180, "Geräteuhr geht 3 min vor")]
+    [InlineData(45, "Geräteuhr geht 45 s nach")]
+    [InlineData(-59, "Geräteuhr geht 59 s vor")]
+    [InlineData(90, "Geräteuhr geht 2 min nach")]
+    [InlineData(3600, "Geräteuhr geht 60 min nach")]
+    public void ClockSkew_says_which_way_this_devices_clock_is_off(int hostAheadSeconds, string expected)
+    {
+        Assert.Equal(expected, Formatting.ClockSkew(TimeSpan.FromSeconds(hostAheadSeconds)));
+    }
+
+    [Theory]
     [InlineData(IncidentState.Open, "Offen")]
     [InlineData(IncidentState.Closed, "Abgeschlossen")]
     public void State_is_german(IncidentState state, string expected)
