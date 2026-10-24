@@ -293,44 +293,54 @@ public class MasterDataChecklistEditingTests
         Assert.Equal(NavModules.All.Count, rows.Count);
     }
 
+    // The editor and the rail must agree, or saving the Navigation list would undo the fold the
+    // rail just showed. Saving it is also what makes the fold permanent.
     [Fact]
-    public void A_layout_without_leadership_lists_it_right_after_atemschutz_and_visible()
-    {
-        var set = MasterDataSet.Empty with
-        {
-            Navigation = NavModules.All
-                .Where(k => !string.Equals(k, NavModules.Leadership, StringComparison.Ordinal))
-                .Select(k => new NavEntry(k, null, true))
-                .ToList(),
-        };
-
-        var rows = Nav(Vm(set)).Rows.ToList();
-
-        var scba = rows.FindIndex(r => r.ModuleKey == NavModules.Scba);
-        Assert.Equal(NavModules.Leadership, rows[scba + 1].ModuleKey);
-        Assert.True(rows[scba + 1].IsVisible);
-        Assert.Equal("Führung", rows[scba + 1].Label);
-    }
-
-    [Fact]
-    public void Leadership_follows_atemschutz_even_when_atemschutz_is_switched_off_in_the_editor()
+    public void A_layout_with_funktionen_and_kraefte_lists_one_fuehrung_row_in_their_place()
     {
         var set = MasterDataSet.Empty with
         {
             Navigation = new[]
             {
                 new NavEntry(NavModules.Etb, null, true),
-                new NavEntry(NavModules.Scba, null, false),
+                new NavEntry(NavModules.Tasks, null, true),
+                new NavEntry("roles", null, false),
+                new NavEntry("forces", null, true),
+                new NavEntry(NavModules.Scba, null, true),
+                new NavEntry(NavModules.Leadership, null, true),
+            },
+        };
+
+        var nav = Nav(Vm(set));
+        var rows = nav.Rows.ToList();
+
+        var tasks = rows.FindIndex(r => r.ModuleKey == NavModules.Tasks);
+        Assert.Equal(NavModules.Leadership, rows[tasks + 1].ModuleKey);
+        Assert.True(rows[tasks + 1].IsVisible);
+        Assert.Equal("Führung", rows[tasks + 1].Label);
+        Assert.Single(rows, r => r.ModuleKey == NavModules.Leadership);
+        Assert.DoesNotContain(nav.ToValues(), e => e.ModuleKey is "roles" or "forces");
+    }
+
+    [Fact]
+    public void Fuehrung_follows_aufgaben_even_when_aufgaben_is_switched_off_in_the_editor()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Navigation = new[]
+            {
+                new NavEntry(NavModules.Etb, null, true),
+                new NavEntry(NavModules.Tasks, null, false),
                 new NavEntry(NavModules.Files, null, true),
             },
         };
 
         var rows = Nav(Vm(set)).Rows.ToList();
 
-        var scba = rows.FindIndex(r => r.ModuleKey == NavModules.Scba);
-        Assert.False(rows[scba].IsVisible);
-        Assert.Equal(NavModules.Leadership, rows[scba + 1].ModuleKey);
-        Assert.True(rows[scba + 1].IsVisible);
+        var tasks = rows.FindIndex(r => r.ModuleKey == NavModules.Tasks);
+        Assert.False(rows[tasks].IsVisible);
+        Assert.Equal(NavModules.Leadership, rows[tasks + 1].ModuleKey);
+        Assert.True(rows[tasks + 1].IsVisible);
     }
 
     [Fact]

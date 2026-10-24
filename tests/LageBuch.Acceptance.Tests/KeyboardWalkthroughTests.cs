@@ -34,10 +34,15 @@ public class KeyboardWalkthroughTests
             keys.Press(PhysicalKey.Enter);
             var vm = shell.Workspace;
 
-            // Kräfte: one vehicle from a neighbouring Feuerwehr.
-            keys.Press(PhysicalKey.Digit5, RawInputModifiers.Control);
+            // Kräfte: one vehicle from a neighbouring Feuerwehr. Führung opens on its board, which
+            // has no form, so its tab takes focus and → → walks to KRÄFTE.
+            keys.Press(PhysicalKey.Digit4, RawInputModifiers.Control);
             Dispatcher.UIThread.RunJobs();
-            window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
+            window.AssertFocused(Named<TabItem>(window, "OrganisationTab"));
+            keys.Press(PhysicalKey.ArrowRight);
+            keys.Press(PhysicalKey.ArrowRight);
+            Dispatcher.UIThread.RunJobs();
+            keys.TabTo(Named<ComboBox>(window, "VehicleBox"));
             keys.Tab();
             keys.Type("FF Nachbarort");
             keys.Tab();
@@ -48,7 +53,7 @@ public class KeyboardWalkthroughTests
             Assert.Equal("Florian Nachbarort 40/1", Assert.Single(vm.Forces.Forces).CallSign);
 
             // Atemschutz: register a Trupp and send it in.
-            keys.Press(PhysicalKey.Digit7, RawInputModifiers.Control);
+            keys.Press(PhysicalKey.Digit6, RawInputModifiers.Control);
             Dispatcher.UIThread.RunJobs();
             window.AssertFocused(Named<AutoCompleteBox>(window, "CallSignBox"));
             keys.Type("Florian Testort 40/1");

@@ -62,12 +62,12 @@ public class InvolvedPartiesTabRenderTests
         root.GetVisualDescendants().OfType<T>().First(v => v.Name == name);
 
     [AvaloniaFact]
-    public void The_rail_carries_a_beteiligte_tab_beside_kraefte()
+    public void The_rail_carries_a_beteiligte_tab_beside_fuehrung()
     {
         var (window, _, _) = ShowWorkspace();
         var headers = WorkspaceRenderHelper.RailHeaders(window).ToList();
 
-        Assert.Equal(headers.IndexOf("KRÄFTE") + 1, headers.IndexOf("BETEILIGTE"));
+        Assert.Equal(headers.IndexOf("FÜHRUNG") + 1, headers.IndexOf("BETEILIGTE"));
     }
 
     [AvaloniaFact]

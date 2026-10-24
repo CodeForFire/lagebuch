@@ -52,10 +52,6 @@
     <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#TransferFields">
       <Setter Property="Orientation" Value="Vertical" />
     </Style>
-    <!-- The bottom bar already says FUNKTIONEN; dropping the heading gives the checkbox room. -->
-    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#RolesTitle">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow Border#RolesGridPanel">
       <Setter Property="IsVisible" Value="False" />
     </Style>
@@ -101,7 +97,6 @@
        the order it appears on screen. -->
   <DockPanel KeyboardNavigation.TabNavigation="Local">
     <Grid KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" x:Name="RolesTitle" Text="FUNKTIONEN" Classes="overline" VerticalAlignment="Top" />
       <CheckBox Grid.Column="1" x:Name="ShowAllRolesCheckBox"
                 Content="Alle Funktionen (auch beendete)"
                 IsChecked="{Binding ShowAllRoles}" />

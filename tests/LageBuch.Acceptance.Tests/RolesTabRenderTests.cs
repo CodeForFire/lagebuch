@@ -44,15 +44,17 @@ public class RolesTabRenderTests
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 
-    // Next to the FÜHRUNG tab, "FÜHRUNG & FUNKTIONEN" read as a second Führung board.
+    // The tab names the view, so the view no longer repeats it as a heading of its own.
     [AvaloniaFact]
-    public void The_funktionen_view_is_titled_funktionen_alone()
+    public void The_funktionen_tab_shows_funktionen_without_a_second_heading()
     {
         var (window, _) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "FUNKTIONEN");
 
+        var strip = WorkspaceRenderHelper.LeadershipTabStrip(window);
+        Assert.Equal("FUNKTIONEN", ((TabItem)strip.SelectedItem!).Header);
         var view = WorkspaceRenderHelper.SelectedTabContent(window).GetVisualDescendants().OfType<RolesView>().Single();
-        Assert.Equal("FUNKTIONEN", view.GetControl<TextBlock>("RolesTitle").Text);
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "FUNKTIONEN");
     }
 
     [AvaloniaFact]

@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.LeadershipTabsView"
+             x:DataType="vm:LeadershipTabsViewModel">
+  <!-- Führung: the board, Funktionen and Kräfte as one rail entry. The tab names what the
+       heading inside each module used to say, so those headings are gone. The strip is the
+       module-tabs style in Theme/Styles.axaml, not the rail's: it stays visible on a phone, where
+       the bottom bar only says FÜHRUNG. -->
+  <TabControl x:Name="LeadershipTabStrip" Classes="module-tabs" TabStripPlacement="Top"
+              SelectedIndex="{Binding SelectedTabIndex}">
+    <TabItem x:Name="OrganisationTab" Header="ORGANISATION" AutomationProperties.Name="Organisation"
+             Content="{Binding Board}" />
+    <TabItem x:Name="RolesTab" Header="FUNKTIONEN" AutomationProperties.Name="Funktionen"
+             Content="{Binding Roles}" />
+    <TabItem x:Name="ForcesTab" Header="KRÄFTE" AutomationProperties.Name="Kräfte"
+             Content="{Binding Forces}" />
+  </TabControl>
+</UserControl>
