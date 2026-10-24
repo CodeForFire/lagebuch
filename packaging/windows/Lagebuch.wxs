@@ -75,9 +75,10 @@
         <Extension Id="lagebuch" ContentType="application/x-lagebuch">
           <Verb Id="open" TargetProperty="LAGEBUCHEXE" Argument="&quot;%1&quot;" />
         </Extension>
-        <Extension Id="fwincident" ContentType="application/x-lagebuch">
-          <Verb Id="open" TargetProperty="LAGEBUCHEXE" Argument="&quot;%1&quot;" />
-        </Extension>
+        <!-- No verb and no ContentType of its own: the verb lives on the ProgId and the MIME
+             type's Extension value names one extension, so declaring either again writes the
+             same registry value twice (WIX0091). Pointing at the ProgId is all it needs. -->
+        <Extension Id="fwincident" />
       </ProgId>
     </Component>
     <SetProperty Id="LAGEBUCHEXE" Value="[INSTALLFOLDER]LageBuch.App.exe" After="CostFinalize" Sequence="execute" />
