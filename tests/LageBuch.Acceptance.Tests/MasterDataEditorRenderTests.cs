@@ -869,7 +869,7 @@ public class MasterDataEditorRenderTests
         var view = new MasterDataEditorView { DataContext = vm };
 
         // Tall enough for every category and this fixture's two Checklisten; grows with the rail.
-        var window = new Window { Content = view, Width = 1080, Height = 1130 };
+        var window = new Window { Content = view, Width = 1080, Height = 1160 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 

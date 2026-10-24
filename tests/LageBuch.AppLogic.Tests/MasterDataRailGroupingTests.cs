@@ -108,7 +108,7 @@ public class MasterDataRailGroupingTests
         var vm = Vm();
 
         Assert.Empty(vm.Checklists);
-        Assert.Equal(13, vm.Sections.Count);
+        Assert.Equal(14, vm.Sections.Count);
     }
 
     // The rail is two ListBoxes over one SelectedSection. Avalonia's SelectedItem is a two-way
