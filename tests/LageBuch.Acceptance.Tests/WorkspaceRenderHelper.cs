@@ -41,6 +41,7 @@ internal static class WorkspaceRenderHelper
         // Fictional roster: the real personnel.json is gitignored, so tests supply their own
         // (#137: same anonymized fixture the app's own placeholders are built from).
         Personnel = AnonymizedExampleData.Personnel,
+        Premises = AnonymizedExampleData.Premises,
     };
 
     public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars(

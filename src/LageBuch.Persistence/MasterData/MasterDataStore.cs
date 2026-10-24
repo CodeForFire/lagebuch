@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -116,6 +117,27 @@ public sealed class MasterDataStore
                     p("$c", t.Category);
                     p("$e", t.ForEtb ? 1 : 0);
                     p("$a", t.ForTasks ? 1 : 0);
+                });
+        }
+
+        Run(cn, tx, "DELETE FROM md_premises;", _ => { });
+        foreach (var o in set.Premises)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_premises (value, street, house_number, postal_code, place, floor_count, apartments_per_floor, underground_floor_count, apartment_labels) VALUES ($n,$s,$h,$z,$p,$f,$a,$u,$l);",
+                p =>
+                {
+                    p("$n", o.Name);
+                    p("$s", o.Street);
+                    p("$h", o.HouseNumber);
+                    p("$z", o.PostalCode);
+                    p("$p", o.Place);
+                    p("$f", o.FloorCount);
+                    p("$a", o.ApartmentsPerFloor);
+                    p("$u", o.UndergroundFloorCount);
+                    p("$l", JsonSerializer.Serialize(o.ApartmentLabels));
                 });
         }
 
@@ -316,6 +338,17 @@ public sealed class MasterDataStore
                 in_etb INTEGER NOT NULL DEFAULT 1,
                 in_tasks INTEGER NOT NULL DEFAULT 1
             );
+            CREATE TABLE IF NOT EXISTS md_premises (
+                value TEXT NOT NULL,
+                street TEXT NOT NULL DEFAULT '',
+                house_number TEXT NOT NULL DEFAULT '',
+                postal_code TEXT NOT NULL DEFAULT '',
+                place TEXT NOT NULL DEFAULT '',
+                floor_count INTEGER NOT NULL DEFAULT 8,
+                apartments_per_floor INTEGER NOT NULL DEFAULT 10,
+                underground_floor_count INTEGER NOT NULL DEFAULT 1,
+                apartment_labels TEXT NOT NULL DEFAULT '{}'
+            );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS md_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """;
@@ -354,6 +387,16 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "category", "TEXT NOT NULL DEFAULT ''");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "in_etb", "INTEGER NOT NULL DEFAULT 1");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "in_tasks", "INTEGER NOT NULL DEFAULT 1");
+
+        // md_premises (#420) arrived complete too; held to the same rule.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "street", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "house_number", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "postal_code", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "place", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "floor_count", "INTEGER NOT NULL DEFAULT 8");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "apartments_per_floor", "INTEGER NOT NULL DEFAULT 10");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "underground_floor_count", "INTEGER NOT NULL DEFAULT 1");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "apartment_labels", "TEXT NOT NULL DEFAULT '{}'");
 
         // Widen an md_links that predates link groups (#518): every link already there is ungrouped.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_links", "group_name", "TEXT NOT NULL DEFAULT ''");
@@ -549,6 +592,7 @@ public sealed class MasterDataStore
             ReadPersonnel(cn),
             ReadVehicles(cn),
             ReadTextSnippets(cn),
+            ReadPremises(cn),
             ReadSettings(cn));
     }
 
@@ -716,6 +760,45 @@ public sealed class MasterDataStore
         }
 
         return TextSnippet.Normalize(list);
+    }
+
+    // Normalized on the way out like the Textbausteine, and for the same reason. A labels column
+    // that no longer parses reads as no labels rather than losing the whole Stammdaten.
+    private static IReadOnlyList<Premises> ReadPremises(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            SELECT value, street, house_number, postal_code, place, floor_count, apartments_per_floor,
+                underground_floor_count, apartment_labels
+            FROM md_premises ORDER BY rowid;
+            """;
+        using var r = cmd.ExecuteReader();
+        var list = new List<Premises>();
+        while (r.Read())
+        {
+            list.Add(new Premises(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetInt32(5), r.GetInt32(6), r.GetInt32(7))
+            {
+                ApartmentLabels = Labels(r.GetString(8)),
+            });
+        }
+
+        return Premises.Normalize(list);
+
+        // Stryker disable Block : without the catch block the method returns null, which
+        // Premises.Normalize reads as no labels too -- the same outcome, so an equivalent mutant.
+        static Dictionary<string, string?> Labels(string json)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<Dictionary<string, string?>>(json) ?? new Dictionary<string, string?>();
+            }
+            catch (JsonException)
+            {
+                return new Dictionary<string, string?>();
+            }
+        }
+
+        // Stryker restore Block
     }
 
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)

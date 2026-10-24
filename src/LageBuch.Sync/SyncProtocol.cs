@@ -96,8 +96,13 @@ public static class SyncProtocol
     /// <c>removeSituationReport</c> and <c>sendSituationReport</c> commands and the snapshot's
     /// <c>situationReports</c>. A host at 15 would reject those commands, so the floor rises to 16.
     /// </para>
+    /// <para>
+    /// 17: the Stammdaten payload carries the Objekte, <c>premises</c>, and <c>addCoBuilding</c> an
+    /// optional <c>apartmentLabels</c> (#420). A peer at 16 skips the key and offers no Objekte, and
+    /// a host there ignores the labels and creates the Haus without them, so the floor stays at 16.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 16;
+    public const int ProtocolVersion = 17;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

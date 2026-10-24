@@ -1,0 +1,1 @@
+Objekte, a new Stammdaten list of buildings with their address, Geschosse, Wohnungen per Geschoss, Untergeschosse and Wohnungsbezeichnungen, are offered when a Haus is added to the CO-Messprotokoll, and picking one fills the dialog and creates the Haus with its labels, copied into the Einsatz so a later change to the Objekt leaves it untouched (#420).

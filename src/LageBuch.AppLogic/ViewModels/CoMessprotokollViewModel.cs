@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Time;
+using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -583,13 +585,17 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
+    private readonly IReadOnlyList<Premises> _premises;
 
-    public CoMessprotokollViewModel(IIncidentSession session, IClock clock, Action onChanged)
+    // premises: the Objekte a new Haus may be picked from (#420); none when omitted.
+    public CoMessprotokollViewModel(IIncidentSession session, IClock clock, Action onChanged, IReadOnlyList<Premises>? premises = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
+        _premises = premises ?? Array.Empty<Premises>();
+        PremisesOptions = _premises.Select(p => p.Name).ToList();
         IsReadOnly = session.IsReadOnly;
         _session.Changed += Refresh;
         Refresh();
@@ -1192,23 +1198,93 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewBuildingNameError))]
+    [NotifyPropertyChangedFor(nameof(NewBuildingPremisesHint))]
     private string _newBuildingName = string.Empty;
 
     [ObservableProperty]
-    private int _newBuildingFloors = 8;
+    [NotifyPropertyChangedFor(nameof(NewBuildingPremisesHint))]
+    private int _newBuildingFloors = Premises.DefaultFloorCount;
 
     [ObservableProperty]
-    private int _newBuildingApartments = 10;
+    [NotifyPropertyChangedFor(nameof(NewBuildingPremisesHint))]
+    private int _newBuildingApartments = Premises.DefaultApartmentsPerFloor;
 
     /// <summary>Untergeschosse aren't visible in the matrix until scrolled to, unlike ground/upper
     /// floors, so most Häuser have at least one at creation time (#218); UG HINZUFÜGEN still covers
     /// adding more, or a building with none, after the fact.</summary>
     [ObservableProperty]
-    private int _newBuildingUndergroundFloors = 1;
+    [NotifyPropertyChangedFor(nameof(NewBuildingPremisesHint))]
+    private int _newBuildingUndergroundFloors = Premises.DefaultUndergroundFloorCount;
+
+    // The Objekt the Bezeichnung names (#420), and what its pick put into each count. A count that
+    // still holds its default or that value is the pick's to change; any other was typed.
+    private Premises? _pickedPremises;
+    private int? _filledFloors;
+    private int? _filledApartments;
+    private int? _filledUndergroundFloors;
+
+    /// <summary>The names of the Objekte a Haus can be picked from (#420).</summary>
+    public IReadOnlyList<string> PremisesOptions { get; }
 
     /// <summary>Whether the Haus still has no Bezeichnung, once the operator has asked (#412).</summary>
     public string? NewBuildingNameError =>
         _errorsShown && string.IsNullOrWhiteSpace(NewBuildingName) ? ValidationMessages.Required : null;
+
+    /// <summary>What a picked Objekt brings, e.g. "Aus den Stammdaten · Lindenallee 12, 12345
+    /// Musterstadt · 4 Wohnungsbezeichnungen", or null when the Bezeichnung names none. The count is of
+    /// the labels that fit the structure as it now stands; the others are not created.</summary>
+    public string? NewBuildingPremisesHint
+    {
+        get
+        {
+            if (_pickedPremises is not { } premises)
+            {
+                return null;
+            }
+
+            var labels = CoMeasurementLabels.LabelsWithin(
+                premises.ApartmentLabels, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors).Count;
+            var parts = new List<string> { "Aus den Stammdaten" };
+            if (premises.AddressLine.Length > 0)
+            {
+                parts.Add(premises.AddressLine);
+            }
+
+            if (labels > 0)
+            {
+                parts.Add(labels == 1 ? "1 Wohnungsbezeichnung" : $"{labels} Wohnungsbezeichnungen");
+            }
+
+            return string.Join(" · ", parts);
+        }
+    }
+
+    // Like a Straße in the Einsatzdaten (#461): only a name that matches fills anything, so typing
+    // on past an Objekt's name keeps the counts it brought but no longer its labels.
+    partial void OnNewBuildingNameChanged(string value)
+    {
+        _pickedPremises = StammdatenCatalogue.Find(value, _premises);
+        if (_pickedPremises is not { } premises)
+        {
+            return;
+        }
+
+        NewBuildingFloors = Fill(NewBuildingFloors, ref _filledFloors, Premises.DefaultFloorCount, premises.FloorCount);
+        NewBuildingApartments = Fill(NewBuildingApartments, ref _filledApartments, Premises.DefaultApartmentsPerFloor, premises.ApartmentsPerFloor);
+        NewBuildingUndergroundFloors = Fill(
+            NewBuildingUndergroundFloors, ref _filledUndergroundFloors, Premises.DefaultUndergroundFloorCount, premises.UndergroundFloorCount);
+    }
+
+    private static int Fill(int current, ref int? filled, int initial, int value)
+    {
+        if (current != initial && current != filled)
+        {
+            return current;
+        }
+
+        filled = value;
+        return value;
+    }
 
     [RelayCommand]
     private void ConfirmAddBuilding()
@@ -1219,11 +1295,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
             return;
         }
 
-        _session.AddCoBuilding(NewBuildingName, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors);
+        // The labels are the Objekt's own copy (#337); Building.Create keeps only those that fit.
+        _session.AddCoBuilding(
+            NewBuildingName, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors, _pickedPremises?.ApartmentLabels);
         NewBuildingName = string.Empty;
-        NewBuildingFloors = 8;
-        NewBuildingApartments = 10;
-        NewBuildingUndergroundFloors = 1;
+        _filledFloors = _filledApartments = _filledUndergroundFloors = null;
+        NewBuildingFloors = Premises.DefaultFloorCount;
+        NewBuildingApartments = Premises.DefaultApartmentsPerFloor;
+        NewBuildingUndergroundFloors = Premises.DefaultUndergroundFloorCount;
         IsAddBuildingDialogOpen = false;
         ShowErrors(false); // the cleared dialog must not reopen already complaining
         _onChanged();

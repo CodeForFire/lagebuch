@@ -91,6 +91,14 @@
     { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null, "isOwn": true, "email": null, "note": null },
     { "lastName": "Beispiel", "firstName": "Bernd", "role": "GF", "callSign": "Florian Musterdorf 40/1", "phone": null, "isOwn": false, "email": null, "note": "Musterdorf, Beispielried" }
   ],
+  "premises": [
+    {
+      "name": "Wohnanlage Lindenallee", "street": "Lindenallee", "houseNumber": "12", "postalCode": "12345", "place": "Musterstadt",
+      "floors": 4, "apartmentsPerFloor": 3, "undergroundFloors": 1,
+      "apartmentLabels": { "0:1": "Hausmeister", "0:3": "Kinderwagen", "-1:1": "Heizung", "-1:2": "Waschküche" }
+    },
+    { "name": "Haus A", "street": "Hauptstraße", "houseNumber": "5", "postalCode": "12345", "place": "Musterstadt", "floors": 3, "apartmentsPerFloor": 2, "undergroundFloors": 0, "apartmentLabels": {} }
+  ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,
     "ilsReminderFollowUpIntervalMinutes": 30,

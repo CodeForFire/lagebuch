@@ -59,6 +59,40 @@ saving it, and an import keeps the first.
 A text is cut to 1000 characters, what an Aufgabe may hold. The inserted text
 is plain text in the entry: changing a Textbaustein later changes no entry.
 
+## Objekte
+
+`premises` is the list **Objekte** in the Stammdaten editor: buildings in the
+Ausrückebereich whose structure is known long before the call, such as a
+recurring Wohnanlage. Each Objekt has a `name`, an optional address (`street`,
+`houseNumber`, `postalCode`, `place`) and the structure a Haus in the
+CO-Messprotokoll starts with:
+
+| Field | JSON | Range | Missing reads as |
+|---|---|---|---|
+| Geschosse | `floors` | 1–50 | 8 |
+| Wohnungen/Geschoss | `apartmentsPerFloor` | 1–30 | 10 |
+| Untergeschosse | `undergroundFloors` | 0–3 | 1 |
+
+`apartmentLabels` names Wohnungen, keyed `"floor:apartment"`: `"0:1"` is the
+first Wohnung in the EG, `"2:3"` the third in the 2. OG and `"-1:1"` the first
+in the 1. UG. The editor shows them as a grid of every floor and Wohnung under
+**WOHNUNGEN BENENNEN**. A Wohnung without a label keeps the name the CO matrix
+gives it (`Links`/`Mitte`/`Rechts` on a floor of three, `Whg. N` otherwise). A
+label is cut to 60 characters, and a key that names no floor or Wohnung of the
+Objekt is dropped.
+
+Typing in **BEZEICHNUNG** in the CO-Messprotokoll's **HAUS HINZUFÜGEN** dialog
+suggests the Objekte. Picking one fills Geschosse, Wohnungen/Geschoss and
+Untergeschosse, unless one of them was already changed by hand, and the Haus is
+created with the Objekt's Wohnungsbezeichnungen. These values are **copied**
+into the Einsatz. Editing or deleting the Objekt later changes no Haus already
+in an Einsatzdatei. A name that matches no Objekt adds a Haus exactly as before.
+
+The address is not copied, because a Haus in the CO-Messprotokoll has none. It
+tells two Objekte apart in the list. Out-of-range numbers are clamped, rows
+without a name are skipped, a second Objekt of the same name (ignoring case) is
+dropped, and a list holds at most 500 Objekte.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the

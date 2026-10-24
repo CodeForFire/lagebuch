@@ -86,6 +86,36 @@ public static class CoMeasurementLabels
         return result;
     }
 
+    /// <summary>The Wohnungsbezeichnungen of <paramref name="labels"/> that fit a Haus of this
+    /// structure (#420): keyed by <see cref="ApartmentLabelKey"/> on a floor and a Wohnung it has,
+    /// trimmed, blanks dropped and cut to <see cref="Building.MaxApartmentLabelLength"/>. They come
+    /// from an Objekt in the Stammdaten or a sync peer, so a key that names no Wohnung is dropped
+    /// rather than kept for a Wohnung that might appear later.</summary>
+    public static IReadOnlyDictionary<string, string?> LabelsWithin(
+        IReadOnlyDictionary<string, string?>? labels, int floorCount, int apartmentsPerFloor, int undergroundFloorCount)
+    {
+        var result = new Dictionary<string, string?>();
+        foreach (var (key, value) in labels ?? new Dictionary<string, string?>())
+        {
+            var parts = key.Split(':');
+            if (parts.Length != 2
+                || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var floor)
+                || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var apartment)
+                || floor < -undergroundFloorCount || floor > floorCount
+                || apartment < 1 || apartment > apartmentsPerFloor
+                || string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            var label = value.Trim();
+            result[ApartmentLabelKey(floor, apartment)] =
+                label.Length > Building.MaxApartmentLabelLength ? label[..Building.MaxApartmentLabelLength].TrimEnd() : label;
+        }
+
+        return result;
+    }
+
     public static string DwellingLocation(Building building, int floorOrdinal, int apartmentNumber)
     {
         ArgumentNullException.ThrowIfNull(building);

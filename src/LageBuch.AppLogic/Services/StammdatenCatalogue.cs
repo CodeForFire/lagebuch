@@ -100,7 +100,18 @@ public static class StammdatenCatalogue
         return FindByName(name, catalogue, entry => entry?.Name);
     }
 
-    // One loop for both row lookups, so the trimming, the case-insensitive comparison and the
+    /// <summary>
+    /// The Objekt <paramref name="name"/> names, or null when the catalogue has no such row (#420).
+    /// A null is not an error: a Haus the Stammdaten do not know is added from what was typed.
+    /// </summary>
+    public static Premises? Find(string? name, IReadOnlyList<Premises> catalogue)
+    {
+        ArgumentNullException.ThrowIfNull(catalogue);
+
+        return FindByName(name, catalogue, entry => entry?.Name);
+    }
+
+    // One loop for every row lookup, so the trimming, the case-insensitive comparison and the
     // first-match rule cannot drift apart between them; only the row type differs. A null row or a
     // null name is tolerated as it always was, which costs nothing next to a mid-Einsatz crash.
     // The class constraint is what makes `return default` mean null: both callers pass records, but

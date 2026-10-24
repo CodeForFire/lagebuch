@@ -191,7 +191,7 @@ public class MasterDataEditorViewModelTests
             new[]
             {
                 "Einstellungen", "Navigation", "Einheiten-Status",
-                "Fahrzeuge", "Links", "Ortsteile", "Personal", "Rollen", "Stichwörter", "Straßen",
+                "Fahrzeuge", "Links", "Objekte", "Ortsteile", "Personal", "Rollen", "Stichwörter", "Straßen",
                 "Textbausteine", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
