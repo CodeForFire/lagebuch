@@ -1165,11 +1165,48 @@ public class IncidentWorkspaceViewModelTests
         vm.HostClockOffset = TimeSpan.FromSeconds(29);
         Assert.Null(vm.ClockSkewWarning);
 
+        vm.HostClockOffset = TimeSpan.FromSeconds(30);
+        Assert.Equal("Geräteuhr geht 30 s nach", vm.ClockSkewWarning);
+
         vm.HostClockOffset = TimeSpan.FromMinutes(-3);
         Assert.Equal("Geräteuhr geht 3 min vor", vm.ClockSkewWarning);
         Assert.Contains(nameof(IncidentWorkspaceViewModel.ClockSkewWarning), raised);
 
         vm.HostClockOffset = TimeSpan.Zero;
+        Assert.Null(vm.ClockSkewWarning);
+    }
+
+    [Fact]
+    public void A_joined_client_follows_the_sessions_clock_offset_on_every_tick_until_it_closes()
+    {
+        var clock = new FixedClock(T0);
+        var session = new SnapshotRoundTrippingSession(TestSession.StartNew(
+            new FakeStore(), clock, new SessionOperator("Müller"), "/x.lagebuch", new[] { ("A?", false) }, Array.Empty<(string, bool)>()))
+        {
+            HostClockOffset = TimeSpan.FromMinutes(2),
+        };
+        var ticker = new FakeTicker();
+        var vm = new IncidentWorkspaceViewModel(
+            session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+
+        Assert.Equal("Geräteuhr geht 2 min nach", vm.ClockSkewWarning);
+
+        session.HostClockOffset = TimeSpan.FromSeconds(-45);
+        ticker.Fire();
+        Assert.Equal("Geräteuhr geht 45 s vor", vm.ClockSkewWarning);
+
+        vm.Dispose();
+        session.HostClockOffset = TimeSpan.Zero;
+        ticker.Fire();
+        Assert.Equal("Geräteuhr geht 45 s vor", vm.ClockSkewWarning);
+    }
+
+    [Fact]
+    public void A_local_incident_never_warns_about_the_clock()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.Equal(TimeSpan.Zero, vm.HostClockOffset);
         Assert.Null(vm.ClockSkewWarning);
     }
 

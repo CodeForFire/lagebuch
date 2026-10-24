@@ -121,7 +121,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             remote.Reconciled += OnRemoteReconciled;
             remote.ReconcileFailed += OnRemoteReconcileFailed;
             remote.CommandRejected += OnRemoteCommandRejected;
-            HostClockOffset = remote.HostClockOffset;
+        }
+
+        // Polled rather than pushed: the offset moves on the session's reconcile loop, and the tick
+        // is already running for every countdown on screen.
+        if (session.IsRemote)
+        {
+            HostClockOffset = session.HostClockOffset;
+            _clockSkewRefresh = _ticker.Subscribe(() => HostClockOffset = _session.HostClockOffset);
         }
 
         // A joined client mirrors; it never saves. Which of the two the footer may claim is fixed here,
@@ -144,15 +151,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private void OnRemoteEnded() => GoHomeRequested?.Invoke();
 
-    private void OnRemoteReconciled()
-    {
-        if (_session is RemoteIncidentSession remote)
-        {
-            HostClockOffset = remote.HostClockOffset;
-        }
-
-        MarkSynced();
-    }
+    private void OnRemoteReconciled() => MarkSynced();
 
     private void OnRemoteReconcileFailed() => SyncState = WorkspaceSyncState.Unconfirmed;
 
@@ -213,7 +212,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private DateTimeOffset? _lastSyncedAt;
 
     /// <summary>
-    /// How far the host's clock is ahead of this device's, from the last reconcile pass. A joined
+    /// How far the host's clock is ahead of this device's, read from the session every tick. A joined
     /// client already runs its countdowns on host time; this only drives the footer warning. Settable
     /// so a render test can drive the footer without a live host.
     /// </summary>
@@ -268,6 +267,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     // Ticks only while a notice shows, so an idle workspace holds no ticker subscription for it.
     private IDisposable? _undoNoticeExpiry;
+    private IDisposable? _clockSkewRefresh;
 
     // The create-task overlay behind an ETB row's button (#88); null while no dialog is open.
     [ObservableProperty]
@@ -825,6 +825,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _disposed = true;
         _session.Changed -= RefreshIncidentData;
         _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
+        _clockSkewRefresh?.Dispose();
         if (_alarmMute is not null)
         {
             _alarmMute.Changed -= OnAlarmMuteChanged;

@@ -47,6 +47,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     // This device is authoritative — it does its own time-driven logging (see IIncidentSession.IsRemote).
     public bool IsRemote => false;
 
+    // This device owns the incident, so its clock is the host clock.
+    public TimeSpan HostClockOffset => TimeSpan.Zero;
+
     public static LocalIncidentSession StartNew(
         IIncidentStore store,
         IClock clock,

@@ -1138,6 +1138,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public bool IsRemote => true;
 
+    public TimeSpan HostClockOffset { get; set; }
+
     public event Action? Changed;
 
     public void ChangeOperator(SessionOperator op) => _inner.ChangeOperator(op);
