@@ -1,1 +1,0 @@
-Funktionen and Kräfte are now tabs of the FÜHRUNG rail entry beside the Führungsorganisation board, which moves up to where Funktionen was, so the rail and the phone's bottom bar are two entries shorter and a saved Stammdaten Navigation list is folded to match.
