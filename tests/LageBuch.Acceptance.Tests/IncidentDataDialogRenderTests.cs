@@ -97,7 +97,7 @@ public class IncidentDataDialogRenderTests
         Assert.Equal("Nebenstr.", session.Incident.Street);
     }
 
-    // #652: Esc with typed Einsatzdaten asks first, focus on ABBRECHEN, so a reflex Enter keeps
+    // #652: Esc with typed Einsatzdaten asks first, focus on WEITER BEARBEITEN, so a reflex Enter keeps
     // editing; VERWERFEN then closes without saving.
     [AvaloniaFact]
     public void Escape_after_typing_asks_before_discarding()
@@ -133,6 +133,18 @@ public class IncidentDataDialogRenderTests
 
         Assert.Equal(1, closed);
         Assert.Equal("Hauptstr.", session.Incident.Street);
+    }
+
+    // The question's "back to the form" button said ABBRECHEN, the same word as the dialog's own
+    // cancel, so a Lagebuchführer pressing it to leave went round in a loop.
+    [AvaloniaFact]
+    public void The_discard_question_says_weiter_bearbeiten_not_a_second_abbrechen()
+    {
+        var window = new Window { Content = new IncidentDataDialogView { DataContext = new IncidentDataDialogViewModel(Session(), () => { }) } };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("WEITER BEARBEITEN", Find<Button>(window, "IncidentDataKeepEditingButton").Content);
     }
 
     // Opt-in PNG capture for the PR's before/after pair; a plain test run writes nothing.

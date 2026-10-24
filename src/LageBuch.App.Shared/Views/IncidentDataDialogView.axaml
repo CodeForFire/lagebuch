@@ -76,7 +76,7 @@
             <Button x:Name="IncidentDataCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
           </StackPanel>
           <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. A
-               destructive confirm (#545): focus on ABBRECHEN, no primary command. Its own overlay
+               destructive confirm (#545): focus on WEITER BEARBEITEN, no primary command. Its own overlay
                root inside the dialog's, so Esc closes the question rather than re-asking it. -->
           <Border x:Name="IncidentDataDiscardPanel" Margin="0,8,0,0"
                   IsVisible="{Binding IsDiscardConfirmOpen}"
@@ -90,7 +90,7 @@
               <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
                 <Button x:Name="IncidentDataDiscardButton" Classes="signal" Content="VERWERFEN"
                         Command="{Binding ConfirmDiscardCommand}" />
-                <Button x:Name="IncidentDataKeepEditingButton" Content="ABBRECHEN"
+                <Button x:Name="IncidentDataKeepEditingButton" Content="WEITER BEARBEITEN"
                         Command="{Binding CancelDiscardCommand}" />
               </StackPanel>
             </StackPanel>
