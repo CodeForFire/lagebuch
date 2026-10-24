@@ -1,0 +1,1 @@
+Ausgabeliste: a new AUSGABE tab records each Gerät handed out, picked from a Geräte list in the Stammdaten, with the name, phone number and organisation of the person who received it, takes it back with one ZURÜCK click, lists what is still out first, warns on Einsatz abschließen while anything has not come back, and prints the list in the PDF Bericht.

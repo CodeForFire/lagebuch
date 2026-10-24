@@ -29,6 +29,7 @@ public class MasterDataEditorRenderTests
             },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
             Keywords = new[] { "B3 Person", "THL 1" },
+            Devices = new[] { "Mobilteil 1", "AED" },
             Districts = new[] { "Aich", "Puch" },
             Streets = new[]
             {
@@ -107,8 +108,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 11 data categories, and this fixture's 2.
-        Assert.Equal(13, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 12 data categories, and this fixture's 2.
+        Assert.Equal(14, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -787,7 +788,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(13, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(14, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -847,7 +848,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(13, rows.Length);
+        Assert.Equal(14, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";
@@ -866,7 +867,9 @@ public class MasterDataEditorRenderTests
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         var view = new MasterDataEditorView { DataContext = vm };
-        var window = new Window { Content = view, Width = 1080, Height = 1080 };
+
+        // Tall enough for every category and this fixture's two Checklisten; grows with the rail.
+        var window = new Window { Content = view, Width = 1080, Height = 1130 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 

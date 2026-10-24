@@ -41,8 +41,13 @@
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+    <!-- Both colours are Style setters: a local Foreground would outrank the .out style. -->
+    <Style Selector="TextBlock#SummaryText">
+      <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    </Style>
     <Style Selector="TextBlock#SummaryText.out">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="Panel#WorkspaceRoot.narrow WrapPanel#DockFields">
@@ -85,7 +90,6 @@
       <TextBlock Grid.Column="0" x:Name="IssuedItemsTitle" Text="AUSGABELISTE" Classes="overline" />
       <TextBlock Grid.Column="1" x:Name="SummaryText" Classes="mono" FontSize="12"
                  Classes.out="{Binding HasItemsOut}"
-                 Foreground="{StaticResource TextMutedBrush}"
                  Text="{Binding Summary}"
                  IsVisible="{Binding Summary, Converter={x:Static ObjectConverters.IsNotNull}}" />
     </Grid>

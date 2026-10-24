@@ -67,6 +67,7 @@ Markdown.
 | **Aufgaben** | Aufträge mit Wichtigkeit, Dringlichkeit, Zuständigem und Timer – mit Sprachansage, wenn sie fällig werden; direkt aus einem ETB-Eintrag anlegbar |
 | **Funktionen** | EL, Abschnittsleiter und weitere Rollen mit von/bis, Übergabe und Handynummer; jede Rolle in den Stammdaten als einmal je Einsatz, einmal je Abschnitt oder beliebig oft einrichtbar |
 | **Beteiligte** | Eigentümer, Fahrzeughalter, Polizei, Evakuierte: Name, Telefon, Notiz und Aufenthaltsort je Person – synchronisiert, im PDF, bewusst ohne ETB-Eintrag |
+| **Ausgabeliste** | Ausgegebene Geräte (Mobilteil, Westen, AED …) aus den Stammdaten: an wen, Telefon, Organisation, mit Uhrzeit; Rückgabe mit einem Klick – was noch draußen ist, steht oben, und „Einsatz abschließen“ warnt davor; im PDF, ohne ETB-Eintrag |
 | **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene; Sicherheitstrupp je Trupp zugeordnet und im ETB protokolliert |
 | **Rückmeldung an ILS** | Erinnerung nach konfigurierbarer Zeit, danach im Intervall, mit ERLEDIGT-Quittierung; überlebt Neustart und Absturz |
 | **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), Messreihe je Wohnung mit Uhrzeit und ppm-Wert in Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort; der Verlauf steht im ETB und im PDF |

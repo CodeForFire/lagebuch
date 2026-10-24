@@ -34,8 +34,8 @@ public class NavigationLayoutTests
         Assert.Equal(
             new[]
             {
-                "checklist:Aufbau", "etb", "tasks", "roles", "forces", "involved", "issued",
-                "scba", "co", "files", "links", "contacts", "checklist:Abbau",
+                "checklist:Aufbau", "etb", "tasks", "roles", "forces", "involved",
+                "scba", "co", "files", "links", "contacts", "issued", "checklist:Abbau",
             },
             Keys(specs));
     }

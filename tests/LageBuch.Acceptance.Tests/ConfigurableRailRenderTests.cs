@@ -80,16 +80,16 @@ public class ConfigurableRailRenderTests
     {
         var window = ShowWorkspace();
 
-        // KONTAKTE is appended rather than placed: this fixture's Stammdaten carry an explicit
-        // layout written before the module existed, and NavigationLayout.Resolve adds a module the
+        // KONTAKTE and AUSGABE are appended rather than placed: this fixture's Stammdaten carry an
+        // explicit layout written before the modules existed, and NavigationLayout.Resolve adds a module the
         // layout never mentions after everything it does. That is the documented contract of
         // NavLayout ("a module added in a later release appears for everyone who never touched the
-        // Navigation list") -- a brigade on the default layout sees it between LINKS and ABBAU.
+        // Navigation list") -- a brigade on the default layout sees them between LINKS and ABBAU.
         Assert.Equal(
             new[]
             {
                 "AUFBAU", "ETB", "NACHBEREITUNG", "AUFGABEN", "KRÄFTE",
-                "DATEIEN", "LINKS", "FAHRZEUG", "KONTAKTE",
+                "DATEIEN", "LINKS", "FAHRZEUG", "KONTAKTE", "AUSGABE",
             },
             WorkspaceRenderHelper.RailHeaders(window));
     }
@@ -158,7 +158,7 @@ public class ConfigurableRailRenderTests
             new[]
             {
                 "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE", "BETEILIGTE", "ATEMSCHUTZ", "CO-MESSUNG",
-                "DATEIEN", "LINKS", "KONTAKTE",
+                "DATEIEN", "LINKS", "KONTAKTE", "AUSGABE",
             },
             WorkspaceRenderHelper.RailHeaders(window));
     }
