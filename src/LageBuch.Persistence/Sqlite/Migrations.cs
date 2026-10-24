@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 29;
+    public const int CurrentVersion = 30;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -200,6 +200,11 @@ public static class Migrations
             ApplyV29(cn, tx);
 
             // Stryker restore all
+        }
+
+        if (version < 30)
+        {
+            ApplyV30(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -874,6 +879,31 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_tasks", "source_entry_id", "TEXT");
 
         // Stryker restore all
+    }
+
+    // The Lagemeldungen (#592): drafts and sent reports. number, sent_at and sent_by stay NULL
+    // while a report is a draft. Ordinal keeps the creation order, as involved_parties does.
+    private static void ApplyV30(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql30 = """
+            CREATE TABLE IF NOT EXISTS situation_reports (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                number INTEGER,
+                reporter TEXT,
+                location TEXT,
+                situation TEXT,
+                measures TEXT,
+                units TEXT,
+                requests TEXT,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                sent_at TEXT,
+                sent_by TEXT,
+                etb_entry_id TEXT
+            );
+            """;
+        Exec(cn, tx, sql30);
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

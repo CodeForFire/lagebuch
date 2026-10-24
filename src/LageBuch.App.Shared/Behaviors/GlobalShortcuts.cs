@@ -129,6 +129,7 @@ public static class GlobalShortcuts
     {
         >= Key.D0 and <= Key.D9 => ShortcutKey.D0 + (key - Key.D0),
         >= Key.NumPad0 and <= Key.NumPad9 => ShortcutKey.D0 + (key - Key.NumPad0),
+        Key.L => ShortcutKey.L,
         Key.N => ShortcutKey.N,
         Key.Tab => ShortcutKey.Tab,
         Key.F1 => ShortcutKey.F1,

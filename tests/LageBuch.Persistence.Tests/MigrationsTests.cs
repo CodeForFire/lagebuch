@@ -312,4 +312,29 @@ public class MigrationsTests : IDisposable
         check.CommandText = "SELECT source_entry_id FROM incident_tasks WHERE text = 'Alt';";
         Assert.Equal(DBNull.Value, check.ExecuteScalar()); // an old task reads back unlinked
     }
+
+    [Fact]
+    public void V29_database_upgrades_to_v30_and_gains_the_situation_reports_table()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (29);";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(30, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText =
+            "SELECT count(*) FROM pragma_table_info('situation_reports') " +
+            "WHERE name IN ('id','ordinal','number','reporter','location','situation','measures','units','requests'," +
+            "'created_by','created_at','sent_at','sent_by','etb_entry_id');";
+        Assert.Equal(14L, (long)check.ExecuteScalar()!);
+    }
 }

@@ -124,8 +124,12 @@ public class ReadingOrderTabTests
         window.Tab();
         window.AssertFocused(railTab);
 
+        // The ETB's own tabs come first (#592), entered at the open one just like the rail.
         window.Tab();
-        window.AssertFocused(Named<CheckBox>(content, "HideSystemCheckBox"));
+        window.AssertFocused(Named<TabItem>(content, "JournalTab"));
+
+        window.Tab();
+        window.AssertFocused(Named<Button>(content, "OpenSpellingHelperButton"));
     }
 
     [AvaloniaFact]
@@ -137,9 +141,12 @@ public class ReadingOrderTabTests
         var railTab = (TabItem)tabs.ContainerFromIndex(tabs.SelectedIndex)!;
 
         // Shift+Tab used to resolve the rail to the very control it started on, and went nowhere.
-        FocusByTab(Named<CheckBox>(content, "HideSystemCheckBox"));
+        // The module's first control is now the ETB's own open tab (#592).
+        FocusByTab(Named<Button>(content, "OpenSpellingHelperButton"));
         window.ShiftTab();
+        window.AssertFocused(Named<TabItem>(content, "JournalTab"));
 
+        window.ShiftTab();
         window.AssertFocused(railTab);
     }
 

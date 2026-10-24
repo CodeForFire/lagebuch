@@ -1132,6 +1132,14 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public Incident Incident { get; private set; }
 
+    /// <summary>Delivers <paramref name="incident"/> the way a host broadcast would, so a test can
+    /// play a snapshot that lands in two steps.</summary>
+    public void Replace(Incident incident)
+    {
+        Incident = incident;
+        Changed?.Invoke();
+    }
+
     public SessionOperator? Operator => _inner.Operator;
 
     public bool IsReadOnly => _inner.IsReadOnly;
@@ -1197,6 +1205,19 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId) => _inner.SetInvolvedPartyDwelling(partyId, dwellingId);
 
     public void SetInvolvedPartyWhereabouts(Guid partyId, string? whereabouts) => _inner.SetInvolvedPartyWhereabouts(partyId, whereabouts);
+
+    public void AddSituationReport(
+        string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        _inner.AddSituationReport(reporter, location, situation, measures, units, requests);
+
+    public void UpdateSituationReport(
+        Guid reportId, string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        _inner.UpdateSituationReport(reportId, reporter, location, situation, measures, units, requests);
+
+    public void RemoveSituationReport(Guid reportId) => _inner.RemoveSituationReport(reportId);
+
+    public void SendSituationReport(Guid reportId, string dispatchCentreName) =>
+        _inner.SendSituationReport(reportId, dispatchCentreName);
 
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         _inner.UpdateTask(taskId, text, assignee, importance, urgency);

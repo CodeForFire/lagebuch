@@ -147,6 +147,40 @@ public class GlobalShortcutTests
         window.AssertFocused(Named<Control>(window, "FromBox"));
     }
 
+    // #592: Ctrl+L starts a draft when there is none and lands in its first field, even from the
+    // journal's VON box, where L is a letter the Lagebuchführer might type.
+    [AvaloniaFact]
+    public void Ctrl_L_opens_the_Lagemeldung_tab_on_a_new_draft_and_focuses_Meldender()
+    {
+        var (window, _, vm) = ShowShell();
+        PressAndSettle(window, PhysicalKey.N, RawInputModifiers.Control);
+        window.AssertFocused(Named<Control>(window, "FromBox"));
+
+        PressAndSettle(window, PhysicalKey.L, RawInputModifiers.Control);
+
+        Assert.Equal("ETB", vm.SelectedNavItem?.Header);
+        Assert.Equal(EtbTabsViewModel.SituationReportTab, vm.EtbTabs.SelectedTabIndex);
+        Assert.Single(vm.SituationReports.Reports);
+        var reporter = Named<AutoCompleteBox>(window, "ReporterBox");
+        window.AssertFocused(reporter);
+
+        // Focus alone must not drop the Funkrufnamen over the fields below.
+        Assert.False(reporter.IsDropDownOpen);
+    }
+
+    [AvaloniaFact]
+    public void Ctrl_N_from_the_Lagemeldung_tab_goes_back_to_the_journal_and_focuses_VON()
+    {
+        var (window, _, vm) = ShowShell();
+        PressAndSettle(window, PhysicalKey.L, RawInputModifiers.Control);
+        window.AssertFocused(Named<Control>(window, "ReporterBox"));
+
+        PressAndSettle(window, PhysicalKey.N, RawInputModifiers.Control);
+
+        Assert.Equal(EtbTabsViewModel.JournalTab, vm.EtbTabs.SelectedTabIndex);
+        window.AssertFocused(Named<Control>(window, "FromBox"));
+    }
+
     [AvaloniaFact]
     public void A_module_shortcut_does_nothing_while_a_workspace_overlay_is_open()
     {

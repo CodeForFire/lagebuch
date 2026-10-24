@@ -168,6 +168,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [NotifyCanExecuteChangedFor(nameof(ContinueEditingCommand))]
     [NotifyCanExecuteChangedFor(nameof(EditIncidentDataCommand))]
     [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(OpenSituationReportCommand))]
     [NotifyPropertyChangedFor(nameof(OperatorDisplay))]
     private bool _isReadOnly;
 
@@ -242,6 +243,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // The create-task overlay behind an ETB row's button (#88); null while no dialog is open.
     [ObservableProperty]
     private TaskDialogViewModel? _pendingTaskDialog;
+
+    // The Buchstabier-Helfer opened from the ETB (#592); null while it is closed.
+    [ObservableProperty]
+    private SpellingHelperDialogViewModel? _pendingSpellingHelper;
 
     // The PDF section-selection overlay (#262); null while no export is in flight.
     [ObservableProperty]
@@ -426,7 +431,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
+        object?[] modules = [EtbTabs, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
         return modules.OfType<INarrowAware>();
     }
 
@@ -494,6 +499,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public ForcesViewModel Forces { get; private set; } = null!;
 
     public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
+
+    public SituationReportsViewModel SituationReports { get; private set; } = null!;
+
+    /// <summary>The ETB rail entry, which shows <see cref="Etb"/> and <see cref="SituationReports"/> as tabs.</summary>
+    public EtbTabsViewModel EtbTabs { get; private set; } = null!;
 
     public ScbaViewModel Scba { get; private set; } = null!;
 
@@ -610,7 +620,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             case ShortcutAction.PreviousModule:
                 return StepRail(-1);
             case ShortcutAction.NewEtbEntry:
-                if (!ShowNavItem(NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, Etb)), toStartField: true))
+                if (!ShowEtbTab(EtbTabsViewModel.JournalTab, toStartField: true))
                 {
                     return false;
                 }
@@ -623,6 +633,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 }
 
                 return true;
+            case ShortcutAction.OpenSituationReport:
+                return ShowSituationReport();
             case ShortcutAction.MostUrgentWarning:
                 return RunMostUrgentWarning();
             default:
@@ -632,7 +644,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private bool IsOverlayOpen =>
         PendingPrompt is not null || PendingConfirm is not null || PendingTaskDialog is not null
-        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null;
+        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null
+        || PendingSpellingHelper is not null;
 
     private bool StepRail(int step)
     {
@@ -881,6 +894,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Roles?.Dispose();
         Forces?.Dispose();
         InvolvedParties?.Dispose();
+        SituationReports?.Dispose();
         if (Scba is not null)
         {
             // Not covered by Dispose: the workspace owns this subscription, and an outgoing
@@ -920,6 +934,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // A Checkliste's key is shared by every list, so its label tells them apart.
         var reopen = SelectedNavItem is { } open ? (open.ModuleKey, open.Header) : default((string Key, string Header)?);
 
+        // The same goes for the tab the ETB had open.
+        var reopenEtbTab = EtbTabs is { } etbTabs ? etbTabs.SelectedTabIndex : EtbTabsViewModel.JournalTab;
+
         DisposeChildren();
 
         Etb = new EtbViewModel(
@@ -929,7 +946,22 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OnChanged,
             OpenTaskDialog,
             OfferReminderReset,
-            entryId => Tasks.RevealTasksFrom(entryId));
+            entryId => Tasks.RevealTasksFrom(entryId),
+            OpenSpellingHelper);
+
+        SituationReports = new SituationReportsViewModel(
+            _session,
+            OnChanged,
+            _masterData.Settings.DispatchCentreName,
+            (message, label, onConfirmed) => RequestConfirmAs("Lagemeldung", message, label, onConfirmed),
+            _masterData.RadioCallSigns,
+            _masterData.Streets
+                .Select(street => Formatting.Address(street.Name, street.District, null, street.PostalCode, street.Place))
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList());
+
+        EtbTabs = new EtbTabsViewModel(Etb, SituationReports, reopenEtbTab);
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
@@ -985,6 +1017,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(InvolvedParties));
+        OnPropertyChanged(nameof(SituationReports));
+        OnPropertyChanged(nameof(EtbTabs));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
@@ -1009,7 +1043,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     {
         var modules = new Dictionary<string, object>(StringComparer.Ordinal)
         {
-            [NavModules.Etb] = Etb,
+            [NavModules.Etb] = EtbTabs,
             [NavModules.Tasks] = Tasks,
             [NavModules.Roles] = Roles,
             [NavModules.Forces] = Forces,
@@ -1070,6 +1104,43 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     private void OnTasksRevealRequested(object? sender, EventArgs e) => ShowModule(Tasks);
 
+    // The ETB rail entry on one of its two tabs: Ctrl+N wants the journal, Ctrl+L the Lagemeldung,
+    // whichever the ETB had open last.
+    private bool ShowEtbTab(int tab, bool toStartField = false)
+    {
+        // Stryker disable all : NavigationLayout.Resolve always keeps the ETB in the rail, so this
+        // guard only covers the moment between two sessions, when the rail is empty.
+        if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, EtbTabs)) is not { } etb)
+        {
+            return false;
+        }
+
+        // Stryker restore all
+        EtbTabs.SelectedTabIndex = tab;
+        return ShowNavItem(etb, toStartField);
+    }
+
+    /// <summary>
+    /// Opens the Lagemeldung tab of the ETB (#592) on the newest draft, starting one when there is
+    /// none: from Ctrl+L, and from the Rückmeldung row the moment the ILS is due — the report is
+    /// what that row is asking for.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanWriteSituationReport))]
+    private void OpenSituationReport() => ShowSituationReport();
+
+    private bool CanWriteSituationReport => !IsReadOnly;
+
+    private bool ShowSituationReport()
+    {
+        if (IsReadOnly || !ShowEtbTab(EtbTabsViewModel.SituationReportTab, toStartField: true))
+        {
+            return false;
+        }
+
+        SituationReports.OpenNewestDraft();
+        return true;
+    }
+
     private void ShowModule(object module) =>
         ShowNavItem(NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, module)));
 
@@ -1100,9 +1171,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// its own ConfirmDialogViewModel wiring. The caller names what is removed in the title
     /// (#670), as every other confirm does.
     /// </summary>
-    private void RequestConfirm(string title, string message, Action onConfirmed)
+    private void RequestConfirm(string title, string message, Action onConfirmed) =>
+        RequestConfirmAs(title, message, "ENTFERNEN", onConfirmed);
+
+    /// <summary>The same guard with a button that says what happens, such as SENDEN (#592).</summary>
+    private void RequestConfirmAs(string title, string message, string confirmLabel, Action onConfirmed)
     {
-        var dialog = new ConfirmDialogViewModel(title, message, "ENTFERNEN", onConfirmed);
+        var dialog = new ConfirmDialogViewModel(title, message, confirmLabel, onConfirmed);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }
@@ -1228,6 +1303,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // Clear the overlay on either outcome; Save has already added the task on confirm.
         dialog.Closed += (_, _) => PendingTaskDialog = null;
         PendingTaskDialog = dialog;
+    }
+
+    /// <summary>Opens the Buchstabier-Helfer over the ETB (#592).</summary>
+    private void OpenSpellingHelper()
+    {
+        var dialog = new SpellingHelperDialogViewModel();
+        dialog.Closed += (_, _) => PendingSpellingHelper = null;
+        PendingSpellingHelper = dialog;
     }
 
     private void PerformClose()

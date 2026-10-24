@@ -91,15 +91,20 @@ public static class SyncProtocol
     /// and lists no Fahrzeugtelefon in its Kontakte, and a payload without it reads as no number,
     /// so the floor stays at 12.
     /// </para>
+    /// <para>
+    /// 16: the Lagemeldungen (#592) — <c>addSituationReport</c>, <c>updateSituationReport</c>,
+    /// <c>removeSituationReport</c> and <c>sendSituationReport</c> commands and the snapshot's
+    /// <c>situationReports</c>. A host at 15 would reject those commands, so the floor rises to 16.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 15;
+    public const int ProtocolVersion = 16;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 12;
+    public const int MinimumProtocolVersion = 16;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

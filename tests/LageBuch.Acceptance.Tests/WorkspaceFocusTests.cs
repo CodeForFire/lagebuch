@@ -117,6 +117,34 @@ public class WorkspaceFocusTests
         window.AssertFocused(Named<Control>(window, "VehicleBox"));
     }
 
+    // A module's own tabs (PR A's module-tabs) behave like rail tabs: a click asks for that tab.
+    [AvaloniaFact]
+    public void Clicking_the_etb_tabs_focuses_each_tab_s_first_field()
+    {
+        var (window, _, vm) = ShowWorkspace();
+        Click(window, RailTab(window, "ETB"));
+
+        Click(window, Named<TabItem>(window, "SituationReportTab"));
+        Assert.Equal(EtbTabsViewModel.SituationReportTab, vm.EtbTabs.SelectedTabIndex);
+        window.AssertFocused(Named<Control>(window, "NewReportButton"));
+
+        Click(window, Named<TabItem>(window, "JournalTab"));
+        Assert.Equal(EtbTabsViewModel.JournalTab, vm.EtbTabs.SelectedTabIndex);
+        window.AssertFocused(Named<Control>(window, "FromBox"));
+    }
+
+    [AvaloniaFact]
+    public void Clicking_the_lagemeldung_tab_on_an_open_draft_focuses_meldender()
+    {
+        var (window, _, vm) = ShowWorkspace();
+        vm.SituationReports.NewReportCommand.Execute(null);
+        Click(window, RailTab(window, "ETB"));
+
+        Click(window, Named<TabItem>(window, "SituationReportTab"));
+
+        window.AssertFocused(Named<Control>(window, "ReporterBox"));
+    }
+
     // Field test: the list a suggestion box used to open on focus covered the rows the
     // Lagebuchführer had switched to the module to read. It now stays closed, as KRÄFTE's ComboBox does.
     [AvaloniaTheory]
