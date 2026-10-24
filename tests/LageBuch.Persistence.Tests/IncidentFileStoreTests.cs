@@ -1,26 +1,49 @@
+using LageBuch.Domain;
+using LageBuch.Domain.Files;
+using LageBuch.Domain.Time;
+using LageBuch.Persistence.Sqlite;
+using Microsoft.Data.Sqlite;
+
 namespace LageBuch.Persistence.Tests;
 
 public class IncidentFileStoreTests : IDisposable
 {
+    private const string Stem = "20260622-0900-B";
+
     private readonly string _dir = Path.Join(Path.GetTempPath(), $"filestore-{Guid.NewGuid():N}");
     private readonly string _incidentPath;
     private readonly IncidentFileStore _store = new();
 
-    public IncidentFileStoreTests() =>
-        _incidentPath = Path.Join(_dir, "20260622-0900-B.lagebuch");
+    public IncidentFileStoreTests()
+    {
+        Directory.CreateDirectory(_dir);
+        _incidentPath = Path.Join(_dir, Stem + ".lagebuch");
+        IncidentRepository.Save(_incidentPath, NewIncident());
+    }
 
     public void Dispose()
     {
+        SqliteConnection.ClearAllPools();
         if (Directory.Exists(_dir))
         {
             Directory.Delete(_dir, recursive: true);
         }
     }
 
-    [Fact]
-    public async Task SaveBytesAsync_then_TryReadBytesAsync_round_trips()
+    private static Incident NewIncident() =>
+        Incident.Start(new FixedClock(), new SessionOperator("Test", null));
+
+    private int BlobRowCount()
     {
-        Directory.CreateDirectory(_dir);
+        using var cn = SqliteConnectionFactory.OpenReadOnly(_incidentPath);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM incident_file_blobs;";
+        return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    [Fact]
+    public async Task Saved_bytes_round_trip_through_the_incident_file()
+    {
         var bytes = new byte[] { 1, 2, 3, 4 };
 
         await _store.SaveBytesAsync(_incidentPath, "abc.jpg", bytes);
@@ -30,40 +53,137 @@ public class IncidentFileStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveBytesAsync_overwrites_an_existing_file_at_the_same_storage_name()
+    public async Task Saving_bytes_creates_no_files_folder_next_to_the_incident()
     {
-        // Idempotency matters once uploads can be retried (issue #167 P1 #2) — a repeat write for
-        // the same storage name must replace, not corrupt or duplicate, the on-disk content.
-        Directory.CreateDirectory(_dir);
+        await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 1 });
+
+        Assert.False(Directory.Exists(Path.Join(_dir, Stem + ".files")));
+    }
+
+    [Fact]
+    public async Task Saving_the_same_storage_name_twice_replaces_the_bytes()
+    {
         await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 1, 2, 3 });
 
         await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 9, 9 });
-        var read = await _store.TryReadBytesAsync(_incidentPath, "abc.jpg");
 
-        Assert.Equal(new byte[] { 9, 9 }, read);
+        Assert.Equal(new byte[] { 9, 9 }, await _store.TryReadBytesAsync(_incidentPath, "abc.jpg"));
+        Assert.Equal(1, BlobRowCount());
     }
 
     [Fact]
-    public async Task SaveBytesAsync_creates_a_sibling_files_folder_next_to_the_incident()
+    public async Task A_streamed_upload_without_a_known_length_lands_in_the_incident_file()
     {
-        Directory.CreateDirectory(_dir);
+        var bytes = new byte[300_000];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+        await using var source = new NonSeekableStream(bytes);
+
+        await _store.SaveStreamAsync(_incidentPath, "big.bin", source);
+
+        Assert.Equal(bytes, await _store.TryReadBytesAsync(_incidentPath, "big.bin"));
+    }
+
+    [Fact]
+    public async Task A_seekable_stream_is_stored_from_its_current_position()
+    {
+        using var source = new MemoryStream(new byte[] { 0, 0, 5, 6, 7 }) { Position = 2 };
+
+        await _store.SaveStreamAsync(_incidentPath, "s.bin", source);
+
+        Assert.Equal(new byte[] { 5, 6, 7 }, await _store.TryReadBytesAsync(_incidentPath, "s.bin"));
+    }
+
+    [Fact]
+    public async Task A_streamed_upload_over_the_size_cap_is_rejected_and_stores_nothing()
+    {
+        await using var source = new NonSeekableStream(new byte[IncidentFile.MaxSizeBytes + 1]);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => _store.SaveStreamAsync(_incidentPath, "huge.bin", source));
+
+        Assert.Equal(0, BlobRowCount());
+    }
+
+    [Fact]
+    public async Task An_incident_save_does_not_drop_stored_attachment_bytes()
+    {
+        await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 4, 2 });
+
+        var incident = NewIncident();
+        IncidentRepository.Save(_incidentPath, incident);
+        IncidentRepository.Save(_incidentPath, incident);
+
+        Assert.Equal(new byte[] { 4, 2 }, await _store.TryReadBytesAsync(_incidentPath, "abc.jpg"));
+    }
+
+    [Fact]
+    public async Task Deleting_bytes_removes_their_row()
+    {
         await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 1 });
 
-        var expectedFolder = Path.Join(_dir, "20260622-0900-B.files");
-        Assert.True(Directory.Exists(expectedFolder));
-        Assert.True(File.Exists(Path.Join(expectedFolder, "abc.jpg")));
+        await _store.DeleteBytesAsync(_incidentPath, "abc.jpg");
+
+        Assert.Null(await _store.TryReadBytesAsync(_incidentPath, "abc.jpg"));
+        Assert.Equal(0, BlobRowCount());
     }
 
     [Fact]
-    public async Task TryReadBytesAsync_returns_null_for_a_file_that_was_never_written()
+    public async Task Deleted_attachment_bytes_are_not_left_in_the_incident_file()
+    {
+        var marker = System.Text.Encoding.ASCII.GetBytes("LAGEBUCH-SECRET-");
+        var payload = new byte[marker.Length * 4096];
+        for (var i = 0; i < 4096; i++)
+        {
+            marker.CopyTo(payload, i * marker.Length);
+        }
+
+        await _store.SaveBytesAsync(_incidentPath, "secret.bin", payload);
+        await _store.DeleteBytesAsync(_incidentPath, "secret.bin");
+
+        Assert.Equal(-1, (await File.ReadAllBytesAsync(_incidentPath)).AsSpan().IndexOf(marker));
+        var wal = _incidentPath + "-wal";
+        if (File.Exists(wal))
+        {
+            Assert.Equal(-1, (await File.ReadAllBytesAsync(wal)).AsSpan().IndexOf(marker));
+        }
+    }
+
+    [Fact]
+    public async Task A_file_stamped_current_without_the_blob_table_still_accepts_bytes()
+    {
+        await using (var cn = SqliteConnectionFactory.OpenExisting(_incidentPath))
+        await using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "DROP TABLE incident_file_blobs;";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 3 });
+
+        Assert.Equal(new byte[] { 3 }, await _store.TryReadBytesAsync(_incidentPath, "abc.jpg"));
+    }
+
+    [Fact]
+    public async Task Reading_bytes_that_were_never_written_returns_null()
     {
         Assert.Null(await _store.TryReadBytesAsync(_incidentPath, "missing.jpg"));
     }
 
     [Fact]
-    public async Task TryReadBytesAsync_returns_null_rather_than_throwing_when_the_folder_does_not_exist()
+    public async Task Reading_from_a_missing_incident_file_returns_null_rather_than_throwing()
     {
-        // _dir is deliberately never created here — degrades quietly, like TryReadState.
-        Assert.Null(await _store.TryReadBytesAsync(_incidentPath, "abc.jpg"));
+        var missing = Path.Join(_dir, "nope.lagebuch");
+
+        Assert.Null(await _store.TryReadBytesAsync(missing, "abc.jpg"));
+        Assert.False(File.Exists(missing));
+    }
+
+    private sealed class FixedClock : IClock
+    {
+        public DateTimeOffset Now { get; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class NonSeekableStream(byte[] bytes) : MemoryStream(bytes)
+    {
+        public override bool CanSeek => false;
     }
 }

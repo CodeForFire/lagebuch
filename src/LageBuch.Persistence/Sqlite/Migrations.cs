@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 30;
+    public const int CurrentVersion = 31;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -205,6 +205,11 @@ public static class Migrations
         if (version < 30)
         {
             ApplyV30(cn, tx);
+        }
+
+        if (version < 31)
+        {
+            ApplyV31(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -905,6 +910,11 @@ public static class Migrations
             """;
         Exec(cn, tx, sql30);
     }
+
+    // The attachment bytes move into the Einsatzdatei: one row per stored file, outside the tables
+    // IncidentRepository rewrites on save.
+    private static void ApplyV31(SqliteConnection cn, SqliteTransaction tx) =>
+        IncidentFileBlobs.EnsureTable(cn, tx);
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

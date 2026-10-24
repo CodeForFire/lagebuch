@@ -1,103 +1,150 @@
 using System.Diagnostics.CodeAnalysis;
+using LageBuch.Domain.Files;
+using LageBuch.Persistence.Sqlite;
 
 namespace LageBuch.Persistence;
 
 /// <summary>
-/// Stores an attached file's bytes on disk in a sibling folder next to its <c>.lagebuch</c>
-/// file, keeping large binary content out of <see cref="IncidentRepository"/>'s full-rewrite-
-/// per-save SQLite tables. Only the metadata row (see <c>incident_files</c>) lives in SQLite.
+/// Stores an attached file's bytes inside the incident's own SQLite file, in
+/// <c>incident_file_blobs</c>. That table sits outside the full rewrite
+/// <see cref="IncidentRepository"/> does per save, so a save never moves attachment bytes; only
+/// the metadata row (see <c>incident_files</c>) is rewritten.
 /// </summary>
 public interface IIncidentFileStore
 {
     Task SaveBytesAsync(string incidentPath, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Writes <paramref name="source"/> straight to disk without ever materializing the whole
-    /// attachment in memory (issue #167 P1 #2) — used for a joined client's upload, whose bytes arrive
-    /// as a raw HTTP request body rather than a JSON-decoded <c>byte[]</c>.
+    /// Stores <paramref name="source"/> without ever materializing the whole attachment in memory
+    /// (issue #167 P1 #2) -- used for a joined client's upload, whose bytes arrive as a raw HTTP
+    /// request body rather than a JSON-decoded <c>byte[]</c>. A stream over
+    /// <see cref="IncidentFile.MaxSizeBytes"/> is rejected with <see cref="InvalidDataException"/>.
     /// </summary>
     Task SaveStreamAsync(string incidentPath, string storageFileName, Stream source, CancellationToken cancellationToken = default);
 
-    /// <summary>Null on any failure (missing file, unreadable folder) — never throws, so a
+    /// <summary>Null on any failure (missing file, missing row) -- never throws, so a
     /// caller degrades quietly, matching <see cref="IncidentRepository.TryReadState"/>.</summary>
     Task<byte[]?> TryReadBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default);
 
-    /// <summary>The real path on disk, for APIs that require a file path rather than bytes
-    /// (QuestPDF's <c>DocumentOperation</c>). Does not guarantee the file exists.</summary>
+    /// <summary>The legacy sibling-folder path of the file. Bytes now live in the incident file;
+    /// this stays only until its last caller moves to <see cref="TryReadBytesAsync"/>.</summary>
     string ResolveDiskPath(string incidentPath, string storageFileName);
 
     /// <summary>
-    /// Best-effort: swallows any I/O failure (missing file, unreadable folder) rather than
-    /// throwing. An orphaned blob left on disk is an acceptable degradation -- it must never block
-    /// the metadata removal (<see cref="LageBuch.Domain.Incident.RemoveFile"/>) that already happened.
+    /// Removes the row and overwrites its pages (<c>secure_delete</c>), so a deleted photo is not
+    /// left readable inside a file that gets handed on. A failure propagates: the caller removing
+    /// the metadata must know the bytes are still there.
     /// </summary>
     Task DeleteBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default);
 }
 
 public sealed class IncidentFileStore : IIncidentFileStore
 {
-    public async Task SaveBytesAsync(string incidentPath, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
+    private const int CopyBufferSize = 81920;
+
+    public Task SaveBytesAsync(string incidentPath, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
     {
-        var folder = FolderFor(incidentPath);
-        Directory.CreateDirectory(folder);
-        await File.WriteAllBytesAsync(Path.Join(folder, storageFileName), bytes, cancellationToken);
+        ArgumentNullException.ThrowIfNull(bytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        using var source = new MemoryStream(bytes, writable: false);
+        Store(incidentPath, storageFileName, source, bytes.Length);
+        return Task.CompletedTask;
     }
 
     public async Task SaveStreamAsync(string incidentPath, string storageFileName, Stream source, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
-        var folder = FolderFor(incidentPath);
-        Directory.CreateDirectory(folder);
-        var path = Path.Join(folder, storageFileName);
-
-        // Write to a sibling temp file first and move it into place only once the whole upload has
-        // landed, so a same-id retry after a dropped connection can never leave a half-written file
-        // at the real path (idempotent — the final Move overwrites any previous complete upload).
-        var tempPath = path + ".upload";
-        await using (var fileStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 81920, useAsync: true))
+        if (source.CanSeek)
         {
-            await source.CopyToAsync(fileStream, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            Store(incidentPath, storageFileName, source, source.Length - source.Position);
+            return;
         }
 
-        File.Move(tempPath, path, overwrite: true);
+        // The length is unknown until the body ends and SQLite needs it up front for the zeroblob,
+        // so spool to a temp file that vanishes on close. Memory stays at the copy buffer.
+        await using var spool = new FileStream(
+            Path.Join(Path.GetTempPath(), $"lagebuch-upload-{Guid.NewGuid():N}.tmp"),
+            FileMode.CreateNew,
+            FileAccess.ReadWrite,
+            FileShare.None,
+            CopyBufferSize,
+            FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+        var buffer = new byte[CopyBufferSize];
+        int read;
+        while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            if (spool.Length + read > IncidentFile.MaxSizeBytes)
+            {
+                throw new InvalidDataException(IncidentFile.TooLargeMessage);
+            }
+
+            await spool.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        spool.Position = 0;
+        Store(incidentPath, storageFileName, spool, spool.Length);
     }
 
     [SuppressMessage(
         "Design",
         "CA1031",
         Justification = "Try-read: an unreadable attachment degrades to null, never fails incident load.")]
-    public async Task<byte[]?> TryReadBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
+    public Task<byte[]?> TryReadBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
     {
         try
         {
-            var path = ResolveDiskPath(incidentPath, storageFileName);
-            return File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken) : null;
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(Read(incidentPath, storageFileName));
         }
         catch
         {
-            return null;
+            return Task.FromResult<byte[]?>(null);
         }
     }
 
     public string ResolveDiskPath(string incidentPath, string storageFileName) =>
         Path.Join(FolderFor(incidentPath), storageFileName);
 
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Best-effort delete: an orphaned blob on disk is an acceptable degradation, never blocking the metadata removal that already happened.")]
     public Task DeleteBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
     {
-        try
+        cancellationToken.ThrowIfCancellationRequested();
+        Remove(incidentPath, storageFileName);
+        return Task.CompletedTask;
+    }
+
+    private static byte[]? Read(string incidentPath, string storageFileName)
+    {
+        using var cn = SqliteConnectionFactory.OpenReadOnly(incidentPath);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT bytes FROM " + IncidentFileBlobs.Table + " WHERE storage_name = $name;";
+        cmd.Parameters.AddWithValue("$name", storageFileName);
+        return cmd.ExecuteScalar() as byte[];
+    }
+
+    private static void Remove(string incidentPath, string storageFileName)
+    {
+        using var cn = SqliteConnectionFactory.OpenExisting(incidentPath);
+        IncidentFileBlobs.EnsureTable(cn, null);
+        using (var pragma = cn.CreateCommand())
         {
-            File.Delete(ResolveDiskPath(incidentPath, storageFileName));
-        }
-        catch
-        {
-            // Swallow -- see the doc comment on IIncidentFileStore.DeleteBytesAsync.
+            pragma.CommandText = "PRAGMA secure_delete = ON;";
+            pragma.ExecuteNonQuery();
         }
 
-        return Task.CompletedTask;
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "DELETE FROM " + IncidentFileBlobs.Table + " WHERE storage_name = $name;";
+        cmd.Parameters.AddWithValue("$name", storageFileName);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void Store(string incidentPath, string storageFileName, Stream source, long length)
+    {
+        using var cn = SqliteConnectionFactory.OpenExisting(incidentPath);
+        IncidentFileBlobs.EnsureTable(cn, null);
+        using var tx = cn.BeginTransaction();
+        IncidentFileBlobs.Write(cn, tx, storageFileName, source, length);
+        tx.Commit();
     }
 
     private static string FolderFor(string incidentPath)
