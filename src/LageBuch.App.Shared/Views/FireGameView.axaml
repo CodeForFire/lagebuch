@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.FireGameView"
+             x:DataType="vm:FireGameViewModel">
+  <UserControl.Styles>
+    <!-- A window of the house front. The colour is set on the template's presenter in every state,
+         pointerover included, so hovering a burning window on a desktop does not paint it dark. -->
+    <Style Selector="Button.firewindow">
+      <Setter Property="Height" Value="60" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Foreground" Value="{StaticResource AmberInkBrush}" />
+    </Style>
+    <Style Selector="Button.firewindow /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#0E131B" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    </Style>
+    <Style Selector="Button.firewindow.small /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource AmberBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <Style Selector="Button.firewindow.medium /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SignalHotBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SignalHotBrush}" />
+    </Style>
+    <Style Selector="Button.firewindow.large /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SignalGradientBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SignalHotBrush}" />
+    </Style>
+    <Style Selector="Button.firewindow PathIcon">
+      <Setter Property="IsVisible" Value="False" />
+      <Setter Property="Foreground" Value="#FFF4D6" />
+    </Style>
+    <Style Selector="Button.firewindow.small PathIcon">
+      <Setter Property="IsVisible" Value="True" />
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="Foreground" Value="{StaticResource AmberInkBrush}" />
+    </Style>
+    <Style Selector="Button.firewindow.medium PathIcon">
+      <Setter Property="IsVisible" Value="True" />
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+    </Style>
+    <Style Selector="Button.firewindow.large PathIcon">
+      <Setter Property="IsVisible" Value="True" />
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="38" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- The easter egg behind the Über card's logo. Sized like the About card: MaxWidth and
+       Stretch, so it shrinks on a phone instead of clipping. -->
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CloseCommand}" b:Overlay.InitialFocus="{Binding #StartButton}">
+    <Border MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="26,22,26,24" Spacing="12">
+            <TextBlock Text="LÖSCHANGRIFF" Classes="overline" />
+
+            <Grid ColumnDefinitions="*,*,*">
+              <StackPanel Grid.Column="0" Spacing="1">
+                <TextBlock Text="PUNKTE" Classes="overline" FontSize="10" />
+                <TextBlock x:Name="ScoreText" Classes="mono" FontSize="20" Text="{Binding Score}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="1">
+                <TextBlock Text="ZEIT" Classes="overline" FontSize="10" />
+                <TextBlock x:Name="TimeText" Classes="mono" FontSize="20" Text="{Binding RemainingSeconds, StringFormat='{}{0} s'}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="1">
+                <TextBlock Text="BESTWERT" Classes="overline" FontSize="10" />
+                <TextBlock x:Name="BestText" Classes="mono" FontSize="20" Text="{Binding BestScore}" />
+              </StackPanel>
+            </Grid>
+
+            <!-- The house front: three windows wide, four floors high. -->
+            <Border Background="{StaticResource SurfaceTopBrush}" CornerRadius="6" Padding="10"
+                    BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1">
+              <ItemsControl x:Name="HouseFront" ItemsSource="{Binding Windows}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <UniformGrid Columns="3" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FireWindowViewModel">
+                    <Button Classes="firewindow" Margin="5"
+                            Classes.small="{Binding IsSmall}" Classes.medium="{Binding IsMedium}"
+                            Classes.large="{Binding IsLarge}"
+                            Command="{Binding ExtinguishCommand}"
+                            AutomationProperties.Name="{Binding AccessibleName}">
+                      <PathIcon Data="M13.5 0.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z" />
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+
+            <StackPanel x:Name="IdlePanel" Spacing="10" IsVisible="{Binding IsIdle}">
+              <TextBlock x:Name="ResultText" Text="{Binding ResultText}" TextWrapping="Wrap"
+                         FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                         IsVisible="{Binding IsOver}" />
+              <TextBlock Classes="secondary" TextWrapping="Wrap"
+                         Text="Brennende Fenster antippen. Früh gelöscht zählt mehr. Sechs Brände zugleich sind Vollbrand." />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
+              <Button x:Name="StartButton" Classes="signal" Content="LOS" Command="{Binding StartCommand}"
+                      IsVisible="{Binding IsIdle}" />
+              <Button x:Name="CloseButton" Content="SCHLIESSEN" Command="{Binding CloseCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

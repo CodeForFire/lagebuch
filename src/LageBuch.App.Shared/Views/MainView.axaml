@@ -158,5 +158,7 @@
                     IsVisible="{Binding PendingAbout, Converter={x:Static ObjectConverters.IsNotNull}}" />
     <ContentControl Content="{Binding PendingShortcutOverview}"
                     IsVisible="{Binding PendingShortcutOverview, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <ContentControl Content="{Binding PendingFireGame}"
+                    IsVisible="{Binding PendingFireGame, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>

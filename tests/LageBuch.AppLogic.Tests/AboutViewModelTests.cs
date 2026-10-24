@@ -170,6 +170,77 @@ public class AboutViewModelTests
         Assert.False(vm.TestSoundCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void Seven_quick_logo_taps_request_the_easter_egg()
+    {
+        var time = new ManualTimeProvider();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", time: time);
+        var requests = 0;
+        vm.EasterEggRequested += (_, _) => requests++;
+
+        for (var i = 0; i < 6; i++)
+        {
+            vm.BadgeTappedCommand.Execute(null);
+            time.Advance(TimeSpan.FromMilliseconds(400));
+        }
+
+        Assert.Equal(0, requests);
+        vm.BadgeTappedCommand.Execute(null);
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
+    public void Seven_taps_spread_over_exactly_three_seconds_still_count()
+    {
+        var time = new ManualTimeProvider();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", time: time);
+        var requests = 0;
+        vm.EasterEggRequested += (_, _) => requests++;
+
+        for (var i = 0; i < 7; i++)
+        {
+            vm.BadgeTappedCommand.Execute(null);
+            time.Advance(TimeSpan.FromMilliseconds(500));
+        }
+
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
+    public void An_eighth_tap_starts_counting_again()
+    {
+        var time = new ManualTimeProvider();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", time: time);
+        var requests = 0;
+        vm.EasterEggRequested += (_, _) => requests++;
+
+        for (var i = 0; i < 13; i++)
+        {
+            vm.BadgeTappedCommand.Execute(null);
+        }
+
+        Assert.Equal(1, requests);
+        vm.BadgeTappedCommand.Execute(null);
+        Assert.Equal(2, requests);
+    }
+
+    [Fact]
+    public void Slow_logo_taps_do_not_request_the_easter_egg()
+    {
+        var time = new ManualTimeProvider();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", time: time);
+        var requests = 0;
+        vm.EasterEggRequested += (_, _) => requests++;
+
+        for (var i = 0; i < 20; i++)
+        {
+            vm.BadgeTappedCommand.Execute(null);
+            time.Advance(TimeSpan.FromMilliseconds(600));
+        }
+
+        Assert.Equal(0, requests);
+    }
+
     private sealed class ThrowingUrlDialogs : IFileDialogService
     {
         public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>(null);

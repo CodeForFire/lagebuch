@@ -31,10 +31,31 @@
                  slogan and the repository URL, so repeating any of them as text beside it would
                  just say the same thing twice. The command bar keeps the flame + wordmark pair —
                  that is the application's mark; this is the project's. -->
-            <Image x:Name="BrandBadge"
-                   Source="avares://LageBuch.App.Shared/Assets/lagebuch-logo.png"
-                   Width="340" Height="340" Stretch="Uniform"
-                   HorizontalAlignment="Center" Margin="0,2,0,0" />
+            <!-- The badge is also a button, styled to look like none: seven quick taps open the
+                 easter egg. Not focusable, so Tab still starts at the card's real controls. -->
+            <Button x:Name="BrandBadgeButton" Classes="badge-tap" Focusable="False"
+                    HorizontalAlignment="Center" Margin="0,2,0,0"
+                    Command="{Binding BadgeTappedCommand}"
+                    AutomationProperties.Name="Lagebuch-Logo">
+              <Button.Styles>
+                <Style Selector="Button.badge-tap">
+                  <Setter Property="Height" Value="NaN" />
+                  <Setter Property="Padding" Value="0" />
+                  <Setter Property="Background" Value="Transparent" />
+                  <Setter Property="BorderThickness" Value="0" />
+                  <Setter Property="Cursor" Value="Arrow" />
+                </Style>
+                <Style Selector="Button.badge-tap:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="Transparent" />
+                </Style>
+                <Style Selector="Button.badge-tap:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                  <Setter Property="Background" Value="Transparent" />
+                </Style>
+              </Button.Styles>
+              <Image x:Name="BrandBadge"
+                     Source="avares://LageBuch.App.Shared/Assets/lagebuch-logo.png"
+                     Width="340" Height="340" Stretch="Uniform" />
+            </Button>
 
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
               <TextBlock Text="VERSION" Classes="overline" FontSize="10" VerticalAlignment="Center" />

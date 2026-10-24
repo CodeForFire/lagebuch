@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
+using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
@@ -19,6 +20,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly string _appVersion;
     private readonly IAlarmService? _alarm;
     private readonly AlarmMute? _alarmMute;
+    private readonly IUiDispatcher? _uiDispatcher;
     private PendingAction _pending = PendingAction.None;
 
     // Set by CancelJoin() and consumed by ConfirmOperatorAsync (#196): a cancelled join leaves
@@ -27,7 +29,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // user-requested and must keep the dialog open, rather than closing it as if the join had won.
     private bool _joinCancelledByUser;
 
-    public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor, IFileDialogService dialogs, string appVersion, IAlarmService? alarm = null, AlarmMute? alarmMute = null)
+    public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor, IFileDialogService dialogs, string appVersion, IAlarmService? alarm = null, AlarmMute? alarmMute = null, IUiDispatcher? uiDispatcher = null)
     {
         _home = home;
         _editor = editor;
@@ -35,6 +37,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _appVersion = appVersion;
         _alarm = alarm;
         _alarmMute = alarmMute;
+        _uiDispatcher = uiDispatcher;
         _home.WorkspaceOpened = ShowWorkspace;
         _home.ReconnectRequested = () => RequestJoinDeviceCommand.Execute(null);
         _currentView = home;
@@ -88,6 +91,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private ShortcutOverviewViewModel? _pendingShortcutOverview;
+
+    [ObservableProperty]
+    private FireGameViewModel? _pendingFireGame;
 
     // Every path that leaves the editor or an open workspace goes through here. Unsaved Stammdaten
     // edits prompt first. Leaving an open, editable incident asks first (#463) -- a stray tap on the
@@ -330,7 +336,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var about = new AboutViewModel(_dialogs, _appVersion, _alarm, _alarmMute);
         about.Closed += (_, _) => PendingAbout = null;
+        about.EasterEggRequested += (_, _) => ShowFireGame();
         PendingAbout = about;
+    }
+
+    // The easter egg replaces the About card rather than stacking on it, so Esc leaves the game
+    // straight back to wherever the Lagebuchführer was.
+    private void ShowFireGame()
+    {
+        PendingAbout = null;
+        var game = new FireGameViewModel(TimeProvider.System, Random.Shared, _uiDispatcher);
+        game.Closed += (_, _) => PendingFireGame = null;
+        PendingFireGame = game;
     }
 
     // Like About: an overlay over whatever is current, navigating nowhere (#544).
@@ -352,7 +369,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(chord);
         if (PendingPrompt is not null || PendingAbout is not null || PendingShortcutOverview is not null
-            || _editor.PendingConfirm is not null || ShortcutRegistry.Find(chord) is not { } shortcut)
+            || PendingFireGame is not null || _editor.PendingConfirm is not null || ShortcutRegistry.Find(chord) is not { } shortcut)
         {
             return false;
         }

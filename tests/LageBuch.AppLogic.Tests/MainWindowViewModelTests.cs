@@ -627,6 +627,39 @@ public class MainWindowViewModelTests
 
         Assert.Null(vm.PendingAbout);
     }
+
+    [Fact]
+    public void The_easter_egg_closes_About_and_opens_the_game_which_its_close_removes()
+    {
+        var vm = New();
+        vm.ShowAboutCommand.Execute(null);
+
+        for (var i = 0; i < 7; i++)
+        {
+            vm.PendingAbout!.BadgeTappedCommand.Execute(null);
+        }
+
+        Assert.Null(vm.PendingAbout);
+        var game = Assert.IsType<FireGameViewModel>(vm.PendingFireGame);
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+
+        game.CloseCommand.Execute(null);
+        Assert.Null(vm.PendingFireGame);
+    }
+
+    [Fact]
+    public void No_shortcut_runs_while_the_game_is_open()
+    {
+        var vm = New();
+        vm.ShowAboutCommand.Execute(null);
+        for (var i = 0; i < 7; i++)
+        {
+            vm.PendingAbout!.BadgeTappedCommand.Execute(null);
+        }
+
+        Assert.False(vm.TryRunShortcut(new KeyChord(ShortcutKey.F1)));
+        Assert.Null(vm.PendingShortcutOverview);
+    }
 }
 
 // NoFiles/OpenPathDialogs/MvFakeMasterData are specific to these tests and either don't exist, or

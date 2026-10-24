@@ -57,6 +57,7 @@ public class OverlayContractTests
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
         new("Main.About", typeof(MainWindowViewModel), typeof(AboutViewModel), OpenMainAbout),
         new("Main.ShortcutOverview", typeof(MainWindowViewModel), typeof(ShortcutOverviewViewModel), OpenMainShortcutOverview),
+        new("Main.FireGame", typeof(MainWindowViewModel), typeof(FireGameViewModel), OpenMainFireGame),
         new("MasterDataEditor.Confirm", typeof(MasterDataEditorViewModel), typeof(ConfirmDialogViewModel), OpenMasterDataEditorConfirm),
     ];
 
@@ -473,6 +474,21 @@ public class OverlayContractTests
         var opener = Named<Button>(window, "ShortcutsButton");
         Activate(opener);
         return new(window, opener, ViewOf<ShortcutOverviewView>(window), () => vm.PendingShortcutOverview is null, () => vm.PendingShortcutOverview?.CloseCommand.Execute(null));
+    }
+
+    // The easter egg replaces the About card, so focus has to find its way back to ÜBER.
+    private static Opened OpenMainFireGame()
+    {
+        var (window, vm) = ShowMain();
+        var opener = Named<Button>(window, "AboutButton");
+        Activate(opener);
+        for (var i = 0; i < 7; i++)
+        {
+            vm.PendingAbout?.BadgeTappedCommand.Execute(null);
+        }
+
+        Dispatcher.UIThread.RunJobs();
+        return new(window, opener, ViewOf<FireGameView>(window), () => vm.PendingFireGame is null, () => vm.PendingFireGame?.CloseCommand.Execute(null));
     }
 
     private static Opened OpenMasterDataEditorConfirm()
