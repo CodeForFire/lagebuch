@@ -22,6 +22,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     private readonly Action _onChanged;
     private readonly Action<string, string, Action> _requestConfirm;
     private readonly string _dispatchCentreName;
+    private readonly IReadOnlyList<string> _addresses;
 
     // The selected report as last read from or written to the incident. A change arriving from
     // elsewhere is told apart from this device's own unsaved typing by comparing against it.
@@ -40,11 +41,17 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     /// Asks the host to confirm before running the action: message, button label, action. Defaults
     /// to running it immediately, so tests that do not care need not supply one.
     /// </param>
+    /// <param name="callSigns">The Stammdaten Funkrufnamen offered for Meldender, as the ETB offers
+    /// them for VON and AN; none when omitted.</param>
+    /// <param name="addresses">The Stammdaten Straßen, each written as an address, offered for the
+    /// Einsatzstelle after the Einsatz's own address; none when omitted.</param>
     public SituationReportsViewModel(
         IIncidentSession session,
         Action onChanged,
         string dispatchCentreName,
-        Action<string, string, Action>? requestConfirm = null)
+        Action<string, string, Action>? requestConfirm = null,
+        IReadOnlyList<string>? callSigns = null,
+        IReadOnlyList<string>? addresses = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -54,6 +61,8 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         _dispatchCentreName = dispatchCentreName;
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         IsReadOnly = session.IsReadOnly;
+        CallSignOptions = callSigns ?? [];
+        _addresses = addresses ?? [];
         Reports = new ObservableCollection<SituationReportRow>();
         RebuildRows();
 
@@ -72,6 +81,18 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     public ObservableCollection<SituationReportRow> Reports { get; }
 
     public bool HasReports => Reports.Count > 0;
+
+    /// <summary>The Funkrufnamen Meldender suggests; a name outside them can still be typed.</summary>
+    public IReadOnlyList<string> CallSignOptions { get; }
+
+    /// <summary>
+    /// What the Einsatzstelle suggests: the address in the Einsatzdaten first, as it stands now,
+    /// then the Stammdaten Straßen. Free text can still be typed.
+    /// </summary>
+    public IReadOnlyList<string> LocationOptions =>
+        Formatting.Address(_session.Incident) is { } own
+            ? [own, .. _addresses.Where(a => !string.Equals(a, own, StringComparison.Ordinal))]
+            : _addresses;
 
     public SpellingHelperViewModel Helper { get; } = new();
 
@@ -197,7 +218,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         _draftsBeforeAdd = incident.SituationReports.Where(r => !r.IsSent).Select(r => r.Id).ToHashSet();
         Write(() => _session.AddSituationReport(
             _session.Operator?.CallSign,
-            Formatting.Address(incident.Street, incident.District),
+            Formatting.Address(incident),
             null,
             null,
             DescribeUnits(incident.Forces),
@@ -399,6 +420,9 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         }
 
         Load(SelectedReport is { } selected ? Find(selected.Id) : null);
+
+        // The Einsatzdaten may have changed the address the suggestions start with.
+        OnPropertyChanged(nameof(LocationOptions));
     }
 
     private void RebuildRows()

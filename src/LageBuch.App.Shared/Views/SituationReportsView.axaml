@@ -127,19 +127,25 @@
                      IsVisible="{Binding SentInfo, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
 
-        <HeaderedContentControl Classes="field" Header="MELDENDER">
-          <!-- Where the tab starts (WorkspaceFocus): the open report's first field, else NEUE
-               LAGEMELDUNG above. -->
-          <TextBox x:Name="ReporterBox" Text="{Binding Reporter}" IsReadOnly="{Binding !IsEditable}"
-                   b:WorkspaceFocus.IsStart="True"
-                   MaxLength="{x:Static vm:SituationReportsViewModel.MaxReporterLength}" />
+        <!-- Where the tab starts (WorkspaceFocus): the open report's first field, else NEUE
+             LAGEMELDUNG above. The Stammdaten Funkrufnamen as suggestions, as on the ETB's VON;
+             a name outside them stays enterable, so an AutoCompleteBox rather than a ComboBox. It
+             has no IsReadOnly, so a sent report disables it instead. -->
+        <HeaderedContentControl Classes="field suggest" Header="MELDENDER">
+          <AutoCompleteBox x:Name="ReporterBox" Text="{Binding Reporter}" IsEnabled="{Binding IsEditable}"
+                           ItemsSource="{Binding CallSignOptions}"
+                           FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                           b:WorkspaceFocus.IsStart="True"
+                           MaxLength="{x:Static vm:SituationReportsViewModel.MaxReporterLength}" />
         </HeaderedContentControl>
 
-        <HeaderedContentControl Classes="field" Header="EINSATZSTELLE">
+        <!-- The Einsatzdaten address first, then the Stammdaten Straßen; free text stays enterable. -->
+        <HeaderedContentControl Classes="field suggest" Header="EINSATZSTELLE">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-            <TextBox Grid.Column="0" x:Name="LocationBox" Text="{Binding Location}" IsReadOnly="{Binding !IsEditable}"
-                     TextWrapping="Wrap"
-                     MaxLength="{x:Static vm:SituationReportsViewModel.MaxLocationLength}" />
+            <AutoCompleteBox Grid.Column="0" x:Name="LocationBox" Text="{Binding Location}" IsEnabled="{Binding IsEditable}"
+                             ItemsSource="{Binding LocationOptions}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             MaxLength="{x:Static vm:SituationReportsViewModel.MaxLocationLength}" />
             <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Top"
                     ToolTip.Tip="Einsatzstelle buchstabieren" AutomationProperties.Name="Einsatzstelle buchstabieren"
                     Command="{Binding SpellFieldCommand}" CommandParameter="{Binding Location}" />

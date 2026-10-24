@@ -29,7 +29,7 @@ public class SituationReportsViewModelTests
     public void A_new_report_is_prefilled_from_the_funkrufname_the_address_and_the_kraefte()
     {
         var (session, _) = NewSession();
-        session.SetAddress("Blumenstraße 13", "Nord");
+        session.SetAddress("Blumenstraße", "Nord", "13", "12345", "Musterstadt");
         session.AddForceUnit("FF Musterstadt", 9, callSign: "HLF 1", officerCount: 1);
         session.AddForceUnit("FF Beispieldorf", 6, officerCount: 1);
         using var vm = NewVm(session);
@@ -39,10 +39,50 @@ public class SituationReportsViewModelTests
         Assert.Equal("Entwurf", Assert.Single(vm.Reports).Title);
         Assert.Same(vm.Reports[0], vm.SelectedReport);
         Assert.Equal("Florian Musterstadt 11/1", vm.Reporter);
-        Assert.Equal("Blumenstraße 13, Nord", vm.Location);
+        Assert.Equal("Blumenstraße 13, Nord, 12345 Musterstadt", vm.Location);
         Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9, FF Beispieldorf 0/1/5/6", vm.Units);
         Assert.Null(vm.Situation);
         Assert.True(vm.IsEditable);
+    }
+
+    [Fact]
+    public void Meldender_suggests_the_stammdaten_funkrufnamen()
+    {
+        var (session, _) = NewSession();
+        string[] callSigns = ["Florian Musterstadt 11/1", "Florian Musterstadt 40/1"];
+
+        using var vm = new SituationReportsViewModel(session, () => { }, "ILS", callSigns: callSigns);
+
+        Assert.Equal(callSigns, vm.CallSignOptions);
+    }
+
+    [Fact]
+    public void Einsatzstelle_suggests_the_einsatzdaten_address_first_then_the_stammdaten_strassen()
+    {
+        var (session, _) = NewSession();
+        session.SetAddress("Blumenstraße", "Nord", "13", "12345", "Musterstadt");
+        string[] streets = ["Am Markt, 12345 Musterstadt", "Blumenstraße 13, Nord, 12345 Musterstadt", "Lindenweg, Süd, 12345 Musterstadt"];
+
+        using var vm = new SituationReportsViewModel(session, () => { }, "ILS", addresses: streets);
+
+        Assert.Equal(
+            ["Blumenstraße 13, Nord, 12345 Musterstadt", "Am Markt, 12345 Musterstadt", "Lindenweg, Süd, 12345 Musterstadt"],
+            vm.LocationOptions);
+    }
+
+    [Fact]
+    public void Einsatzstelle_follows_a_change_of_the_einsatzdaten_address()
+    {
+        var (session, _) = NewSession();
+        using var vm = new SituationReportsViewModel(session, () => { }, "ILS", addresses: ["Am Markt, 12345 Musterstadt"]);
+        Assert.Equal(["Am Markt, 12345 Musterstadt"], vm.LocationOptions);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        session.SetAddress("Lindenweg", "Süd", "4", "12345", "Musterstadt");
+
+        Assert.Contains(nameof(SituationReportsViewModel.LocationOptions), raised);
+        Assert.Equal("Lindenweg 4, Süd, 12345 Musterstadt", vm.LocationOptions[0]);
     }
 
     [Fact]

@@ -29,7 +29,7 @@ public class SituationReportsTabRenderTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        session.SetAddress("Blumenstraße 13", "Musterstadt-Nord");
+        session.SetAddress("Blumenstraße", "Musterstadt-Nord", "13", "12345", "Musterstadt");
         session.AddForceUnit("FF Musterstadt", 9, callSign: "HLF 1", officerCount: 1, scbaCount: 4);
         session.AddForceUnit("FF Beispieldorf", 6, callSign: "LF 2", officerCount: 1);
         session.AddSituationReport(

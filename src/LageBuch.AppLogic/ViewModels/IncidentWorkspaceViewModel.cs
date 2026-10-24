@@ -950,7 +950,16 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OpenSpellingHelper);
 
         SituationReports = new SituationReportsViewModel(
-            _session, OnChanged, _masterData.Settings.DispatchCentreName, (message, label, onConfirmed) => RequestConfirmAs("Lagemeldung", message, label, onConfirmed));
+            _session,
+            OnChanged,
+            _masterData.Settings.DispatchCentreName,
+            (message, label, onConfirmed) => RequestConfirmAs("Lagemeldung", message, label, onConfirmed),
+            _masterData.RadioCallSigns,
+            _masterData.Streets
+                .Select(street => Formatting.Address(street.Name, street.District, null, street.PostalCode, street.Place))
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList());
 
         EtbTabs = new EtbTabsViewModel(Etb, SituationReports, reopenEtbTab);
 

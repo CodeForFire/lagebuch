@@ -466,6 +466,29 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void The_lagemeldung_offers_each_stammdaten_strasse_as_an_address()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md() with { Streets = [new Street("Am Markt", PostalCode: "12345", Place: "Musterstadt"), new Street("Lindenweg", "Süd", "12345", "Musterstadt")] },
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        Assert.Equal(["Am Markt, 12345 Musterstadt", "Lindenweg, Süd, 12345 Musterstadt"], vm.SituationReports.LocationOptions);
+    }
+
+    [Fact]
     public void Ctrl_l_does_nothing_on_a_read_only_incident()
     {
         var vm = ReadOnlyWorkspace(out _, closed: true);

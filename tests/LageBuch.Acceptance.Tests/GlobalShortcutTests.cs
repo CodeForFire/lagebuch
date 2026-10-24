@@ -161,7 +161,11 @@ public class GlobalShortcutTests
         Assert.Equal("ETB", vm.SelectedNavItem?.Header);
         Assert.Equal(EtbTabsViewModel.SituationReportTab, vm.EtbTabs.SelectedTabIndex);
         Assert.Single(vm.SituationReports.Reports);
-        window.AssertFocused(Named<Control>(window, "ReporterBox"));
+        var reporter = Named<AutoCompleteBox>(window, "ReporterBox");
+        window.AssertFocused(reporter);
+
+        // Focus alone must not drop the Funkrufnamen over the fields below.
+        Assert.False(reporter.IsDropDownOpen);
     }
 
     [AvaloniaFact]
