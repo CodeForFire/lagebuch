@@ -150,7 +150,7 @@ public static class WorkspaceFocus
         if (sender is Control root && Subscriptions.TryGetValue(root, out var subscription)
             && e.Source is InputElement focused)
         {
-            subscription.KeepRailEntryOnSelectedTab();
+            subscription.KeepRailEntryOnSelectedTab(focused);
             if (!Overlay.IsInOverlay(focused))
             {
                 subscription.Remember(focused);
@@ -159,13 +159,23 @@ public static class WorkspaceFocus
     }
 
     // A click on a rail tab asks for that module; ↑/↓ on the rail does not. Tapped comes after
-    // the press that selected the tab, so the new module is already the selected one.
+    // the press that selected the tab, so the new module is already the selected one. A click on
+    // one of a module's own tabs (a TabControl.module-tabs inside it) asks for that tab the same
+    // way; the clicked tab itself is inside the module and holds focus, so the start field has
+    // to take it from there. Not on a phone: there focus pops the soft keyboard over half the module.
     private static void OnTapped(object? sender, TappedEventArgs e)
     {
         if (sender is Control root && Subscriptions.TryGetValue(root, out var subscription)
-            && e.Source is Visual source && subscription.RailTabOf(source) is not null)
+            && e.Source is Visual source)
         {
-            subscription.FocusStart();
+            if (subscription.RailTabOf(source) is not null)
+            {
+                subscription.FocusStart();
+            }
+            else if (!subscription.Workspace.IsNarrow && subscription.ModuleTabOf(source) is not null)
+            {
+                subscription.FocusStart(toStartField: true);
+            }
         }
     }
 
@@ -196,11 +206,27 @@ public static class WorkspaceFocus
         // included, so Tab from the header bars landed on whatever the module last had focused, and
         // Shift+Tab from the module's first control resolved back to that control and went nowhere
         // (#695). Bubbling to the root comes after the TabControl's own handling, so this wins.
-        public void KeepRailEntryOnSelectedTab()
+        public void KeepRailEntryOnSelectedTab(InputElement focused)
         {
-            var tab = SelectedRailTab();
-            KeyboardNavigation.SetTabOnceActiveElement(rail, tab);
-            if (rail.ItemsPanelRoot is { } panel)
+            KeepEntryOn(rail, SelectedRailTab());
+
+            // The same one level down: a module's own tabs are a TabControl inside the rail, and
+            // without this Tab from the rail skipped past them into whatever the module last had
+            // focused.
+            foreach (var tabs in focused.GetVisualAncestors().OfType<TabControl>())
+            {
+                if (!ReferenceEquals(tabs, rail) && rail.IsVisualAncestorOf(tabs)
+                    && tabs.SelectedItem is { } item && tabs.ContainerFromItem(item) is TabItem tab)
+                {
+                    KeepEntryOn(tabs, tab);
+                }
+            }
+        }
+
+        private static void KeepEntryOn(TabControl tabs, TabItem? tab)
+        {
+            KeyboardNavigation.SetTabOnceActiveElement(tabs, tab);
+            if (tabs.ItemsPanelRoot is { } panel)
             {
                 KeyboardNavigation.SetTabOnceActiveElement(panel, tab);
             }
@@ -209,6 +235,10 @@ public static class WorkspaceFocus
         public TabItem? RailTabOf(Visual visual) =>
             visual.GetSelfAndVisualAncestors().OfType<TabItem>()
                 .FirstOrDefault(tab => rail.IndexFromContainer(tab) >= 0);
+
+        public TabItem? ModuleTabOf(Visual visual) =>
+            visual.GetSelfAndVisualAncestors().OfType<TabItem>()
+                .FirstOrDefault(tab => rail.IndexFromContainer(tab) < 0 && rail.IsVisualAncestorOf(tab));
 
         public void OnModuleFocusRequested(object? sender, ModuleFocusRequestedEventArgs e) => FocusStart(e.ToStartField);
 
@@ -255,6 +285,12 @@ public static class WorkspaceFocus
                         start.Focus(NavigationMethod.Tab);
                         EntryForm.SelectText(start);
                     }
+                    else
+                    {
+                        // A module tab without an entry dock: its open tab takes focus instead,
+                        // so ←/→ reach the module's other tabs from there rather than from nowhere.
+                        SelectedModuleTab(content)?.Focus(NavigationMethod.Tab);
+                    }
                 },
                 DispatcherPriority.ContextIdle);
 
@@ -293,6 +329,11 @@ public static class WorkspaceFocus
 
         private TabItem? SelectedRailTab() =>
             rail.SelectedItem is { } item && rail.ContainerFromItem(item) is TabItem { } tab && EntryForm.CanTakeFocus(tab) ? tab : null;
+
+        private static TabItem? SelectedModuleTab(Control content) =>
+            content.GetVisualDescendants().OfType<TabControl>().FirstOrDefault() is { } tabs
+            && tabs.SelectedItem is { } item && tabs.ContainerFromItem(item) is TabItem { } tab
+            && EntryForm.CanTakeFocus(tab) ? tab : null;
 
         // The module's own mark, else its entry dock's first field. A read-only module hides its
         // dock and has no start.

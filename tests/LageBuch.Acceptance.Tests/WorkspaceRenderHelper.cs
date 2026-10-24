@@ -164,6 +164,24 @@ internal static class WorkspaceRenderHelper
             $"no rail tab headed \"{header}\" -- the rail shows: {shown}.");
     }
 
+    /// <summary>
+    /// Opens the rail entry headed <paramref name="railHeader"/>, then its own tab headed
+    /// <paramref name="tabHeader"/>, the way a user gets there.
+    /// </summary>
+    public static TabControl SelectModuleTab(Window window, string railHeader, string tabHeader)
+    {
+        SelectTab(window, railHeader);
+        var strip = ModuleTabStrip(window);
+        strip.SelectedItem = strip.Items.OfType<TabItem>().Single(t => Equals(t.Header, tabHeader));
+        Dispatcher.UIThread.RunJobs();
+        return strip;
+    }
+
+    /// <summary>The <c>module-tabs</c> strip inside the open rail entry.</summary>
+    public static TabControl ModuleTabStrip(Window window) =>
+        SelectedTabContent(window).GetVisualDescendants().OfType<TabControl>()
+            .Single(t => t.Classes.Contains("module-tabs"));
+
     /// <summary>The realized visual of the selected tab's content.</summary>
     /// <remarks>
     /// <c>TabControl.SelectedContent</c> is the selected <em>item</em>, which is a Visual only
