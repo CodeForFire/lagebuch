@@ -35,7 +35,18 @@ public class TextSnippetMatcherTests
     [InlineData("::st-x", 6)]
     [InlineData("Uhrzeit 14:30", 13)]
     [InlineData("::st", 1)] // caret inside the trigger
-    public void Anything_else_is_not_a_request(string text, int caret) =>
+    public void Anything_else_is_not_a_request(string text, int caret)
+    {
+        Assert.False(TextSnippetMatcher.TryGetQuery(text, caret, out var start, out var query));
+        Assert.Equal(-1, start);
+        Assert.Equal(string.Empty, query);
+    }
+
+    [Theory]
+    [InlineData(null, 3)]
+    [InlineData("::st", 5)] // a caret past the end, as a stale selection can report
+    [InlineData("::st", -1)]
+    public void A_missing_text_or_a_caret_outside_it_is_no_request_and_no_crash(string? text, int caret) =>
         Assert.False(TextSnippetMatcher.TryGetQuery(text, caret, out _, out _));
 
     [Fact]
@@ -89,6 +100,34 @@ public class TextSnippetMatcherTests
         Assert.Equal(result.Text.Length, result.SelectionStart);
         Assert.Equal(0, result.SelectionLength);
     }
+
+    [Fact]
+    public void Apply_selects_a_gap_at_the_very_start_of_the_text()
+    {
+        var result = TextSnippetMatcher.Apply("::kon", 0, 5, new TextSnippet("kon", "[X] kontrollieren"));
+
+        Assert.Equal(0, result.SelectionStart);
+        Assert.Equal(3, result.SelectionLength);
+    }
+
+    [Fact]
+    public void Apply_selects_only_a_closed_gap()
+    {
+        // A stray "]" before the gap and an unclosed "[" are not gaps.
+        var closedLater = TextSnippetMatcher.Apply("::a", 0, 3, new TextSnippet("a", "Lage [X] bestätigt"));
+        var unclosed = TextSnippetMatcher.Apply("::b", 0, 3, new TextSnippet("b", "Lage [X bestätigt"));
+
+        Assert.Equal("[X]", closedLater.Text.Substring(closedLater.SelectionStart, closedLater.SelectionLength));
+        Assert.Equal(unclosed.Text.Length, unclosed.SelectionStart);
+        Assert.Equal(0, unclosed.SelectionLength);
+    }
+
+    [Theory]
+    [InlineData(-1, 2)]
+    [InlineData(3, 2)]
+    [InlineData(0, 9)]
+    public void Apply_refuses_a_range_outside_the_text(int start, int caret) =>
+        Assert.ThrowsAny<ArgumentOutOfRangeException>(() => TextSnippetMatcher.Apply("::stl", start, caret, Snippets[0]));
 
     [Fact]
     public void Apply_without_gap_selection_puts_the_caret_after_the_text()
