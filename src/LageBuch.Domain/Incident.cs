@@ -3,6 +3,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
+using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -23,6 +24,7 @@ public sealed class Incident
     private readonly List<Building> _buildings = new();
     private readonly List<Dwelling> _dwellings = new();
     private readonly List<InvolvedParty> _involvedParties = new();
+    private readonly List<SituationReport> _situationReports = new();
 
     private Incident()
     {
@@ -83,6 +85,9 @@ public sealed class Incident
 
     /// <summary>The Beteiligte — people involved who are not forces — in creation order.</summary>
     public IReadOnlyList<InvolvedParty> InvolvedParties => _involvedParties;
+
+    /// <summary>The Lagemeldungen (#592) — drafts and sent ones — in creation order.</summary>
+    public IReadOnlyList<SituationReport> SituationReports => _situationReports;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -154,7 +159,8 @@ public sealed class Incident
         IEnumerable<InvolvedParty> involvedParties,
         string? houseNumber = null,
         string? postalCode = null,
-        string? place = null)
+        string? place = null,
+        IEnumerable<SituationReport>? situationReports = null)
     {
         var incident = new Incident
         {
@@ -184,6 +190,7 @@ public sealed class Incident
         incident._buildings.AddRange(buildings);
         incident._dwellings.AddRange(dwellings);
         incident._involvedParties.AddRange(involvedParties);
+        incident._situationReports.AddRange(situationReports ?? []);
         return incident;
     }
 
@@ -616,7 +623,7 @@ public sealed class Incident
 
         // Optional clauses are omitted rather than printed empty, so a bare unit reads as
         // "Einheit aufgenommen: Aich, Stärke 0/6/6" instead of trailing "davon 0 AGT — Status: ".
-        var text = $"Einheit aufgenommen: {Label(unit)}, Stärke {unit.StrengthText}";
+        var text = $"Einheit aufgenommen: {unit.Label}, Stärke {unit.StrengthText}";
         if (unit.ScbaCount > 0)
         {
             text += $", davon {unit.ScbaCount} AGT";
@@ -667,9 +674,6 @@ public sealed class Incident
         return updated;
     }
 
-    private static string Label(ForceUnit unit) =>
-        unit.CallSign is null ? unit.Brigade : $"{unit.Brigade} ({unit.CallSign})";
-
     /// <summary>
     /// Corrects a unit's Stärke (Führungskraft / Gesamt / davon AGT) in place, keeping its identity
     /// and position (#76). A real change is protokolliert twice, mirroring the ETB's own edit rule:
@@ -707,7 +711,7 @@ public sealed class Incident
 
         // The AGT clause appears only when the AGT count itself moved — same economy as
         // AddForceUnit's optional clauses.
-        var text = $"{Label(updated)}: Stärke {previous.StrengthText} → {updated.StrengthText}";
+        var text = $"{updated.Label}: Stärke {previous.StrengthText} → {updated.StrengthText}";
         if (previous.ScbaCount != updated.ScbaCount)
         {
             text += $", davon AGT {previous.ScbaCount} → {updated.ScbaCount}";
@@ -720,9 +724,9 @@ public sealed class Incident
 
     private static string StatusChangeText(ForceUnit previous, ForceUnit updated) => updated.Status switch
     {
-        null => $"{Label(updated)}: Status aufgehoben (vorher {previous.Status})",
-        _ when previous.Status is null => $"{Label(updated)}: Status {updated.Status}",
-        _ => $"{Label(updated)}: Status {previous.Status} → {updated.Status}",
+        null => $"{updated.Label}: Status aufgehoben (vorher {previous.Status})",
+        _ when previous.Status is null => $"{updated.Label}: Status {updated.Status}",
+        _ => $"{updated.Label}: Status {previous.Status} → {updated.Status}",
     };
 
     /// <summary>
@@ -745,7 +749,7 @@ public sealed class Incident
 
         var unit = _forces[index];
         _forces.RemoveAt(index);
-        AppendSystemEntry(clock, op, $"Einheit entfernt: {Label(unit)}", from: unit.CallSign);
+        AppendSystemEntry(clock, op, $"Einheit entfernt: {unit.Label}", from: unit.CallSign);
     }
 
     /// <summary>The smallest positive Truppnummer not already assigned to an active-or-historical
@@ -1160,6 +1164,100 @@ public sealed class Incident
     {
         var index = _involvedParties.FindIndex(p => p.Id == partyId);
         return index >= 0 ? index : throw new KeyNotFoundException($"Beteiligte/r {partyId} nicht gefunden.");
+    }
+
+    /// <summary>
+    /// Starts a Lagemeldung as a draft (#592). Silent: nothing has been reported yet, so nothing
+    /// goes into the ETB until <see cref="SendSituationReport"/>. Several drafts may exist at once,
+    /// so two synced devices drafting at the same time never conflict.
+    /// </summary>
+    public SituationReport AddSituationReport(
+        IClock clock,
+        SessionOperator op,
+        string? reporter,
+        string? location,
+        string? situation,
+        string? measures,
+        string? units,
+        string? requests)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var report = SituationReport.Create(clock.Now, reporter, location, situation, measures, units, requests, op);
+        _situationReports.Add(report);
+        return report;
+    }
+
+    /// <summary>Corrects a draft Lagemeldung in place. A sent one is the record of what was said
+    /// over the radio and throws; an unknown id throws so a replayed command fails loudly.</summary>
+    public SituationReport UpdateSituationReport(
+        Guid reportId,
+        string? reporter,
+        string? location,
+        string? situation,
+        string? measures,
+        string? units,
+        string? requests)
+    {
+        EnsureOpen();
+        var index = FindDraftSituationReportIndex(reportId);
+        var updated = _situationReports[index].WithDetails(reporter, location, situation, measures, units, requests);
+        _situationReports[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Discards a draft Lagemeldung. A sent one stays, like the ETB entry it wrote.</summary>
+    public void RemoveSituationReport(Guid reportId)
+    {
+        EnsureOpen();
+        _situationReports.RemoveAt(FindDraftSituationReportIndex(reportId));
+    }
+
+    /// <summary>
+    /// Sends a draft Lagemeldung: numbers it after the last one sent, and writes its Funkspruch to
+    /// the ETB as an outgoing entry from the Meldender to the Leitstelle. One aggregate operation,
+    /// so a synced client's send can never leave a numbered report without its ETB line.
+    /// </summary>
+    public SituationReport SendSituationReport(IClock clock, SessionOperator op, Guid reportId, string dispatchCentreName)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ArgumentException.ThrowIfNullOrWhiteSpace(dispatchCentreName);
+
+        var index = FindDraftSituationReportIndex(reportId);
+        var draft = _situationReports[index];
+        if (draft.Funkspruch.Length == 0)
+        {
+            throw new ArgumentException("Die Lagemeldung ist leer.", nameof(reportId));
+        }
+
+        var number = _situationReports.Select(r => r.Number ?? 0).DefaultIfEmpty(0).Max() + 1;
+        var sent = draft.AsSent(number, clock.Now, op);
+        AddJournalEntry(
+            clock,
+            op,
+            EtbDirection.Outgoing,
+            $"Lagemeldung Nr. {number}: {sent.Funkspruch}",
+            from: sent.Reporter,
+            to: dispatchCentreName.Trim());
+        _situationReports[index] = sent;
+        return sent;
+    }
+
+    private int FindDraftSituationReportIndex(Guid reportId)
+    {
+        var index = _situationReports.FindIndex(r => r.Id == reportId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Lagemeldung {reportId} nicht gefunden.");
+        }
+
+        return _situationReports[index].IsSent
+            ? throw new InvalidOperationException("Eine gesendete Lagemeldung kann nicht mehr geändert werden.")
+            : index;
     }
 
     /// <summary>

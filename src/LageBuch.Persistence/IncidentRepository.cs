@@ -60,7 +60,7 @@ public sealed class IncidentRepository
                     "role_assignments", "force_units", "force_unit_edits", "scba_trupps",
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
-                    "co_buildings", "co_dwellings", "co_readings", "involved_parties",
+                    "co_buildings", "co_dwellings", "co_readings", "involved_parties", "situation_reports",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -106,6 +106,7 @@ public sealed class IncidentRepository
         WriteCoDwellings(inserts, incident);
         WriteTasks(inserts, incident);
         WriteInvolvedParties(inserts, incident);
+        WriteSituationReports(inserts, incident);
 
         tx.Commit();
     }
@@ -446,6 +447,33 @@ public sealed class IncidentRepository
                     p("$dwellingLabel", (object?)party.DwellingLabel ?? DBNull.Value);
                     p("$where", (object?)party.Whereabouts ?? DBNull.Value);
                     p("$whereAt", (object?)party.WhereaboutsAt?.ToString(Iso) ?? DBNull.Value);
+                });
+        }
+    }
+
+    private static void WriteSituationReports(InsertCommands inserts, Incident incident)
+    {
+        for (var i = 0; i < incident.SituationReports.Count; i++)
+        {
+            var report = incident.SituationReports[i];
+            Run(
+                inserts,
+                "INSERT INTO situation_reports (id, ordinal, number, reporter, location, situation, measures, units, requests, created_by, created_at, sent_at, sent_by) VALUES ($id,$o,$nr,$rep,$loc,$sit,$mea,$uni,$req,$by,$cat,$sat,$sby);",
+                p =>
+                {
+                    p("$id", report.Id.ToString());
+                    p("$o", i);
+                    p("$nr", (object?)report.Number ?? DBNull.Value);
+                    p("$rep", (object?)report.Reporter ?? DBNull.Value);
+                    p("$loc", (object?)report.Location ?? DBNull.Value);
+                    p("$sit", (object?)report.Situation ?? DBNull.Value);
+                    p("$mea", (object?)report.Measures ?? DBNull.Value);
+                    p("$uni", (object?)report.Units ?? DBNull.Value);
+                    p("$req", (object?)report.Requests ?? DBNull.Value);
+                    p("$by", report.CreatedBy);
+                    p("$cat", report.CreatedAt.ToString(Iso));
+                    p("$sat", (object?)report.SentAt?.ToString(Iso) ?? DBNull.Value);
+                    p("$sby", (object?)report.SentBy ?? DBNull.Value);
                 });
         }
     }
@@ -809,6 +837,23 @@ public sealed class IncidentRepository
                 Str(r, 8),
                 Str(r, 9) is { } whereaboutsAt ? ParseDate(whereaboutsAt) : null));
 
+        var situationReports = ReadAll(
+            cn,
+            "SELECT id, number, reporter, location, situation, measures, units, requests, created_by, created_at, sent_at, sent_by FROM situation_reports ORDER BY ordinal;",
+            r => Domain.SituationReports.SituationReport.Rehydrate(
+                Guid.Parse(r.GetString(0)),
+                NullableInt(r, 1),
+                Str(r, 2),
+                Str(r, 3),
+                Str(r, 4),
+                Str(r, 5),
+                Str(r, 6),
+                Str(r, 7),
+                r.GetString(8),
+                ParseDate(r.GetString(9)),
+                NullableDate(r, 10),
+                Str(r, 11)));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -842,7 +887,8 @@ public sealed class IncidentRepository
             involvedParties,
             meta[11] as string,
             meta[12] as string,
-            meta[13] as string);
+            meta[13] as string,
+            situationReports);
     }
 
     private static DateTimeOffset ParseDate(string s) =>
