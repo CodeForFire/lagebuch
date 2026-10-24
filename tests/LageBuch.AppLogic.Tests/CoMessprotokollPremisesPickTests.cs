@@ -45,6 +45,26 @@ public class CoMessprotokollPremisesPickTests
     }
 
     [Fact]
+    public void The_hint_leaves_out_an_address_and_labels_the_objekt_does_not_have()
+    {
+        var (_, vm) = CreateVm(new[] { new Premises("Haus B") });
+
+        vm.NewBuildingName = "Haus B";
+
+        Assert.Equal("Aus den Stammdaten", vm.NewBuildingPremisesHint);
+    }
+
+    [Fact]
+    public void The_hint_counts_a_single_label_in_the_singular()
+    {
+        var (_, vm) = CreateVm(new[] { new Premises("Haus B") { ApartmentLabels = new Dictionary<string, string?> { ["0:1"] = "Kiosk" } } });
+
+        vm.NewBuildingName = "Haus B";
+
+        Assert.Equal("Aus den Stammdaten · 1 Wohnungsbezeichnung", vm.NewBuildingPremisesHint);
+    }
+
+    [Fact]
     public void Adding_a_picked_objekt_creates_the_haus_with_its_labels()
     {
         var (session, vm) = CreateVm();

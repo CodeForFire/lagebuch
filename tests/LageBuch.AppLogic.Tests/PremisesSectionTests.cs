@@ -109,6 +109,87 @@ public class PremisesSectionTests
     }
 
     [Fact]
+    public void Changing_the_structure_marks_the_editor_dirty_and_recounts_the_labels()
+    {
+        var changes = 0;
+        var section = new PremisesSection("Objekte", new[] { Lindenallee }, () => changes++);
+        var row = section.Rows[0];
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        row.UndergroundFloorCount = 0;
+
+        Assert.Equal(1, changes);
+        Assert.Contains(nameof(PremisesRow.LabelCount), raised);
+        Assert.Contains(nameof(PremisesRow.LabelToggleText), raised);
+        Assert.Equal(2, row.LabelCount);
+    }
+
+    [Fact]
+    public void Typing_a_label_announces_the_new_count_and_caption()
+    {
+        var section = Section(new Premises("Haus A", FloorCount: 1, ApartmentsPerFloor: 2, UndergroundFloorCount: 0));
+        var row = section.Rows[0];
+        row.ToggleLabelGridCommand.Execute(null);
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        row.Floors[0].Cells[0].Label = "Dachwohnung";
+
+        Assert.Contains(nameof(PremisesRow.LabelCount), raised);
+        Assert.Contains(nameof(PremisesRow.LabelToggleText), raised);
+    }
+
+    [Fact]
+    public void The_caption_names_no_count_while_no_wohnung_is_named() =>
+        Assert.Equal("WOHNUNGEN BENENNEN", Section(new Premises("Haus A")).Rows[0].LabelToggleText);
+
+    public static TheoryData<Premises> OneFieldTyped() => new()
+    {
+        new Premises("Haus A"),
+        new Premises(string.Empty, Street: "Lindenallee"),
+        new Premises(string.Empty, HouseNumber: "12"),
+        new Premises(string.Empty, PostalCode: "12345"),
+        new Premises(string.Empty, Place: "Musterstadt"),
+        new Premises(string.Empty) { ApartmentLabels = new Dictionary<string, string?> { ["0:1"] = "Hausmeister" } },
+    };
+
+    [Theory]
+    [MemberData(nameof(OneFieldTyped))]
+    public void A_row_with_any_field_typed_is_not_blank(Premises premises) =>
+        Assert.False(Section(premises).Rows[0].IsBlank);
+
+    [Fact]
+    public void A_row_with_nothing_typed_is_blank() =>
+        Assert.True(Section(new Premises(" ")).Rows[0].IsBlank);
+
+    [Fact]
+    public void Confirming_the_removal_takes_the_row_out_and_marks_the_editor_dirty()
+    {
+        var changes = 0;
+        var section = new PremisesSection("Objekte", new[] { Lindenallee }, () => changes++, (_, remove) => remove());
+
+        section.RemoveCommand.Execute(section.Rows[0]);
+
+        Assert.Empty(section.Rows);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Removing_a_row_the_section_does_not_hold_changes_nothing()
+    {
+        var changes = 0;
+        string? asked = null;
+        var section = new PremisesSection("Objekte", new[] { Lindenallee }, () => changes++, (question, _) => asked = question);
+
+        section.RemoveCommand.Execute(new PremisesRow(Lindenallee, () => { }));
+
+        Assert.Single(section.Rows);
+        Assert.Equal(0, changes);
+        Assert.Null(asked);
+    }
+
+    [Fact]
     public void A_blank_added_row_goes_at_once_and_a_named_one_asks_first()
     {
         string? asked = null;
