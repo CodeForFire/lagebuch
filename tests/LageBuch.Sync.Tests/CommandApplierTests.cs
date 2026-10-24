@@ -773,4 +773,54 @@ public class CommandApplierTests
         Assert.Null(incident.Fuehrungsstufe);
         Assert.Equal(entries, incident.Journal.Count);
     }
+
+    [Fact]
+    public void MoveCommandNode_over_the_wire_moves_the_node_attributed_to_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var host = new SessionOperator("Host", "FFB 1");
+        var nord = incident.AddCommandNode(clock, host, CommandNodeKind.Abschnitt, "Nord");
+        var sued = incident.AddCommandNode(clock, host, CommandNodeKind.Abschnitt, "Süd");
+
+        ApplyOverWire(new MoveCommandNodeCommand(new OperatorDto("Maier", "FFB 2"), sued.Id, nord.Id, null), incident, clock);
+
+        var moved = incident.FindCommandNode(sued.Id)!;
+        Assert.Equal((CommandNodeKind.Unterabschnitt, nord.Id), (moved.Kind, moved.ParentId));
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+
+        ApplyOverWire(new MoveCommandNodeCommand(new OperatorDto("Maier", "FFB 2"), sued.Id, null, nord.Id), incident, clock);
+        Assert.Equal([sued.Id, nord.Id], incident.CommandNodes.Select(n => n.Id));
+    }
+
+    // A peer may send any ids: one this incident does not hold, a node into itself, or a parent
+    // that is a partner. Each is refused and leaves the tree as it was.
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("itself")]
+    [InlineData("into-partner")]
+    [InlineData("before-unknown")]
+    public void A_hostile_move_is_refused_and_the_incident_is_unchanged(string scenario)
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var host = new SessionOperator("Host", "FFB 1");
+        var nord = incident.AddCommandNode(clock, host, CommandNodeKind.Abschnitt, "Nord");
+        var rd = incident.AddCommandNode(clock, host, CommandNodeKind.Partner, "Rettungsdienst");
+        var before = incident.CommandNodes.ToList();
+        var entries = incident.Journal.Count;
+        var peer = new OperatorDto("Maier", "FFB 2");
+        SyncCommand command = scenario switch
+        {
+            "unknown" => new MoveCommandNodeCommand(peer, Guid.NewGuid(), null, null),
+            "itself" => new MoveCommandNodeCommand(peer, nord.Id, nord.Id, null),
+            "into-partner" => new MoveCommandNodeCommand(peer, nord.Id, rd.Id, null),
+            _ => new MoveCommandNodeCommand(peer, nord.Id, null, Guid.NewGuid()),
+        };
+
+        Assert.ThrowsAny<Exception>(() => ApplyOverWire(command, incident, clock));
+
+        Assert.Equal(before, incident.CommandNodes);
+        Assert.Equal(entries, incident.Journal.Count);
+    }
 }

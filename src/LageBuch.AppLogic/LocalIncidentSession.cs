@@ -197,6 +197,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void DissolveCommandNode(Guid nodeId) =>
         Mutate(() => Incident.DissolveCommandNode(_clock, RequireOperator(), nodeId));
 
+    public void MoveCommandNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId) =>
+        Mutate(() => Incident.MoveCommandNode(_clock, RequireOperator(), nodeId, parentId, beforeNodeId));
+
     public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
         Mutate(() => Incident.MoveForceUnit(_clock, RequireOperator(), unitId, nodeId));
 

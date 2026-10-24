@@ -975,6 +975,70 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Moves a node under <paramref name="parentId"/> (null: the top level), before
+    /// <paramref name="beforeNodeId"/> among its new siblings (null: at the end). An Abschnitt moved
+    /// under another becomes its Unterabschnitt, an Unterabschnitt moved to the top an Abschnitt;
+    /// units and Funktionen go along. <see cref="CommandNodeMoves.Refusal"/> holds the rules. Only a
+    /// change of level or Abschnitt reaches the ETB: the order is layout, like a Standort.
+    /// </summary>
+    public CommandNode MoveCommandNode(IClock clock, SessionOperator op, Guid nodeId, Guid? parentId, Guid? beforeNodeId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindCommandNodeIndex(nodeId);
+        if (CommandNodeMoves.Refusal(this, nodeId, parentId, beforeNodeId) is { } refusal)
+        {
+            throw new InvalidOperationException(refusal);
+        }
+
+        var previous = _commandNodes[index];
+        var moved = previous.MovedTo(parentId);
+        var reordered = _commandNodes.ToList();
+        reordered.RemoveAt(index);
+        var at = beforeNodeId is { } bid && bid != nodeId ? reordered.FindIndex(n => n.Id == bid) : -1;
+        if (beforeNodeId == nodeId)
+        {
+            at = index;
+        }
+
+        reordered.Insert(at < 0 ? reordered.Count : at, moved);
+
+        if (previous.ParentId == parentId
+            && SiblingOrder(_commandNodes, parentId).SequenceEqual(SiblingOrder(reordered, parentId)))
+        {
+            return previous;
+        }
+
+        _commandNodes.Clear();
+        _commandNodes.AddRange(reordered);
+
+        if (previous.ParentId != parentId)
+        {
+            AppendSystemEntry(clock, op, MoveText(previous, moved));
+        }
+
+        return moved;
+    }
+
+    private static IEnumerable<Guid> SiblingOrder(IEnumerable<CommandNode> nodes, Guid? parentId) =>
+        nodes.Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, parentId)).Select(n => n.Id);
+
+    private string MoveText(CommandNode previous, CommandNode moved)
+    {
+        string NameOf(Guid? id) => id is { } nodeId ? FindCommandNode(nodeId)?.Name ?? "—" : "—";
+
+        return (previous.Kind, moved.Kind) switch
+        {
+            (CommandNodeKind.Unterabschnitt, CommandNodeKind.Abschnitt) => $"Unterabschnitt {moved.Name} als Abschnitt eingeordnet",
+            (CommandNodeKind.Abschnitt, CommandNodeKind.Unterabschnitt) =>
+                $"Abschnitt {moved.Name} als Unterabschnitt in {NameOf(moved.ParentId)} eingeordnet",
+            _ => $"Unterabschnitt {moved.Name} verschoben: {NameOf(previous.ParentId)} → {NameOf(moved.ParentId)}",
+        };
+    }
+
+    /// <summary>
     /// Dissolves a node; it stays in <see cref="CommandNodes"/> as history. Refused while units sit
     /// on it or a live Unterabschnitt lies under it.
     /// </summary>

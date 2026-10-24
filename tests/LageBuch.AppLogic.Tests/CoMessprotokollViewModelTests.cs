@@ -1187,6 +1187,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void DissolveCommandNode(Guid nodeId) => _inner.DissolveCommandNode(nodeId);
 
+    public void MoveCommandNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId) => _inner.MoveCommandNode(nodeId, parentId, beforeNodeId);
+
     public void MoveForceUnit(Guid unitId, Guid? nodeId) => _inner.MoveForceUnit(unitId, nodeId);
 
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
