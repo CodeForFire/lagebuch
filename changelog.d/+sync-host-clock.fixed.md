@@ -1,0 +1,1 @@
+Sync: a joined device runs its Atemschutz and Aufgaben countdowns on the host's clock instead of its own, so a device whose clock is off no longer shows a Trupp time it does not have or sounds the Rückzugsalarm late, and its footer says how far the device clock is off once that exceeds half a minute.

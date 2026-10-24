@@ -123,6 +123,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             remote.CommandRejected += OnRemoteCommandRejected;
         }
 
+        // Polled rather than pushed: the offset moves on the session's reconcile loop, and the tick
+        // is already running for every countdown on screen.
+        if (session.IsRemote)
+        {
+            HostClockOffset = session.HostClockOffset;
+            _clockSkewRefresh = _ticker.Subscribe(() => HostClockOffset = _session.HostClockOffset);
+        }
+
         // A joined client mirrors; it never saves. Which of the two the footer may claim is fixed here,
         // at construction, from the session it was handed.
         SyncState = session.IsRemote ? WorkspaceSyncState.Current : WorkspaceSyncState.Local;
@@ -183,6 +191,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [NotifyPropertyChangedFor(nameof(ShowLocalSavedStatus))]
     private string? _persistenceError;
 
+    // Under this a skew is noise next to how fast anyone reads a countdown; over it, a Trupp's
+    // remaining time on another device's screen visibly disagrees.
+    private static readonly TimeSpan ClockSkewWarningThreshold = TimeSpan.FromSeconds(30);
+
     // ===== Joined-client sync state (#295). A joined device saves nothing locally, so the footer shows
     // the host's Stand and whether that Stand is still confirmed, rather than a save that never
     // happened. Settable so a render test can drive the footer without a live host. =====
@@ -199,6 +211,23 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     [ObservableProperty]
     private DateTimeOffset? _lastSyncedAt;
+
+    /// <summary>
+    /// How far the host's clock is ahead of this device's, read from the session every tick. A joined
+    /// client already runs its countdowns on host time; this only drives the footer warning. Settable
+    /// so a render test can drive the footer without a live host.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ClockSkewWarning))]
+    private TimeSpan _hostClockOffset;
+
+    /// <summary>
+    /// Null while this device's clock is within <see cref="ClockSkewWarningThreshold"/> of the host's.
+    /// Otherwise says by how much. The countdowns here are right either way; the warning is so the
+    /// clock gets set before this device works on its own, hosting the next Einsatz.
+    /// </summary>
+    public string? ClockSkewWarning =>
+        HostClockOffset.Duration() < ClockSkewWarningThreshold ? null : Formatting.ClockSkew(HostClockOffset);
 
     /// <summary>
     /// Null = nothing was refused. The host's own reason for turning down the last change, shown as a
@@ -239,6 +268,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     // Ticks only while a notice shows, so an idle workspace holds no ticker subscription for it.
     private IDisposable? _undoNoticeExpiry;
+    private IDisposable? _clockSkewRefresh;
 
     // The create-task overlay behind an ETB row's button (#88); null while no dialog is open.
     [ObservableProperty]
@@ -808,6 +838,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _disposed = true;
         _session.Changed -= RefreshIncidentData;
         _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
+        _clockSkewRefresh?.Dispose();
         if (_alarmMute is not null)
         {
             _alarmMute.Changed -= OnAlarmMuteChanged;

@@ -2,6 +2,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Sync.Hosting.Tests;
@@ -71,6 +72,30 @@ public class HomeViewModelJoinTests
         Assert.NotNull(opened);
         Assert.False(opened!.CanExport);           // a client can't export the host's file
         Assert.False(opened.CanContinueEditing);   // nor resume a local file it doesn't own
+        await opened.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task A_joined_workspace_runs_the_atemschutz_clock_on_host_time_and_says_the_device_is_off()
+    {
+        // The host is three minutes ahead of this device and has just started a Trupp. On this
+        // device's own clock the Trupp would not have started yet.
+        var clock = new FixedClock { Now = TimeProvider.System.GetLocalNow() + TimeSpan.FromMinutes(3) };
+        var hostSession = HostSession(clock);
+        hostSession.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        hostSession.StartScbaTrupp(hostSession.Incident.ScbaTrupps.Single().Id);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        var vm = Home();
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
+
+        Assert.NotNull(opened);
+        Assert.Equal("00:00", opened!.Scba.Trupps.Single().ElapsedDisplay);
+        Assert.Equal("Geräteuhr geht 3 min nach", opened.ClockSkewWarning);
         await opened.LeaveAsync();
     }
 

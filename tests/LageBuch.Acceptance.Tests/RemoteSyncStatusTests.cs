@@ -100,6 +100,25 @@ public class RemoteSyncStatusTests
     }
 
     [AvaloniaFact]
+    public void A_joined_client_whose_clock_is_off_the_hosts_says_so_in_the_footer()
+    {
+        var vm = BuildWorkspace();
+        vm.SyncState = WorkspaceSyncState.Current;
+        vm.LastSyncedAt = new DateTimeOffset(2026, 8, 12, 9, 14, 32, TimeSpan.Zero);
+        var window = Show(vm);
+
+        Assert.False(Panel(window, "ClockSkewStatus").IsVisible);
+        Capture(window, "clock-skew-before.png");
+
+        vm.HostClockOffset = TimeSpan.FromMinutes(3);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Panel(window, "ClockSkewStatus").IsVisible);
+        Assert.True(Panel(window, "SyncCurrentStatus").IsVisible);
+        Capture(window, "clock-skew-after.png");
+    }
+
+    [AvaloniaFact]
     public void An_unconfirmed_client_marks_its_stand_and_shows_a_rejected_command()
     {
         var vm = BuildWorkspace();

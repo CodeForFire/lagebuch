@@ -89,6 +89,27 @@ public class WireContractTests
 
     [Theory]
     [MemberData(nameof(Hosts))]
+    public async Task Revision_tells_the_hosts_time(string kind)
+    {
+        await using var host = await StartAsync(kind);
+
+        var position = await GetAsync<RevisionInfo>(host.Http, SyncProtocol.RevisionPath);
+
+        Assert.NotNull(position.HostTime);
+    }
+
+    [Fact]
+    public void A_revision_without_a_host_time_reads_as_unknown()
+    {
+        // What a host older than protocol 14 sends.
+        var position = SyncJson.Deserialize<RevisionInfo>("""{"revision":3,"epoch":"6f1c2d3e-0000-0000-0000-000000000001"}""");
+
+        Assert.Equal(3, position.Revision);
+        Assert.Null(position.HostTime);
+    }
+
+    [Theory]
+    [MemberData(nameof(Hosts))]
     public async Task A_command_is_answered_with_the_snapshot_at_the_hosts_position(string kind)
     {
         await using var host = await StartAsync(kind);
