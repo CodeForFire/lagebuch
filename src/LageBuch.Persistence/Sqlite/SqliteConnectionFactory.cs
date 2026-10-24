@@ -16,8 +16,15 @@ public static class SqliteConnectionFactory
     public static SqliteConnection OpenExisting(string path) =>
         Open(path, SqliteOpenMode.ReadWrite, journal: true);
 
+    /// <summary>
+    /// Read-only by <c>PRAGMA query_only</c>, not by <see cref="SqliteOpenMode.ReadOnly"/>. A
+    /// connection opened read-only may never checkpoint, so when it is the last to close a WAL file
+    /// it leaves an empty -wal and a 32 KB -shm beside it for good -- next to every recent Einsatz
+    /// the Home overview peeks into. Opened read-write, the closing connection removes them. SQLite
+    /// still falls back to a read-only open by itself when the file is write-protected.
+    /// </summary>
     public static SqliteConnection OpenReadOnly(string path) =>
-        Open(path, SqliteOpenMode.ReadOnly, journal: false);
+        Open(path, SqliteOpenMode.ReadWrite, journal: false, queryOnly: true);
 
     /// <summary>
     /// Opens a connection and applies the standard PRAGMAs, disposing it if any of that fails.
@@ -28,7 +35,7 @@ public static class SqliteConnectionFactory
     /// the file locked for the rest of the process: undeletable, and unreadable by anything else.
     /// Linux hides the leak entirely, which is why it survived until a Windows CI run caught it.
     /// </summary>
-    private static SqliteConnection Open(string path, SqliteOpenMode mode, bool journal)
+    private static SqliteConnection Open(string path, SqliteOpenMode mode, bool journal, bool queryOnly = false)
     {
         var cn = new SqliteConnection(new SqliteConnectionStringBuilder
         {
@@ -51,6 +58,11 @@ public static class SqliteConnectionFactory
             if (journal)
             {
                 Execute(cn, "PRAGMA journal_mode=WAL;");
+            }
+
+            if (queryOnly)
+            {
+                Execute(cn, "PRAGMA query_only=ON;");
             }
 
             Execute(cn, "PRAGMA foreign_keys=ON;");

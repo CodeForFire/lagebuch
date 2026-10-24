@@ -17,10 +17,12 @@ public class ClosedIncidentReadOnlyTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path))
-        {
-            File.Delete(_path);
-        }
+
+        // The write-protected test leaves its -wal/-shm behind: SQLite cannot checkpoint a file
+        // it may not write. File.Delete is a no-op for a missing file.
+        File.Delete(_path);
+        File.Delete(_path + "-wal");
+        File.Delete(_path + "-shm");
     }
 
     private void SaveClosedIncident()
@@ -32,6 +34,24 @@ public class ClosedIncidentReadOnlyTests : IDisposable
         IncidentRepository.Save(_path, incident);
     }
 
+    private void AssertNoSidecars()
+    {
+        Assert.False(File.Exists(_path + "-wal"), "-wal left beside the file");
+        Assert.False(File.Exists(_path + "-shm"), "-shm left beside the file");
+    }
+
+    private void SetWriteProtected(bool on)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(_path, on ? FileAttributes.ReadOnly : FileAttributes.Normal);
+        }
+        else
+        {
+            File.SetUnixFileMode(_path, on ? UnixFileMode.UserRead : UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
     [Fact]
     public void ReadOnly_connection_rejects_writes()
     {
@@ -40,6 +60,56 @@ public class ClosedIncidentReadOnlyTests : IDisposable
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "UPDATE incident_meta SET status='hacked';";
         Assert.Throws<SqliteException>(() => cmd.ExecuteNonQuery());
+    }
+
+    [Fact]
+    public void Closing_a_read_only_connection_leaves_no_wal_or_shm_beside_the_file()
+    {
+        // A connection opened with SQLITE_OPEN_READONLY may never checkpoint, so when it is the
+        // last one to close it leaves an empty -wal and a 32 KB -shm behind for good.
+        SaveClosedIncident();
+        using (var cn = SqliteConnectionFactory.OpenReadOnly(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT state FROM incident_meta;";
+            cmd.ExecuteScalar();
+        }
+
+        AssertNoSidecars();
+    }
+
+    [Fact]
+    public void Reading_the_state_for_the_overview_leaves_no_wal_or_shm_beside_the_file()
+    {
+        // Home asks this of every recent file, so a leak here litters the user's Einsatz folder.
+        SaveClosedIncident();
+
+        Assert.Equal(IncidentState.Closed, IncidentRepository.TryReadState(_path));
+        AssertNoSidecars();
+    }
+
+    [Fact]
+    public void Loading_a_closed_incident_leaves_no_wal_or_shm_beside_the_file()
+    {
+        SaveClosedIncident();
+
+        IncidentRepository.Load(_path);
+        AssertNoSidecars();
+    }
+
+    [Fact]
+    public void A_write_protected_file_still_shows_its_state_in_the_overview()
+    {
+        SaveClosedIncident();
+        SetWriteProtected(true);
+        try
+        {
+            Assert.Equal(IncidentState.Closed, IncidentRepository.TryReadState(_path));
+        }
+        finally
+        {
+            SetWriteProtected(false);
+        }
     }
 
     [Fact]
