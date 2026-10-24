@@ -81,7 +81,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
                   <Button x:Name="CommandNodeDiscardButton" Classes="signal" Content="VERWERFEN"
                           Command="{Binding ConfirmDiscardCommand}" />
-                  <Button x:Name="CommandNodeKeepEditingButton" Content="ABBRECHEN"
+                  <Button x:Name="CommandNodeKeepEditingButton" Content="WEITER BEARBEITEN"
                           Command="{Binding CancelDiscardCommand}" />
                 </StackPanel>
               </StackPanel>

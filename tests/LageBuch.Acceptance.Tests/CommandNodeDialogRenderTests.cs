@@ -157,6 +157,16 @@ public class CommandNodeDialogRenderTests
         window.AssertFocused(Find<Button>(window, "CommandNodeKeepEditingButton"));
     }
 
+    // Its "back to the form" button said ABBRECHEN like the dialog's own cancel, so pressing it again
+    // went round in a loop instead of leaving.
+    [AvaloniaFact]
+    public void The_discard_question_says_weiter_bearbeiten_not_a_second_abbrechen()
+    {
+        var (window, _) = Show(Filled(Session()), 560, 760);
+
+        Assert.Equal("WEITER BEARBEITEN", Find<Button>(window, "CommandNodeKeepEditingButton").Content);
+    }
+
     [AvaloniaFact]
     public void Every_button_of_the_dialog_has_a_name_for_automation()
     {

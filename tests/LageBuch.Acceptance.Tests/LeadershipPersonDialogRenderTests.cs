@@ -215,4 +215,15 @@ public class LeadershipPersonDialogRenderTests
         Assert.True(Find<Border>(window, "PersonDialogDiscardPanel").IsEffectivelyVisible);
         window.AssertFocused(Find<Button>(window, "PersonDialogKeepEditingButton"));
     }
+
+    // Field report: the dialog could not be left. The question's "back to the form" button said
+    // ABBRECHEN, the same word as the dialog's own cancel, so pressing it again went round in a loop.
+    [AvaloniaFact]
+    public void The_discard_question_says_weiter_bearbeiten_not_a_second_abbrechen()
+    {
+        var (window, _) = Show(new LeadershipPersonDialogViewModel(Session(), Clock, MasterData(), null, RoleSlot.Leiter), 560, 560);
+
+        Assert.Equal("WEITER BEARBEITEN", Find<Button>(window, "PersonDialogKeepEditingButton").Content);
+        Assert.Equal("ABBRECHEN", Find<Button>(window, "PersonDialogCancelButton").Content);
+    }
 }
