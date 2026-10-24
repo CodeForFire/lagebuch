@@ -144,6 +144,16 @@ public class LeadershipBoardRenderTests
     }
 
     // A control inside a card template: its name is the template's, not the view's.
+    // A press and release in the control's own top level: the window, or a flyout's popup.
+    private static void Press(Control control)
+    {
+        var topLevel = TopLevel.GetTopLevel(control)!;
+        var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), topLevel)!.Value;
+        topLevel.MouseDown(centre, MouseButton.Left);
+        topLevel.MouseUp(centre, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     private static T Named<T>(Visual root, string name)
         where T : Control =>
         root.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
@@ -527,20 +537,20 @@ public class LeadershipBoardRenderTests
         Assert.Equal(before, board.Vm.Sections.Single(c => c.Name == "Abschnitt 2 Süd").Units.Single().NodeLabel);
     }
 
+    // Real presses, not Command.Execute plus a raised Click: the flyout used to close in the Click
+    // event, which detached the entries before Button ran their command, so a click chose nothing.
     [AvaloniaFact]
     public void Picking_a_fuehrungsstufe_sets_it_and_closes_the_flyout()
     {
         var board = Show();
         var stufe = Named<Button>(board.View, "StufeButton");
 
-        stufe.Flyout!.ShowAt(stufe);
-        Dispatcher.UIThread.RunJobs();
+        Press(stufe);
+        Assert.True(stufe.Flyout!.IsOpen);
         var content = ((Flyout)stufe.Flyout).Content as Control;
         var pick = content!.GetVisualDescendants().OfType<Button>()
             .Single(b => b.DataContext is StufeChoice { Label: "Stufe D" });
-        pick.Command!.Execute(null);
-        pick.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-        Dispatcher.UIThread.RunJobs();
+        Press(pick);
 
         Assert.Equal(Fuehrungsstufe.D, board.Session!.Incident.Fuehrungsstufe);
         Assert.Equal("Stufe D", Named<TextBlock>(board.View, "StufeText").Text);
