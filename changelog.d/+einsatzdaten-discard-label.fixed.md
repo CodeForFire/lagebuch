@@ -1,0 +1,1 @@
+The Einsatzdaten dialog's "ÄNDERUNGEN VERWERFEN?" question labels its way back to the form WEITER BEARBEITEN instead of a second ABBRECHEN, which sent a Lagebuchführer trying to leave round in a loop.
