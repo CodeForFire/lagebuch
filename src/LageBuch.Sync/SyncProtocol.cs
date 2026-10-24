@@ -86,8 +86,13 @@ public static class SyncProtocol
     /// the areas it is offered in (<c>etb</c>, <c>tasks</c>). A peer at 12 or 13 skips the key and
     /// offers no <c>::</c> suggestions, so the floor stays at 12.
     /// </para>
+    /// <para>
+    /// 15: the Stammdaten payload carries <c>phone</c> on vehicles. A peer at 12 to 14 skips the key
+    /// and lists no Fahrzeugtelefon in its Kontakte, and a payload without it reads as no number,
+    /// so the floor stays at 12.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 14;
+    public const int ProtocolVersion = 15;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

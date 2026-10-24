@@ -266,6 +266,46 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Vehicles_round_trip_the_phone_number()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/11/1", 4, Phone: "01 71 / 1 23 45 67"),
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+            },
+        };
+        MasterDataStore.Save(_path, set);
+
+        var reopened = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(set.Vehicles, reopened.Vehicles);
+    }
+
+    [Fact]
+    public void A_pre_vehicle_phone_database_widens_in_place_and_reads_existing_vehicles_without_a_number()
+    {
+        // Every store a released build wrote has md_vehicles without phone.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1);
+                INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ('FFB Wache 1', 'FFB 1/40/1', 9);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Null(Assert.Single(set.Vehicles).Phone);
+    }
+
+    [Fact]
     public void A_database_with_the_old_wachen_and_funkrufnamen_tables_opens_and_derives_from_vehicles()
     {
         // Simulate a database written while Wachen/Funkrufnamen were still their own lists. The

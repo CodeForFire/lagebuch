@@ -108,7 +108,7 @@ public class ContactsTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Single(vm.Contacts.VisibleContacts);
-        Assert.Equal("Beispiel, Bernd", vm.Contacts.VisibleContacts[0].Person.DisplayName);
+        Assert.Equal("Beispiel, Bernd", vm.Contacts.VisibleContacts[0].Entry.Name);
 
         // The hit is drawn, not just computed: the Notiz carries exactly one highlighted run.
         var note = ContactsView(window).GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "ContactNote");
@@ -126,6 +126,30 @@ public class ContactsTabRenderTests
         var tags = ContactsView(window).GetVisualDescendants().OfType<Border>()
             .Where(b => b.Name == "ForeignTag" && b.IsEffectivelyVisible);
         Assert.Single(tags);
+    }
+
+    // A Fahrzeugtelefon is listed after the people, and tagged, so its Funkrufname in the name slot
+    // is not read as a person's name. A vehicle without a number stays out of the list.
+    [AvaloniaFact]
+    public void A_vehicle_with_a_number_is_listed_and_carries_the_fahrzeug_tag()
+    {
+        var md = MasterData() with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 11/1", 4, true, Phone: "01 71 / 2 34 56 78"),
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 40/1", 9),
+            },
+        };
+        var (window, vm) = ShowWorkspace(md);
+        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
+
+        Assert.Equal(9, vm.Contacts.VisibleContacts.Count);
+        Assert.Equal("Florian Musterstadt 11/1", vm.Contacts.VisibleContacts[^1].Entry.Name);
+        var tags = ContactsView(window).GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Name == "VehicleTag" && b.IsEffectivelyVisible);
+        Assert.Single(tags);
+        Capture(window, "kontakte-fahrzeug.png");
     }
 
     // #700: the roster writes "01 71 / 1 23 45 67"; the card reads it the DIN 5008 way, and a
@@ -177,7 +201,7 @@ public class ContactsTabRenderTests
         vm.Contacts.FilterText = "Beispielried";
 
         Assert.Single(vm.Contacts.VisibleContacts);
-        Assert.Equal("Musterhuber, Sepp", vm.Contacts.VisibleContacts[0].Person.DisplayName);
+        Assert.Equal("Musterhuber, Sepp", vm.Contacts.VisibleContacts[0].Entry.Name);
     }
 
     [AvaloniaFact]

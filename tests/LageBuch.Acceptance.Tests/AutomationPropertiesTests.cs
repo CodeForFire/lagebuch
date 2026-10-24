@@ -87,7 +87,7 @@ public class AutomationPropertiesTests
 
         var vehicles = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
         vehicles.AddCommand.Execute(null);
-        AssertNamed("Fahrzeuge", 1);
+        AssertNamed("Fahrzeuge", 2); // likewise: the wide row and its phone form
     }
 
     private static ForcesViewModel BuildForcesVm(out LocalIncidentSession session)

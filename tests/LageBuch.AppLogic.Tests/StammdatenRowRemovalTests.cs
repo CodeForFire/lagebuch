@@ -46,7 +46,7 @@ public class StammdatenRowRemovalTests
             case "Fahrzeuge":
                 {
                     var s = new VehiclesSection("Fahrzeuge", Array.Empty<Vehicle>(), Array.Empty<string>(), Array.Empty<string>(), () => { }, requestConfirm);
-                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Wache = "FFB Wache 1", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Phone = "0170 0000000", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
                 }
 
             case "Trupp-Typen":
@@ -120,6 +120,7 @@ public class StammdatenRowRemovalTests
                     {
                         s.Rows[0].Wache = string.Empty;
                         s.Rows[0].CallSign = string.Empty;
+                        s.Rows[0].Phone = string.Empty;
                         s.RemoveCommand.Execute(s.Rows[0]);
                     }
 

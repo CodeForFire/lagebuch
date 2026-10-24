@@ -62,6 +62,22 @@
     <Style Selector="Panel#EditorRoot.narrow Grid#PersonnelHeader">
       <Setter Property="IsVisible" Value="False" />
     </Style>
+
+    <!-- Fahrzeuge rows: the same swap. Six columns do not fit 412dp either; before the phone
+         number they already squeezed Wache and Funkrufname to a few pixels. One Style per
+         selector: a comma-grouped one resolves to their common base and fails to compile. -->
+    <Style Selector="Border.vehicle-narrow">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow Grid.vehicle-wide">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow Border.vehicle-narrow">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow Grid#VehiclesHeader">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
     <Style Selector="Panel#EditorRoot.narrow DockPanel#EditorBody">
       <Setter Property="Margin" Value="12,16" />
     </Style>
@@ -546,7 +562,7 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Vehicles editor (#76): Wache + Funkrufname + Sitzplätze. -->
+              <!-- Vehicles editor (#76): Wache + Funkrufname + Fahrzeugtelefon + Sitzplätze. -->
               <DataTemplate x:DataType="vm:VehiclesSection">
                 <DockPanel Classes="add-below">
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
@@ -557,13 +573,14 @@
                        "Auto" would size to this Grid's own (empty) content instead of the row
                        template's buttons, leaving the header and row Grids to disagree on width
                        and dragging SITZPLÄTZE/ZF/EIGEN out of alignment with their columns. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,70,32" Margin="0,0,0,6">
+                  <Grid x:Name="VehiclesHeader" DockPanel.Dock="Top" ColumnDefinitions="*,*,*,150,70,70,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="2" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="3" Text="ZF" Classes="overline" FontSize="10"
+                    <TextBlock Grid.Column="2" Text="TELEFON" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="3" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="4" Text="ZF" Classes="overline" FontSize="10"
                                ToolTip.Tip="Zugführerfahrzeug" />
-                    <TextBlock Grid.Column="4" Text="EIGEN" Classes="overline" FontSize="10"
+                    <TextBlock Grid.Column="5" Text="EIGEN" Classes="overline" FontSize="10"
                                ToolTip.Tip="Eigenes Fahrzeug" />
                   </Grid>
                   <ScrollViewer>
@@ -580,50 +597,108 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
-                          <Grid ColumnDefinitions="*,*,150,70,70,32" Margin="0,0,0,6">
-                            <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
-                                 aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
-                            <Grid Grid.Column="0" Margin="0,0,6,0">
-                              <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
-                                               ItemsSource="{Binding WacheOptions}"
-                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                               Text="{Binding Wache}" />
-                              <!-- Chevron affordance (#259), see OperatorPromptView for rationale. -->
-                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                        Margin="0,0,9,0" IsHitTestVisible="False"
-                                        Foreground="{StaticResource TextMutedBrush}"
-                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                          <Panel>
+                            <Grid Classes="vehicle-wide" ColumnDefinitions="*,*,*,150,70,70,32" Margin="0,0,0,6">
+                              <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
+                                   aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
+                              <Grid Grid.Column="0" Margin="0,0,6,0">
+                                <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
+                                                 ItemsSource="{Binding WacheOptions}"
+                                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                                 Text="{Binding Wache}" />
+                                <!-- Chevron affordance (#259), see OperatorPromptView for rationale. -->
+                                <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                          Margin="0,0,9,0" IsHitTestVisible="False"
+                                          Foreground="{StaticResource TextMutedBrush}"
+                                          Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                              </Grid>
+                              <Grid Grid.Column="1" Margin="0,0,6,0">
+                                <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                                 ItemsSource="{Binding CallSignOptions}"
+                                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                                 Text="{Binding CallSign}" />
+                                <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                          Margin="0,0,9,0" IsHitTestVisible="False"
+                                          Foreground="{StaticResource TextMutedBrush}"
+                                          Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                              </Grid>
+                              <!-- The Fahrzeugtelefon: a vehicle with one is listed in the Kontakte tab. -->
+                              <TextBox Grid.Column="2" Margin="0,0,6,0" AutomationProperties.Name="Telefon"
+                                       PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                                       Text="{Binding Phone}" />
+                              <NumericUpDown Grid.Column="3" Width="90" Minimum="0" Maximum="99" Increment="1"
+                                             FormatString="0" Value="{Binding Seats}" VerticalAlignment="Center" />
+                              <!-- Marks a command vehicle (ELW/KdoW) that carries the Zugführer: unlike
+                                   Officer/Mannschaft this is not seat-derived, so it needs its own flag. -->
+                              <CheckBox Grid.Column="4" IsChecked="{Binding HasZugfuehrer}"
+                                        VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Zugführerfahrzeug" />
+                              <!-- Own vehicle or a neighbouring brigade's (#458). -->
+                              <CheckBox Grid.Column="5" IsChecked="{Binding IsOwn}"
+                                        VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Eigenes Fahrzeug"
+                                        AutomationProperties.Name="Eigenes Fahrzeug" />
+                              <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
+                                   DataContext, whose static type is object under compiled bindings, so a
+                                   compiled $parent cast path won't resolve. -->
+                              <Button Grid.Column="6" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                      AutomationProperties.Name="Entfernen"
+                                      Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                      CommandParameter="{Binding}">
+                                <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                              </Button>
                             </Grid>
-                            <Grid Grid.Column="1" Margin="0,0,6,0">
-                              <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                                               ItemsSource="{Binding CallSignOptions}"
-                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                               Text="{Binding CallSign}" />
-                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                        Margin="0,0,9,0" IsHitTestVisible="False"
-                                        Foreground="{StaticResource TextMutedBrush}"
-                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-                            </Grid>
-                            <NumericUpDown Grid.Column="2" Width="90" Minimum="0" Maximum="99" Increment="1"
-                                           FormatString="0" Value="{Binding Seats}" VerticalAlignment="Center" />
-                            <!-- Marks a command vehicle (ELW/KdoW) that carries the Zugführer: unlike
-                                 Officer/Mannschaft this is not seat-derived, so it needs its own flag. -->
-                            <CheckBox Grid.Column="3" IsChecked="{Binding HasZugfuehrer}"
-                                      VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Zugführerfahrzeug" />
-                            <!-- Own vehicle or a neighbouring brigade's (#458). -->
-                            <CheckBox Grid.Column="4" IsChecked="{Binding IsOwn}"
-                                      VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Eigenes Fahrzeug"
-                                      AutomationProperties.Name="Eigenes Fahrzeug" />
-                            <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
-                                 DataContext, whose static type is object under compiled bindings, so a
-                                 compiled $parent cast path won't resolve. -->
-                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
-                                    AutomationProperties.Name="Entfernen"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                            </Button>
-                          </Grid>
+
+                            <!-- The phone form of the same row, swapped in as the Personal row's is:
+                                 every field carries its own label, since the header is gone. -->
+                            <Border Classes="row-card vehicle-narrow" Margin="0,0,0,6">
+                              <Grid ColumnDefinitions="*,*" ColumnSpacing="8"
+                                    RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                                <HeaderedContentControl Grid.Row="0" Grid.Column="0" Classes="field" Header="WACHE">
+                                  <Grid>
+                                    <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
+                                                     ItemsSource="{Binding WacheOptions}"
+                                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                                     AutomationProperties.Name="Wache"
+                                                     Text="{Binding Wache}" />
+                                    <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Margin="0,0,9,0" IsHitTestVisible="False"
+                                              Foreground="{StaticResource TextMutedBrush}"
+                                              Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                                  </Grid>
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="0" Grid.Column="1" Classes="field" Header="FUNKRUFNAME">
+                                  <Grid>
+                                    <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                                     ItemsSource="{Binding CallSignOptions}"
+                                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                                     AutomationProperties.Name="Funkrufname"
+                                                     Text="{Binding CallSign}" />
+                                    <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Margin="0,0,9,0" IsHitTestVisible="False"
+                                              Foreground="{StaticResource TextMutedBrush}"
+                                              Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                                  </Grid>
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="1" Grid.ColumnSpan="2" Classes="field" Header="TELEFON">
+                                  <TextBox Text="{Binding Phone}" AutomationProperties.Name="Telefon"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="2" Grid.Column="0" Classes="field" Header="SITZPLÄTZE">
+                                  <NumericUpDown Minimum="0" Maximum="99" Increment="1" FormatString="0"
+                                                 AutomationProperties.Name="Sitzplätze" Value="{Binding Seats}" />
+                                </HeaderedContentControl>
+                                <CheckBox Grid.Row="2" Grid.Column="1" IsChecked="{Binding HasZugfuehrer}"
+                                          Content="Zugführerfahrzeug" VerticalAlignment="Bottom" />
+                                <CheckBox Grid.Row="3" Grid.Column="0" IsChecked="{Binding IsOwn}"
+                                          Content="Eigenes Fahrzeug" VerticalAlignment="Center" />
+                                <Button Grid.Row="3" Grid.Column="1" Classes="icon-btn card-action" HorizontalAlignment="Right"
+                                        ToolTip.Tip="Entfernen" AutomationProperties.Name="Entfernen"
+                                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                        CommandParameter="{Binding}">
+                                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                </Button>
+                              </Grid>
+                            </Border>
+                          </Panel>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>

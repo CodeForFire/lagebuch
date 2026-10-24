@@ -8,7 +8,8 @@ using LageBuch.Persistence.MasterData;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// Searchable view of the Personal Stammdaten, shown as a read-only tab in the incident workspace.
+/// Searchable view of the Personal Stammdaten, plus every Fahrzeug that carries a phone, shown as a
+/// read-only tab in the incident workspace.
 /// It answers the question an Einsatzleitung actually asks over the radio — "wer ist zuständig für
 /// ABC?" — and then lets that person be reached. Like <see cref="LinksViewModel"/> it holds no
 /// session and mutates nothing: the roster is global master data, not incident state, so phoning
@@ -16,22 +17,26 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
 {
-    // Person is a record, so two people with identical fields are equal by value. A dictionary
-    // keyed on Person would collapse them; a parallel array cannot, and costs nothing at roster
-    // size (the Landkreis roster is ~35 people).
-    private readonly (Person Person, string Haystack)[] _entries;
+    // ContactEntry is a record, so two contacts with identical fields are equal by value. A
+    // dictionary keyed on it would collapse them; a parallel array cannot, and costs nothing at
+    // roster size (the Landkreis roster is ~35 people).
+    private readonly (ContactEntry Entry, string Haystack)[] _entries;
     private readonly IFileDialogService _dialogs;
 
-    public ContactsViewModel(IReadOnlyList<Person> people, IFileDialogService dialogs)
+    // Of the vehicles, only those with a number are listed, after the people, in Stammdaten order:
+    // a vehicle without one is nobody to reach.
+    public ContactsViewModel(IReadOnlyList<Person> people, IFileDialogService dialogs, IReadOnlyList<Vehicle>? vehicles = null)
     {
         ArgumentNullException.ThrowIfNull(people);
         _dialogs = dialogs;
-        Contacts = people;
-        _entries = people.Select(p => (p, HaystackFor(p))).ToArray();
-        VisibleContacts = new ObservableCollection<ContactRow>(people.Select(p => RowFor(p, Array.Empty<string>())));
+        Contacts = people.Select(ContactEntry.FromPerson)
+            .Concat((vehicles ?? Array.Empty<Vehicle>()).Where(v => v.HasPhone).Select(ContactEntry.FromVehicle))
+            .ToArray();
+        _entries = Contacts.Select(c => (c, HaystackFor(c))).ToArray();
+        VisibleContacts = new ObservableCollection<ContactRow>(Contacts.Select(c => RowFor(c, Array.Empty<string>())));
     }
 
-    public IReadOnlyList<Person> Contacts { get; }
+    public IReadOnlyList<ContactEntry> Contacts { get; }
 
     /// <summary>
     /// The subset of <see cref="Contacts"/> matching <see cref="FilterText"/>, and what the view
@@ -68,7 +73,7 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
     partial void OnFilterTextChanged(string value) => ApplyFilter();
 
     /// <summary>
-    /// Everything about one person that is worth searching, joined into a single string.
+    /// Everything about one contact that is worth searching, joined into a single string.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -87,10 +92,10 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
     /// dial would otherwise match nothing.
     /// </para>
     /// </remarks>
-    private static string HaystackFor(Person p)
+    private static string HaystackFor(ContactEntry c)
     {
-        var fields = new List<string?> { p.DisplayName, p.Role, p.CallSign, p.Phone, p.Email, p.Note };
-        var digits = new string((p.Phone ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+        var fields = new List<string?> { c.Name, c.Caption, c.CallSign, c.Phone, c.Email, c.Note };
+        var digits = new string((c.Phone ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
         if (digits.Length > 0)
         {
             fields.Add(digits);
@@ -100,7 +105,7 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
     }
 
     /// <summary>
-    /// Splits the query on whitespace and keeps a person only when <em>every</em> term appears
+    /// Splits the query on whitespace and keeps a contact only when <em>every</em> term appears
     /// somewhere in their fields.
     /// </summary>
     /// <remarks>
@@ -117,11 +122,11 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         VisibleContacts.Clear();
-        foreach (var (person, haystack) in _entries)
+        foreach (var (entry, haystack) in _entries)
         {
             if (terms.All(t => haystack.Contains(t, StringComparison.OrdinalIgnoreCase)))
             {
-                VisibleContacts.Add(RowFor(person, terms));
+                VisibleContacts.Add(RowFor(entry, terms));
             }
         }
     }
@@ -130,8 +135,8 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
     /// Only the name and the Notiz are split for highlighting: they are the two lines a hit has
     /// to explain. A hit in the Rolle or the Funkrufname is already plain to see next to the name.
     /// </summary>
-    private static ContactRow RowFor(Person person, IReadOnlyList<string> terms) =>
-        new(person, TextSegment.Highlight(person.DisplayName, terms), TextSegment.Highlight(person.Note, terms));
+    private static ContactRow RowFor(ContactEntry entry, IReadOnlyList<string> terms) =>
+        new(entry, TextSegment.Highlight(entry.Name, terms), TextSegment.Highlight(entry.Note, terms));
 
     [RelayCommand]
     private void ClearFilter() => FilterText = string.Empty;
@@ -142,17 +147,17 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
     /// <see cref="MailAddressValidator"/> for what a CR/LF or a '?' in one would otherwise do.
     /// </summary>
     [RelayCommand]
-    private async Task MailAsync(Person person)
+    private async Task MailAsync(ContactEntry contact)
     {
-        ArgumentNullException.ThrowIfNull(person);
-        ErrorMessage = await ContactLauncher.TryMailAsync(_dialogs, person.Email, person.DisplayName);
+        ArgumentNullException.ThrowIfNull(contact);
+        ErrorMessage = await ContactLauncher.TryMailAsync(_dialogs, contact.Email, contact.Name);
     }
 
     /// <inheritdoc cref="MailAsync"/>
     [RelayCommand]
-    private async Task CallAsync(Person person)
+    private async Task CallAsync(ContactEntry contact)
     {
-        ArgumentNullException.ThrowIfNull(person);
-        ErrorMessage = await ContactLauncher.TryCallAsync(_dialogs, person.Phone, person.DisplayName);
+        ArgumentNullException.ThrowIfNull(contact);
+        ErrorMessage = await ContactLauncher.TryCallAsync(_dialogs, contact.Phone, contact.Name);
     }
 }

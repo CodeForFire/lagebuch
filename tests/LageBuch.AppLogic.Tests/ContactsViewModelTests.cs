@@ -33,7 +33,7 @@ public class ContactsViewModelTests
         vm.FilterText = "gefahrgut";
 
         Assert.Single(vm.VisibleContacts);
-        Assert.Equal("Beispiel, Bernd", vm.VisibleContacts[0].Person.DisplayName);
+        Assert.Equal("Beispiel, Bernd", vm.VisibleContacts[0].Entry.Name);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class ContactsViewModelTests
         vm.FilterText = "Biburg";
 
         Assert.Single(vm.VisibleContacts);
-        Assert.Equal("Musterhuber, Sepp", vm.VisibleContacts[0].Person.DisplayName);
+        Assert.Equal("Musterhuber, Sepp", vm.VisibleContacts[0].Entry.Name);
     }
 
     // Every term has to match, but each may land in a different field and in any order -- a plain
@@ -82,7 +82,7 @@ public class ContactsViewModelTests
         vm.FilterText = "01711234567";
 
         Assert.Single(vm.VisibleContacts);
-        Assert.Equal("Mustermann, Max", vm.VisibleContacts[0].Person.DisplayName);
+        Assert.Equal("Mustermann, Max", vm.VisibleContacts[0].Entry.Name);
     }
 
     [Fact]
@@ -299,7 +299,7 @@ public class ContactsViewModelTests
     {
         var row = Vm().VisibleContacts[0];
 
-        Assert.Equal("01 71 / 1 23 45 67", row.Person.Phone);
+        Assert.Equal("01 71 / 1 23 45 67", row.Entry.Phone);
         Assert.Equal("0171 1234567", row.PhoneDisplay);
         Assert.True(row.CanDial);
         Assert.False(row.ShowsUndialablePhone);
@@ -330,6 +330,91 @@ public class ContactsViewModelTests
 
         Assert.False(row.CanDial);
         Assert.False(row.ShowsUndialablePhone);
+    }
+
+    // A Fahrzeugtelefon is somebody to call too, so a vehicle that has a number is a contact. It
+    // comes after the people, in Stammdaten order; a vehicle without a number has no reason to be
+    // in a list of whom to reach.
+    [Fact]
+    public void A_vehicle_with_a_number_is_listed_after_the_people()
+    {
+        var vm = new ContactsViewModel(
+            new[] { new Person("Mustermann", "Max", "KBR", "Land 1", "01 71 / 1 23 45 67") },
+            new NoopContactDialogs(),
+            new[]
+            {
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 40/1", 9),
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 11/1", 4, Phone: "01 71 / 2 34 56 78"),
+                new Vehicle("FF Musterdorf", "Florian Musterdorf 14/1", 6, Phone: "   "),
+            });
+
+        Assert.Equal(new[] { "Mustermann, Max", "Florian Musterstadt 11/1" }, vm.VisibleContacts.Select(r => r.Entry.Name));
+        Assert.Equal(2, vm.Contacts.Count);
+
+        var vehicle = vm.VisibleContacts[1];
+        Assert.True(vehicle.Entry.IsVehicle);
+        Assert.False(vm.VisibleContacts[0].Entry.IsVehicle);
+        Assert.Equal("FF Musterstadt", vehicle.Entry.Caption);
+        Assert.Equal("0171 2345678", vehicle.PhoneDisplay);
+        Assert.True(vehicle.CanDial);
+    }
+
+    [Theory]
+    [InlineData("musterstadt 11")]
+    [InlineData("FF Musterstadt")]
+    [InlineData("01712345678")]
+    public void A_vehicle_is_found_by_funkrufname_wache_or_dialled_digits(string query)
+    {
+        var vm = new ContactsViewModel(
+            new[] { new Person("Mustermann", "Max", "KBR", "Land 1", "01 71 / 1 23 45 67") },
+            new NoopContactDialogs(),
+            new[] { new Vehicle("FF Musterstadt", "Florian Musterstadt 11/1", 4, Phone: "01 71 / 2 34 56 78") });
+
+        vm.FilterText = query;
+
+        Assert.Equal("Florian Musterstadt 11/1", Assert.Single(vm.VisibleContacts).Entry.Name);
+    }
+
+    [Fact]
+    public void A_foreign_vehicle_is_marked_foreign()
+    {
+        var vm = new ContactsViewModel(
+            Array.Empty<Person>(),
+            new NoopContactDialogs(),
+            new[] { new Vehicle("FF Musterdorf", "Florian Musterdorf 14/1", 6, IsOwn: false, Phone: "01 71 / 2 34 56 78") });
+
+        Assert.True(Assert.Single(vm.VisibleContacts).IsForeign);
+    }
+
+    [Fact]
+    public async Task Calling_a_vehicle_hands_its_number_to_the_platform()
+    {
+        var dialogs = new NoopContactDialogs();
+        var vm = new ContactsViewModel(
+            Array.Empty<Person>(),
+            dialogs,
+            new[] { new Vehicle("FF Musterstadt", "Florian Musterstadt 11/1", 4, Phone: "01 71 / 2 34 56 78") });
+
+        await vm.CallCommand.ExecuteAsync(vm.Contacts[0]);
+
+        Assert.Null(vm.ErrorMessage);
+        Assert.Equal("01 71 / 2 34 56 78", dialogs.DialedNumber);
+    }
+
+    // The vehicle list is imported too, so its numbers go through the same validator.
+    [Fact]
+    public async Task A_vehicle_number_carrying_a_ussd_code_never_reaches_the_dialer()
+    {
+        var dialogs = new NoopContactDialogs();
+        var vm = new ContactsViewModel(
+            Array.Empty<Person>(),
+            dialogs,
+            new[] { new Vehicle("FF Böse", "Florian Böse 1", 4, Phone: "*#06#") });
+
+        await vm.CallCommand.ExecuteAsync(vm.Contacts[0]);
+
+        Assert.Equal("„Florian Böse 1“ hat keine gültige Telefonnummer.", vm.ErrorMessage);
+        Assert.Null(dialogs.DialedNumber);
     }
 
     // A blank field arrives from the importer as "" rather than null, so the view's per-field

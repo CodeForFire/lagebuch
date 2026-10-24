@@ -349,6 +349,25 @@ public class PhoneLayoutTests
         AssertNothingOverflows(window, view);
     }
 
+    // Six columns cannot fit 412dp either -- they squeezed Wache and Funkrufname to a few pixels
+    // even before the Fahrzeugtelefon joined them -- so a Fahrzeug row stacks like a Personal one.
+    [AvaloniaFact]
+    public void The_stammdaten_vehicle_rows_stack_on_a_phone()
+    {
+        var vm = new MasterDataEditorViewModel(new DemoProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = PhoneWindow(view);
+
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Fahrzeuge");
+        Dispatcher.UIThread.RunJobs();
+
+        var descendants = view.GetVisualDescendants().ToList();
+        Assert.True(descendants.OfType<Border>().Single(b => b.Classes.Contains("vehicle-narrow")).IsEffectivelyVisible);
+        Assert.False(descendants.OfType<Grid>().Single(g => g.Classes.Contains("vehicle-wide")).IsEffectivelyVisible);
+        Assert.False(Named<Grid>(view, "VehiclesHeader").IsEffectivelyVisible);
+        AssertNothingOverflows(window, view);
+    }
+
     // #461: a Straßen row is four fields and a button, which still has to fit 412dp: the street
     // name keeps the widest column and nothing runs past the edge.
     [AvaloniaFact]

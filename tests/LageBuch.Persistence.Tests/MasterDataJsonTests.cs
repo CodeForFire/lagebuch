@@ -384,12 +384,26 @@ public class MasterDataJsonTests
                 new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
                 new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true),
                 new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9, IsOwn: false),
+                new Vehicle("FFB Wache 1", "FFB 1/11/1", 4, Phone: "01 71 / 1 23 45 67"),
             },
         };
 
         var reparsed = Parse(MasterDataJson.Serialize(original));
 
         Assert.Equal(original.Vehicles, reparsed.Vehicles);
+    }
+
+    /// <summary>A file written before vehicles had a phone number carries none: null, not "".</summary>
+    [Fact]
+    public void Parse_reads_a_vehicle_without_phone_as_having_no_number()
+    {
+        var set = Parse("""
+            { "vehicles": [ { "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 } ] }
+            """);
+
+        var vehicle = Assert.Single(set.Vehicles);
+        Assert.Null(vehicle.Phone);
+        Assert.False(vehicle.HasPhone);
     }
 
     [Fact]
