@@ -178,6 +178,21 @@ public static class CommandApplier
             case SendSituationReportCommand c:
                 incident.SendSituationReport(clock, Operator(c.Operator), c.ReportId, c.DispatchCentreName);
                 break;
+            case IssueItemCommand c:
+                incident.IssueItem(clock, Operator(c.Operator), c.Device, c.IssuedTo, c.IssuedToPhone, c.IssuedToDetails, c.Remark);
+                break;
+            case UpdateIssuedItemCommand c:
+                incident.UpdateIssuedItem(c.ItemId, c.Device, c.IssuedTo, c.IssuedToPhone, c.IssuedToDetails, c.Remark);
+                break;
+            case ReturnIssuedItemCommand c:
+                incident.ReturnIssuedItem(clock, Operator(c.Operator), c.ItemId);
+                break;
+            case UndoIssuedItemReturnCommand c:
+                incident.UndoIssuedItemReturn(c.ItemId);
+                break;
+            case RemoveIssuedItemCommand c:
+                incident.RemoveIssuedItem(c.ItemId);
+                break;
             case UpdateTaskCommand c:
                 incident.UpdateTask(c.TaskId, c.Text, c.Assignee, c.Importance, c.Urgency);
                 break;

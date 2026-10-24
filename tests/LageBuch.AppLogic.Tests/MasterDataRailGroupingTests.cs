@@ -87,7 +87,7 @@ public class MasterDataRailGroupingTests
             new[]
             {
                 "Einstellungen", "Navigation", "Einheiten-Status",
-                "Fahrzeuge", "Links", "Objekte", "Ortsteile", "Personal", "Rollen", "Stichwörter", "Straßen",
+                "Fahrzeuge", "Geräte", "Links", "Objekte", "Ortsteile", "Personal", "Rollen", "Stichwörter", "Straßen",
                 "Textbausteine", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));

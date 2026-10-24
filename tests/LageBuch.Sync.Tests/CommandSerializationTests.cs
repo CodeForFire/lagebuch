@@ -78,6 +78,12 @@ public class CommandSerializationTests
         new UpdateSituationReportCommand(Guid.NewGuid(), "ELW 1", null, "Feuer aus", null, null, null),
         new RemoveSituationReportCommand(Guid.NewGuid()),
         new SendSituationReportCommand(Op, Guid.NewGuid(), "ILS"),
+        new IssueItemCommand(Op, "Mobilteil 1", "Erika Beispiel", "0171 0000001", "THW OV Beispielstadt", "mit Ladekabel"),
+        new IssueItemCommand(Op, "AED", "Max Beispiel", null, null, null),
+        new UpdateIssuedItemCommand(Guid.NewGuid(), "AED", "Max Beispiel", null, "Polizei", null),
+        new ReturnIssuedItemCommand(Op, Guid.NewGuid()),
+        new UndoIssuedItemReturnCommand(Guid.NewGuid()),
+        new RemoveIssuedItemCommand(Guid.NewGuid()),
         new UpdateTaskCommand(Guid.NewGuid(), "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium),
         new ExtendTaskTimerCommand(Guid.NewGuid(), 5),
     }.Select(c => new object[] { c });
@@ -284,6 +290,31 @@ public class CommandSerializationTests
             "updateSituationReport" => new UpdateSituationReportCommand(id, "ELW 1", null, "Lage", null, null, null),
             "removeSituationReport" => new RemoveSituationReportCommand(id),
             _ => new SendSituationReportCommand(Op, id, "ILS"),
+        };
+
+        var json = SyncJson.Serialize(command);
+
+        Assert.Contains($"\"$type\":\"{discriminator}\"", json, StringComparison.Ordinal);
+        Assert.Equal(command.GetType(), SyncJson.Deserialize<SyncCommand>(json).GetType());
+    }
+
+    // The Ausgabeliste discriminators are a wire contract between joined devices.
+    [Theory]
+    [InlineData("issueItem")]
+    [InlineData("updateIssuedItem")]
+    [InlineData("returnIssuedItem")]
+    [InlineData("undoIssuedItemReturn")]
+    [InlineData("removeIssuedItem")]
+    public void Issued_item_commands_use_their_discriminators(string discriminator)
+    {
+        var id = Guid.NewGuid();
+        SyncCommand command = discriminator switch
+        {
+            "issueItem" => new IssueItemCommand(Op, "AED", "Max Beispiel", null, null, null),
+            "updateIssuedItem" => new UpdateIssuedItemCommand(id, "AED", "Max Beispiel", null, null, null),
+            "returnIssuedItem" => new ReturnIssuedItemCommand(Op, id),
+            "undoIssuedItemReturn" => new UndoIssuedItemReturnCommand(id),
+            _ => new RemoveIssuedItemCommand(id),
         };
 
         var json = SyncJson.Serialize(command);

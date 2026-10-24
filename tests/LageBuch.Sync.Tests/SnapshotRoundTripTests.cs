@@ -427,6 +427,34 @@ public class SnapshotRoundTripTests
 
         Assert.Empty(restored.SituationReports);
     }
+
+    [Fact]
+    public void Issued_items_round_trip_through_the_snapshot_over_the_wire()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Muster", "ELW 1");
+        var incident = Incident.Start(clock, op);
+        var radio = incident.IssueItem(clock, op, "Mobilteil 1", "Erika Beispiel", "0171 0000001", "THW OV Beispielstadt", "mit Ladekabel");
+        incident.IssueItem(clock, op, "AED", "Max Beispiel", null, null, null);
+        incident.ReturnIssuedItem(clock, op, radio.Id);
+
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(incident.IssuedItems, restored.IssuedItems);
+    }
+
+    [Fact]
+    public void A_snapshot_without_issued_items_reads_as_none()
+    {
+        var clock = new FixedClock();
+        var incident = Incident.Start(clock, new SessionOperator("Muster"));
+        var snapshot = SnapshotMapper.ToSnapshot(incident) with { IssuedItems = null };
+
+        var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(snapshot)));
+
+        Assert.Empty(restored.IssuedItems);
+    }
 }
 
 internal sealed class FixedClock : IClock

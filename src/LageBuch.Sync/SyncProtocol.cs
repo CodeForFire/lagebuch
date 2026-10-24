@@ -111,15 +111,21 @@ public static class SyncProtocol
     /// snapshot's readings the same. A host at 16 to 18 ignores it -- the reading is recorded
     /// without an Ort -- and a client there drops the snapshot's, so the floor stays at 16.
     /// </para>
+    /// <para>
+    /// 20: the Ausgabeliste — <c>issueItem</c>, <c>updateIssuedItem</c>, <c>returnIssuedItem</c>,
+    /// <c>undoIssuedItemReturn</c> and <c>removeIssuedItem</c> commands, the snapshot's
+    /// <c>issuedItems</c>, and the Stammdaten payload's <c>devices</c>. A host at 19 would reject
+    /// those commands, so the floor rises to 20.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 19;
+    public const int ProtocolVersion = 20;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 16;
+    public const int MinimumProtocolVersion = 20;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

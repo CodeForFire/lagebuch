@@ -205,6 +205,21 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SendSituationReport(Guid reportId, string dispatchCentreName) =>
         Mutate(() => Incident.SendSituationReport(_clock, RequireOperator(), reportId, dispatchCentreName));
 
+    public void IssueItem(string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark) =>
+        Mutate(() => Incident.IssueItem(_clock, RequireOperator(), device, issuedTo, issuedToPhone, issuedToDetails, remark));
+
+    public void UpdateIssuedItem(Guid itemId, string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark) =>
+        Mutate(() => Incident.UpdateIssuedItem(itemId, device, issuedTo, issuedToPhone, issuedToDetails, remark));
+
+    public void ReturnIssuedItem(Guid itemId) =>
+        Mutate(() => Incident.ReturnIssuedItem(_clock, RequireOperator(), itemId));
+
+    public void UndoIssuedItemReturn(Guid itemId) =>
+        Mutate(() => Incident.UndoIssuedItemReturn(itemId));
+
+    public void RemoveIssuedItem(Guid itemId) =>
+        Mutate(() => Incident.RemoveIssuedItem(itemId));
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Mutate(() => Incident.UpdateTask(taskId, text, assignee, importance, urgency));
 

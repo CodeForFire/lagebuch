@@ -461,7 +461,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [EtbTabs, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
+        object?[] modules = [EtbTabs, Tasks, Roles, Forces, InvolvedParties, IssuedItems, Scba, CoMessprotokoll, Files, Links, Contacts];
         return modules.OfType<INarrowAware>();
     }
 
@@ -529,6 +529,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public ForcesViewModel Forces { get; private set; } = null!;
 
     public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
+
+    public IssuedItemsViewModel IssuedItems { get; private set; } = null!;
 
     public SituationReportsViewModel SituationReports { get; private set; } = null!;
 
@@ -925,6 +927,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Roles?.Dispose();
         Forces?.Dispose();
         InvolvedParties?.Dispose();
+        IssuedItems?.Dispose();
         SituationReports?.Dispose();
         if (Scba is not null)
         {
@@ -1000,6 +1003,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirm);
 
+        IssuedItems = new IssuedItemsViewModel(_session, OnChanged, _masterData.Devices, RequestConfirm);
+
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnHeaderSourceChanged;
@@ -1048,6 +1053,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(InvolvedParties));
+        OnPropertyChanged(nameof(IssuedItems));
         OnPropertyChanged(nameof(SituationReports));
         OnPropertyChanged(nameof(EtbTabs));
         OnPropertyChanged(nameof(Scba));
@@ -1079,6 +1085,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Roles] = Roles,
             [NavModules.Forces] = Forces,
             [NavModules.InvolvedParties] = InvolvedParties,
+            [NavModules.IssuedItems] = IssuedItems,
             [NavModules.Scba] = Scba,
             [NavModules.Co] = CoMessprotokoll,
             [NavModules.Files] = Files,
@@ -1281,15 +1288,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private bool CanClose => !IsReadOnly && !IsClient;
 
     // Closing is permanent (the incident becomes read-only), so confirm first. If a Trupp is
-    // still under air, call that out — closing mid-Atemschutz is a serious mistake.
+    // still under air, call that out — closing mid-Atemschutz is a serious mistake. So is a Gerät
+    // still out: once closed, the Ausgabeliste can no longer record it coming back.
     [RelayCommand(CanExecute = nameof(CanClose))]
     private void CloseIncident()
     {
         var activeTrupps = _session.Incident.ScbaTrupps.Count(t => t.IsActive || t.IsWithdrawing);
-        var message = activeTrupps > 0
-            ? $"ACHTUNG: {activeTrupps} Atemschutztrupp(s) noch unter PA. " +
-              "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?"
-            : "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?";
+        var itemsOut = _session.Incident.ItemsOut;
+        var warnings = string.Concat(
+            activeTrupps > 0 ? $"ACHTUNG: {activeTrupps} Atemschutztrupp(s) noch unter PA. " : string.Empty,
+            itemsOut > 0 ? $"ACHTUNG: {itemsOut} Gerät(e) noch nicht zurückgegeben. " : string.Empty);
+        var message = warnings + "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?";
 
         // The final PDF is usually the next thing the Lagebuchführer makes, and a closed incident
         // can no longer be corrected, so offer it here (#425); sending it by e-mail is a nested

@@ -43,6 +43,12 @@ public static class ValidationMessages
     /// <summary>A Beteiligte/r without a name, which nobody could look up again.</summary>
     public const string NameRequired = "Name eingeben";
 
+    /// <summary>An Ausgabe without a Gerät, which nobody could ask back for.</summary>
+    public const string DeviceRequired = "Gerät eingeben";
+
+    /// <summary>An Ausgabe without the person it went to, which nobody could ask back for.</summary>
+    public const string IssuedToRequired = "Ausgegeben an: Name eingeben";
+
     /// <summary>The Wache a Kräfte row belongs to, without which the row reports nobody.</summary>
     public const string BrigadeRequired = "Wache eingeben";
 

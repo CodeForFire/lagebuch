@@ -135,6 +135,21 @@ public interface IIncidentSession
     /// outgoing entry to <paramref name="dispatchCentreName"/>.</summary>
     void SendSituationReport(Guid reportId, string dispatchCentreName);
 
+    /// <summary>Hands a Gerät out (Ausgabeliste), stamped by the host. No ETB line.</summary>
+    void IssueItem(string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark);
+
+    /// <summary>Corrects a line of the Ausgabeliste in place. No ETB line.</summary>
+    void UpdateIssuedItem(Guid itemId, string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark);
+
+    /// <summary>Records that a Gerät came back, stamped by the host. No ETB line.</summary>
+    void ReturnIssuedItem(Guid itemId);
+
+    /// <summary>Takes a return back, for a ZURÜCK pressed on the wrong line. No ETB line.</summary>
+    void UndoIssuedItemReturn(Guid itemId);
+
+    /// <summary>Takes a line of the Ausgabeliste back completely. No ETB line.</summary>
+    void RemoveIssuedItem(Guid itemId);
+
     /// <summary>Corrects a task's fields (#246): typo fixes, reassignment, re-prioritizing.</summary>
     void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency);
 

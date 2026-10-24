@@ -508,6 +508,21 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SendSituationReport(Guid reportId, string dispatchCentreName) =>
         Send(new SendSituationReportCommand(Op(), reportId, dispatchCentreName));
 
+    public void IssueItem(string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark) =>
+        Send(new IssueItemCommand(Op(), device, issuedTo, issuedToPhone, issuedToDetails, remark));
+
+    public void UpdateIssuedItem(Guid itemId, string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark) =>
+        Send(new UpdateIssuedItemCommand(itemId, device, issuedTo, issuedToPhone, issuedToDetails, remark));
+
+    public void ReturnIssuedItem(Guid itemId) =>
+        Send(new ReturnIssuedItemCommand(Op(), itemId));
+
+    public void UndoIssuedItemReturn(Guid itemId) =>
+        Send(new UndoIssuedItemReturnCommand(itemId));
+
+    public void RemoveIssuedItem(Guid itemId) =>
+        Send(new RemoveIssuedItemCommand(itemId));
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Send(new UpdateTaskCommand(taskId, text, assignee ?? string.Empty, importance, urgency));
 

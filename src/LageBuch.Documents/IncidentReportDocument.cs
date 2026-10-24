@@ -95,6 +95,11 @@ public sealed class IncidentReportDocument : IDocument
                     column.Item().Element(c => InvolvedPartiesSection.Compose(c, _incident));
                 }
 
+                if (_sections.HasFlag(IncidentPdfSections.IssuedItems))
+                {
+                    column.Item().Element(c => IssuedItemsSection.Compose(c, _incident));
+                }
+
                 if (_sections.HasFlag(IncidentPdfSections.Tasks))
                 {
                     column.Item().Element(c => TasksSection.Compose(c, _incident, _asOf));
