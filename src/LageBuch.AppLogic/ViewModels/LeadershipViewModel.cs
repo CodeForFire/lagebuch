@@ -92,6 +92,13 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
     public bool IsDraggingUnit => DraggingUnitId is not null;
 
+    /// <summary>The node whose card is being dragged, so the view can show where it may land; null otherwise.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDraggingNode))]
+    private Guid? _draggingNodeId;
+
+    public bool IsDraggingNode => DraggingNodeId is not null;
+
     /// <summary>The Leitstelle the Einsatzleitung reports to, from the Stammdaten (default "ILS").</summary>
     public string DispatchCentreName { get; }
 
@@ -291,6 +298,50 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     }
 
     public void EndDrag() => DraggingUnitId = null;
+
+    /// <summary>
+    /// Whether <paramref name="nodeId"/> may go under <paramref name="parentId"/> (null: the top level)
+    /// before <paramref name="beforeNodeId"/> (null: at the end): the Einsatz is open, the domain's
+    /// <see cref="CommandNodeMoves.Refusal"/> allows it, and it would change something.
+    /// </summary>
+    public bool CanMoveNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId)
+    {
+        if (IsReadOnly || CommandNodeMoves.Refusal(_incident, nodeId, parentId, beforeNodeId) is not null)
+        {
+            return false;
+        }
+
+        var node = _incident.FindCommandNode(nodeId);
+        if (node?.ParentId != parentId)
+        {
+            return true;
+        }
+
+        // Same Abschnitt: only a new place among the siblings is a move.
+        var siblings = _incident.CommandNodes.Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, parentId)).Select(n => n.Id).ToList();
+        var index = siblings.IndexOf(nodeId);
+        var next = index + 1 < siblings.Count ? siblings[index + 1] : (Guid?)null;
+        return beforeNodeId != nodeId && beforeNodeId != next;
+    }
+
+    /// <summary>Moves a node; false when <see cref="CanMoveNode"/> says no or the session refuses.</summary>
+    public bool MoveNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId)
+    {
+        ActionError = null;
+        return CanMoveNode(nodeId, parentId, beforeNodeId)
+            && Run(() => _session.MoveCommandNode(nodeId, parentId, beforeNodeId));
+    }
+
+    /// <summary>A drag of the card of <paramref name="nodeId"/> began; ignored on a read-only Einsatz.</summary>
+    public void BeginNodeDrag(Guid nodeId)
+    {
+        if (!IsReadOnly)
+        {
+            DraggingNodeId = nodeId;
+        }
+    }
+
+    public void EndNodeDrag() => DraggingNodeId = null;
 
     private bool CanAdd => !IsReadOnly;
 

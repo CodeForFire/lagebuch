@@ -41,6 +41,12 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     // Funkgruppe the record spells off-catalogue, must not read as one.
     private Fields _seeded;
 
+    // Where the node stood when the dialog opened (its Abschnitt, and the sibling after it), and
+    // where LIEGT IN and EINORDNEN VOR now put it. Edit mode only.
+    private (Guid? Parent, Guid? Before) _seededPlace;
+    private Guid? _placeParentId;
+    private Guid? _placeBeforeId;
+
     private CommandNodeDialogViewModel(
         IIncidentSession session,
         MasterDataSet masterData,
@@ -65,6 +71,12 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
     public event EventHandler? Closed;
 
+    /// <summary>The LIEGT IN entry for "no Abschnitt above it".</summary>
+    public const string OwnAbschnittLabel = "— eigenständiger Abschnitt —";
+
+    /// <summary>The EINORDNEN VOR entry for "after every sibling".</summary>
+    public const string AtEndLabel = "— am Ende —";
+
     /// <summary>The Funkgruppen of the Stammdaten, offered as suggestions and never enforced.</summary>
     public IReadOnlyList<string> FunkgruppeOptions { get; }
 
@@ -78,6 +90,27 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
     /// <summary>False when editing the Einsatzleitung's own post: it has no Auftrag.</summary>
     public bool ShowAuftrag => _mode != Mode.Post;
+
+    /// <summary>LIEGT IN: an existing Abschnitt or Unterabschnitt can change level or Abschnitt.</summary>
+    public bool ShowParent => _mode == Mode.Edit && _kind is CommandNodeKind.Abschnitt or CommandNodeKind.Unterabschnitt;
+
+    /// <summary>EINORDNEN VOR: an existing node of the sheet can change its place; a partner cannot.</summary>
+    public bool ShowPosition => _mode == Mode.Edit && _kind != CommandNodeKind.Partner;
+
+    /// <summary>LIEGT IN's entries: <see cref="OwnAbschnittLabel"/>, then every other live Abschnitt.</summary>
+    public IReadOnlyList<NodeChoice> ParentChoices { get; private set; } = [];
+
+    /// <summary>What a closed LIEGT IN says.</summary>
+    public string ParentLabel => Label(ParentChoices, OwnAbschnittLabel);
+
+    /// <summary>Why the node cannot go into an Abschnitt, in German; null when it can.</summary>
+    public string? ParentHint { get; private set; }
+
+    /// <summary>EINORDNEN VOR's entries: the node's siblings at the chosen place, then <see cref="AtEndLabel"/>.</summary>
+    public IReadOnlyList<NodeChoice> PositionChoices { get; private set; } = [];
+
+    /// <summary>What a closed EINORDNEN VOR says.</summary>
+    public string PositionLabel => Label(PositionChoices, AtEndLabel);
 
     [ObservableProperty]
     private string _name;
@@ -151,7 +184,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             Funkgruppe = node?.Funkgruppe,
             Rufname = node?.Rufname,
             Telefon = node?.Telefon,
-        }.Seeded();
+        }.Seeded().SeededPlace();
     }
 
     /// <summary>Opens the dialog on the Einsatzleitung Feuerwehr's own post.</summary>
@@ -175,7 +208,12 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     /// live record: a peer's edit meanwhile is not something typed here, and must neither ask the
     /// discard question nor be overwritten by an untouched save.
     /// </summary>
-    public bool HasChanges => Current() != _seeded;
+    public bool HasChanges => Current() != _seeded || PlaceChanged;
+
+    private bool PlaceChanged => (_placeParentId, _placeBeforeId) != _seededPlace;
+
+    // The Abschnitt the name has to be free in: where LIEGT IN puts the node when editing it.
+    private Guid? TargetParentId => _mode == Mode.Edit ? _placeParentId : _parentId;
 
     private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen && NameError is null;
 
@@ -200,7 +238,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         }
 
         var taken = _session.Incident.CommandNodes.Any(n =>
-            n.IsLive && n.Id != _nodeId && n.ParentId == _parentId
+            n.IsLive && n.Id != _nodeId && n.ParentId == TargetParentId
             && string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase));
         return taken ? "Name ist bereits vergeben." : null;
     }
@@ -213,6 +251,85 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         _seeded = Current();
         return this;
     }
+
+    // Starts LIEGT IN and EINORDNEN VOR where the node stands: its Abschnitt, and the next live
+    // sibling after it (none when it is the last).
+    private CommandNodeDialogViewModel SeededPlace()
+    {
+        if (LiveNode is { } node)
+        {
+            var nodes = _session.Incident.CommandNodes;
+            var index = nodes.ToList().FindIndex(n => n.Id == node.Id);
+            _placeParentId = node.ParentId;
+            _placeBeforeId = nodes.Skip(index + 1)
+                .FirstOrDefault(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, node.ParentId))?.Id;
+        }
+
+        _seededPlace = (_placeParentId, _placeBeforeId);
+        RebuildPlaceChoices();
+        return this;
+    }
+
+    private void SelectParent(Guid? parentId)
+    {
+        _placeParentId = parentId;
+
+        // Back in its own Abschnitt the node keeps its old place; anywhere else it starts at the end.
+        _placeBeforeId = parentId == _seededPlace.Parent ? _seededPlace.Before : null;
+        NameError = ValidateName();
+        RebuildPlaceChoices();
+    }
+
+    private void SelectBefore(Guid? beforeId)
+    {
+        _placeBeforeId = beforeId;
+        RebuildPlaceChoices();
+    }
+
+    private void RebuildPlaceChoices()
+    {
+        if (!ShowPosition)
+        {
+            return;
+        }
+
+        var nodes = _session.Incident.CommandNodes;
+        if (ShowParent)
+        {
+            var parents = new List<NodeChoice> { Choice(null, OwnAbschnittLabel, _placeParentId is null, SelectParent) };
+
+            // Two levels only: an Abschnitt that still leads Unterabschnitte cannot become one.
+            ParentHint = nodes.Any(n => n.IsLive && n.ParentId == _nodeId) ? "Erst die Unterabschnitte verschieben." : null;
+            if (ParentHint is null)
+            {
+                parents.AddRange(nodes
+                    .Where(n => n.IsLive && n.Kind == CommandNodeKind.Abschnitt && n.Id != _nodeId)
+                    .Select(n => Choice(n.Id, n.Name, n.Id == _placeParentId, SelectParent)));
+            }
+
+            ParentChoices = parents;
+        }
+
+        PositionChoices =
+        [
+            .. nodes
+                .Where(n => n.IsLive && n.Id != _nodeId && CommandNodeMoves.IsSiblingAt(n, _placeParentId))
+                .Select(n => Choice(n.Id, n.Name, n.Id == _placeBeforeId, SelectBefore)),
+            Choice(null, AtEndLabel, _placeBeforeId is null, SelectBefore),
+        ];
+
+        OnPropertyChanged(nameof(ParentChoices));
+        OnPropertyChanged(nameof(ParentLabel));
+        OnPropertyChanged(nameof(ParentHint));
+        OnPropertyChanged(nameof(PositionChoices));
+        OnPropertyChanged(nameof(PositionLabel));
+    }
+
+    private static NodeChoice Choice(Guid? nodeId, string label, bool isCurrent, Action<Guid?> onSelect) =>
+        new(nodeId, label, isCurrent, new RelayCommand(() => onSelect(nodeId)));
+
+    private static string Label(IReadOnlyList<NodeChoice> choices, string none) =>
+        choices.FirstOrDefault(c => c.IsCurrent)?.Label ?? none;
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
@@ -265,10 +382,18 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                     return false;
                 }
 
-                if (HasChanges)
+                if (typed != _seeded)
                 {
                     var save = Merge(typed, Seen(node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon));
                     _session.UpdateCommandNode(node.Id, save.Name, save.Auftrag, save.Standort, save.Funkgruppe, save.Rufname, save.Telefon);
+                    _onChanged?.Invoke();
+                }
+
+                // After the details, so a refused move (a peer formed an Unterabschnitt under it
+                // meanwhile) still keeps what was typed; the reason shows and the dialog stays open.
+                if (PlaceChanged)
+                {
+                    _session.MoveCommandNode(node.Id, _placeParentId, _placeBeforeId);
                     _onChanged?.Invoke();
                 }
 
