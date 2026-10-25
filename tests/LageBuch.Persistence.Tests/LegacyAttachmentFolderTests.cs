@@ -138,10 +138,12 @@ public class LegacyAttachmentFolderTests : IDisposable
 
         if (OperatingSystem.IsWindows())
         {
-            using (new FileStream(legacy, FileMode.Open, FileAccess.Read, FileShare.None))
+            // Readable but not deletable: no FileShare.Delete.
+            using (new FileStream(legacy, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 _ = IncidentRepository.Load(path);
                 Assert.Equal(bytes, await _store.TryReadBytesAsync(path, storage));
+                Assert.True(File.Exists(legacy));
             }
         }
         else
@@ -203,6 +205,133 @@ public class LegacyAttachmentFolderTests : IDisposable
 
         Assert.Equal(0, BlobRowCount(path));
         Assert.False(Directory.Exists(FolderFor(path)));
+    }
+
+    private (string Path, IncidentFile First, IncidentFile Second) SaveWithTwoLegacyFiles(byte[] first, byte[] second)
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        var a = incident.AddFile(clock, op, "a.jpg", "image/jpeg", first.Length);
+        var b = incident.AddFile(clock, op, "b.jpg", "image/jpeg", second.Length);
+        var path = Path.Join(_dir, Stem + ".lagebuch");
+        IncidentRepository.Save(path, incident);
+        var folder = FolderFor(path);
+        Directory.CreateDirectory(folder);
+        File.WriteAllBytes(Path.Join(folder, IncidentFile.StorageFileName(a.Id, a.FileName)), first);
+        File.WriteAllBytes(Path.Join(folder, IncidentFile.StorageFileName(b.Id, b.FileName)), second);
+        return (path, a, b);
+    }
+
+    [Fact]
+    public async Task An_unreadable_legacy_file_does_not_block_opening_and_the_rest_is_imported()
+    {
+        var good = new byte[] { 1, 2, 3 };
+        var (path, first, second) = SaveWithTwoLegacyFiles(good, new byte[] { 9, 9 });
+        var folder = FolderFor(path);
+        var goodName = IncidentFile.StorageFileName(first.Id, first.FileName);
+        var badName = IncidentFile.StorageFileName(second.Id, second.FileName);
+        var bad = Path.Join(folder, badName);
+
+        await using var locked = OperatingSystem.IsWindows()
+            ? new FileStream(bad, FileMode.Open, FileAccess.Read, FileShare.None)
+            : null;
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(bad, UnixFileMode.None);
+        }
+
+        try
+        {
+            _ = IncidentRepository.Load(path);
+
+            Assert.Equal(good, await _store.TryReadBytesAsync(path, goodName));
+            Assert.False(File.Exists(Path.Join(folder, goodName)));
+            Assert.True(File.Exists(bad));
+            Assert.Null(await _store.TryReadBytesAsync(path, badName));
+            Assert.Equal(1, BlobRowCount(path));
+        }
+        finally
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(bad, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_legacy_file_that_is_a_symlink_is_never_copied_into_the_incident()
+    {
+        var (path, file) = SaveWithLegacyFile(".lagebuch", new byte[] { 1 });
+        var legacy = Path.Join(FolderFor(path), IncidentFile.StorageFileName(file.Id, file.FileName));
+        var secret = Path.Join(_root, "secret.txt");
+        await File.WriteAllTextAsync(secret, "private key");
+        File.Delete(legacy);
+        try
+        {
+            File.CreateSymbolicLink(legacy, secret);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        _ = IncidentRepository.Load(path);
+
+        Assert.Equal(0, BlobRowCount(path));
+        Assert.True(File.Exists(secret));
+        Assert.NotNull(new FileInfo(legacy).LinkTarget);
+    }
+
+    [Fact]
+    public void A_legacy_folder_that_is_a_symlink_is_skipped_entirely()
+    {
+        var (path, file) = SaveWithLegacyFile(".lagebuch", new byte[] { 1 });
+        var folder = FolderFor(path);
+        var elsewhere = Path.Join(_root, "elsewhere");
+        Directory.Move(folder, elsewhere);
+        try
+        {
+            Directory.CreateSymbolicLink(folder, elsewhere);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        _ = IncidentRepository.Load(path);
+
+        Assert.Equal(0, BlobRowCount(path));
+        Assert.True(File.Exists(Path.Join(elsewhere, IncidentFile.StorageFileName(file.Id, file.FileName))));
+    }
+
+    [Fact]
+    public async Task A_stored_row_of_a_different_length_does_not_licence_deleting_the_legacy_file()
+    {
+        var (path, file) = SaveWithLegacyFile(".lagebuch", new byte[] { 1, 2, 3 });
+        var storage = IncidentFile.StorageFileName(file.Id, file.FileName);
+        await _store.SaveBytesAsync(path, storage, new byte[] { 7 });
+
+        _ = IncidentRepository.Load(path);
+
+        Assert.True(File.Exists(Path.Join(FolderFor(path), storage)));
+        Assert.Equal(new byte[] { 7 }, await _store.TryReadBytesAsync(path, storage));
+    }
+
+    [Fact]
+    public void A_legacy_file_over_the_cap_is_skipped_and_left_on_disk()
+    {
+        var (path, file) = SaveWithLegacyFile(".lagebuch", new byte[] { 1, 2, 3, 4, 5 });
+        var legacy = Path.Join(FolderFor(path), IncidentFile.StorageFileName(file.Id, file.FileName));
+
+        using (var cn = SqliteConnectionFactory.OpenExisting(path))
+        {
+            LegacyAttachmentFolder.Import(cn, path, maxSizeBytes: 4);
+        }
+
+        Assert.Equal(0, BlobRowCount(path));
+        Assert.True(File.Exists(legacy));
     }
 
     private sealed class FixedClock : IClock
