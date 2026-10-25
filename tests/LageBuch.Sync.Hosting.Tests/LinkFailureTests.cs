@@ -166,4 +166,54 @@ public class LinkFailureTests
         relay.Resume();
         await caughtUp;
     }
+
+    [Fact]
+    public async Task A_command_in_flight_when_the_link_dies_reaches_the_operator()
+    {
+        // Found by a load test: the command dies with the connection, the reconnect then succeeds and
+        // the reconcile poll confirms the host's Stand — which simply lacks the entry. Nothing on
+        // screen said that this input was gone.
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+        await using var relay = FaultyRelay.Start(port);
+        await using var client = await ConnectAsync(relay);
+
+        var rejection = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.CommandRejected += reason => rejection.TrySetResult(reason);
+
+        relay.Pause();
+        client.AddJournalEntry(EtbDirection.Incoming, "Geht im Abriss verloren");
+        await relay.WaitForHeldTrafficAsync();
+        relay.Reset();
+        relay.Resume();
+
+        Assert.Equal(RemoteIncidentSession.CommandLostReason, await rejection.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.DoesNotContain(hostSession.Incident.Journal, e => e.Text == "Geht im Abriss verloren");
+    }
+
+    [Fact]
+    public async Task A_command_the_host_never_answers_reaches_the_operator_after_the_command_timeout()
+    {
+        // A link gone silent: no reset, no error, so without a deadline of its own the command would
+        // wait out the HTTP client's 100 s and then vanish without a word.
+        var clock = new FixedClock();
+        var time = new FakeTimeProvider();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+        await using var relay = FaultyRelay.Start(port);
+        await using var client = await ConnectAsync(relay, time);
+
+        var rejection = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.CommandRejected += reason => rejection.TrySetResult(reason);
+
+        relay.Pause();
+        client.AddJournalEntry(EtbDirection.Incoming, "Hängt in der Funkstille");
+        await relay.WaitForHeldTrafficAsync();
+        time.Advance(SyncProtocol.CommandTimeout);
+
+        Assert.Equal(RemoteIncidentSession.CommandLostReason, await rejection.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+    }
 }

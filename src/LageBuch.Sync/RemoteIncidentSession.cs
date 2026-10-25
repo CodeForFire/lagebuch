@@ -34,6 +34,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </summary>
     public const long DefaultCacheMaxBytes = 500L * 1024 * 1024;
 
+    /// <summary>
+    /// What the Lagebuchführer is told when a command got no answer: the link broke or went silent
+    /// while it was on its way. Whether the host applied it is unknown, so it asks to check rather
+    /// than claiming either.
+    /// </summary>
+    public const string CommandLostReason = "Verbindung zum Host unterbrochen – bitte prüfen und ggf. neu eingeben.";
+
     private readonly HttpClient _http;
     private readonly HttpClientHandler _handler;
     private readonly HubConnection _hub;
@@ -790,12 +797,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     [SuppressMessage(
         "Design",
         "CA1031",
-        Justification = "This is the end of a fire-and-forget path: a refusal or any other HTTP error status surfaces on CommandRejected (a workspace banner); a transport failure surfaces on Disconnected/Ended, and an unreadable success body on the reconcile poll, because the host's revision has moved. Rethrowing would fault a discarded task and take the process down mid-Einsatz.")]
+        Justification = "This is the end of a fire-and-forget path: a refusal, any other HTTP error status and a command that got no answer surface on CommandRejected (a workspace banner); an unreadable success body surfaces on the reconcile poll, because the host's revision has moved. Rethrowing would fault a discarded task and take the process down mid-Einsatz.")]
     private async Task SendAndReportAsync(SyncCommand command)
     {
+        using var deadline = new CancellationTokenSource(SyncProtocol.CommandTimeout, _time);
         try
         {
-            await SendAsync(command);
+            await SendAsync(command, deadline.Token);
         }
         catch (CommandRejectedException ex)
         {
@@ -808,11 +816,19 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             // not move, so nothing else would ever notice that this input was lost.
             _ui.Post(() => CommandRejected?.Invoke(DescribeRefusal(status)));
         }
+        catch (Exception ex) when (ex is HttpRequestException
+                                       || (ex is OperationCanceledException && deadline.IsCancellationRequested))
+        {
+            // No answer at all: the link broke under the command, or went silent until the deadline.
+            // Disconnected says that the connection is gone, but not that this input went with it, and
+            // the reconcile poll afterwards restores a Stand that simply lacks it — so this is the only
+            // place the Lagebuchführer can learn which entry to check.
+            _ui.Post(() => CommandRejected?.Invoke(CommandLostReason));
+        }
         catch (Exception)
         {
-            // A transport failure is not reported here on purpose: losing the connection already shows
-            // on Disconnected/Ended, and once it is back the reconcile poll restores the true state. A
-            // second banner saying the same thing would only add noise at the worst possible moment.
+            // An unreadable success body: the host applied the command and its revision moved, so the
+            // reconcile poll brings the result over. Teardown lands here too, with nobody left to tell.
         }
     }
 

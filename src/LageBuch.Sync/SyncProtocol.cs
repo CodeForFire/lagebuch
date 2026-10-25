@@ -201,6 +201,14 @@ public static class SyncProtocol
     public static readonly TimeSpan ReconcileTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// How long a joined client waits for the host to answer one command. On a link that went silent
+    /// the command would otherwise wait out the HTTP client's 100 s default; with it, the
+    /// Lagebuchführer learns within this much that the input may not have arrived. Generous, because
+    /// the answer carries the whole snapshot and a weak WLAN is slow, not dead.
+    /// </summary>
+    public static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>
     /// The longest <see cref="RevisionPath"/> round trip whose <see cref="RevisionInfo.HostTime"/> still
     /// counts. The host read its clock somewhere inside the round trip, so half of it is the error of
     /// the estimate; a slower answer is dropped rather than averaged in, and the last good one stays.
