@@ -53,7 +53,7 @@ public static class CoMessprotokollSection
                     {
                         var label = CoMeasurementLabels.ApartmentLabel(building, floor, unit.ApartmentNumber);
                         var co = unit.CoValue is { } v ? $"{v} ppm" : "kein Messwert";
-                        var key = KeyText(unit.KeyAvailable);
+                        var key = KeyText(unit.KeyAvailable, unit.KeyNumber);
                         var resident = string.IsNullOrWhiteSpace(unit.ResidentName) ? null : $", {unit.ResidentName}";
 
                         // ppm severity is its own span, colored independently of Status (search
@@ -103,7 +103,7 @@ public static class CoMessprotokollSection
 
                     var location = CoMeasurementLabels.DwellingLocation(building, d.FloorOrdinal, d.ApartmentNumber);
                     var resident = d.ResidentName ?? "—";
-                    var key = KeyText(d.KeyAvailable);
+                    var key = KeyText(d.KeyAvailable, d.KeyNumber);
                     var co = d.CoValue is { } v ? $"{v} ppm" : "—";
 
                     // #702: who the Beteiligte list records as found here, after what was measured.
@@ -140,8 +140,11 @@ public static class CoMessprotokollSection
         _ => Colors.White,
     };
 
-    private static string KeyText(KeyAvailability key) => key switch
+    // The Schlüsselnummer goes in print because the PDF is the record: it is what tells the crew,
+    // after the Einsatz, which handed-over key still has to go back to whom.
+    private static string KeyText(KeyAvailability key, string? keyNumber) => key switch
     {
+        KeyAvailability.Available when keyNumber is not null => $"ja (Nr. {keyNumber})",
         KeyAvailability.Available => "ja",
         KeyAvailability.NotAvailable => "nein",
         _ => "—",

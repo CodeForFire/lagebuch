@@ -2,6 +2,10 @@ namespace LageBuch.Domain.CoMeasurement;
 
 public sealed record Dwelling
 {
+    /// <summary>The longest Schlüsselnummer accepted, after trimming. A key tag reads "14", "B-3" or
+    /// "Hof 2"; the cap is there because the value also arrives from a sync peer.</summary>
+    public const int MaxKeyNumberLength = 20;
+
     public Guid Id { get; private init; }
 
     public Guid BuildingId { get; private init; }
@@ -15,6 +19,10 @@ public sealed record Dwelling
     public DwellingStatus Status { get; private init; }
 
     public KeyAvailability KeyAvailable { get; private init; }
+
+    /// <summary>The tag or Schlüsselbrett number of a handed-over key, so it can be given back.
+    /// Only ever set while <see cref="KeyAvailable"/> is <see cref="KeyAvailability.Available"/>.</summary>
+    public string? KeyNumber { get; private init; }
 
     public int? CoValue { get; private init; }
 
@@ -36,6 +44,7 @@ public sealed record Dwelling
     /// Rebuilds a Wohnung from storage. <paramref name="readings"/> is appended last with a
     /// default, the same convention <see cref="LageBuch.Domain.ForceUnit.Rehydrate"/> uses for its
     /// edit history, so a file or snapshot written before #424 rehydrates with an empty series.
+    /// <paramref name="keyNumber"/> follows it for the same reason.
     /// </summary>
     public static Dwelling Rehydrate(
         Guid id,
@@ -46,7 +55,8 @@ public sealed record Dwelling
         DwellingStatus status,
         KeyAvailability keyAvailable,
         int? coValue,
-        IEnumerable<CoReading>? readings = null)
+        IEnumerable<CoReading>? readings = null,
+        string? keyNumber = null)
         => new()
         {
             Id = id,
@@ -56,6 +66,7 @@ public sealed record Dwelling
             ResidentName = residentName,
             Status = status,
             KeyAvailable = keyAvailable,
+            KeyNumber = keyNumber,
             CoValue = coValue,
             Readings = (readings ?? Enumerable.Empty<CoReading>()).ToList(),
         };
@@ -93,9 +104,13 @@ public sealed record Dwelling
     public Dwelling WithApartmentNumber(int apartmentNumber) =>
         this with { ApartmentNumber = apartmentNumber };
 
-    public Dwelling WithDetails(string? residentName, KeyAvailability keyAvailable) => this with
+    /// <summary>Sets the Bewohner and the Schlüssel. The <paramref name="keyNumber"/> is kept only
+    /// while the key is there: once it is "Keiner" or "Unbekannt" there is no key to give back.
+    /// </summary>
+    public Dwelling WithDetails(string? residentName, KeyAvailability keyAvailable, string? keyNumber = null) => this with
     {
         ResidentName = string.IsNullOrWhiteSpace(residentName) ? null : residentName.Trim(),
         KeyAvailable = keyAvailable,
+        KeyNumber = keyAvailable == KeyAvailability.Available && !string.IsNullOrWhiteSpace(keyNumber) ? keyNumber.Trim() : null,
     };
 }

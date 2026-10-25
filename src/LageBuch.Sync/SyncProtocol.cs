@@ -138,15 +138,22 @@ public static class SyncProtocol
     /// 23 adds <c>moveCommandNode</c>, which reorders a node or moves it between the two levels. A
     /// peer at 22 would reject it, so the floor rises with it.
     /// </para>
+    /// <para>
+    /// 24: <c>updateDwellingDetails</c> carries the <c>keyNumber</c> of a handed-over key, and the
+    /// snapshot's Wohnungen the same. The command carries the Wohnung's whole detail state, so a
+    /// client at 23 editing the Bewohner would send it without the number, which a host at 24 reads
+    /// as "cleared" -- wiping what another device entered, the <c>setAddress</c> case of 8. The
+    /// floor rises to 24.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 23;
+    public const int ProtocolVersion = 24;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 23;
+    public const int MinimumProtocolVersion = 24;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

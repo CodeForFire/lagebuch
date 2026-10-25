@@ -74,6 +74,7 @@ internal static class SchemaGuard
         new("co_dwellings", "resident_name", "TEXT", false, null),
         new("co_dwellings", "key_available", "INTEGER", false, null),
         new("co_dwellings", "co_value", "INTEGER", false, null),
+        new("co_dwellings", "key_number", "TEXT", false, null),
         new("co_readings", "value", "INTEGER", false, null),
         new("command_nodes", "parent_id", "TEXT", false, null),
         new("command_nodes", "auftrag", "TEXT", false, null),

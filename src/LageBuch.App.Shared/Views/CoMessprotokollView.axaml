@@ -461,6 +461,14 @@
                 <RadioButton x:Name="KeyUnknownRadio" GroupName="dwellingKey" Content="Unbekannt"
                              IsChecked="{Binding Editor.IsKeyUnknown, Mode=TwoWay}" />
               </StackPanel>
+              <!-- The tag number of a handed-over key, so it goes back to the right person. Only
+                   enabled under "Vorhanden"; the view model drops it on FERTIG otherwise. Its own
+                   overline, because the placeholder is gone as soon as a number is typed. -->
+              <TextBlock Text="SCHLÜSSELNUMMER (OPTIONAL)" Classes="overline" FontSize="10" Margin="0,6,0,0" />
+              <TextBox x:Name="KeyNumberBox" Text="{Binding Editor.KeyNumber}"
+                       PlaceholderText="z. B. 14" MaxLength="{x:Static dom:Dwelling.MaxKeyNumberLength}"
+                       IsEnabled="{Binding Editor.IsKeyNumberEnabled, FallbackValue=False}"
+                       AutomationProperties.Name="Schlüsselnummer" />
             </StackPanel>
 
           </StackPanel>
@@ -696,8 +704,11 @@
                                            Classes.dangerous="{Binding IsCoDangerous}"
                                            Classes.lethal="{Binding IsCoLethal}" />
                               </StackPanel>
+                              <!-- Capped and trimmed: a long Schlüsselnummer must not squeeze the ppm
+                                   out of the Auto column. The tooltip carries it in full. -->
                               <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="10"
-                                         Margin="4,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
+                                         Margin="4,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"
+                                         MaxWidth="52" TextTrimming="CharacterEllipsis" />
                               <!-- Who lives there. Belongs on the tile, not only in the tooltip:
                                    the crew reads the whole matrix at a glance, and a name that
                                    needs a hover to reveal is not displayed at all for that job. -->

@@ -451,4 +451,32 @@ public class MigrationsTests : IDisposable
 
         Assert.Equal(0, r.GetInt32(5));
     }
+
+    [Fact]
+    public void V34_database_upgrades_to_v35_and_its_wohnungen_have_no_schluesselnummer()
+    {
+        // A V34 file: today's schema minus the column, with a Wohnung already in it.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE co_dwellings DROP COLUMN key_number;
+                INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, status, key_available)
+                    VALUES ('d', 'b', 0, 1, 0, 1);
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (34);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(35, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT key_number FROM co_dwellings WHERE id = 'd';";
+        Assert.Equal(DBNull.Value, check.ExecuteScalar());
+    }
 }

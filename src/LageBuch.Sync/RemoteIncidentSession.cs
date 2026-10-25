@@ -826,8 +826,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
         Send(new SetDwellingStatusCommand(Op(), buildingId, floorOrdinal, apartmentNumber, status));
 
-    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable) =>
-        Send(new UpdateDwellingDetailsCommand(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable.ToNullableBool()));
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable, string? keyNumber = null) =>
+        Send(new UpdateDwellingDetailsCommand(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable.ToNullableBool(), keyNumber));
 
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
         Send(new SetFloorDescriptionCommand(buildingId, floorOrdinal, description));

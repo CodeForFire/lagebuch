@@ -168,6 +168,19 @@ public class CoDwellingRemovalTests
         Assert.Contains("Schlüssel vorhanden", entry, StringComparison.Ordinal);
     }
 
+    // The Schlüsselnummer is what tells the crew which key still has to go back, so a Wohnung that
+    // is deleted while holding one must not take the number out of the record with it.
+    [Fact]
+    public void RemoveDwellings_NamesTheSchluesselnummerOfAHandedOverKey()
+    {
+        var (incident, clock, op, buildingId) = Scene(apartmentsPerFloor: 4);
+        incident.SetDwellingDetails(buildingId, 0, 4, null, KeyAvailability.Available, "14");
+
+        incident.RemoveDwellings(clock, op, buildingId, 0, new[] { 4 });
+
+        Assert.Contains("(Schlüssel Nr. 14)", incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void RemoveDwellings_RefusesToEmptyAFloor()
     {

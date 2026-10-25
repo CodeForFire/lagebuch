@@ -576,6 +576,78 @@ public class CoMeasurementTests
         Assert.False(incident.Dwellings[0].HasData);
     }
 
+    [Fact]
+    public void A_handed_over_key_keeps_its_trimmed_Schluesselnummer()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, null, KeyAvailability.Available, "  B-14 ");
+
+        Assert.Equal("B-14", incident.Dwellings[0].KeyNumber);
+    }
+
+    [Theory]
+    [InlineData(KeyAvailability.NotAvailable)]
+    [InlineData(KeyAvailability.Unknown)]
+    public void The_Schluesselnummer_is_dropped_once_the_key_is_no_longer_there(KeyAvailability keyAvailable)
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        var haus = incident.Buildings[0].Id;
+        incident.SetDwellingDetails(haus, 0, 1, null, KeyAvailability.Available, "14");
+
+        incident.SetDwellingDetails(haus, 0, 1, null, keyAvailable, "14");
+
+        Assert.Null(incident.Dwellings[0].KeyNumber);
+    }
+
+    [Fact]
+    public void A_blank_Schluesselnummer_is_stored_as_none()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, null, KeyAvailability.Available, "   ");
+
+        Assert.Null(incident.Dwellings[0].KeyNumber);
+    }
+
+    [Fact]
+    public void SetDwellingDetails_rejects_a_Schluesselnummer_over_the_cap()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        var tooLong = new string('7', Dwelling.MaxKeyNumberLength + 1);
+
+        Assert.Throws<ArgumentException>(() =>
+            incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, null, KeyAvailability.Available, tooLong));
+        Assert.Null(incident.Dwellings[0].KeyNumber);
+        Assert.Equal(KeyAvailability.Unknown, incident.Dwellings[0].KeyAvailable);
+    }
+
+    [Fact]
+    public void A_Schluesselnummer_at_the_cap_is_accepted_and_the_cap_ignores_padding()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        var atCap = new string('7', Dwelling.MaxKeyNumberLength);
+
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, null, KeyAvailability.Available, $" {atCap} ");
+
+        Assert.Equal(atCap, incident.Dwellings[0].KeyNumber);
+    }
+
     // --- Issue #265: per-floor Wohnungen counts and labels (Option B) -------------------------
     [Fact]
     public void Building_ApartmentsFor_UsesDefaultUntilOverridden()

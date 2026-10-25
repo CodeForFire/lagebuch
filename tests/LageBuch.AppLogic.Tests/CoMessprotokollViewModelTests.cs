@@ -772,6 +772,7 @@ public class CoMessprotokollViewModelTests
         editor.CoValue = 120;
         editor.ResidentName = "Musterfrau";
         editor.KeyAvailable = KeyAvailability.Available;
+        editor.KeyNumber = "14";
         editor.Label = "Hinterhaus";
 
         vm.CloseEditorCommand.Execute(null);
@@ -782,6 +783,7 @@ public class CoMessprotokollViewModelTests
         Assert.Null(dwelling.CoValue);
         Assert.Null(dwelling.ResidentName);
         Assert.Equal(KeyAvailability.Unknown, dwelling.KeyAvailable);
+        Assert.Null(dwelling.KeyNumber);
         Assert.Equal("Links", CoMeasurementLabels.ApartmentLabel(session.Incident.Buildings[0], 0, 1));
         Assert.False(vm.IsEditorOpen);
         Assert.Null(vm.Editor);
@@ -915,6 +917,7 @@ public class CoMessprotokollViewModelTests
         editor.CoValue = 120;
         editor.ResidentName = "Musterfrau";
         editor.KeyAvailable = KeyAvailability.Available;
+        editor.KeyNumber = " 14 ";
         editor.Label = "Hinterhaus";
 
         vm.ConfirmEditorCommand.Execute(null);
@@ -924,9 +927,68 @@ public class CoMessprotokollViewModelTests
         Assert.Equal(120, dwelling.CoValue);
         Assert.Equal("Musterfrau", dwelling.ResidentName);
         Assert.Equal(KeyAvailability.Available, dwelling.KeyAvailable);
+        Assert.Equal("14", dwelling.KeyNumber);
         Assert.Equal("Hinterhaus", CoMeasurementLabels.ApartmentLabel(session.Incident.Buildings[0], 0, 1));
         Assert.False(vm.IsEditorOpen);
         Assert.Null(vm.Editor);
+    }
+
+    [Fact]
+    public void A_changed_Schluesselnummer_alone_is_a_change_that_commits()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        session.SetDwellingDetails(buildingId, 0, 1, null, KeyAvailability.Available, "14");
+        var editor = OpenEditor(vm, 0, 1);
+        Assert.Equal("14", editor.KeyNumber);
+        Assert.False(editor.HasDetailChange);
+
+        editor.KeyNumber = "15";
+
+        Assert.True(editor.HasDetailChange);
+        vm.ConfirmEditorCommand.Execute(null);
+        Assert.Equal("15", DwellingOf(session, buildingId, 0, 1).KeyNumber);
+    }
+
+    // The field is disabled under "Keiner"/"Unbekannt", but what was typed before the radio moved
+    // is still in the buffer: it must neither count as a change nor reach the incident.
+    [Fact]
+    public void A_Schluesselnummer_without_a_key_is_neither_a_change_nor_committed()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        session.SetDwellingDetails(buildingId, 0, 1, null, KeyAvailability.NotAvailable);
+        var editor = OpenEditor(vm, 0, 1);
+        Assert.False(editor.IsKeyNumberEnabled);
+
+        editor.KeyNumber = "14";
+
+        Assert.False(editor.HasDetailChange);
+        editor.IsKeyAvailable = true;
+        Assert.True(editor.IsKeyNumberEnabled);
+        editor.IsKeyNotAvailable = true;
+        vm.ConfirmEditorCommand.Execute(null);
+        Assert.Null(DwellingOf(session, buildingId, 0, 1).KeyNumber);
+    }
+
+    [Fact]
+    public void The_tile_previews_the_Schluesselnummer_while_it_is_typed()
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+        var tile = vm.MatrixRows.SelectMany(r => r.Cells).First(c => c.FloorOrdinal == 0 && c.ApartmentNumber == 1);
+
+        editor.KeyAvailable = KeyAvailability.Available;
+        Assert.Equal("\uD83D\uDD11", tile.KeyDisplay);
+
+        editor.KeyNumber = "B-14";
+
+        Assert.Equal("\uD83D\uDD11 B-14", tile.KeyDisplay);
+        Assert.Contains("Schlüssel Nr. B-14", tile.TileTooltip, StringComparison.Ordinal);
+
+        editor.KeyAvailable = KeyAvailability.NotAvailable;
+        Assert.Equal("\u2716", tile.KeyDisplay);
+        Assert.Contains("Kein Schlüssel", tile.TileTooltip, StringComparison.Ordinal);
     }
 
     // The CheckBox this replaced could never get back to "unbekannt" once clicked.
@@ -1348,8 +1410,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
         _inner.SetDwellingStatus(buildingId, floorOrdinal, apartmentNumber, status);
 
-    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable) =>
-        _inner.SetDwellingDetails(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable);
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable, string? keyNumber = null) =>
+        _inner.SetDwellingDetails(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable, keyNumber);
 
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
         _inner.SetFloorDescription(buildingId, floorOrdinal, description);

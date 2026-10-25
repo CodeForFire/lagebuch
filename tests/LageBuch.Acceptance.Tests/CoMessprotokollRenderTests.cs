@@ -82,6 +82,46 @@ public class CoMessprotokollRenderTests
     }
 
     [AvaloniaFact]
+    public void CoMessprotokoll_handed_over_key_shows_its_Schluesselnummer_on_tile_and_in_editor()
+    {
+        var (window, vm, session) = ShowWorkspace();
+
+        session.AddCoBuilding("Mehrfamilienhaus A", 2, 3);
+        Dispatcher.UIThread.RunJobs();
+
+        var haus = session.Incident.Buildings[0].Id;
+        session.SetDwellingDetails(haus, 2, 1, "Musterfrau", Domain.CoMeasurement.KeyAvailability.Available, "14");
+        session.SetDwellingDetails(haus, 1, 2, null, Domain.CoMeasurement.KeyAvailability.Available, "B-3");
+        session.SetDwellingDetails(haus, 1, 3, null, Domain.CoMeasurement.KeyAvailability.Available);
+        session.SetDwellingDetails(haus, 0, 1, "Mustermann", Domain.CoMeasurement.KeyAvailability.NotAvailable);
+        session.RecordCoValue(haus, 2, 1, 45);
+        session.SetDwellingStatus(haus, 2, 1, Domain.CoMeasurement.DwellingStatus.Affected);
+        session.SetDwellingStatus(haus, 1, 2, Domain.CoMeasurement.DwellingStatus.Searched);
+        Dispatcher.UIThread.RunJobs();
+
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+
+        var cell = vm.CoMessprotokoll.MatrixRows.SelectMany(r => r.Cells).Single(c => c.FloorOrdinal == 2 && c.ApartmentNumber == 1);
+        Assert.Equal("\uD83D\uDD11 14", cell.KeyDisplay);
+        cell.OpenEditorCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var box = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "KeyNumberBox");
+        Assert.True(box.IsEnabled);
+        Assert.Equal("14", box.Text);
+
+        vm.CoMessprotokoll.Editor!.IsKeyNotAvailable = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(box.IsEnabled);
+
+        vm.CoMessprotokoll.Editor!.IsKeyAvailable = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(box.IsEnabled);
+
+        Capture(window, "co-messung-schluesselnummer.png");
+    }
+
+    [AvaloniaFact]
     public void CoMessprotokoll_ImplausibleValue_ShowsWarningInEditor()
     {
         var (window, vm, session) = ShowWorkspace();

@@ -323,7 +323,11 @@ public sealed record SetDwellingStatusCommand(
 
 // No operator (silent)
 public sealed record UpdateDwellingDetailsCommand(
-    Guid BuildingId, int FloorOrdinal, int ApartmentNumber, string? ResidentName, bool? KeyAvailable) : SyncCommand;
+    Guid BuildingId, int FloorOrdinal, int ApartmentNumber, string? ResidentName, bool? KeyAvailable,
+
+    // Protocol 24. Defaulted so the record still deserializes without it, but a peer below 24 is
+    // refused: its command would read as "no Schlüsselnummer" and wipe one (see SyncProtocol).
+    string? KeyNumber = null) : SyncCommand;
 
 // No operator (silent)
 public sealed record SetFloorDescriptionCommand(
