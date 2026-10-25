@@ -30,18 +30,18 @@ public sealed partial class VehiclesSection : EditorSection
         _wacheOptions = wacheOptions;
         _callSignOptions = callSignOptions;
         Rows = new ObservableCollection<VehicleRow>(
-            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer, v.IsOwn, v.Phone)));
+            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer, v.IsOwn, v.Phone, v.Email)));
     }
 
     public ObservableCollection<VehicleRow> Rows { get; }
 
-    private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer, bool isOwn, string? phone) =>
-        new(wache, callSign, seats, hasZugfuehrer, isOwn, phone, _wacheOptions, _callSignOptions, _onChanged);
+    private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer, bool isOwn, string? phone, string? email) =>
+        new(wache, callSign, seats, hasZugfuehrer, isOwn, phone, email, _wacheOptions, _callSignOptions, _onChanged);
 
     [RelayCommand]
     private void Add()
     {
-        var row = NewRow(string.Empty, string.Empty, 0, false, isOwn: true, phone: null);
+        var row = NewRow(string.Empty, string.Empty, 0, false, isOwn: true, phone: null, email: null);
         Rows.Add(row);
         _onChanged();
         OnRowAdded(row);
@@ -55,7 +55,7 @@ public sealed partial class VehiclesSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign, row.Phone), () =>
+        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign, row.Phone, row.Email), () =>
         {
             if (Rows.Remove(row))
             {
@@ -66,7 +66,7 @@ public sealed partial class VehiclesSection : EditorSection
 
     /// <summary>
     /// Rows with a non-blank Wache and Funkrufname; trimmed, seats as entered, a blank
-    /// Fahrzeugtelefon stored as none.
+    /// Fahrzeugtelefon or E-Mail stored as none.
     /// </summary>
     public IReadOnlyList<Vehicle> ToValues()
     {
@@ -78,7 +78,8 @@ public sealed partial class VehiclesSection : EditorSection
             if (wache.Length > 0 && callSign.Length > 0)
             {
                 var phone = string.IsNullOrWhiteSpace(row.Phone) ? null : row.Phone.Trim();
-                result.Add(new Vehicle(wache, callSign, row.Seats, row.HasZugfuehrer, row.IsOwn, phone));
+                var email = string.IsNullOrWhiteSpace(row.Email) ? null : row.Email.Trim();
+                result.Add(new Vehicle(wache, callSign, row.Seats, row.HasZugfuehrer, row.IsOwn, phone, email));
             }
         }
 

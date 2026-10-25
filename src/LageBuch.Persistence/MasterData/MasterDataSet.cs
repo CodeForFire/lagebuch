@@ -426,13 +426,24 @@ public sealed record Person(
 /// and older Stammdaten payloads keep working unchanged. IsOwn tells the brigade's own vehicles
 /// from those of a neighbouring one (#458); defaulted to own for the same reason, which is the
 /// opposite of HasZugfuehrer's default -- a missing flag must not turn a whole fleet foreign.
-/// Phone is the Fahrzeugtelefon, optional and trailing for the same reason; a vehicle that has
-/// one is listed in the Kontakte tab next to the roster.
+/// Phone is the Fahrzeugtelefon and Email the vehicle's mailbox (an ELW's, a Wache's), both
+/// optional and trailing for the same reason; a vehicle that has either is listed in the Kontakte
+/// tab next to the roster.
 /// </summary>
-public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false, bool IsOwn = true, string? Phone = null)
+public sealed record Vehicle(
+    string Wache,
+    string CallSign,
+    int Seats,
+    bool HasZugfuehrer = false,
+    bool IsOwn = true,
+    string? Phone = null,
+    string? Email = null)
 {
     /// <inheritdoc cref="Person.HasPhone"/>
     public bool HasPhone => !string.IsNullOrWhiteSpace(Phone);
+
+    /// <inheritdoc cref="Person.HasEmail"/>
+    public bool HasEmail => !string.IsNullOrWhiteSpace(Email);
 }
 
 /// <summary>
@@ -721,6 +732,9 @@ public static class AnonymizedExampleData
     public const string EmailAddress = "max.mustermann@ff-musterstadt.example";
     public const string EmailAddressAlt = "erika.musterfrau@ff-musterstadt.example";
 
+    // A vehicle's mailbox reads as a function, never as a person's name.
+    public const string VehicleEmailAddress = "elw1@ff-musterstadt.example";
+
     // The two shapes a roster Notiz actually takes: a Fachgebiet, and the Feuerwehren somebody
     // covers. Both are here so a fixture can exercise the Kontakte search against either.
     public const string PersonNote = "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz";
@@ -766,6 +780,7 @@ public static class AnonymizedExampleData
     public const string PersonDisplayNamePlaceholder = "z. B. " + PersonLastName + ", " + PersonFirstName;
     public const string PhoneNumberPlaceholder = "z. B. " + PhoneNumber;
     public const string EmailPlaceholder = "z. B. " + EmailAddress;
+    public const string VehicleEmailPlaceholder = "z. B. " + VehicleEmailAddress;
     public const string PersonNotePlaceholder = "z. B. " + PersonNote;
     public const string WhereaboutsPlaceholder = "z. B. " + Whereabouts + " oder im RTW " + RescueCallSign;
     public const string OperatorNamePlaceholder = "z. B. " + OperatorSurname;
@@ -964,7 +979,8 @@ public static class MasterDataJson
                         x.TryGetProperty("seats", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0,
                         x.TryGetProperty("hasZugfuehrer", out var hz) && hz.ValueKind == JsonValueKind.True,
                         IsOwn(x),
-                        Opt(x, "phone")))
+                        Opt(x, "phone"),
+                        Opt(x, "email")))
                     .ToList()
                 : Array.Empty<Vehicle>();
 
@@ -1392,7 +1408,7 @@ public static class MasterDataJson
             checklists = ChecklistsForExport(set),
             navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url, group = l.Group }),
-            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone }),
+            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone, email = v.Email }),
             personnel = set.Personnel.Select(p => new
             {
                 lastName = p.LastName,

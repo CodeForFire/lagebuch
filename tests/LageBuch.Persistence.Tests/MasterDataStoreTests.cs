@@ -284,6 +284,7 @@ public class MasterDataStoreTests : IDisposable
             Vehicles = new[]
             {
                 new Vehicle("FFB Wache 1", "FFB 1/11/1", 4, Phone: "01 71 / 1 23 45 67"),
+                new Vehicle("FFB Wache 1", "FFB 1/12/1", 2, Email: "elw1@ff-musterstadt.example"),
                 new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
             },
         };
@@ -314,6 +315,29 @@ public class MasterDataStoreTests : IDisposable
         var set = MasterDataStore.GetOrCreate(_path);
 
         Assert.Null(Assert.Single(set.Vehicles).Phone);
+    }
+
+    [Fact]
+    public void A_pre_vehicle_email_database_widens_in_place_and_reads_existing_vehicles_without_an_address()
+    {
+        // Every store a released build wrote has md_vehicles without email.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT);
+                INSERT INTO md_vehicles (wache, call_sign, seats, phone) VALUES ('FFB Wache 1', 'FFB 1/40/1', 9, '01 71 / 1 23 45 67');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var vehicle = Assert.Single(MasterDataStore.GetOrCreate(_path).Vehicles);
+
+        Assert.Null(vehicle.Email);
+        Assert.Equal("01 71 / 1 23 45 67", vehicle.Phone);
     }
 
     [Fact]

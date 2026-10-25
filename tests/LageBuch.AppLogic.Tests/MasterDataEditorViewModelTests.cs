@@ -830,6 +830,34 @@ public class MasterDataEditorViewModelTests
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
 
+    // The same reason as for a person: a vehicle's address the launcher would refuse is a dead mail
+    // button in Kontakte. Named by the Funkrufname, which is what finds the row.
+    [Fact]
+    public void An_unusable_vehicle_email_address_blocks_saving_and_names_the_vehicle()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithVehicles(new Vehicle("FFB Wache 1", "FFB 1/12/1", 2))));
+
+        Vehicles(vm).Rows[0].Email = "elw1@@ff-musterstadt.example";
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.True(vm.HasVehicleConflicts);
+        Assert.Contains("FFB 1/12/1", vm.VehicleConflicts, StringComparison.Ordinal);
+        Assert.DoesNotContain("@", vm.VehicleConflicts, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_vehicle_with_a_usable_or_blank_address_saves()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithVehicles(
+            new Vehicle("FFB Wache 1", "FFB 1/12/1", 2, Email: "elw1@ff-musterstadt.example"),
+            new Vehicle("FFB Wache 1", "FFB 1/40/1", 9, Email: "   "))));
+
+        Vehicles(vm).AddCommand.Execute(null); // dirty, so CanSave is not merely "nothing changed"
+
+        Assert.Null(vm.VehicleConflicts);
+        Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
     private static MasterDataSet SetWithPersonnel(params Person[] people) => MasterDataSet.Empty with
     {
         Personnel = people,

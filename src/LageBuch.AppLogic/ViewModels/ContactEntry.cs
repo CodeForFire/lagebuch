@@ -4,8 +4,8 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// Somebody the Kontakte tab can reach: a person off the roster, or a vehicle that carries a
-/// Fahrzeugtelefon. Both read the same on a card -- a name, a caption beside it, a number -- so the
-/// tab searches and dials one shape rather than two. Name is the headline: a person's
+/// Fahrzeugtelefon or an E-Mail. Both read the same on a card -- a name, a caption beside it, a
+/// number, an address -- so the tab searches, dials and mails one shape rather than two. Name is the headline: a person's
 /// "Nachname, Vorname", a vehicle's Funkrufname. Caption sits beside it: a person's Rolle, a
 /// vehicle's Wache. CallSign is a person's Funkrufname, and null for a vehicle, whose name
 /// already is one.
@@ -35,6 +35,6 @@ public sealed record ContactEntry(
     public static ContactEntry FromVehicle(Vehicle vehicle)
     {
         ArgumentNullException.ThrowIfNull(vehicle);
-        return new(vehicle.CallSign, vehicle.Wache, null, vehicle.Phone, null, null, vehicle.IsOwn, IsVehicle: true);
+        return new(vehicle.CallSign, vehicle.Wache, null, vehicle.Phone, vehicle.Email, null, vehicle.IsOwn, IsVehicle: true);
     }
 }
