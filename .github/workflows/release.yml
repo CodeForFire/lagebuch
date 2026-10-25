@@ -51,6 +51,8 @@ jobs:
       # scripts/android-version-code.sh, so the checkout has to have happened. It used to sit
       # after `v` and only on a push, which was fine while the step was self-contained.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - id: v
         env:
@@ -114,11 +116,15 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
       # Shared with pr-msi.yml; the publish flags there mirror PUBLISH_FLAGS above.
-      - uses: ./.github/actions/build-msi
+      # zizmor suggests the newer `$/` self-repository syntax; `./` is what the release has been
+      # proven with, and the release MSI path is not changed without a tag to test it on.
+      - uses: ./.github/actions/build-msi # zizmor: ignore[self-repository]
         with:
           version: ${{ needs.version.outputs.version }}
           msi-version: ${{ needs.version.outputs.msi_version }}
@@ -135,13 +141,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
       - name: Publish
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: >
           dotnet publish src/LageBuch.App/LageBuch.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
-          -p:Version=${{ needs.version.outputs.version }} -o publish
+          "-p:Version=${VERSION}" -o publish
       # build-deb.sh renders the hicolor icon sizes with ImageMagick and refuses to build
       # without it; ubuntu-24.04 runners carry no ImageMagick, rsvg or Inkscape. desktop-file-utils
       # is only needed so the script's optional entry validation actually runs in CI.
@@ -150,10 +160,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends imagemagick desktop-file-utils
       - name: Build .deb
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           chmod +x packaging/linux/build-deb.sh
           packaging/linux/build-deb.sh \
-            "${{ needs.version.outputs.version }}" \
+            "${VERSION}" \
             publish \
             src/LageBuch.App.Shared/Assets/icon-1024.png \
             src/LageBuch.App/Assets/icon.svg \
@@ -171,6 +183,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
@@ -186,11 +200,14 @@ jobs:
           dotnet workload config --update-mode manifests
           dotnet workload install android
       - name: Publish
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          VERSION_CODE: ${{ needs.version.outputs.version_code }}
         run: >
           dotnet publish src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Release
-          -p:ApplicationVersion=${{ needs.version.outputs.version_code }}
-          -p:ApplicationDisplayVersion=${{ needs.version.outputs.version }}
-          -p:Version=${{ needs.version.outputs.version }}
+          "-p:ApplicationVersion=${VERSION_CODE}"
+          "-p:ApplicationDisplayVersion=${VERSION}"
+          "-p:Version=${VERSION}"
           -o publish-android
       # The publish emits both formats: the .aab, and the universal .apk bundletool extracts
       # from that same signed bundle. The .apk goes on the release as before; the .aab is kept
@@ -239,6 +256,8 @@ jobs:
       attestations: write # and write the signed attestation back to the repo
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # Only the packages a user installs. Without a pattern this pulls every artifact of the
       # run, and the CI-debug-signed .aab ended up on the 0.7.0-0.8.1 releases; it is a build
       # artifact for inspection only (docs/releasing.md).
@@ -338,7 +357,9 @@ jobs:
           - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
             oder \`xattr -dr com.apple.quarantine /Applications/Lagebuch.app\`.
           EOF
-      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+      # `gh release create` could do this too (zizmor's superfluous-actions); swapping a working
+      # release step is a change of its own, tested on a tag.
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3 # zizmor: ignore[superfluous-actions]
         with:
           tag_name: v${{ needs.version.outputs.version }}
           name: Lagebuch v${{ needs.version.outputs.version }}
@@ -362,18 +383,24 @@ jobs:
       attestations: write # and write the signed attestation back to the repo
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
       - name: Publish
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: >
           dotnet publish src/LageBuch.App/LageBuch.App.csproj -r osx-arm64 ${{ env.PUBLISH_FLAGS }}
-          -p:Version=${{ needs.version.outputs.version }} -o publish
+          "-p:Version=${VERSION}" -o publish
       - name: Build .dmg
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           chmod +x packaging/macos/build-dmg.sh
           packaging/macos/build-dmg.sh \
-            "${{ needs.version.outputs.version }}" \
+            "${VERSION}" \
             publish \
             src/LageBuch.App.Shared/Assets/icon-1024.png \
             src/LageBuch.App/Assets/document-1024.png \

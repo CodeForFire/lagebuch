@@ -1,4 +1,8 @@
 version: 2
+# Every ecosystem below waits seven days before proposing a new release
+# (`cooldown`), so a compromised version that is caught and yanked in its first
+# days never reaches a pull request here. Security updates ignore the
+# cooldown, so a published advisory still arrives at once.
 updates:
   # Keep the SHA-pinned GitHub Actions current.
   - package-ecosystem: github-actions
@@ -6,6 +10,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
     # codeql-action/init writes a config that codeql-action/analyze refuses
     # unless both run the same version ("Loaded a configuration file for
     # version '4.38.2', but running version '4.38.0'"). Dependabot treats each
@@ -24,6 +30,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
 
   # The pinned towncrier behind the changelog check in ci.yml.
   - package-ecosystem: pip
@@ -31,6 +39,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
 
   # NuGet packages across the solution. All Avalonia packages are grouped so
   # they arrive as a single pull request (they must always move in lockstep).
@@ -39,6 +49,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
     groups:
       avalonia:
         patterns:
@@ -58,6 +70,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
     groups:
       avalonia:
         patterns:
@@ -70,6 +84,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
     groups:
       avalonia:
         patterns:

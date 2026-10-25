@@ -1,0 +1,44 @@
+name: zizmor
+
+# Static analysis for the workflows themselves: template injection, credentials
+# persisted into artifacts, over-broad permissions, dangerous triggers. CodeQL
+# reads the C# code and nothing under .github/, and SHA pinning only fixes which
+# code an action runs, not what a workflow does with its inputs.
+#
+# Findings are uploaded as SARIF, so they land in the Code Scanning tab and come
+# back on a pull request as review comments, the way CodeQL's do. A finding that
+# is accepted on purpose carries an inline `# zizmor: ignore[<audit>]` with the
+# reason next to it, never a dismissal in the UI.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, so a new zizmor audit or a newly published advisory against a
+    # pinned action finds existing workflows even when the repository is quiet.
+    - cron: '41 4 * * 1'
+
+permissions: {}
+
+concurrency:
+  group: zizmor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      security-events: write # upload the SARIF results
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
