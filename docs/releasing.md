@@ -96,7 +96,7 @@ assembled.
 
 The checksums and the provenance are what the README tells users to verify, and
 only a tag push runs those steps — they landed after v0.5.0 was cut (#375), so
-they had never run once when this list was written. Four checks, once per
+they had never run once when this list was written. Five checks, once per
 release:
 
 - [ ] `SHA256SUMS.txt` is attached and lists the `.msi`, the `.deb` and the
@@ -104,6 +104,10 @@ release:
       in a folder holding nothing but the downloads.
 - [ ] `gh attestation verify <file> --repo CodeForFire/lagebuch` passes for
       those three. It reads the file, not the URL, so download them first.
+- [ ] `lagebuch-<version>-desktop.cdx.json` and `…-android.cdx.json` are
+      attached, and adding `--predicate-type https://cyclonedx.org/bom` to the
+      verify above passes for the same three files. The SBOMs come from
+      `scripts/sbom.sh`, which leaves out build-time packages such as StyleCop.
 - [ ] The macOS run attached both the `.dmg` and its `.sha256`, and
       `shasum -a 256 -c lagebuch-<version>-macos-arm64.dmg.sha256` passes.
 - [ ] The release is marked pre-release if and only if the tag carries a suffix.

@@ -152,6 +152,21 @@ jobs:
         run: >
           dotnet publish src/LageBuch.App/LageBuch.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
           "-p:Version=${VERSION}" -o publish
+      # One desktop SBOM covers the .msi, the .deb and the .dmg: all three publish this project
+      # from the same locked package graph and differ only in the .NET runtime pack. It is
+      # generated here, from the restore the publish above just did.
+      - name: Write the desktop SBOM
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          dotnet tool restore
+          scripts/sbom.sh src/LageBuch.App/LageBuch.App.csproj lagebuch-desktop "$VERSION" \
+            "sbom/lagebuch-${VERSION}-desktop.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-desktop
+          path: sbom/*.cdx.json
+          if-no-files-found: error
       # build-deb.sh renders the hicolor icon sizes with ImageMagick and refuses to build
       # without it; ubuntu-24.04 runners carry no ImageMagick, rsvg or Inkscape. desktop-file-utils
       # is only needed so the script's optional entry validation actually runs in CI.
@@ -209,6 +224,18 @@ jobs:
           "-p:ApplicationDisplayVersion=${VERSION}"
           "-p:Version=${VERSION}"
           -o publish-android
+      - name: Write the Android SBOM
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          dotnet tool restore
+          scripts/sbom.sh src/LageBuch.App.Android/LageBuch.App.Android.csproj lagebuch-android "$VERSION" \
+            "sbom/lagebuch-${VERSION}-android.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-android
+          path: sbom/*.cdx.json
+          if-no-files-found: error
       # The publish emits both formats: the .aab, and the universal .apk bundletool extracts
       # from that same signed bundle. The .apk goes on the release as before; the .aab is kept
       # as a build artifact for the manual Google Play upload (docs/releasing.md).
@@ -263,7 +290,7 @@ jobs:
       # artifact for inspection only (docs/releasing.md).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: '{msi,deb,apk}'
+          pattern: '{msi,deb,apk,sbom-desktop,sbom-android}'
           path: dist
       # download-artifact nests each artifact in its own directory (dist/msi/...),
       # but on the release page the assets sit side by side. Flatten first, so the
@@ -279,7 +306,10 @@ jobs:
           for ext in msi deb apk; do
             test "$(find dist -maxdepth 1 -type f -name "*.$ext" | wc -l)" -eq 1 || { echo "::error::Expected exactly one .$ext in dist/"; exit 1; }
           done
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 3 || { echo "::error::Unexpected files in dist/ - only .msi, .deb and .apk belong on the release"; exit 1; }
+          for sbom in desktop android; do
+            test "$(find dist -maxdepth 1 -type f -name "*-$sbom.cdx.json" | wc -l)" -eq 1 || { echo "::error::Expected exactly one $sbom SBOM in dist/"; exit 1; }
+          done
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 5 || { echo "::error::Unexpected files in dist/ - only .msi, .deb, .apk and the two SBOMs belong on the release"; exit 1; }
           cd dist
           sha256sum -- * > "${RUNNER_TEMP}/SHA256SUMS.txt"
           mv "${RUNNER_TEMP}/SHA256SUMS.txt" SHA256SUMS.txt
@@ -294,6 +324,18 @@ jobs:
             dist/*.msi
             dist/*.deb
             dist/*.apk
+      # The SBOMs, signed and bound to the packages they describe, so `gh attestation verify`
+      # can show what a package was built from, not only where.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.msi
+            dist/*.deb
+          sbom-path: dist/lagebuch-${{ needs.version.outputs.version }}-desktop.cdx.json
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*.apk
+          sbom-path: dist/lagebuch-${{ needs.version.outputs.version }}-android.cdx.json
       - name: Build release notes
         env:
           VERSION: ${{ needs.version.outputs.version }}
@@ -345,6 +387,15 @@ jobs:
 
           \`\`\`
           gh attestation verify <Datei> --repo CodeForFire/lagebuch
+          \`\`\`
+
+          **Stückliste (SBOM).** \`lagebuch-${VERSION}-desktop.cdx.json\` (Windows, Linux, macOS)
+          und \`lagebuch-${VERSION}-android.cdx.json\` listen jede enthaltene Bibliothek mit
+          Version, Lizenz und Prüfsumme im CycloneDX-Format. Beide sind ebenfalls signiert an
+          ihre Pakete gebunden:
+
+          \`\`\`
+          gh attestation verify <Datei> --repo CodeForFire/lagebuch --predicate-type https://cyclonedx.org/bom
           \`\`\`
 
           **Die Pakete sind nicht signiert.** Beim ersten Start:
@@ -414,6 +465,18 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*.dmg
+      # The release already carries the desktop SBOM; this binds the same graph to the .dmg.
+      - name: Write the desktop SBOM
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          dotnet tool restore
+          scripts/sbom.sh src/LageBuch.App/LageBuch.App.csproj lagebuch-desktop "$VERSION" \
+            "sbom/lagebuch-${VERSION}-desktop.cdx.json"
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*.dmg
+          sbom-path: sbom/lagebuch-${{ needs.version.outputs.version }}-desktop.cdx.json
       # The .dmg is built after the tag release exists, so it cannot join that
       # release's SHA256SUMS.txt — it carries its own .sha256 file instead.
       - name: Attach .dmg to the release
