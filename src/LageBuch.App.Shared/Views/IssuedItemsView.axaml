@@ -49,6 +49,14 @@
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+    <!-- The stock hint under GERÄT, amber once none is left. -->
+    <Style Selector="TextBlock#DeviceStockText">
+      <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock#DeviceStockText.out">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
 
     <Style Selector="Panel#WorkspaceRoot.narrow WrapPanel#DockFields">
       <Setter Property="Orientation" Value="Vertical" />
@@ -166,6 +174,10 @@
             <Button x:Name="IssueItemButton" Classes="signal dock-action" Content="AUSGEBEN"
                     Command="{Binding AddCommand}" VerticalAlignment="Bottom" Margin="0,0,0,7" />
           </WrapPanel>
+          <TextBlock x:Name="DeviceStockText" Classes="mono" FontSize="12" Margin="0,4,0,0"
+                     Classes.out="{Binding IsNewDeviceExhausted}"
+                     Text="{Binding NewDeviceStock}"
+                     IsVisible="{Binding NewDeviceStock, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <TextBlock x:Name="DockErrorSummary" Classes="field-error"
                      Text="{Binding NewItemError}"
                      IsVisible="{Binding NewItemError, Converter={x:Static ObjectConverters.IsNotNull}}" />

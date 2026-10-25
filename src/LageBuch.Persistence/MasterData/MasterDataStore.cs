@@ -55,7 +55,6 @@ public sealed class MasterDataStore
 
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
         ReplaceList(cn, tx, "md_keywords", set.Keywords);
-        ReplaceList(cn, tx, "md_devices", set.Devices);
         ReplaceList(cn, tx, "md_districts", set.Districts);
 
         Run(cn, tx, "DELETE FROM md_streets;", _ => { });
@@ -71,6 +70,20 @@ public sealed class MasterDataStore
                     p("$d", street.District);
                     p("$z", street.PostalCode);
                     p("$p", street.Place);
+                });
+        }
+
+        Run(cn, tx, "DELETE FROM md_devices;", _ => { });
+        foreach (var d in set.Devices)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_devices (value, count) VALUES ($v,$c);",
+                p =>
+                {
+                    p("$v", d.Name);
+                    p("$c", d.Count);
                 });
         }
 
@@ -295,7 +308,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_keywords (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_devices (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_devices (value TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL, place TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
@@ -399,6 +412,9 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "apartments_per_floor", "INTEGER NOT NULL DEFAULT 10");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "underground_floor_count", "INTEGER NOT NULL DEFAULT 1");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "apartment_labels", "TEXT NOT NULL DEFAULT '{}'");
+
+        // md_devices arrived complete too; held to the same rule.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_devices", "count", "INTEGER NOT NULL DEFAULT 0");
 
         // Widen an md_links that predates link groups (#518): every link already there is ungrouped.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_links", "group_name", "TEXT NOT NULL DEFAULT ''");
@@ -595,7 +611,7 @@ public sealed class MasterDataStore
             ReadVehicles(cn),
             ReadTextSnippets(cn),
             ReadPremises(cn),
-            ReadColumn(cn, "SELECT value FROM md_devices;"),
+            ReadDevices(cn),
             ReadSettings(cn));
     }
 
@@ -802,6 +818,21 @@ public sealed class MasterDataStore
         }
 
         // Stryker restore Block
+    }
+
+    private static List<Device> ReadDevices(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT value, count FROM md_devices;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<Device>();
+        while (r.Read())
+        {
+            // Clamped on the way out too, as the Trupp-Typen are: the column is only defaulted.
+            list.Add(new Device(r.GetString(0), Device.ClampCount(r.GetInt32(1))));
+        }
+
+        return list;
     }
 
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)

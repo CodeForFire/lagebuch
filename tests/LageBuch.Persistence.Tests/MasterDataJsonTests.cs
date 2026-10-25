@@ -17,7 +17,7 @@ public class MasterDataJsonTests
               "roles": ["EL", "ZF"],
               "unitStatus": ["Alarmiert"],
               "keywords": ["B3 Person", "THL 1"],
-              "devices": ["Mobilteil 1", "AED"],
+              "devices": [{ "name": "Mobilteil 1", "count": 2 }, "AED"],
               "truppTypes": [{ "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 }],
               "checklistTemplateAufbau": [{ "text": "Schritt 1", "mandatory": true }],
               "checklistTemplateAbbau": [{ "text": "Abbauschritt", "mandatory": false }],
@@ -29,7 +29,7 @@ public class MasterDataJsonTests
         Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
         Assert.Equal(new[] { "B3 Person", "THL 1" }, set.Keywords);
-        Assert.Equal(new[] { "Mobilteil 1", "AED" }, set.Devices);
+        Assert.Equal(new[] { new Device("Mobilteil 1", 2), new Device("AED", 0) }, set.Devices);
         Assert.Equal(new TruppType("Angriffstrupp", 2, 30), Assert.Single(set.TruppTypes));
         Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplates[0].Items));
         Assert.Equal(new ChecklistTemplateItem("Abbauschritt", false), Assert.Single(set.ChecklistTemplates[1].Items));
@@ -138,6 +138,42 @@ public class MasterDataJsonTests
         => Assert.ThrowsAny<JsonException>(() => Parse("{ not valid"));
 
     [Fact]
+    public void A_Geraet_count_is_trimmed_clamped_and_defaults_to_not_counted()
+    {
+        var set = MasterDataJson.Parse(
+            """
+            {
+              "devices": [
+                { "name": " Weste EL ", "count": 2 },
+                { "name": "HRT", "count": -3 },
+                { "name": "Fernglas", "count": 5000 },
+                { "name": "AED" },
+                { "name": "GoPro", "count": "1" }
+              ]
+            }
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                new Device("Weste EL", 2),
+                new Device("HRT", 0),
+                new Device("Fernglas", Device.MaxCount),
+                new Device("AED", 0),
+                new Device("GoPro", 0),
+            },
+            set.Devices);
+    }
+
+    [Fact]
+    public void A_Geraet_without_a_name_is_refused_in_German()
+    {
+        var ex = Assert.Throws<JsonException>(() => MasterDataJson.Parse("""{ "devices": [{ "name": null, "count": 1 }] }"""));
+
+        Assert.Equal("Gerät: \"name\" darf nicht null sein.", ex.Message);
+    }
+
+    [Fact]
     public void Serialize_round_trips_through_Parse()
     {
         var original = MasterDataSet.Empty with
@@ -145,7 +181,7 @@ public class MasterDataJsonTests
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
             Keywords = new[] { "B3 Person", "THL Öl" },
-            Devices = new[] { "Weste Atemschutz", "Sonstiges (siehe Bemerkung)" },
+            Devices = new[] { new Device("Weste Atemschutz", 4), new Device("Sonstiges (siehe Bemerkung)", 0) },
             Districts = new[] { "Puch", "Aich" },
             Streets = new[]
             {
@@ -618,7 +654,7 @@ public class MasterDataJsonTests
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Links = new[] { new Link("N", "U") } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Keywords = new[] { "B3 Person" } }).IsEmpty);
-        Assert.False((MasterDataSet.Empty with { Devices = new[] { "AED" } }).IsEmpty);
+        Assert.False((MasterDataSet.Empty with { Devices = new[] { new Device("AED", 1) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Districts = new[] { "Puch" } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Streets = new[] { new Street("Hauptstraße") } }).IsEmpty);
     }

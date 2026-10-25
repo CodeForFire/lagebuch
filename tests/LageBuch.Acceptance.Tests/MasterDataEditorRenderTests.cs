@@ -29,7 +29,7 @@ public class MasterDataEditorRenderTests
             },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
             Keywords = new[] { "B3 Person", "THL 1" },
-            Devices = new[] { "Mobilteil 1", "AED" },
+            Devices = new[] { new Device("Mobilteil 1", 1), new Device("Weste EL", 2), new Device("Sonstiges (siehe Bemerkung)", 0) },
             Districts = new[] { "Aich", "Puch" },
             Streets = new[]
             {
@@ -284,6 +284,32 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-trupp-typen.png"));
+    }
+
+    // The Geräte carry an Anzahl the Ausgabeliste checks, so each row has a spinner beside its name.
+    [AvaloniaFact]
+    public void Geraete_section_renders_an_anzahl_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Geräte");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var names = view.GetVisualDescendants().OfType<TextBox>().Select(t => t.Text).ToList();
+        Assert.Contains("Mobilteil 1", names);
+        Assert.Contains("Weste EL", names);
+        var counts = view.GetVisualDescendants().OfType<NumericUpDown>().Select(n => n.Value).ToList();
+        Assert.Equal(new decimal?[] { 1, 2, 0 }, counts);
+
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+            using var frame = window.CaptureRenderedFrame()!;
+            frame.SavePng(Path.Join(dir, "master-data-editor-geraete.png"));
+        }
     }
 
     // #704: the Stichwörter are a plain list like Einheiten-Status, so they reuse its section and

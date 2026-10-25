@@ -816,6 +816,45 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Geräte editor: name + Anzahl, laid out like the Trupp-Typen above. -->
+              <DataTemplate x:DataType="vm:DevicesSection">
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- A fixed trailing width matching the row template's icon-btn button, as in the
+                       Fahrzeuge template above: "Auto" would size to this Grid's own empty content. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="GERÄT" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="ANZAHL" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Wie viele davon vorhanden sind. 0 = nicht gezählt" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DeviceRow">
+                          <Grid ColumnDefinitions="*,110,32" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
+                                     PlaceholderText="Weste EL" />
+                            <NumericUpDown Grid.Column="1" Width="90" Minimum="0" Increment="1" FormatString="0"
+                                           Maximum="{Binding MaxCount}"
+                                           Value="{Binding Count}" VerticalAlignment="Center"
+                                           AutomationProperties.Name="Anzahl" />
+                            <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
+                                 $parent path cannot resolve here. -->
+                            <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Objekte editor (#420): a card per Objekt, because name, address and structure are
                    too many columns for one header. The fields wrap, so the card works on a phone.
                    The Wohnungsbezeichnungen open below as a grid of every floor and Wohnung. -->

@@ -11,6 +11,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -18,9 +19,10 @@ namespace LageBuch.Acceptance.Tests;
 // as InvolvedPartiesTabRenderTests. Fictional people only.
 public class IssuedItemsTabRenderTests
 {
-    private static readonly string[] Devices =
+    private static readonly Device[] Devices =
     [
-        "Mobilteil 1", "Mobilteil 2", "Digitalkamera", "HRT", "Weste EAL", "Weste Presse", "AED", "Fernglas",
+        new("Mobilteil 1", 1), new("Mobilteil 2", 1), new("Digitalkamera", 1), new("HRT", 2),
+        new("Weste EAL", 2), new("Weste Presse", 1), new("AED", 1), new("Fernglas", 1),
     ];
 
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace(
@@ -102,6 +104,31 @@ public class IssuedItemsTabRenderTests
         Capture(window, "ausgabe-tab.png");
     }
 
+    // The one Weste Presse is already out, so the hint under GERÄT turns amber; the HRT has one left.
+    [AvaloniaFact]
+    public void The_stock_hint_under_geraet_turns_amber_when_none_is_left()
+    {
+        var (window, vm, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "AUSGABE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var hint = Named<TextBlock>(content, "DeviceStockText");
+
+        Assert.False(hint.IsEffectivelyVisible);
+
+        vm.IssuedItems.NewDevice = "HRT";
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(hint.IsEffectivelyVisible);
+        Assert.Equal("1 von 2 frei", hint.Text);
+        Assert.DoesNotContain("out", hint.Classes);
+
+        vm.IssuedItems.NewDevice = "Weste Presse";
+        vm.IssuedItems.NewIssuedTo = "Musterfrau, Erika";
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Kein Gerät frei: 1 von 1 ausgegeben", hint.Text);
+        Assert.Contains("out", hint.Classes);
+        Capture(window, "ausgabe-stock-hint.png");
+    }
+
     [AvaloniaFact]
     public void An_empty_ausgabe_tab_says_so()
     {
@@ -164,7 +191,7 @@ public class IssuedItemsTabRenderTests
         var popup = box.GetVisualDescendants().OfType<Popup>().Single();
         var list = popup.Child!.GetVisualDescendants().OfType<ListBox>().Single();
         Assert.True(popup.IsOpen);
-        Assert.Equal(Devices, list.Items.Cast<string>());
+        Assert.Equal(Devices.Select(d => d.Name), list.Items.Cast<string>());
 
         CaptureWithPopup(window, popup, "ausgabe-geraete-suggestions.png");
     }

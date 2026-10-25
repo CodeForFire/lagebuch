@@ -582,7 +582,7 @@ public class IncidentWorkspaceViewModelTests
             session,
             clock,
             new FakeTicker(),
-            Md() with { Devices = ["Mobilteil 1", "AED"] },
+            Md() with { Devices = [new Device("Mobilteil 1", 1), new Device("AED", 1)] },
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());

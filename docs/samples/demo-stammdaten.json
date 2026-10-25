@@ -10,7 +10,21 @@
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz", "Einsatzbereit über Funk", "Abgerückt"],
   "keywords": ["B1", "B2", "B3", "B3 Person", "THL 1", "THL 2 VU eingeklemmt", "THL Öl", "ABC 1"],
-  "devices": ["Mobilteil 1", "Mobilteil 2", "Digitalkamera", "GoPro", "HRT", "Weste EAL", "Weste EL", "Weste Presse", "Weste Atemschutz", "AED", "Fernglas", "Windmesser", "Sonstiges (siehe Bemerkung)"],
+  "devices": [
+    { "name": "Mobilteil 1", "count": 1 },
+    { "name": "Mobilteil 2", "count": 1 },
+    { "name": "Digitalkamera", "count": 1 },
+    { "name": "GoPro", "count": 1 },
+    { "name": "HRT", "count": 4 },
+    { "name": "Weste EAL", "count": 2 },
+    { "name": "Weste EL", "count": 2 },
+    { "name": "Weste Presse", "count": 1 },
+    { "name": "Weste Atemschutz", "count": 2 },
+    { "name": "AED", "count": 1 },
+    { "name": "Fernglas", "count": 1 },
+    { "name": "Windmesser", "count": 1 },
+    { "name": "Sonstiges (siehe Bemerkung)", "count": 0 }
+  ],
   "districts": ["Musterdorf", "Neudorf", "Oberau"],
   "streets": [
     { "name": "Am Sportplatz", "district": "", "postalCode": "12345", "place": "Musterstadt" },

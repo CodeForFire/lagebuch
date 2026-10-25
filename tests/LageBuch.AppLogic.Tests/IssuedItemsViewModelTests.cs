@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Equipment;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -8,7 +9,7 @@ public class IssuedItemsViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 9, 27, 14, 0, 0, TimeSpan.FromHours(2));
 
-    private static readonly string[] Devices = ["Mobilteil 1", "AED", "Weste EAL"];
+    private static readonly Device[] Devices = [new("Mobilteil 1", 1), new("AED", 1), new("Weste EAL", 2), new("Sonstiges", 0)];
 
     private static LocalIncidentSession NewSession(FakeStore? store = null, FixedClock? clock = null) =>
         TestSession.StartNew(
@@ -277,6 +278,136 @@ public class IssuedItemsViewModelTests
 
         Assert.Equal(ValidationMessages.IssuedToRequired, row.Error);
         Assert.Equal("Max Beispiel", Assert.Single(session.Incident.IssuedItems).IssuedTo);
+    }
+
+    [Fact]
+    public void The_stock_hint_counts_what_is_still_out_against_the_stammdaten()
+    {
+        var session = NewSession();
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices) { NewDevice = "weste eal " };
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Assert.Equal("2 von 2 frei", vm.NewDeviceStock);
+        Assert.False(vm.IsNewDeviceExhausted);
+
+        session.IssueItem("Weste EAL", "Erika Beispiel", null, null, null);
+        Assert.Equal("1 von 2 frei", vm.NewDeviceStock);
+        Assert.Contains(nameof(IssuedItemsViewModel.NewDeviceStock), changed);
+        Assert.Contains(nameof(IssuedItemsViewModel.IsNewDeviceExhausted), changed);
+
+        // Another spelling of the same Gerät is the same Weste.
+        session.IssueItem("WESTE EAL", "Max Beispiel", null, null, null);
+        Assert.Equal("Kein Gerät frei: 2 von 2 ausgegeben", vm.NewDeviceStock);
+        Assert.True(vm.IsNewDeviceExhausted);
+
+        session.ReturnIssuedItem(session.Incident.IssuedItems[0].Id);
+        Assert.Equal("1 von 2 frei", vm.NewDeviceStock);
+        Assert.False(vm.IsNewDeviceExhausted);
+    }
+
+    [Fact]
+    public void Typing_a_geraet_updates_the_stock_hint()
+    {
+        using var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.NewDevice = "AED";
+
+        Assert.Equal("1 von 1 frei", vm.NewDeviceStock);
+        Assert.Contains(nameof(IssuedItemsViewModel.NewDeviceStock), changed);
+        Assert.Contains(nameof(IssuedItemsViewModel.IsNewDeviceExhausted), changed);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Sonstiges")] // in the Stammdaten, but not counted
+    [InlineData("Wärmebildkamera")] // not in the Stammdaten at all
+    public void A_geraet_nobody_counted_has_no_stock_hint_and_is_never_exhausted(string? device)
+    {
+        var session = NewSession();
+        session.IssueItem("Sonstiges", "Max Beispiel", null, null, null);
+        session.IssueItem("Wärmebildkamera", "Max Beispiel", null, null, null);
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices) { NewDevice = device };
+
+        Assert.Null(vm.NewDeviceStock);
+        Assert.False(vm.IsNewDeviceExhausted);
+    }
+
+    [Fact]
+    public void Handing_out_a_geraet_with_none_left_asks_first_and_cancelling_keeps_the_form()
+    {
+        var session = NewSession();
+        session.IssueItem("Mobilteil 1", "Erika Beispiel", null, null, null);
+        string? title = null;
+        string? message = null;
+        var changes = 0;
+        using var vm = new IssuedItemsViewModel(session, () => changes++, Devices, (t, m, _) =>
+        {
+            title = t;
+            message = m;
+        })
+        {
+            NewDevice = "mobilteil 1",
+            NewIssuedTo = "Max Beispiel",
+            NewRemark = "Ersatzakku",
+        };
+        var submitted = new List<EntrySubmittedEventArgs>();
+        vm.EntrySubmitted += (_, e) => submitted.Add(e);
+
+        vm.AddCommand.Execute(null);
+
+        Assert.Equal("Kein Gerät mehr frei", title);
+        Assert.Equal("Laut Stammdaten gibt es 1 × „Mobilteil 1“, ausgegeben sind 1. Trotzdem ausgeben?", message);
+        Assert.Single(session.Incident.IssuedItems);
+        Assert.Equal("mobilteil 1", vm.NewDevice);
+        Assert.Equal("Max Beispiel", vm.NewIssuedTo);
+        Assert.Equal("Ersatzakku", vm.NewRemark);
+        Assert.Equal(0, changes);
+        Assert.Empty(submitted);
+    }
+
+    [Fact]
+    public void Confirming_hands_the_geraet_out_anyway()
+    {
+        var session = NewSession();
+        session.IssueItem("AED", "Erika Beispiel", null, null, null);
+        var changes = 0;
+        using var vm = new IssuedItemsViewModel(session, () => changes++, Devices, (_, _, onConfirmed) => onConfirmed())
+        {
+            NewDevice = "AED",
+            NewIssuedTo = "Max Beispiel",
+            NewIssuedToPhone = "0171 0000002",
+        };
+
+        vm.AddCommand.Execute(null);
+
+        Assert.Equal(2, session.Incident.ItemsOut);
+        var item = session.Incident.IssuedItems[1];
+        Assert.Equal("AED", item.Device);
+        Assert.Equal("Max Beispiel", item.IssuedTo);
+        Assert.Equal("0171 0000002", item.IssuedToPhone);
+        Assert.Null(vm.NewDevice);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void A_geraet_still_in_stock_is_handed_out_without_asking()
+    {
+        var session = NewSession();
+        session.IssueItem("Weste EAL", "Erika Beispiel", null, null, null);
+        var asked = false;
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices, (_, _, _) => asked = true)
+        {
+            NewDevice = "Weste EAL",
+            NewIssuedTo = "Max Beispiel",
+        };
+
+        vm.AddCommand.Execute(null);
+
+        Assert.False(asked);
+        Assert.Equal(2, session.Incident.ItemsOut);
     }
 
     [Fact]

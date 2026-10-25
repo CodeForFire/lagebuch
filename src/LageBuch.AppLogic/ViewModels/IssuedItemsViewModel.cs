@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Equipment;
+using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -161,21 +162,26 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly Action<string, string, Action> _requestConfirm;
+    private readonly IReadOnlyList<Device> _devices;
 
     // Quiet until the first press: a tab that opens already scolding teaches nothing.
     private bool _errorsShown;
 
     /// <param name="session">The incident session every change goes through.</param>
     /// <param name="onChanged">Called after each accepted change, as every module does.</param>
-    /// <param name="deviceOptions">The Stammdaten's Geräte, offered as suggestions, never a closed set.</param>
+    /// <param name="devices">
+    /// The Stammdaten's Geräte, offered as suggestions, never a closed set. Each one's Anzahl is
+    /// checked against what is still out before another is handed out.
+    /// </param>
     /// <param name="requestConfirm">
-    /// Asks the host to confirm the removal before running it, as <see cref="InvolvedPartiesViewModel"/>
-    /// does. Defaults to running it immediately, so tests that do not care need not supply one.
+    /// Asks the host to confirm a removal, or an Ausgabe of a Gerät with none left, before running it,
+    /// as <see cref="InvolvedPartiesViewModel"/> does. Defaults to running it immediately, so tests
+    /// that do not care need not supply one.
     /// </param>
     public IssuedItemsViewModel(
         IIncidentSession session,
         Action onChanged,
-        IReadOnlyList<string>? deviceOptions = null,
+        IReadOnlyList<Device>? devices = null,
         Action<string, string, Action>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -183,7 +189,8 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
         _session = session;
         _onChanged = onChanged;
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
-        DeviceOptions = deviceOptions ?? [];
+        _devices = devices ?? [];
+        DeviceOptions = _devices.Select(d => d.Name).ToList();
         IsReadOnly = session.IsReadOnly;
         Items = new ObservableCollection<IssuedItemRow>(BuildRows());
         _session.Changed += Refresh;
@@ -226,6 +233,8 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewItemError))]
     [NotifyPropertyChangedFor(nameof(IsNewDeviceMissing))]
+    [NotifyPropertyChangedFor(nameof(NewDeviceStock))]
+    [NotifyPropertyChangedFor(nameof(IsNewDeviceExhausted))]
     private string? _newDevice;
 
     [ObservableProperty]
@@ -244,6 +253,21 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewItemError))]
     private string? _newRemark;
+
+    /// <summary>
+    /// How many of the typed Gerät are still in the ELW: "2 von 3 frei", or "Kein Gerät frei: 3 von 3
+    /// ausgegeben". Null for a Gerät the Stammdaten do not count.
+    /// </summary>
+    public string? NewDeviceStock => StockOf(NewDevice) switch
+    {
+        null => null,
+        var (issued, count) when issued < count => $"{count - issued} von {count} frei",
+        var (issued, count) => $"Kein Gerät frei: {issued} von {count} ausgegeben",
+    };
+
+    /// <summary>Whether every counted one of the typed Gerät is out, which colours the hint as a
+    /// warning and has AUSGEBEN ask first.</summary>
+    public bool IsNewDeviceExhausted => StockOf(NewDevice) is var (issued, count) && issued >= count;
 
     /// <summary>What stops the Ausgabe from being recorded, once the Lagebuchführer has asked.</summary>
     public string? NewItemError =>
@@ -328,7 +352,24 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
         // A typed "mobilteil 1 " records as the Stammdaten's "Mobilteil 1"; anything the list
         // lacks is kept as typed.
         var device = StammdatenCatalogue.Normalize(NewDevice, DeviceOptions) ?? NewDevice;
-        _session.IssueItem(device, NewIssuedTo, NewIssuedToPhone, NewIssuedToDetails, NewRemark); // Changed → Refresh
+        var issuedTo = NewIssuedTo;
+        if (StockOf(device) is var (issued, count) && issued >= count)
+        {
+            // Asked, never refused: a Gerät handed back without a ZURÜCK, or one borrowed from
+            // another ELW, is still in someone's hand and still has to be recorded.
+            _requestConfirm(
+                "Kein Gerät mehr frei",
+                $"Laut Stammdaten gibt es {count} × „{device}“, ausgegeben sind {issued}. Trotzdem ausgeben?",
+                () => Issue(device, issuedTo));
+            return;
+        }
+
+        Issue(device, issuedTo);
+    }
+
+    private void Issue(string device, string issuedTo)
+    {
+        _session.IssueItem(device, issuedTo, NewIssuedToPhone, NewIssuedToDetails, NewRemark); // Changed → Refresh
         NewDevice = null;
         NewIssuedTo = null;
         NewIssuedToPhone = null;
@@ -338,6 +379,21 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
         IsComposerOpen = false;
         _onChanged();
         EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Succeeded);
+    }
+
+    // How many of the Gerät are out against how many the Stammdaten count, or null when they count
+    // none. Matched ignoring case, like every catalogue lookup, so a line recorded before the
+    // Stammdaten respelled the Gerät still counts.
+    private (int Issued, int Count)? StockOf(string? device)
+    {
+        if (StammdatenCatalogue.Find(device, _devices) is not { Count: > 0 } entry)
+        {
+            return null;
+        }
+
+        var issued = _session.Incident.IssuedItems.Count(
+            i => i.IsOut && string.Equals(i.Device, entry.Name, StringComparison.OrdinalIgnoreCase));
+        return (issued, entry.Count);
     }
 
     private void ShowErrors(bool shown)
@@ -359,6 +415,8 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
 
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(HasItemsOut));
+        OnPropertyChanged(nameof(NewDeviceStock));
+        OnPropertyChanged(nameof(IsNewDeviceExhausted));
     }
 
     private List<IssuedItemRow> BuildRows() =>

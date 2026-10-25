@@ -114,8 +114,8 @@ public static class SyncProtocol
     /// <para>
     /// 20: the Ausgabeliste — <c>issueItem</c>, <c>updateIssuedItem</c>, <c>returnIssuedItem</c>,
     /// <c>undoIssuedItemReturn</c> and <c>removeIssuedItem</c> commands, the snapshot's
-    /// <c>issuedItems</c>, and the Stammdaten payload's <c>devices</c>. A host at 19 would reject
-    /// those commands, so the floor rises to 20.
+    /// <c>issuedItems</c>, and the Stammdaten payload's <c>devices</c> with their counts. A host
+    /// at 19 would reject those commands, so the floor rises to 20.
     /// </para>
     /// </summary>
     public const int ProtocolVersion = 20;
