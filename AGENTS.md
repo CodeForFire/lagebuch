@@ -198,6 +198,12 @@ open a PR. Absolute rule, no exceptions.
   `gh api repos/<owner>/<action>/git/refs/tags/<tag> --jq .object.sha`.
 - Every repo needs `.github/dependabot.yml` covering the `github-actions`
   ecosystem; add it if missing.
+- `zizmor.yml` audits every workflow and composite action, and its findings
+  arrive as code scanning alerts. Values from `needs`, `inputs` or
+  `github.event` reach a `run:` through `env:`, never as `${{ }}` inside the
+  script. A checkout sets `persist-credentials: false` unless the job pushes.
+  A finding accepted on purpose gets an inline `# zizmor: ignore[<audit>]`
+  with the reason in a comment beside it. Run it locally with `zizmor .`.
 
 ## Avalonia docs MCP
 

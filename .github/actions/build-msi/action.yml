@@ -29,9 +29,10 @@ runs:
         -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
         -p:DebugType=none -p:DebugSymbols=false
         "-p:Version=$env:VERSION" -o publish
+    # The GITHUB_PATH write below appends a fixed directory, nothing derived from input.
     - name: Install WiX
       shell: pwsh
-      run: |
+      run: | # zizmor: ignore[github-env]
         dotnet tool install --global wix --version 5.0.2
         echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
     - name: Build MSI
