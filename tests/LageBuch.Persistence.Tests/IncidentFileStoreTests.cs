@@ -245,6 +245,84 @@ public class IncidentFileStoreTests : IDisposable
         Assert.False(File.Exists(missing));
     }
 
+    [Fact]
+    public async Task Stored_bytes_over_the_read_cap_are_not_loaded()
+    {
+        var store = new IncidentFileStore(maxReadBytes: 4, spoolDirectory: _dir);
+        await store.SaveBytesAsync(_incidentPath, "big.jpg", new byte[] { 1, 2, 3, 4, 5 });
+
+        Assert.Null(await store.TryReadBytesAsync(_incidentPath, "big.jpg"));
+    }
+
+    [Fact]
+    public async Task Stored_bytes_exactly_at_the_read_cap_are_loaded()
+    {
+        var store = new IncidentFileStore(maxReadBytes: 4, spoolDirectory: _dir);
+        await store.SaveBytesAsync(_incidentPath, "edge.jpg", new byte[] { 1, 2, 3, 4 });
+
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, await store.TryReadBytesAsync(_incidentPath, "edge.jpg"));
+    }
+
+    [Fact]
+    public async Task The_upload_spool_is_readable_by_its_owner_only()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // The per-user temp directory's ACL keeps other users out there.
+        }
+
+        var spoolRoot = Path.Join(_dir, "spool");
+        var store = new IncidentFileStore(IncidentFile.MaxSizeBytes, spoolRoot);
+        var source = new SpoolInspectingStream(new byte[] { 1, 2, 3 }, spoolRoot);
+
+        await store.SaveStreamAsync(_incidentPath, "spool.jpg", source);
+
+        var mode = Assert.Single(source.SpoolModes);
+        Assert.Equal(UnixFileMode.None, mode & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.OtherRead | UnixFileMode.OtherWrite));
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(spoolRoot));
+        Assert.Empty(Directory.GetFiles(spoolRoot, "*", SearchOption.AllDirectories));
+    }
+
+    // Under the app's own temp folder, where the startup sweep finds what a crash left behind.
+    [Fact]
+    public async Task The_upload_spool_lives_in_the_lagebuch_temp_folder()
+    {
+        var spoolRoot = Path.Join(Path.GetTempPath(), "lagebuch");
+        var source = new SpoolInspectingStream(new byte[] { 4, 5 }, spoolRoot);
+
+        await _store.SaveStreamAsync(_incidentPath, "default.jpg", source);
+
+        Assert.NotEmpty(source.SpoolPaths);
+        Assert.All(source.SpoolPaths, p => Assert.StartsWith("upload-", Path.GetFileName(p), StringComparison.Ordinal));
+    }
+
+    /// <summary>Records the mode of every spool file present while the upload is being read.</summary>
+    private sealed class SpoolInspectingStream(byte[] bytes, string spoolRoot) : MemoryStream(bytes)
+    {
+        private bool _inspected;
+
+        public List<string> SpoolPaths { get; } = [];
+
+        public List<UnixFileMode> SpoolModes { get; } = [];
+
+        public override bool CanSeek => false;
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (!_inspected)
+            {
+                _inspected = true;
+                SpoolPaths.AddRange(Directory.GetFiles(spoolRoot, "upload-*.tmp"));
+                if (!OperatingSystem.IsWindows())
+                {
+                    SpoolModes.AddRange(SpoolPaths.Select(File.GetUnixFileMode));
+                }
+            }
+
+            return base.ReadAsync(buffer, cancellationToken);
+        }
+    }
+
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset Now { get; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.Zero);

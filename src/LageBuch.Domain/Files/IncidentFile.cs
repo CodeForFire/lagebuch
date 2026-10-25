@@ -142,9 +142,7 @@ public sealed record IncidentFile
         => new()
         {
             Id = id,
-            FileName = SanitizeFileName(fileName)
-                ?? SanitizeFileName(StorageFileName(id, fileName))
-                ?? FileNameSanitizer.DefaultFallback,
+            FileName = RehydratedFileName(id, fileName),
             DisplayName = displayName,
             ContentType = contentType,
             SizeBytes = sizeBytes,
@@ -169,6 +167,16 @@ public sealed record IncidentFile
     /// <see cref="Id"/> and the original extension, never persisted separately.
     /// </summary>
     public static string StorageFileName(Guid id, string fileName) => $"{id}{Path.GetExtension(fileName)}";
+
+    /// <summary>
+    /// The <see cref="FileName"/> <see cref="Rehydrate"/> derives from a stored, untrusted
+    /// <paramref name="fileName"/>. Public so code that sees only the raw row -- the import of an
+    /// older build's attachment folder -- keys the bytes exactly as every reader will.
+    /// </summary>
+    public static string RehydratedFileName(Guid id, string fileName) =>
+        SanitizeFileName(fileName)
+            ?? SanitizeFileName(StorageFileName(id, fileName))
+            ?? FileNameSanitizer.DefaultFallback;
 
     /// <summary>
     /// Sanitising is shared with the Android picked-name path via

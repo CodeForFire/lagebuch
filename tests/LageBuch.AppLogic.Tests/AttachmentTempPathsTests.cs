@@ -372,6 +372,79 @@ public class AttachmentTempPathsTests
         }
     }
 
+    private static string NewSpool(string root)
+    {
+        Directory.CreateDirectory(root);
+        var spool = Path.Join(root, $"upload-{Guid.NewGuid():N}.tmp");
+        File.WriteAllBytes(spool, new byte[] { 1, 2, 3 });
+        return spool;
+    }
+
+    // A crash never reaches DeleteOnClose, so the client's photo would stay in the temp folder.
+    [Fact]
+    public void SweepOpenDirectories_removes_an_upload_spool_a_crash_left_behind()
+    {
+        var root = NewSweepRoot();
+        try
+        {
+            var spool = NewSpool(root);
+
+            AttachmentTempPaths.SweepOpenDirectories(root);
+
+            Assert.False(File.Exists(spool));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("upload-notes.tmp")]
+    [InlineData("upload-0123456789abcdef0123456789abcdef.jpg")]
+    [InlineData("brand.tmp")]
+    public void SweepOpenDirectories_leaves_a_file_that_is_no_upload_spool_alone(string name)
+    {
+        var root = NewSweepRoot();
+        try
+        {
+            Directory.CreateDirectory(root);
+            var foreign = Path.Join(root, name);
+            File.WriteAllBytes(foreign, new byte[] { 1 });
+
+            AttachmentTempPaths.SweepOpenDirectories(root);
+
+            Assert.True(File.Exists(foreign));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SweepOpenDirectories_with_a_cutoff_keeps_a_newer_upload_spool_and_removes_an_older_one()
+    {
+        var root = NewSweepRoot();
+        var cutoff = new DateTime(2026, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var older = NewSpool(root);
+            var newer = NewSpool(root);
+            File.SetLastWriteTimeUtc(older, cutoff.AddHours(-1));
+            File.SetLastWriteTimeUtc(newer, cutoff.AddHours(1));
+
+            AttachmentTempPaths.SweepOpenDirectories(root, modifiedBefore: cutoff);
+
+            Assert.False(File.Exists(older));
+            Assert.True(File.Exists(newer));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void IsInsideRoot_accepts_a_path_below_the_root()
     {

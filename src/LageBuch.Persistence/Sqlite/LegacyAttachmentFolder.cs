@@ -25,7 +25,8 @@ internal static class LegacyAttachmentFolder
     /// regardless. A SQLite failure still propagates, before anything on disk has been touched.
     /// Files nothing names are left alone.
     /// </summary>
-    public static void Import(SqliteConnection cn, string incidentPath, long maxSizeBytes = IncidentFile.MaxSizeBytes)
+    public static void Import(
+        SqliteConnection cn, string incidentPath, long maxSizeBytes = IncidentFile.MaxSizeBytes, Func<string, Stream>? openSource = null)
     {
         ArgumentNullException.ThrowIfNull(cn);
         ArgumentNullException.ThrowIfNull(incidentPath);
@@ -49,9 +50,11 @@ internal static class LegacyAttachmentFolder
                     continue;
                 }
 
-                var storage = IncidentFile.StorageFileName(guid, fileName);
-                var candidate = Path.GetFullPath(Path.Join(folder, storage));
-                if (!candidate.StartsWith(root, StringComparison.Ordinal))
+                // Keyed on the name Rehydrate makes of the row, which is what every reader -- and an
+                // older build writing this folder -- passes to StorageFileName. The raw name can
+                // carry anything a crafted file puts there, a NUL or an extension the sanitiser drops.
+                var storage = IncidentFile.StorageFileName(guid, IncidentFile.RehydratedFileName(guid, fileName));
+                if (ResolveInside(folder, root, storage) is not { } candidate)
                 {
                     continue;
                 }
@@ -68,7 +71,7 @@ internal static class LegacyAttachmentFolder
                 // cleanup failed; delete the original only if the stored bytes are the same size.
                 var stored = BlobLength(cn, tx, storage);
                 var done = stored is null
-                    ? CopyIntoBlob(cn, tx, storage, candidate, maxSizeBytes)
+                    ? CopyIntoBlob(cn, tx, storage, candidate, maxSizeBytes, openSource ?? OpenSource)
                     : stored == info.Length;
                 if (done)
                 {
@@ -82,6 +85,27 @@ internal static class LegacyAttachmentFolder
         DeleteImported(imported, folder);
     }
 
+    /// <summary>
+    /// The full path of <paramref name="storage"/> in <paramref name="folder"/>, or null when it
+    /// leaves the folder or is no valid path at all (<see cref="Path.GetFullPath(string)"/> throws
+    /// <see cref="ArgumentException"/>); such a row is skipped and the Einsatz still opens.
+    /// </summary>
+    private static string? ResolveInside(string folder, string root, string storage)
+    {
+        try
+        {
+            var candidate = Path.GetFullPath(Path.Join(folder, storage));
+            return candidate.StartsWith(root, StringComparison.Ordinal) ? candidate : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static FileStream OpenSource(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
     private static bool IsLink(FileSystemInfo info) =>
         info.LinkTarget is not null || info.Attributes.HasFlag(FileAttributes.ReparsePoint);
 
@@ -89,21 +113,25 @@ internal static class LegacyAttachmentFolder
     /// False when the file is over the cap or cannot be read: it stays on disk and the import goes on.
     /// A row begun for a file that then failed to read is removed again.
     /// </summary>
-    private static bool CopyIntoBlob(SqliteConnection cn, SqliteTransaction tx, string storage, string path, long maxSizeBytes)
+    private static bool CopyIntoBlob(
+        SqliteConnection cn, SqliteTransaction tx, string storage, string path, long maxSizeBytes, Func<string, Stream> openSource)
     {
         try
         {
-            using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var source = openSource(path);
             if (source.Length > maxSizeBytes)
             {
                 return false;
             }
 
+            // Whatever stops the copy, the zeroblob row it began must not be committed: its length
+            // matches the original, so a later open would take it as imported and delete the file.
+            // The outer handler still decides whether the failure skips this file or the import.
             try
             {
                 IncidentFileBlobs.Write(cn, tx, storage, source, source.Length);
             }
-            catch (IOException)
+            catch
             {
                 RemoveBlob(cn, tx, storage);
                 throw;
@@ -152,10 +180,6 @@ internal static class LegacyAttachmentFolder
         }
     }
 
-    [SuppressMessage(
-        "Security",
-        "CA2100:Review SQL queries for security vulnerabilities",
-        Justification = "The table name is the compile-time constant IncidentFileBlobs.Table; the value is bound as a parameter.")]
     private static long? BlobLength(SqliteConnection cn, SqliteTransaction tx, string storage)
     {
         using var cmd = cn.CreateCommand();
@@ -166,10 +190,6 @@ internal static class LegacyAttachmentFolder
         return value is null or DBNull ? null : Convert.ToInt64(value, CultureInfo.InvariantCulture);
     }
 
-    [SuppressMessage(
-        "Security",
-        "CA2100:Review SQL queries for security vulnerabilities",
-        Justification = "The table name is the compile-time constant IncidentFileBlobs.Table; the value is bound as a parameter.")]
     private static void RemoveBlob(SqliteConnection cn, SqliteTransaction tx, string storage)
     {
         using var cmd = cn.CreateCommand();

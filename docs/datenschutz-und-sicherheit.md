@@ -98,7 +98,10 @@ auch die Anhänge mit. Wer ihn löscht, löscht sie ebenfalls.
 
 Ein entfernter oder ersetzter Anhang wird in der Datei **überschrieben**, nicht
 nur als gelöscht markiert. Die Datei wird dadurch aber nicht kleiner: der frei
-gewordene Platz bleibt reserviert und wird wiederverwendet.
+gewordene Platz bleibt reserviert und wird wiederverwendet. Schlägt das
+Überschreiben in seltenen Fällen fehl, erhält der Lagebuchführer eine Meldung.
+Die Daten können dann in der Datei bleiben, ebenso nach einem Absturz genau in
+diesem Moment.
 
 **Ältere Einsatzdateien werden beim Öffnen umgewandelt.** Frühere Versionen
 legten Anhänge in einem Ordner neben der Datei ab, der denselben Namen trug,

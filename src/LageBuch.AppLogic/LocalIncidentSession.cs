@@ -309,11 +309,13 @@ public sealed class LocalIncidentSession : IIncidentSession
         var file = Incident.RemoveFile(_clock, RequireOperator(), fileId);
 
         // The metadata removal is persisted first, so a failing byte delete cannot leave the file
-        // with a row that memory no longer has. The failure still reaches the caller; Changed is
-        // raised either way because the domain already changed.
+        // with a row that memory no longer has. Save only queues the write, so it is flushed before
+        // the delete. The failure still reaches the caller; Changed is raised either way because
+        // the domain already changed.
         Save();
         try
         {
+            await _store.FlushAsync(cancellationToken);
             await _store.DeleteFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
         }
         finally

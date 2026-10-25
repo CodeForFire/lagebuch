@@ -446,11 +446,13 @@ public class IncidentSessionTests
         session.Changed += () => changed++;
         store.DeleteFailure = new IOException("wipe failed");
         var savesBefore = store.SaveCount;
+        var flushesBefore = store.FlushCount;
 
         await Assert.ThrowsAsync<IOException>(() => session.RemoveFileAsync(fileId));
 
         Assert.Empty(session.Incident.Files);
         Assert.Equal(savesBefore + 1, store.SaveCountAtDelete); // saved before the delete was tried
+        Assert.Equal(flushesBefore + 1, store.FlushCountAtDelete); // and written, not just queued
         Assert.Equal(1, changed); // the domain changed, so views refresh despite the failure
     }
 
@@ -556,13 +558,22 @@ internal sealed class FakeStore : IIncidentStore
     /// <summary><see cref="SaveCount"/> as it stood when the byte delete was attempted.</summary>
     public int SaveCountAtDelete { get; private set; }
 
+    public int FlushCount { get; private set; }
+
+    /// <summary><see cref="FlushCount"/> as it stood when the byte delete was attempted.</summary>
+    public int FlushCountAtDelete { get; private set; }
+
     public void Save(string path, Incident incident)
     {
         _saved[path] = incident;
         SaveCount++;
     }
 
-    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default)
+    {
+        FlushCount++;
+        return Task.CompletedTask;
+    }
 
     public Incident Load(string path) => _saved[path];
 
@@ -589,6 +600,7 @@ internal sealed class FakeStore : IIncidentStore
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
     {
         SaveCountAtDelete = SaveCount;
+        FlushCountAtDelete = FlushCount;
         if (DeleteFailure is not null)
         {
             return Task.FromException(DeleteFailure);

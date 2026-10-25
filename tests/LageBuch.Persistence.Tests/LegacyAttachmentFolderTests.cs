@@ -366,6 +366,98 @@ public class LegacyAttachmentFolderTests : IDisposable
         Assert.True(File.Exists(stray));
     }
 
+    private static void SetRawFileName(string path, string rawName)
+    {
+        using var cn = SqliteConnectionFactory.OpenExisting(path);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "UPDATE incident_files SET file_name = $n;";
+        cmd.Parameters.AddWithValue("$n", rawName);
+        cmd.ExecuteNonQuery();
+    }
+
+    private async Task<byte[]?> ReadAsTheSessionDoes(string path)
+    {
+        var loaded = Assert.Single(IncidentRepository.Load(path).Files);
+        return await _store.TryReadBytesAsync(path, IncidentFile.StorageFileName(loaded.Id, loaded.FileName));
+    }
+
+    [Fact]
+    public async Task A_file_name_with_an_embedded_nul_does_not_stop_the_incident_from_opening()
+    {
+        var bytes = new byte[] { 3, 1, 4 };
+        var (path, _) = SaveWithLegacyFile(".lagebuch", bytes);
+        SetRawFileName(path, "foto.jp\0g");
+
+        var incident = IncidentRepository.Load(path);
+
+        Assert.Equal("foto.jpg", Assert.Single(incident.Files).FileName);
+        Assert.Equal(bytes, await ReadAsTheSessionDoes(path));
+        Assert.False(Directory.Exists(FolderFor(path)));
+    }
+
+    [Fact]
+    public async Task A_raw_extension_the_sanitiser_changes_is_imported_under_the_key_the_reader_uses()
+    {
+        var bytes = new byte[] { 2, 7, 1, 8 };
+        var (path, _) = SaveWithLegacyFile(".lagebuch", bytes);
+        SetRawFileName(path, "foto.jp<g");
+
+        Assert.Equal(bytes, await ReadAsTheSessionDoes(path));
+        Assert.False(Directory.Exists(FolderFor(path)));
+    }
+
+    [Fact]
+    public void A_source_failing_mid_copy_with_any_exception_leaves_no_row_behind()
+    {
+        var (path, file) = SaveWithLegacyFile(".lagebuch", new byte[] { 1, 2, 3, 4, 5, 6 });
+        var legacy = Path.Join(FolderFor(path), IncidentFile.StorageFileName(file.Id, file.FileName));
+
+        using (var cn = SqliteConnectionFactory.OpenExisting(path))
+        {
+            LegacyAttachmentFolder.Import(cn, path, openSource: _ => new FailingAfterFirstReadStream(6));
+        }
+
+        Assert.Equal(0, BlobRowCount(path));
+        Assert.True(File.Exists(legacy));
+    }
+
+    private sealed class FailingAfterFirstReadStream(long length) : Stream
+    {
+        private bool _readOnce;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => true;
+
+        public override bool CanWrite => false;
+
+        public override long Length => length;
+
+        public override long Position { get; set; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_readOnce)
+            {
+                throw new UnauthorizedAccessException("revoked mid-copy");
+            }
+
+            _readOnce = true;
+            buffer[offset] = 1;
+            return 1;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset Now { get; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.Zero);
