@@ -42,7 +42,7 @@
             <Grid Width="146" ColumnDefinitions="34,*" Margin="0,2">
               <TextBlock Grid.Column="0" Text="{Binding Source}" Classes="mono" FontWeight="SemiBold" />
               <TextBlock Grid.Column="1" Text="{Binding Word}" TextTrimming="CharacterEllipsis"
-                         Foreground="{StaticResource TextMutedBrush}" />
+                         Foreground="{StaticResource TextSecondaryBrush}" />
             </Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>

@@ -61,7 +61,7 @@
                 Command="{Binding NewReportCommand}" />
         <TextBlock DockPanel.Dock="Top" x:Name="EmptyText" Margin="12,8" TextWrapping="Wrap"
                    Text="Noch keine Lagemeldung."
-                   Foreground="{StaticResource TextMutedBrush}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
                    IsVisible="{Binding !HasReports}" />
         <!-- A handful of reports per Einsatz: a plain StackPanel, so every row is realized and
              can be brought into view, as in the Stammdaten editor's category list. -->
@@ -80,10 +80,10 @@
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="SemiBold" />
                   <TextBlock Grid.Column="1" Text="{Binding TimeText}" Classes="mono"
-                             Foreground="{StaticResource TextMutedBrush}" />
+                             Foreground="{StaticResource TextSecondaryBrush}" />
                 </Grid>
                 <TextBlock Text="{Binding Summary}" FontSize="12" TextTrimming="CharacterEllipsis"
-                           Foreground="{StaticResource TextMutedBrush}" />
+                           Foreground="{StaticResource TextSecondaryBrush}" />
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -112,7 +112,7 @@
 
     <TextBlock x:Name="NoSelectionText" TextWrapping="Wrap" Margin="4,0"
                Text="NEUE LAGEMELDUNG beginnt eine Meldung an die Leitstelle, vorbefüllt mit Funkrufname, Einsatzstelle und Kräften."
-               Foreground="{StaticResource TextMutedBrush}"
+               Foreground="{StaticResource TextSecondaryBrush}"
                IsVisible="{Binding !HasSelection}" />
 
     <!-- The editor. Every field follows each keystroke so the Funkspruch below does too; the
@@ -123,7 +123,7 @@
       <StackPanel Spacing="10" Margin="0,0,4,0">
         <StackPanel Spacing="2">
           <TextBlock x:Name="EditorHeaderText" Text="{Binding EditorHeader}" Classes="display" FontSize="18" />
-          <TextBlock x:Name="SentInfoText" Text="{Binding SentInfo}" Foreground="{StaticResource TextMutedBrush}"
+          <TextBlock x:Name="SentInfoText" Text="{Binding SentInfo}" Foreground="{StaticResource TextSecondaryBrush}"
                      IsVisible="{Binding SentInfo, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
 
@@ -208,7 +208,7 @@
                                  FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"
                                  AutomationProperties.Name="Funkspruch" />
             <TextBlock Text="Noch leer: Einsatzstelle, Lage, Maßnahmen, Einheiten oder Nachforderungen eintragen."
-                       TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
+                       TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
                        IsVisible="{Binding !FunkspruchPreview.Length}" />
           </StackPanel>
         </Border>
