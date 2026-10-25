@@ -166,7 +166,16 @@ public class VersionHandshakeTests
         // 17 adds premises to the Stammdaten payload and apartmentLabels to addCoBuilding. A peer at
         // 16 skips the key and offers no Objekte, and a host there creates the Haus without its
         // labels, so it stays joinable.
-        Assert.Equal(17, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 17, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 16, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_host_time_on_revision_raises_the_protocol_to_eighteen_but_not_the_floor()
+    {
+        // 18 adds hostTime to /revision. A client at 16 or 17 ignores it and stays on its own clock,
+        // and a host there omits it, which a newer client reads as unknown, so it stays joinable.
+        Assert.Equal(18, SyncProtocol.ProtocolVersion);
         Assert.Equal(16, SyncProtocol.MinimumProtocolVersion);
     }
 }
