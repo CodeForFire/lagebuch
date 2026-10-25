@@ -334,6 +334,38 @@ public class LegacyAttachmentFolderTests : IDisposable
         Assert.True(File.Exists(legacy));
     }
 
+    [Fact]
+    public void A_legacy_file_exactly_at_the_cap_is_imported()
+    {
+        var (path, file) = SaveWithLegacyFile(".lagebuch", new byte[] { 1, 2, 3, 4 });
+
+        using (var cn = SqliteConnectionFactory.OpenExisting(path))
+        {
+            LegacyAttachmentFolder.Import(cn, path, maxSizeBytes: 4);
+        }
+
+        Assert.Equal(1, BlobRowCount(path));
+        Assert.False(File.Exists(Path.Join(FolderFor(path), IncidentFile.StorageFileName(file.Id, file.FileName))));
+    }
+
+    [Fact]
+    public void A_row_whose_id_is_not_a_guid_never_imports_a_file()
+    {
+        var (path, file) = SaveWithLegacyFile(".lagebuch", new byte[] { 1 });
+        var stray = Path.Join(FolderFor(path), IncidentFile.StorageFileName(Guid.Empty, file.FileName));
+        File.WriteAllBytes(stray, new byte[] { 9 });
+        using (var cn = SqliteConnectionFactory.OpenExisting(path))
+        {
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "UPDATE incident_files SET id = 'not-a-guid';";
+            cmd.ExecuteNonQuery();
+            LegacyAttachmentFolder.Import(cn, path);
+        }
+
+        Assert.Equal(0, BlobRowCount(path));
+        Assert.True(File.Exists(stray));
+    }
+
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset Now { get; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.Zero);

@@ -104,6 +104,42 @@ public class IncidentFileStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_streamed_upload_of_exactly_the_size_cap_is_accepted()
+    {
+        await using var source = new NonSeekableStream(new byte[IncidentFile.MaxSizeBytes]);
+
+        await _store.SaveStreamAsync(_incidentPath, "exact.bin", source);
+
+        var stored = await _store.TryReadBytesAsync(_incidentPath, "exact.bin");
+
+        Assert.NotNull(stored);
+        Assert.Equal((int)IncidentFile.MaxSizeBytes, stored.Length);
+    }
+
+    [Fact]
+    public async Task An_empty_attachment_is_stored_as_an_empty_row()
+    {
+        await _store.SaveBytesAsync(_incidentPath, "empty.bin", Array.Empty<byte>());
+
+        Assert.Empty(await _store.TryReadBytesAsync(_incidentPath, "empty.bin") ?? [1]);
+        Assert.Equal(1, BlobRowCount());
+    }
+
+    [Fact]
+    public void A_source_shorter_than_the_announced_length_is_rejected_and_rolls_back()
+    {
+        using var cn = IncidentFileBlobs.OpenForWrite(_incidentPath);
+        using (var tx = cn.BeginTransaction())
+        {
+            using var source = new MemoryStream(new byte[] { 1, 2 });
+
+            Assert.Throws<EndOfStreamException>(() => IncidentFileBlobs.Write(cn, tx, "short.bin", source, 5));
+        }
+
+        Assert.Equal(0, BlobRowCount());
+    }
+
+    [Fact]
     public async Task An_incident_save_does_not_drop_stored_attachment_bytes()
     {
         await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 4, 2 });
