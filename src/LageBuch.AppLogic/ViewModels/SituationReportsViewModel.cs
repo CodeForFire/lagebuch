@@ -126,14 +126,10 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     /// <summary>The phone's way in to the helper, shown exactly when it is not.</summary>
     public bool ShowHelperButton => IsNarrow && !IsHelperOpen;
 
+    // The editor's state follows the report Load put in it, not this selection, which passes
+    // through null mid-refresh. A commit refreshes while focus is moving to the next field, and an
+    // editor hidden or disabled for that moment strands the focus; Load raises the notifications.
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelection))]
-    [NotifyPropertyChangedFor(nameof(IsEditable))]
-    [NotifyPropertyChangedFor(nameof(EditorHeader))]
-    [NotifyPropertyChangedFor(nameof(SentInfo))]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteDraftCommand))]
-    [NotifyCanExecuteChangedFor(nameof(RefreshUnitsCommand))]
     private SituationReportRow? _selectedReport;
 
     [ObservableProperty]
@@ -169,15 +165,15 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     [ObservableProperty]
     private string? _error;
 
-    public bool HasSelection => SelectedReport is not null;
+    public bool HasSelection => _saved is not null;
 
     /// <summary>A draft on a live incident: a sent report is the record of what was said.</summary>
-    public bool IsEditable => !IsReadOnly && SelectedReport is { IsSent: false };
+    public bool IsEditable => !IsReadOnly && _saved is { IsSent: false };
 
-    public string EditorHeader => SelectedReport switch
+    public string EditorHeader => _saved switch
     {
         null => string.Empty,
-        { IsSent: true } row => $"LAGEMELDUNG {Formatting.Upper(row.Title)}",
+        { IsSent: true, Number: { } number } => $"LAGEMELDUNG NR. {number}",
         _ => "LAGEMELDUNG · ENTWURF",
     };
 
@@ -465,6 +461,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
             Requests = Moved(previous.Requests, report.Requests, Requests);
         }
 
+        OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SentInfo));
         OnPropertyChanged(nameof(IsEditable));
         OnPropertyChanged(nameof(EditorHeader));
