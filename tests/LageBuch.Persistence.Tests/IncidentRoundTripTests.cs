@@ -354,7 +354,7 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Null(loadedActive.PressureReadings[1].Location);
         Assert.Equal(180, loadedActive.LatestPressure);
         Assert.True(loadedActive.IsActive);
-        Assert.Equal("Trupp 1 (Angriffstrupp)", loadedActive.DisplayName);
+        Assert.Equal("FFB 1/40/1 · Angriffstrupp", loadedActive.DisplayName);
 
         Assert.Equal(removed.Id, loadedActive.SafetyTruppId);
         Assert.Null(loaded.ScbaTrupps[2].SafetyTruppId);

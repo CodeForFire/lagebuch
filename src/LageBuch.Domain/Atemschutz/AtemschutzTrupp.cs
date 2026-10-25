@@ -73,31 +73,23 @@ public sealed class AtemschutzTrupp
 
     public string Designation { get; private init; } = string.Empty;
 
-    /// <summary>"Trupp {N} ({Designation})" — the display form used wherever the Funkrufname is
-    /// already shown in a column of its own: the grid, the PDF table and the ETB lines whose
-    /// Von/An carries it. Kept here as the single source of truth so the number and the type name
-    /// are never composed differently in two places. Where the Trupp stands alone, use
-    /// <see cref="DisplayNameWithCallSign"/> instead.</summary>
-    public string DisplayName => FormatDisplayName(TruppNumber, Designation);
+    /// <summary>
+    /// "{CallSign} · {Designation}" — how the crew names a Trupp: the vehicle it rides with and
+    /// what it does. The running <see cref="TruppNumber"/> is bookkeeping nobody says on the radio,
+    /// so it stays out. The Funkrufname comes first because it is what tells two Trupps apart and
+    /// what survives when a banner has to ellipsise (#417). Kept here as the single source of truth
+    /// so the name is never composed differently in two places.
+    /// <para>
+    /// The Funkrufname is optional (it is free text typed at Bereitstellung, #92), so without one
+    /// this is the designation alone rather than a dangling separator.
+    /// </para>
+    /// </summary>
+    public string DisplayName => FormatDisplayName(CallSign, Designation);
 
     /// <summary>Same formatting as <see cref="DisplayName"/>, usable before an instance exists —
     /// e.g. to compose the registration ETB line from form inputs, before the mutation commits.</summary>
-    public static string FormatDisplayName(int truppNumber, string designation) => $"Trupp {truppNumber} ({designation})";
-
-    /// <summary>
-    /// "{CallSign} · Trupp {N} ({Designation})" — the form for the places that show the Trupp on
-    /// its own, with no Funkrufname column beside it: the two header banners and the ETB lines that
-    /// name a second Trupp. The Funkrufname comes first because it is what tells two Trupps apart:
-    /// two vehicles each send a "Trupp 1", and under pressure the banner has to answer "which one
-    /// is being called?" in its first word (#417). It is also what survives when the banner has to
-    /// ellipsise.
-    /// <para>
-    /// The Funkrufname is optional (it is free text typed at Bereitstellung, #92), so without one
-    /// this is exactly <see cref="DisplayName"/> rather than a dangling separator.
-    /// </para>
-    /// </summary>
-    public string DisplayNameWithCallSign =>
-        string.IsNullOrWhiteSpace(CallSign) ? DisplayName : $"{CallSign} · {DisplayName}";
+    public static string FormatDisplayName(string? callSign, string designation) =>
+        string.IsNullOrWhiteSpace(callSign) ? designation : $"{callSign.Trim()} · {designation}";
 
     /// <summary>
     /// The crew, in position order: between <see cref="StandardMemberCount"/> and

@@ -52,6 +52,56 @@ public class ScbaViewModelTests
         Assert.Equal(new[] { false, true }, outcomes);
     }
 
+    // A Trupp rides with a unit that is at this Einsatz, so the suggestions are the Kräfte entered
+    // for it -- not every vehicle in the Stammdaten.
+    [Fact]
+    public void Call_sign_suggestions_list_the_kraefte_of_the_incident_not_the_stammdaten()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        session.AddForceUnit("FF Musterdorf", 6, callSign: "Florian Musterdorf 42/1");
+        session.AddForceUnit("FF Musterstadt", 9, callSign: "Florian Musterstadt 40/1", status: "Alarmiert");
+        using var vm = Vm(clock, session);
+
+        Assert.Equal(new[] { "Florian Musterdorf 42/1", "Florian Musterstadt 40/1" }, vm.CallSignOptions);
+        Assert.DoesNotContain("FFB 1/40/1", vm.CallSignOptions);
+    }
+
+    [Fact]
+    public void Call_sign_suggestions_update_when_a_kraft_is_added()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        using var vm = Vm(clock, session);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        Assert.Empty(vm.CallSignOptions);
+        session.AddForceUnit("FF Musterdorf", 6, callSign: "Florian Musterdorf 42/1");
+
+        Assert.Equal(new[] { "Florian Musterdorf 42/1" }, vm.CallSignOptions);
+        Assert.Contains(nameof(ScbaViewModel.CallSignOptions), raised);
+    }
+
+    // A ComboBox or AutoCompleteBox whose ItemsSource is swapped under it misbehaves (#408), so an
+    // unrelated change must leave the list instance alone.
+    [Fact]
+    public void Call_sign_suggestions_skip_blanks_and_duplicates_and_are_not_replaced_without_cause()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        session.AddForceUnit("FF Musterdorf", 6, callSign: "Florian Musterdorf 42/1");
+        session.AddForceUnit("FF Musterdorf", 3, callSign: " Florian Musterdorf 42/1 ");
+        session.AddForceUnit("THW", 4);
+        using var vm = Vm(clock, session);
+        var before = vm.CallSignOptions;
+
+        Register(vm);
+
+        Assert.Equal(new[] { "Florian Musterdorf 42/1" }, vm.CallSignOptions);
+        Assert.Same(before, vm.CallSignOptions);
+    }
+
     private static LocalIncidentSession NewSession(FixedClock clock) =>
         TestSession.StartNew(
             new FakeStore(),
@@ -213,7 +263,7 @@ public class ScbaViewModelTests
         row.StartCommand.Execute(null);
 
         Assert.Equal(
-            "Nächste Druckabfrage: Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp) in "
+            "Nächste Druckabfrage: Florian Musterstadt 40/1 · Angriffstrupp in "
             + row.ControlRemainingDisplay,
             vm.NextControlDisplay);
 
@@ -221,11 +271,11 @@ public class ScbaViewModelTests
         ticker.Fire();
 
         Assert.Equal(
-            "Druckabfrage fällig: Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp)",
+            "Druckabfrage fällig: Florian Musterstadt 40/1 · Angriffstrupp",
             vm.NextControlDisplay);
     }
 
-    // The Funkrufname is optional, so a brigade that types none still gets the old wording rather
+    // The Funkrufname is optional, so a brigade that types none gets the Trupp-Art alone rather
     // than a dangling separator.
     [Fact]
     public void Header_reminder_falls_back_to_the_plain_name_without_a_funkrufname()
@@ -238,7 +288,7 @@ public class ScbaViewModelTests
         row.StartCommand.Execute(null);
 
         Assert.Equal(
-            "Nächste Druckabfrage: Trupp 1 (Angriffstrupp) in " + row.ControlRemainingDisplay,
+            "Nächste Druckabfrage: Angriffstrupp in " + row.ControlRemainingDisplay,
             vm.NextControlDisplay);
     }
 
@@ -255,7 +305,7 @@ public class ScbaViewModelTests
         row.StartCommand.Execute(null);
 
         Assert.True(vm.IsControlCountingDown);
-        Assert.Equal("Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp)", vm.NextControlName);
+        Assert.Equal("Florian Musterstadt 40/1 · Angriffstrupp", vm.NextControlName);
         Assert.Equal(row.ControlRemainingDisplay, vm.NextControlRemaining);
 
         clock.Now = T0.AddMinutes(6);
@@ -398,7 +448,7 @@ public class ScbaViewModelTests
 
         Assert.True(vm.IsAnyAlarm);
         Assert.Contains(AlarmSound.RetreatAlarm, alarm.Played);
-        Assert.StartsWith("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay, StringComparison.Ordinal);
+        Assert.StartsWith("Angriffstrupp", vm.AlarmDisplay, StringComparison.Ordinal);
         Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
     }
 
@@ -420,7 +470,7 @@ public class ScbaViewModelTests
 
         // The header row's tile carries the word RÜCKZUGSALARM, so the text leads with the crew.
         Assert.Equal(
-            "Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp): Einsatzzeit erreicht",
+            "Florian Musterstadt 40/1 · Angriffstrupp: Einsatzzeit erreicht",
             vm.AlarmDisplay);
     }
 
@@ -548,7 +598,7 @@ public class ScbaViewModelTests
         row.PressureInput = 45;
         row.RecordPressureCommand.Execute(null);
 
-        Assert.Equal("Trupp 1 (Angriffstrupp): Rückzugsdruck erreicht (45 bar)", vm.AlarmDisplay);
+        Assert.Equal("Angriffstrupp: Rückzugsdruck erreicht (45 bar)", vm.AlarmDisplay);
     }
 
     [Fact]
@@ -1113,7 +1163,7 @@ public class ScbaViewModelTests
 
         Assert.Contains(
             session.Incident.Journal,
-            e => e.Text == "Trupp 1 (CSA-Trupp) bereitgestellt: Müller / Schmidt / Huber, Einstiegsdruck 300 bar");
+            e => e.Text == "CSA-Trupp bereitgestellt: Müller / Schmidt / Huber, Einstiegsdruck 300 bar");
     }
 
     [Fact]
@@ -1172,16 +1222,16 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void The_grid_row_and_alarm_banner_use_the_TruppNumber_display_format()
+    public void The_grid_row_names_the_trupp_without_its_number()
     {
         var clock = new FixedClock(T0);
         var vm = Vm(clock, NewSession(clock));
         vm.NewTruppNumber = 5;
 
-        var row = Register(vm);
+        var row = Register(vm, callSign: "Florian Musterstadt 40/1");
 
         Assert.Equal(5, row.TruppNumber);
-        Assert.Equal("Trupp 5 (Angriffstrupp)", row.DisplayName);
+        Assert.Equal("Florian Musterstadt 40/1 · Angriffstrupp", row.DisplayName);
     }
 
     // --- Abfrage-Intervall defaults to a third of Einsatzzeit (issue #78) ---

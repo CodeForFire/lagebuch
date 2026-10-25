@@ -70,7 +70,7 @@ public class ScbaSafetyTruppFlyoutTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(standby.Id, scba.Trupps.Single(r => r.Id == row.Id).SafetyTruppChoices.Single(c => c.IsCurrent).Id);
-        Assert.Equal("Trupp " + standby.TruppNumber, scba.Trupps.Single(r => r.Id == row.Id).SafetyTruppButtonText);
+        Assert.Equal(standby.DisplayName, scba.Trupps.Single(r => r.Id == row.Id).SafetyTruppButtonText);
     }
 
     [AvaloniaFact]

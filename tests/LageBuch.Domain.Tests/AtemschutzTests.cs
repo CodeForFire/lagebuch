@@ -654,8 +654,10 @@ public class AtemschutzTests
             () => incident.AddScbaTrupp(clock, "Wassertrupp", TruppMember.Crew("Huber", "Bauer"), entryPressure: 300, truppNumber: 3));
     }
 
+    // The crew names a Trupp by the vehicle it rides with and what it does; the running number
+    // is bookkeeping nobody says on the radio.
     [Fact]
-    public void DisplayName_combines_truppNumber_and_designation()
+    public void DisplayName_is_the_funkrufname_and_the_designation_without_the_number()
     {
         var incident = NewIncident(out var clock);
         var trupp = incident.AddScbaTrupp(
@@ -663,36 +665,24 @@ public class AtemschutzTests
             "Angriffstrupp",
             TruppMember.Crew("Müller", "Schmidt"),
             entryPressure: 300,
-            truppNumber: 3);
+            truppNumber: 3,
+            callSign: "Florian Musterstadt 40/1");
 
-        Assert.Equal("Trupp 3 (Angriffstrupp)", trupp.DisplayName);
+        Assert.Equal("Florian Musterstadt 40/1 · Angriffstrupp", trupp.DisplayName);
+    }
+
+    // The Funkrufname is optional (#92 allows free text and nothing at all), so the name has to
+    // degrade to the designation rather than render a dangling separator.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ")]
+    public void DisplayName_is_the_designation_alone_without_a_funkrufname(string? callSign)
+    {
+        Assert.Equal("Wassertrupp", AtemschutzTrupp.FormatDisplayName(callSign, "Wassertrupp"));
     }
 
     [Fact]
     public void FormatDisplayName_matches_the_instance_property()
-    {
-        Assert.Equal("Trupp 2 (Wassertrupp)", AtemschutzTrupp.FormatDisplayName(2, "Wassertrupp"));
-    }
-
-    [Fact]
-    public void DisplayNameWithCallSign_leads_with_the_funkrufname()
-    {
-        var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(
-            clock,
-            "Angriffstrupp",
-            TruppMember.Crew("Müller", "Schmidt"),
-            entryPressure: 300,
-            truppNumber: 1,
-            callSign: "Florian Musterstadt 40/1");
-
-        Assert.Equal("Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp)", trupp.DisplayNameWithCallSign);
-    }
-
-    // The Funkrufname is optional (#92 allows free text and nothing at all), so the combined form
-    // has to degrade to the plain one rather than render a dangling separator.
-    [Fact]
-    public void DisplayNameWithCallSign_falls_back_to_the_plain_name_without_a_funkrufname()
     {
         var incident = NewIncident(out var clock);
         var trupp = incident.AddScbaTrupp(
@@ -700,35 +690,10 @@ public class AtemschutzTests
             "Wassertrupp",
             TruppMember.Crew("Huber", "Bauer"),
             entryPressure: 300,
-            truppNumber: 2);
-
-        Assert.Equal("Trupp 2 (Wassertrupp)", trupp.DisplayNameWithCallSign);
-        Assert.Equal(trupp.DisplayName, trupp.DisplayNameWithCallSign);
-    }
-
-    // Two vehicles each send a "Trupp 1" -- the case from #417. The plain DisplayName cannot tell
-    // them apart; the combined one must.
-    [Fact]
-    public void DisplayNameWithCallSign_separates_two_trupps_that_share_a_number_across_vehicles()
-    {
-        var incident = NewIncident(out var clock);
-        var first = incident.AddScbaTrupp(
-            clock,
-            "Angriffstrupp",
-            TruppMember.Crew("Müller", "Schmidt"),
-            entryPressure: 300,
-            truppNumber: 1,
-            callSign: "Florian Musterstadt 40/1");
-        var second = incident.AddScbaTrupp(
-            clock,
-            "Angriffstrupp",
-            TruppMember.Crew("Huber", "Bauer"),
-            entryPressure: 300,
             truppNumber: 2,
             callSign: "Florian Musterdorf 42/1");
 
-        Assert.Equal(first.Designation, second.Designation);
-        Assert.NotEqual(first.DisplayNameWithCallSign, second.DisplayNameWithCallSign);
+        Assert.Equal(AtemschutzTrupp.FormatDisplayName("Florian Musterdorf 42/1", "Wassertrupp"), trupp.DisplayName);
     }
 
     // #426: the grid and the PDF both print this, so the wording lives on the Trupp.

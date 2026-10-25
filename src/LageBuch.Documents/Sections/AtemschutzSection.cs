@@ -49,24 +49,16 @@ public static class AtemschutzSection
                 foreach (var trupp in incident.ScbaTrupps)
                 {
                     // The Sicherheitstrupp (#399) and the status with its Messreihe (#426) ride as
-                    // sub-lines here rather than taking columns of their own. A4 portrait less the
-                    // 1.5 cm margins leaves ~510pt; the five constant columns already claim 345 of
-                    // it, so the remaining 165pt splits 2/3/2 into roughly 47/71/47pt and Mannschaft
-                    // already wraps. A ninth column would cut it to 55pt (relative) or 45pt
-                    // (constant) and the crew — the thing this table exists to record — would stop
-                    // being legible. A sub-line costs no width at all. A dangling id prints nothing,
-                    // which is the right degradation.
-                    table.Cell().Element(RowTop).Column(cell =>
-                    {
-                        cell.Item().Text(trupp.DisplayName);
-                        if (trupp.SafetyTruppId is { } safetyId
-                            && incident.FindScbaTruppOrDefault(safetyId) is { } safety)
-                        {
-                            cell.Item().Text($"Si.-Trupp: Trupp {safety.TruppNumber}")
-                                .FontSize(8).FontColor(Colors.Grey.Darken1);
-                        }
-                    });
-
+                    // sub-lines under the row rather than taking columns of their own. A4 portrait
+                    // less the 1.5 cm margins leaves ~510pt; the five constant columns already
+                    // claim 345 of it, so the remaining 165pt splits 2/3/2 into roughly 47/71/47pt
+                    // and Mannschaft already wraps. A ninth column would cut it to 55pt (relative)
+                    // or 45pt (constant) and the crew — the thing this table exists to record —
+                    // would stop being legible. A full-width sub-line costs no width at all, and
+                    // "Sicherheitstrupp" written out does not fit the 47pt Trupp column unbroken.
+                    // The Funkrufname has a column of its own, so the Trupp column prints the
+                    // Trupp-Art alone rather than the call sign twice.
+                    table.Cell().Element(RowTop).Text(trupp.Designation);
                     table.Cell().Element(RowTop).Text(trupp.MembersDisplay);
                     table.Cell().Element(RowTop).Text(Formatting.OrDash(trupp.CallSign));
                     table.Cell().Element(RowTop).Text(trupp.StartTime is { } s ? Formatting.Timestamp(s) : "—");
@@ -84,8 +76,15 @@ public static class AtemschutzSection
 
                     // Grey like the CO Messreihe (#424): the page is scanned for red, and a past
                     // reading must not announce a danger that has already passed.
-                    table.Cell().ColumnSpan((uint)HeaderTitles.Length).Element(Cells.Body)
-                        .Text(DetailLine(trupp, asOf)).FontSize(8).FontColor(Colors.Grey.Darken1);
+                    table.Cell().ColumnSpan((uint)HeaderTitles.Length).Element(Cells.Body).Column(cell =>
+                    {
+                        if (SafetyLine(incident, trupp) is { } safety)
+                        {
+                            cell.Item().Text(safety).FontSize(8).FontColor(Colors.Grey.Darken1);
+                        }
+
+                        cell.Item().Text(DetailLine(trupp, asOf)).FontSize(8).FontColor(Colors.Grey.Darken1);
+                    });
                 }
             });
         });
@@ -114,6 +113,17 @@ public static class AtemschutzSection
         r.Location is null
             ? $"{Formatting.TimeOfDay(r.Time)} {r.Bar} bar"
             : $"{Formatting.TimeOfDay(r.Time)} {r.Bar} bar ({r.Location})";
+
+    /// <summary>The Sicherheitstrupp posted for <paramref name="trupp"/>, or null when there is
+    /// none — or only a dangling id, which prints nothing rather than something misleading.</summary>
+    public static string? SafetyLine(Incident incident, AtemschutzTrupp trupp)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        ArgumentNullException.ThrowIfNull(trupp);
+        return trupp.SafetyTruppId is { } safetyId && incident.FindScbaTruppOrDefault(safetyId) is { } safety
+            ? $"Sicherheitstrupp: {safety.DisplayName}"
+            : null;
+    }
 
     /// <summary>
     /// When "Druck akt." was measured, or null while it is still only the entry pressure — that

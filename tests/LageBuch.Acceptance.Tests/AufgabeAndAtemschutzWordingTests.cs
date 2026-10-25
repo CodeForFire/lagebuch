@@ -62,7 +62,6 @@ public class AufgabeAndAtemschutzWordingTests
 
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["Si."] = "Sicherheitstrupp",
             ["akt."] = "Zuletzt gemeldeter Druck",
             ["Abfrage"] = "Zeit bis zur nächsten Druckabfrage",
         };
@@ -74,6 +73,14 @@ public class AufgabeAndAtemschutzWordingTests
 
         Assert.Equal(expected.Keys.Order(StringComparer.Ordinal), labels.Select(l => l.Text).Distinct().Order(StringComparer.Ordinal));
         Assert.All(labels, l => Assert.Equal(expected[l.Text], ToolTip.GetTip(l.Block) as string));
+
+        // "Si." needed a tooltip to be understood at all, so it is written out instead.
+        var texts = view.GetVisualDescendants().OfType<TextBlock>()
+            .Where(t => t.IsEffectivelyVisible)
+            .Select(t => t.Text)
+            .ToList();
+        Assert.Contains("Sicherheitstrupp", texts);
+        Assert.DoesNotContain("Si.", texts);
     }
 
     [AvaloniaFact]
