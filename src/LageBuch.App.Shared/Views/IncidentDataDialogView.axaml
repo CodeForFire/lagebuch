@@ -75,22 +75,24 @@
                     Command="{Binding SaveCommand}" />
             <Button x:Name="IncidentDataCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
           </StackPanel>
-          <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. A
-               destructive confirm (#545): focus on WEITER BEARBEITEN, no primary command. Its own overlay
-               root inside the dialog's, so Esc closes the question rather than re-asking it. -->
+          <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. ABBRECHEN means
+               leave here too: it discards and closes, and so does a second Esc, so there is always a
+               way out; ZURÜCK goes back to the form. A destructive confirm (#545): focus on ZURÜCK, so
+               a reflex Enter keeps what was typed, and no primary command. -->
+
           <Border x:Name="IncidentDataDiscardPanel" Margin="0,8,0,0"
                   IsVisible="{Binding IsDiscardConfirmOpen}"
                   b:Overlay.IsInline="True"
-                  b:Overlay.CancelCommand="{Binding CancelDiscardCommand}"
+                  b:Overlay.CancelCommand="{Binding ConfirmDiscardCommand}"
                   b:Overlay.InitialFocus="{Binding #IncidentDataKeepEditingButton}"
                   BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
             <StackPanel Spacing="8">
               <TextBlock Text="ÄNDERUNGEN VERWERFEN?" Classes="overline" />
               <TextBlock Text="Die Eingaben sind noch nicht gespeichert." TextWrapping="Wrap" />
               <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
-                <Button x:Name="IncidentDataDiscardButton" Classes="signal" Content="VERWERFEN"
+                <Button x:Name="IncidentDataDiscardButton" Classes="signal" Content="ABBRECHEN"
                         Command="{Binding ConfirmDiscardCommand}" />
-                <Button x:Name="IncidentDataKeepEditingButton" Content="WEITER BEARBEITEN"
+                <Button x:Name="IncidentDataKeepEditingButton" Content="ZURÜCK"
                         Command="{Binding CancelDiscardCommand}" />
               </StackPanel>
             </StackPanel>

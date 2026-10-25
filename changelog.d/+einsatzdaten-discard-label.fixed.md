@@ -1,1 +1,1 @@
-The Einsatzdaten dialog's "ÄNDERUNGEN VERWERFEN?" question labels its way back to the form WEITER BEARBEITEN instead of a second ABBRECHEN, which sent a Lagebuchführer trying to leave round in a loop.
+The Einsatzdaten dialog can always be left: in its "ÄNDERUNGEN VERWERFEN?" question ABBRECHEN now discards and closes, as does a second Esc, and the way back to the form says ZURÜCK, where a second ABBRECHEN used to lead back into the form and round in a loop.
