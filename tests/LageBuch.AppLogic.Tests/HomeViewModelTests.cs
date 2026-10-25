@@ -859,8 +859,6 @@ internal sealed class StateProbeStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
-
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
@@ -903,8 +901,6 @@ internal sealed class ThrowingStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
-
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
@@ -943,8 +939,6 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
-
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
@@ -992,8 +986,6 @@ internal sealed class CountingStore : IIncidentStore
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
-
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;

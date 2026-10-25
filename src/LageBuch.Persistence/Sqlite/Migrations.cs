@@ -512,9 +512,9 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "checklist_items", "kind", "INTEGER NOT NULL DEFAULT 0");
     }
 
-    // Adds the metadata store for attached files (#62). Only metadata lives here — the actual
-    // bytes sit in a sibling ".files" folder next to the .lagebuch file, kept out of this
-    // full-rewrite-per-save table set so an unrelated edit never rewrites attachment content.
+    // Adds the metadata store for attached files (#62). Only metadata lives here. The bytes sat in
+    // a sibling ".files" folder when this shipped; they now live in incident_file_blobs, and
+    // LegacyAttachmentFolder imports an old folder on open.
     private static void ApplyV10(SqliteConnection cn, SqliteTransaction tx)
     {
         const string sql14 = """

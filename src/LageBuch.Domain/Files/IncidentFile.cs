@@ -164,8 +164,8 @@ public sealed record IncidentFile
     };
 
     /// <summary>
-    /// The name this file's bytes are stored under (sibling <c>.files</c> folder, or the
-    /// host's <c>GET /files/{id}</c> cache key on a joined client) — always derived from
+    /// The name this file's bytes are stored under (the key in the incident file's
+    /// attachment table, or the host's <c>GET /files/{id}</c> cache key on a joined client) — always derived from
     /// <see cref="Id"/> and the original extension, never persisted separately.
     /// </summary>
     public static string StorageFileName(Guid id, string fileName) => $"{id}{Path.GetExtension(fileName)}";

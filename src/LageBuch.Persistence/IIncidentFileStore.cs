@@ -26,10 +26,6 @@ public interface IIncidentFileStore
     /// caller degrades quietly, matching <see cref="IncidentRepository.TryReadState"/>.</summary>
     Task<byte[]?> TryReadBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default);
 
-    /// <summary>The legacy sibling-folder path of the file. Bytes now live in the incident file;
-    /// this stays only until its last caller moves to <see cref="TryReadBytesAsync"/>.</summary>
-    string ResolveDiskPath(string incidentPath, string storageFileName);
-
     /// <summary>
     /// Removes the row and overwrites its pages (<c>secure_delete</c>), so a deleted photo is not
     /// left readable inside a file that gets handed on. A failure propagates: the caller removing
@@ -113,9 +109,6 @@ public sealed class IncidentFileStore : IIncidentFileStore
             CancellationToken.None);
     }
 
-    public string ResolveDiskPath(string incidentPath, string storageFileName) =>
-        Path.Join(FolderFor(incidentPath), storageFileName);
-
     public Task DeleteBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
     {
         return Task.Run(() => Remove(incidentPath, storageFileName), cancellationToken);
@@ -145,12 +138,5 @@ public sealed class IncidentFileStore : IIncidentFileStore
         using var tx = cn.BeginTransaction();
         IncidentFileBlobs.Write(cn, tx, storageFileName, source, length);
         tx.Commit();
-    }
-
-    private static string FolderFor(string incidentPath)
-    {
-        var directory = Path.GetDirectoryName(incidentPath);
-        var stem = Path.GetFileNameWithoutExtension(incidentPath);
-        return Path.Join(string.IsNullOrEmpty(directory) ? "." : directory, stem + ".files");
     }
 }

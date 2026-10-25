@@ -9,8 +9,7 @@ namespace LageBuch.AppLogic.Services;
 /// from the synced <see cref="IIncidentSession.Incident"/>; every attachment's bytes come through
 /// <see cref="IIncidentSession.GetFileBytesAsync"/>, which reads the client's attachment cache and
 /// only falls back to pulling from the host. The host keeps using
-/// <see cref="LocalIncidentSession.ExportPdfAsync"/>, which merges PDF attachments straight from
-/// its own disk.
+/// <see cref="LocalIncidentSession.ExportPdfAsync"/>, which delegates here.
 /// </summary>
 public static class SessionPdfExport
 {

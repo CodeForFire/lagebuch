@@ -2,6 +2,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Time;
+using Microsoft.Data.Sqlite;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -384,11 +385,10 @@ public class IncidentSessionTests
     }
 
     [Fact]
-    public async Task ExportPdfAsync_merges_an_attached_pdfs_pages_via_its_disk_path()
+    public async Task ExportPdfAsync_merges_an_attached_pdfs_pages()
     {
-        // Exercises the issue #167 P1 #3 path end to end: AddFileAsync writes the attachment to
-        // disk (FakeStore's thin disk shim), and ExportPdfAsync must resolve and merge it from
-        // that real path rather than holding it in memory.
+        // AddFileAsync stores the attachment; ExportPdfAsync reads it back through the store and
+        // merges it via a temp copy.
         var store = new FakeStore();
         var session = TestSession.StartNew(
             store,
@@ -410,18 +410,109 @@ public class IncidentSessionTests
             withAttachment.Length > withoutAttachment.Length,
             $"Expected merging the attached PDF's pages to grow the export (without={withoutAttachment.Length}, with={withAttachment.Length}).");
     }
+
+    [Fact]
+    public async Task RemoveFileAsync_persists_the_metadata_removal_before_the_byte_delete_and_reports_its_failure()
+    {
+        var store = new FakeStore();
+        var session = TestSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("foto.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        var fileId = Assert.Single(session.Incident.Files).Id;
+        var changed = 0;
+        session.Changed += () => changed++;
+        store.DeleteFailure = new IOException("wipe failed");
+        var savesBefore = store.SaveCount;
+
+        await Assert.ThrowsAsync<IOException>(() => session.RemoveFileAsync(fileId));
+
+        Assert.Empty(session.Incident.Files);
+        Assert.Equal(savesBefore + 1, store.SaveCountAtDelete); // saved before the delete was tried
+        Assert.Equal(1, changed); // the domain changed, so views refresh despite the failure
+    }
+
+    [Fact]
+    public async Task An_attachment_added_right_after_a_new_incident_starts_is_stored()
+    {
+        var directory = Directory.CreateTempSubdirectory("lagebuch-session-").FullName;
+        try
+        {
+            var path = Path.Join(directory, "einsatz.lagebuch");
+            var store = new IncidentStore();
+            var session = TestSession.StartNew(
+                store,
+                new FixedClock(T0),
+                new SessionOperator("Müller"),
+                path,
+                Array.Empty<(string, bool)>(),
+                Array.Empty<(string, bool)>());
+            var bytes = new byte[] { 9, 8, 7, 6 };
+
+            await session.AddFileAsync("foto.jpg", "image/jpeg", bytes);
+
+            var file = Assert.Single(session.Incident.Files);
+            Assert.Equal(bytes, await session.GetFileBytesAsync(file.Id));
+            Assert.False(Directory.Exists(Path.Join(directory, "einsatz.files")));
+            await store.FlushAsync();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Host_pdf_export_still_merges_a_pdf_attachment()
+    {
+        var directory = Directory.CreateTempSubdirectory("lagebuch-session-").FullName;
+        try
+        {
+            var path = Path.Join(directory, "einsatz.lagebuch");
+            var store = new IncidentStore();
+            var session = TestSession.StartNew(
+                store,
+                new FixedClock(T0),
+                new SessionOperator("Müller"),
+                path,
+                Array.Empty<(string, bool)>(),
+                Array.Empty<(string, bool)>());
+            var exporter = new TestPdfExporter();
+            var withoutAttachment = await session.ExportPdfAsync(exporter);
+            await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
+
+            var withAttachment = await session.ExportPdfAsync(exporter);
+
+            Assert.True(
+                withAttachment.Length > withoutAttachment.Length,
+                $"Expected merging the attached PDF's pages to grow the export (without={withoutAttachment.Length}, with={withAttachment.Length}).");
+            await store.FlushAsync();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }
 
-// In-memory fake store — no disk, deterministic. File bytes also get a thin real-disk mirror (a
-// per-instance temp folder) purely so ResolveFileDiskPath has a real path to hand to QuestPDF's
-// DocumentOperation for PDF-attachment-merge tests (see issue #167 P1 #3) — everything else about
-// this fake stays in-memory.
+// In-memory fake store — no disk, deterministic.
 internal sealed class FakeStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _saved = new();
-    private readonly string _diskDir = Directory.CreateTempSubdirectory("lagebuch-fakestore-").FullName;
 
     public int SaveCount { get; private set; }
+
+    /// <summary>When set, <see cref="DeleteFileBytesAsync"/> throws it, like a store whose wipe failed.</summary>
+    public Exception? DeleteFailure { get; set; }
+
+    /// <summary><see cref="SaveCount"/> as it stood when the byte delete was attempted.</summary>
+    public int SaveCountAtDelete { get; private set; }
 
     public void Save(string path, Incident incident)
     {
@@ -437,10 +528,10 @@ internal sealed class FakeStore : IIncidentStore
 
     private readonly Dictionary<string, byte[]> _files = new();
 
-    public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
     {
         _files[$"{path}/{storageFileName}"] = bytes;
-        await File.WriteAllBytesAsync(Path.Join(_diskDir, storageFileName), bytes, cancellationToken);
+        return Task.CompletedTask;
     }
 
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default)
@@ -453,10 +544,14 @@ internal sealed class FakeStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(_diskDir, storageFileName);
-
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
     {
+        SaveCountAtDelete = SaveCount;
+        if (DeleteFailure is not null)
+        {
+            return Task.FromException(DeleteFailure);
+        }
+
         _files.Remove($"{path}/{storageFileName}");
         return Task.CompletedTask;
     }
@@ -497,8 +592,6 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
-
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;

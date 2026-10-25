@@ -14,8 +14,8 @@ public static class IncidentPdf
     /// <param name="fileBytes">
     /// Bytes for image entries in <see cref="Incident.Files"/>, keyed by id — resolved by the caller
     /// (this project stays filesystem-free). Image entries render inline via
-    /// <see cref="Sections.FilesSection"/>. An entry with no bytes supplied (a missing sibling-folder
-    /// file) is skipped rather than failing the export.
+    /// <see cref="Sections.FilesSection"/>. An entry with no bytes supplied (attachment bytes
+    /// the incident file no longer holds) is skipped rather than failing the export.
     /// </param>
     /// <param name="pdfAttachmentPaths">
     /// Disk paths for <c>application/pdf</c> entries in <see cref="Incident.Files"/>, keyed by id —

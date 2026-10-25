@@ -2,10 +2,12 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
 
 namespace LageBuch.Sync.Hosting.Tests;
 
@@ -442,6 +444,85 @@ public class IncidentHostTests
         getResponse.EnsureSuccessStatusCode();
         Assert.Equal("image/jpeg", getResponse.Content.Headers.ContentType?.MediaType);
         Assert.Equal(bytes, await getResponse.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task A_joined_clients_upload_is_served_back_byte_identical()
+    {
+        var directory = Directory.CreateTempSubdirectory("lagebuch-host-").FullName;
+        try
+        {
+            var clock = new FixedClock();
+            var store = new IncidentStore();
+            var session = TestSession.StartNew(
+                store,
+                clock,
+                new SessionOperator("Host", "FFB 1"),
+                Path.Join(directory, "einsatz.lagebuch"),
+                Array.Empty<(string, bool)>(),
+                Array.Empty<(string, bool)>());
+            await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+            var port = await TestHost.StartOnFreePortAsync(host);
+
+            using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+            http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+            http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+            var bytes = Enumerable.Range(0, 5000).Select(i => (byte)(i % 251)).ToArray();
+            var fileId = Guid.NewGuid();
+            var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", bytes.LongLength);
+            using var commandContent = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+            (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), commandContent)).EnsureSuccessStatusCode();
+
+            // A non-seekable body has no known length, so it goes out chunked, without Content-Length.
+            using var uploadContent = new StreamContent(new ForwardOnlyStream(bytes));
+            uploadContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+            (await http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), uploadContent)).EnsureSuccessStatusCode();
+
+            var getResponse = await http.GetAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute));
+            getResponse.EnsureSuccessStatusCode();
+            Assert.Equal(bytes, await getResponse.Content.ReadAsByteArrayAsync());
+            await store.FlushAsync();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task A_failing_byte_delete_after_a_removal_answers_500_while_the_metadata_stays_removed()
+    {
+        var clock = new FixedClock();
+        var store = new InMemoryStore();
+        var session = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = await TestHost.StartOnFreePortAsync(host);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        var fileId = Guid.NewGuid();
+        var op = new OperatorDto("Client", "RUF 1");
+        using var addContent = new StringContent(
+            SyncJson.Serialize<SyncCommand>(new AddFileCommand(op, fileId, "brand.jpg", "image/jpeg", 3)), Encoding.UTF8, "application/json");
+        (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), addContent)).EnsureSuccessStatusCode();
+        store.DeleteFailure = new IOException("wipe failed");
+
+        using var removeContent = new StringContent(
+            SyncJson.Serialize<SyncCommand>(new RemoveFileCommand(op, fileId)), Encoding.UTF8, "application/json");
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), removeContent);
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Empty(session.Incident.Files);
     }
 
     [Fact]
@@ -1158,5 +1239,16 @@ public class IncidentHostTests
         Assert.False(host.JoinsClosed);
         Assert.Equal(HttpStatusCode.OK, await GetVersionWithPinAsync(port, "5678"));
         Assert.Equal(HttpStatusCode.OK, await GetVersionWithPinAsync(port, "1234"));
+    }
+
+    // A body with no known length, so HttpClient sends it chunked and without Content-Length.
+    private sealed class ForwardOnlyStream : MemoryStream
+    {
+        public ForwardOnlyStream(byte[] bytes)
+            : base(bytes)
+        {
+        }
+
+        public override bool CanSeek => false;
     }
 }
