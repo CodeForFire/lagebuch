@@ -38,8 +38,11 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly IHubContext<IncidentHub> _hub;
     private readonly SemaphoreSlim _revisionRequests = new(0);
+    private readonly SemaphoreSlim _commandRequests = new(0);
+    private readonly System.Collections.Concurrent.ConcurrentQueue<SyncCommand> _received = new();
     private int _commandsReceived;
     private TaskCompletionSource? _revisionGate;
+    private TaskCompletionSource? _commandGate;
 
     private ScriptedSnapshotHost(WebApplication app, IHubContext<IncidentHub> hub, IncidentSnapshot initial)
     {
@@ -75,6 +78,9 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     /// rather than inferring it from state that something else might have produced.
     /// </summary>
     public int CommandsReceived => _commandsReceived;
+
+    /// <summary>The commands that reached <c>POST /command</c>, in the order they arrived.</summary>
+    public IReadOnlyList<SyncCommand> ReceivedCommands => _received.ToArray();
 
     /// <summary>
     /// When set, <c>GET /revision</c> answers with this status and no body — a reconcile pass that
@@ -142,9 +148,16 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         // reason -- but deliberately pushes nothing. That is what makes "the sender converges from its
         // own response" observable at all: on the real host a broadcast is dispatched before the
         // response is written, so it could always have been the broadcast that did it.
-        app.MapPost(SyncProtocol.CommandPath, (SyncCommand _) =>
+        app.MapPost(SyncProtocol.CommandPath, async (SyncCommand command, CancellationToken aborted) =>
         {
             Interlocked.Increment(ref host._commandsReceived);
+            host._received.Enqueue(command);
+            if (host._commandGate is { } gate)
+            {
+                host._commandRequests.Release();
+                await gate.Task.WaitAsync(aborted);
+            }
+
             if (host.FailCommandsWith is { } status)
             {
                 return Results.StatusCode((int)status);
@@ -200,11 +213,39 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// From now on, every <c>POST /command</c> is held open, unanswered, until
+    /// <see cref="ReleaseCommands"/> — a host still busy applying what it was sent.
+    /// </summary>
+    public void HoldCommands() =>
+        _commandGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Lets every held <c>POST /command</c> answer. Holding goes on only if <paramref name="keepHolding"/>.</summary>
+    public void ReleaseCommands(bool keepHolding = false)
+    {
+        var gate = _commandGate;
+        _commandGate = keepHolding
+            ? new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)
+            : null;
+        gate?.TrySetResult();
+    }
+
+    /// <summary>Completes once one more <c>POST /command</c> is being held (see <see cref="HoldCommands"/>).</summary>
+    public async Task WaitForHeldCommandAsync(TimeSpan? timeout = null)
+    {
+        if (!await _commandRequests.WaitAsync(timeout ?? TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException("No POST /command reached the scripted host.");
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         ReleaseRevisionRequests();
+        ReleaseCommands();
         await _app.DisposeAsync();
         _revisionRequests.Dispose();
+        _commandRequests.Dispose();
     }
 
     private static async Task OversizedBodyAsync(Stream body)

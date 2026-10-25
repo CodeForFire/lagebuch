@@ -48,6 +48,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // whichever thread called, and SignalR's receive loop, a command's response and the reconcile
     // poll genuinely race here.
     private readonly object _applyGate = new();
+
+    // Orders this device's commands (see SendAsync) by guarding _lastSend.
+    private readonly object _sendOrderGate = new();
     private readonly CancellationTokenSource _reconcileCts = new();
 
     // Created with the session rather than inside the loop, so it exists the moment ConnectAsync returns:
@@ -59,6 +62,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private SyncPosition _applied;
     private Task? _reconcileLoop;
     private int _disposed;
+
+    // Completes once the newest command has its answer; the next one waits for it (see SendAsync).
+    private Task _lastSend = Task.CompletedTask;
 
     // Ticks, so the reconcile loop can write it and the UI thread read it without a lock.
     private long _hostClockOffsetTicks;
@@ -832,15 +838,37 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </exception>
     public async Task SendAsync(SyncCommand command, CancellationToken ct = default)
     {
-        using var content = new StringContent(SyncJson.Serialize(command), Encoding.UTF8, "application/json");
-        using var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
-        if (response.StatusCode == HttpStatusCode.BadRequest)
+        // One command on the wire at a time, in the order they were made. Concurrent POSTs each take
+        // whichever pooled connection is free, so a correction typed right after its entry could reach
+        // the host first and be refused as an unknown id. The new tail is published before anything is
+        // awaited, so a command made from inside a Changed handler still queues behind this one.
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task previous;
+        lock (_sendOrderGate)
         {
-            throw new CommandRejectedException(await ReadRejectionAsync(response, ct));
+            previous = _lastSend;
+            _lastSend = done.Task;
         }
 
-        response.EnsureSuccessStatusCode();
-        ApplySnapshot(SyncJson.Deserialize<IncidentSnapshot>(await response.Content.ReadAsStringAsync(ct)));
+        try
+        {
+            // Never faults: it is the previous command's TaskCompletionSource, completed either way.
+            await previous;
+
+            using var content = new StringContent(SyncJson.Serialize(command), Encoding.UTF8, "application/json");
+            using var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                throw new CommandRejectedException(await ReadRejectionAsync(response, ct));
+            }
+
+            response.EnsureSuccessStatusCode();
+            ApplySnapshot(SyncJson.Deserialize<IncidentSnapshot>(await response.Content.ReadAsStringAsync(ct)));
+        }
+        finally
+        {
+            done.SetResult();
+        }
     }
 
     /// <summary>

@@ -635,7 +635,8 @@ public class CommandApplierTests
     [Fact]
     public void The_link_survives_the_task_overtaking_its_entry_on_the_way_to_the_host()
     {
-        // RemoteIncidentSession.Send is fire-and-forget: the two POSTs race, either may land first.
+        // A client older than its per-device command order sent the two as racing POSTs, so either
+        // may land first, and a host still has to cope with such a peer.
         var clock = new FixedClock();
         var incident = NewIncident(clock);
         var minted = Guid.NewGuid();

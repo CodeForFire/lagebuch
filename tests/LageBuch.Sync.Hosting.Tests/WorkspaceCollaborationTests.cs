@@ -42,10 +42,10 @@ public class WorkspaceCollaborationTests
     // on every host broadcast (times out so a broken push fails fast).
     //
     // Use this rather than counting NextChange calls whenever one user action fans out into more than
-    // one command: RemoteIncidentSession.Send is fire-and-forget, so the commands travel as separate,
-    // concurrent POSTs that race each other to the host, and the host broadcasts a fresh snapshot per
-    // command it applies. Neither the order the host applies them in nor the number of broadcasts the
-    // client ends up seeing is fixed, so only the converged state is a sound thing to wait for (#326).
+    // one command: the commands travel as separate POSTs, and the host broadcasts a fresh snapshot per
+    // command it applies. The number of broadcasts the client ends up seeing is not fixed — the guard
+    // drops whichever of a response and its broadcast arrives second — so only the converged state is
+    // a sound thing to wait for (#326).
     //
     // Waiting on the client also settles the host: IncidentHost broadcasts from inside the session's
     // Changed raise, which the host's own workspace (subscribed first, at construction) has already
@@ -253,9 +253,8 @@ public class WorkspaceCollaborationTests
         dialog.IncidentNumber = "B 1.2 260715 123";
         dialog.Street = "Hauptstr. 12";
 
-        // Save sends two commands (number, address) that race each other to the host and broadcast
-        // back one at a time, so wait for both to have landed rather than for a fixed number of
-        // broadcasts -- the client may well see the address arrive first and the number only later.
+        // Save sends two commands (number, address) that broadcast back one at a time, so wait for
+        // both to have landed rather than for a fixed number of broadcasts.
         dialog.SaveCommand.Execute(null);
         await WaitForClient(
             client,
