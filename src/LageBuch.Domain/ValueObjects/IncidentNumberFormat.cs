@@ -6,9 +6,11 @@ namespace LageBuch.Domain.ValueObjects;
 
 /// <summary>
 /// The shape of a brigade's Einsatznummer (#462), from a Stammdaten template such as
-/// <c>B 1.2 {JJMMTT} {NNN}</c>. Inside braces, <c>JJJJ</c>/<c>JJ</c>, <c>MM</c> and <c>TT</c> are the
+/// <c>{A} 1.2 {JJMMTT} {NNNN}</c>. Inside braces, <c>A</c> is the Einsatzart's letter (B for Brand,
+/// T for THL, R for Rettungsdienst ...), <c>JJJJ</c>/<c>JJ</c>, <c>MM</c> and <c>TT</c> are the
 /// incident's date (<c>Y</c> and <c>D</c> spell year and day too), and a run of <c>N</c> is the
-/// running number the Leitstelle assigns; everything else is literal.
+/// running number the Leitstelle assigns; everything else, such as the spec's version "1.2", is
+/// literal.
 /// <para>
 /// It only helps: <see cref="Prefill"/> types the known parts for the Lagebuchführer and leaves the
 /// running number as a gap, and <see cref="Matches"/> backs a hint, never a refusal. The template
@@ -88,12 +90,20 @@ public sealed record IncidentNumberFormat
     }
 
     /// <summary>
-    /// The template with the date filled in from <paramref name="startedAt"/> (in its own offset) and
-    /// the first gap left empty, with the caret where the gap was -- or at the end without one. Later
-    /// gaps are left empty too.
+    /// The template with the date filled in from <paramref name="startedAt"/> (in its own offset), the
+    /// Einsatzart from <paramref name="keyword"/>, and the first gap left empty, with the caret where
+    /// the gap was -- or at the end without one. Later gaps are left empty too.
+    /// <para>
+    /// The Einsatzart is the Stichwort's first letter: the Bavarian Stichwörter lead with their
+    /// Einsatzart (B 3, THL 1, ABC 1, SON, RD). Without a Stichwort that starts with a letter, the
+    /// Einsatzart is a gap like the running number.
+    /// </para>
     /// </summary>
-    public (string Text, int CaretIndex) Prefill(DateTimeOffset startedAt)
+    public (string Text, int CaretIndex) Prefill(DateTimeOffset startedAt, string? keyword = null)
     {
+        var lead = keyword?.TrimStart() is { Length: > 0 } k && char.IsAsciiLetter(k[0])
+            ? char.ToUpperInvariant(k[0])
+            : (char?)null;
         var text = new StringBuilder();
         int? caret = null;
         foreach (var part in _parts)
@@ -106,7 +116,10 @@ public sealed record IncidentNumberFormat
                 case DatePart d:
                     text.Append(startedAt.ToString(d.Format, CultureInfo.InvariantCulture));
                     break;
-                case GapPart:
+                case EinsatzartPart when lead is { } letter:
+                    text.Append(letter);
+                    break;
+                default:
                     caret ??= text.Length;
                     break;
             }
@@ -117,9 +130,9 @@ public sealed record IncidentNumberFormat
 
     /// <summary>
     /// Whether <paramref name="number"/> has the template's shape: literals exactly (any run of
-    /// whitespace standing for one or more), each date field as that many digits -- not the
-    /// incident's actual date, which an Einsatz past midnight would fail -- and each gap as one or
-    /// more digits.
+    /// whitespace standing for one or more), the Einsatzart as one capital letter, each date field
+    /// as that many digits -- not the incident's actual date, which an Einsatz past midnight would
+    /// fail -- and each gap as one or more digits.
     /// </summary>
     public bool Matches(string number)
     {
@@ -135,6 +148,7 @@ public sealed record IncidentNumberFormat
                 LiteralPart { IsWhitespace: true } => Run(number, reachable, char.IsWhiteSpace),
                 LiteralPart l => Exact(number, reachable, l.Text),
                 DatePart d => Digits(number, reachable, d.Format.Length),
+                EinsatzartPart => CapitalLetter(number, reachable),
                 _ => Run(number, reachable, char.IsAsciiDigit),
             };
         }
@@ -153,6 +167,13 @@ public sealed record IncidentNumberFormat
         {
             FlushLiteral(parts, literal);
             parts.Add(new GapPart());
+            return true;
+        }
+
+        if (body == "A")
+        {
+            FlushLiteral(parts, literal);
+            parts.Add(new EinsatzartPart());
             return true;
         }
 
@@ -228,6 +249,20 @@ public sealed record IncidentNumberFormat
         return next;
     }
 
+    private static bool[] CapitalLetter(string number, bool[] from)
+    {
+        var next = new bool[from.Length];
+        for (var p = 0; p < number.Length; p++)
+        {
+            if (from[p] && char.IsAsciiLetterUpper(number[p]))
+            {
+                next[p + 1] = true;
+            }
+        }
+
+        return next;
+    }
+
     // One or more characters satisfying the predicate, from any reachable position: a single sweep,
     // so a template full of gaps against a long number stays linear.
     private static bool[] Run(string number, bool[] from, Func<char, bool> accepts)
@@ -250,4 +285,6 @@ public sealed record IncidentNumberFormat
     private sealed record DatePart(string Format) : Part;
 
     private sealed record GapPart : Part;
+
+    private sealed record EinsatzartPart : Part;
 }

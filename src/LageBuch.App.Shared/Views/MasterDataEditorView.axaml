@@ -402,10 +402,10 @@
                       <TextBox x:Name="IncidentNumberFormatBox" Classes="mono"
                                Text="{Binding IncidentNumberFormat}"
                                MaxLength="{x:Static md:IncidentSettings.MaxIncidentNumberFormatLength}"
-                               PlaceholderText="z. B. B 1.2 {JJMMTT} {NNN}"
+                               PlaceholderText="z. B. {A} 1.2 {JJMMTT} {NNNN}"
                                AutomationProperties.Name="Format der Einsatznummer" />
                       <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                 Text="{}{JJMMTT} = Einsatzdatum, {NNN} = Lücke für die Nummer der Leitstelle. Ein neuer Einsatz bekommt den Rest vorausgefüllt." />
+                                 Text="{}{A} = Einsatzart aus dem Stichwort (B, T, R …), {JJMMTT} = Einsatzdatum, {NNNN} = Lücke für die laufende Nummer der Leitstelle. Ein neuer Einsatz bekommt den Rest vorausgefüllt." />
                     </StackPanel>
                   </StackPanel>
                 </ScrollViewer>

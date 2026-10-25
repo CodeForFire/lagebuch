@@ -569,6 +569,65 @@ public class IncidentDataDialogViewModelTests
         Assert.True(vm.ShowIncidentNumberFormatHint);
     }
 
+    // The Einsatzart letter comes from the Stichwort (#462): B3P is a Brand, THL 1 a THL.
+    [Fact]
+    public void The_einsatzart_letter_is_pre_filled_from_the_stichwort_the_incident_has()
+    {
+        var vm = WithFormat(NewSession(new FakeStore(), keyword: "THL 1"), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        Assert.Equal("T 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal(13, vm.IncidentNumberCaretIndex);
+    }
+
+    [Fact]
+    public void Without_a_stichwort_the_caret_waits_on_the_einsatzart()
+    {
+        var vm = WithFormat(NewSession(new FakeStore()), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        Assert.Equal(" 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal(0, vm.IncidentNumberCaretIndex);
+    }
+
+    [Fact]
+    public void Typing_the_stichwort_fills_in_the_einsatzart_of_an_untouched_pre_fill()
+    {
+        var vm = WithFormat(NewSession(new FakeStore()), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        vm.Keyword = "B3P";
+        Assert.Equal("B 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal("B 1.2 260622 ", vm.IncidentNumberPrefill);
+        Assert.Equal(13, vm.IncidentNumberCaretIndex);
+
+        vm.Keyword = "THL 2";
+        Assert.Equal("T 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal("T 1.2 260622 ", vm.IncidentNumberPrefill);
+    }
+
+    [Fact]
+    public void Changing_the_stichwort_never_touches_a_number_already_typed_into()
+    {
+        var vm = WithFormat(NewSession(new FakeStore(), keyword: "B3P"), "{A} 1.2 {JJMMTT} {NNNN}");
+        vm.IncidentNumber += "4711";
+
+        vm.Keyword = "THL 1";
+
+        Assert.Equal("B 1.2 260622 4711", vm.IncidentNumber);
+    }
+
+    [Fact]
+    public void An_untouched_pre_fill_that_followed_the_stichwort_is_still_not_stored()
+    {
+        var store = new FakeStore();
+        var vm = WithFormat(NewSession(store), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        vm.Keyword = "B3P";
+        vm.SaveCommand.Execute(null);
+
+        var saved = store.Load("/x.lagebuch");
+        Assert.Equal("B3P", saved.Keyword);
+        Assert.Null(saved.IncidentNumber);
+    }
+
     [Fact]
     public void Without_a_format_there_is_never_a_hint()
     {

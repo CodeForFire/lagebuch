@@ -53,6 +53,48 @@ public class IncidentNumberFormatTests
         Assert.Equal("260716 ", Parse("{JJMMTT} {NNN}").Prefill(lateUtc).Text);
     }
 
+    // The leading letter is the Einsatzart, which the Stichwort names: B3P is a Brand, THL 1 a
+    // Technische Hilfeleistung, RD a Rettungsdienst; "1.2" is the spec's version and stays literal.
+    [Theory]
+    [InlineData("B3P", "B 1.2 260715 ")]
+    [InlineData("THL 1 VU", "T 1.2 260715 ")]
+    [InlineData("abc 1", "A 1.2 260715 ")]
+    [InlineData("  SON Tragehilfe", "S 1.2 260715 ")]
+    [InlineData("RD 1", "R 1.2 260715 ")]
+    public void Prefill_takes_the_einsatzart_letter_from_the_stichwort(string keyword, string expected)
+    {
+        var (text, caret) = Parse("{A} 1.2 {JJMMTT} {NNNN}").Prefill(Started, keyword);
+
+        Assert.Equal(expected, text);
+        Assert.Equal(text.Length, caret);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("3 B")]
+    [InlineData("Ölspur")]
+    public void Without_a_usable_stichwort_the_einsatzart_is_a_gap_and_takes_the_caret(string? keyword)
+    {
+        var (text, caret) = Parse("{A} 1.2 {JJMMTT} {NNNN}").Prefill(Started, keyword);
+
+        Assert.Equal(" 1.2 260715 ", text);
+        Assert.Equal(0, caret);
+    }
+
+    [Theory]
+    [InlineData("B 1.2 260715 1234", true)]
+    [InlineData("T 1.2 260715 7", true)]
+    [InlineData("1.2 260715 1234", false)]
+    [InlineData("BT 1.2 260715 1234", false)]
+    [InlineData("b 1.2 260715 1234", false)]
+    [InlineData("3 1.2 260715 1234", false)]
+    public void The_einsatzart_matches_one_capital_letter(string number, bool matches)
+    {
+        Assert.Equal(matches, Parse("{A} 1.2 {JJMMTT} {NNNN}").Matches(number));
+    }
+
     [Theory]
     [InlineData("B 1.2 260715 123")]
     [InlineData("B 1.2 260714 7")]
@@ -92,6 +134,8 @@ public class IncidentNumberFormatTests
     [InlineData("B {} {NNN}")]
     [InlineData("B {XYZ}")]
     [InlineData("B {JJN}")]
+    [InlineData("{AA} {NNN}")]
+    [InlineData("{AJJ} {NNN}")]
     [InlineData("B } {NNN}")]
     public void A_blank_or_malformed_template_is_no_format(string? template)
     {

@@ -51,8 +51,8 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         _incidentNumber = incident.IncidentNumber?.Value;
         if (_incidentNumber is null && incidentNumberFormat is not null)
         {
-            (IncidentNumberPrefill, IncidentNumberCaretIndex) = incidentNumberFormat.Prefill(incident.StartedAt);
-            _incidentNumber = IncidentNumberPrefill;
+            (_incidentNumberPrefill, _incidentNumberCaretIndex) = incidentNumberFormat.Prefill(incident.StartedAt, _keyword);
+            _incidentNumber = _incidentNumberPrefill;
         }
 
         _street = incident.Street;
@@ -90,13 +90,16 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
 
     /// <summary>
     /// What the Stammdaten's Einsatznummer format typed in for an incident that has no number yet
-    /// (#462): prefix and date, with the Leitstelle's running number left as a gap. Null when nothing
-    /// was pre-filled. Never stored as it stands -- only once the Lagebuchführer has added to it.
+    /// (#462): the Einsatzart from the Stichwort, the spec's version and the date, with the
+    /// Leitstelle's running number left as a gap. Null when nothing was pre-filled. It follows the
+    /// Stichwort until the number is typed into, and is never stored as it stands.
     /// </summary>
-    public string? IncidentNumberPrefill { get; }
+    [ObservableProperty]
+    private string? _incidentNumberPrefill;
 
-    /// <summary>Where the gap in <see cref="IncidentNumberPrefill"/> is, for the caret.</summary>
-    public int IncidentNumberCaretIndex { get; }
+    /// <summary>Where the first gap in <see cref="IncidentNumberPrefill"/> is, for the caret.</summary>
+    [ObservableProperty]
+    private int _incidentNumberCaretIndex;
 
     /// <summary>
     /// A number that does not have the format's shape is only pointed out, never refused: an
@@ -108,6 +111,23 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         && !_incidentNumberFormat.Matches(number);
 
     public string IncidentNumberFormatHint => $"Entspricht nicht dem Format {_incidentNumberFormat?.Template}";
+
+    // The Einsatzart comes from the Stichwort, which is usually typed in this very dialog, after it
+    // opened: refill the number while it still is exactly the pre-fill, and never once typed into.
+    partial void OnKeywordChanged(string? value)
+    {
+        if (_incidentNumberFormat is null
+            || IncidentNumberPrefill is null
+            || !string.Equals(IncidentNumber, IncidentNumberPrefill, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var (text, caret) = _incidentNumberFormat.Prefill(_session.Incident.StartedAt, value);
+        IncidentNumberPrefill = text;
+        IncidentNumberCaretIndex = caret;
+        IncidentNumber = text;
+    }
 
     [ObservableProperty]
     private string? _street;

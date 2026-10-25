@@ -304,7 +304,8 @@ public class IncidentDataDialogRenderTests
     }
 
     // #462: an incident without a number opens with the Stammdaten's format pre-filled.
-    private static (Window Window, IncidentDataDialogViewModel Vm, LocalIncidentSession Session) PrefilledDialog()
+    private static (Window Window, IncidentDataDialogViewModel Vm, LocalIncidentSession Session) PrefilledDialog(
+        string? keyword = "B3P")
     {
         var session = TestSession.StartNew(
             new FakeStore(),
@@ -313,8 +314,8 @@ public class IncidentDataDialogRenderTests
             "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>(),
-            keyword: "B3P");
-        Assert.True(IncidentNumberFormat.TryParse("B 1.2 {JJMMTT} {NNN}", out var format));
+            keyword: keyword);
+        Assert.True(IncidentNumberFormat.TryParse("{A} 1.2 {JJMMTT} {NNNN}", out var format));
         var vm = new IncidentDataDialogViewModel(session, () => { }, incidentNumberFormat: format);
         var window = new Window { Content = new IncidentDataDialogView { DataContext = vm }, Width = 560, Height = 520 };
         window.Show();
@@ -333,10 +334,27 @@ public class IncidentDataDialogRenderTests
         window.Press(PhysicalKey.Tab);
         Dispatcher.UIThread.RunJobs();
         window.AssertFocused(box);
-        window.Type("123");
+        window.Type("1234");
         window.Press(PhysicalKey.Enter);
 
-        Assert.Equal(prefill + "123", session.Incident.IncidentNumber?.Value);
+        Assert.Equal("B 1.2 260622 1234", session.Incident.IncidentNumber?.Value);
+    }
+
+    // The usual order: the Stichwort comes first, from the alarm, and names the Einsatzart.
+    [AvaloniaFact]
+    public void Typing_the_stichwort_first_puts_its_einsatzart_in_front_of_the_number()
+    {
+        var (window, _, session) = PrefilledDialog(keyword: null);
+
+        window.Type("THL 1");
+        window.Press(PhysicalKey.Tab);
+        Dispatcher.UIThread.RunJobs();
+        window.AssertFocused(Find<TextBox>(window, "IncidentDataNumberBox"));
+        window.Type("77");
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Equal("THL 1", session.Incident.Keyword);
+        Assert.Equal("T 1.2 260622 77", session.Incident.IncidentNumber?.Value);
     }
 
     [AvaloniaFact]
@@ -350,7 +368,7 @@ public class IncidentDataDialogRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(hint.IsEffectivelyVisible);
-        Assert.Equal("Entspricht nicht dem Format B 1.2 {JJMMTT} {NNN}", hint.Text);
+        Assert.Equal("Entspricht nicht dem Format {A} 1.2 {JJMMTT} {NNNN}", hint.Text);
 
         var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);

@@ -284,7 +284,7 @@ public sealed record IncidentSettings(
     // Kreisleitstelle, a Rettungsleitstelle or plain Leitstelle.
     string DispatchCentreName = IncidentSettings.DefaultDispatchCentreName,
 
-    // The Einsatznummer's template (#462), e.g. "B 1.2 {JJMMTT} {NNN}"; null when the brigade has
+    // The Einsatznummer's template (#462), e.g. "{A} 1.2 {JJMMTT} {NNNN}"; null when the brigade has
     // none. Kept as typed: LageBuch.Domain's IncidentNumberFormat reads it, and a template it cannot
     // read simply pre-fills nothing.
     string? IncidentNumberFormat = null)
