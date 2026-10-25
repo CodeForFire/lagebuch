@@ -156,8 +156,8 @@ one note on why the trust model around the middle two is where it is.
   without requiring a full identity-binding redesign.
 - **Image metadata is not stripped from attachments.** Image bytes are stored
   verbatim, so a photo taken on a duty phone keeps whatever the camera wrote
-  into it — GPS coordinates, capture time, device model — inside the incident's
-  `.files` folder, in what the host serves to every joined device, and in the
+  into it — GPS coordinates, capture time, device model — inside the incident
+  file, in what the host serves to every joined device, and in the
   exported PDF report that goes to the Akte. The coordinates are typically a
   private address, often the same one whose resident is already named in the
   CO-Messprotokoll. PNG, WebP and GIF metadata chunks are equally untouched.

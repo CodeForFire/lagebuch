@@ -47,7 +47,7 @@ einzelne Datei gespeichert wird.
 | Kräfte | Wache, Funkrufname, Stärke als Zahlen (ZF/GF/Mann, AGT), Status, Bemerkung – **keine Namen** | Einsatzdatei |
 | Aufgaben | Auftrag, Zuständiger (Freitext), „angelegt von“, „erledigt von“, Zeiten | Einsatzdatei |
 | Beteiligte | **Name, Telefonnummer, Notiz und Aufenthaltsort** (z. B. „im RTW …“, mit Uhrzeit) von Personen außerhalb der Feuerwehr (z. B. Eigentümer, Fahrzeughalter, Polizei), die Wohnung, in der sie angetroffen wurden, „angelegt von“ | Einsatzdatei |
-| Dateien und Anhänge | Fotos und PDFs, deren Originaldateiname und „hinzugefügt von“ | Ordner neben der Einsatzdatei |
+| Dateien und Anhänge | Fotos und PDFs, deren Originaldateiname und „hinzugefügt von“ | Einsatzdatei |
 | Änderungsprotokoll | wer wann welche Aktion ausgeführt hat | Einsatzdatei |
 
 Drei Punkte verdienen besondere Aufmerksamkeit:
@@ -91,18 +91,22 @@ liegt dort, wo sie beim Speichern abgelegt wurde – Lagebuch gibt keinen Ort vo
 Neben der Datei können betriebsbedingt Hilfsdateien mit den Endungen `-wal` und
 `-shm` entstehen.
 
-**Anhänge liegen nicht in der Einsatzdatei**, sondern in einem Ordner daneben,
-der denselben Namen trägt wie die Einsatzdatei, ergänzt um die Endung `.files`:
+**Anhänge liegen in der Einsatzdatei.** Fotos und PDFs werden als Bytes in
+derselben Datei gespeichert wie alles andere; zu einem Einsatz gehört also genau
+eine Datei. Wer einen Einsatz kopiert, archiviert oder weitergibt, nimmt damit
+auch die Anhänge mit. Wer ihn löscht, löscht sie ebenfalls.
 
-```
-Einsatz-20260917.lagebuch     ← Einsatzdaten, ETB, Atemschutz, CO-Messung …
-Einsatz-20260917.files/         ← die angehängten Fotos und PDFs
-```
+Ein entfernter oder ersetzter Anhang wird in der Datei **überschrieben**, nicht
+nur als gelöscht markiert. Die Datei wird dadurch aber nicht kleiner: der frei
+gewordene Platz bleibt reserviert und wird wiederverwendet.
 
-Wer einen Einsatz kopiert, archiviert oder weitergibt, muss **beides**
-mitnehmen. Wer einen Einsatz löscht, muss beides löschen. Die Dateien im
-`.files`-Ordner tragen technische Namen, nicht die ursprünglichen Dateinamen;
-der Originalname steht in der Einsatzdatei.
+**Ältere Einsatzdateien werden beim Öffnen umgewandelt.** Frühere Versionen
+legten Anhänge in einem Ordner neben der Datei ab, der denselben Namen trug,
+ergänzt um die Endung `.files`. Beim ersten Öffnen übernimmt Lagebuch die dort
+liegenden Anhänge in die Einsatzdatei und entfernt den Ordner. Was in dem Ordner
+liegt, aber zu keinem Anhang gehört, bleibt dort; ebenso Verknüpfungen,
+Dateien über der Größengrenze und unlesbare Dateien. Solche Reste sind dann
+selbst zu löschen.
 
 ### Die Programmdaten auf dem Gerät
 
@@ -289,9 +293,8 @@ ein Begleitgerät.
   Android-Geräteverschlüsselung).
 - **Bildschirmsperre und Zugang zum Gerät.** Wer am Laptop sitzt, sieht die
   Stammdaten.
-- **Ablage und Archivierung** der Einsatzdateien – immer zusammen mit dem
-  zugehörigen `.files`-Ordner –, einschließlich Sicherung und Zugriffsschutz auf
-  dem Ablageort.
+- **Ablage und Archivierung** der Einsatzdateien, einschließlich Sicherung und
+  Zugriffsschutz auf dem Ablageort. Beides betrifft nur noch die eine Datei.
 - **Löschfristen** für Einsatzdateien, PDF-Berichte und die Personalliste
   festlegen und umsetzen; siehe
   [Aufbewahren und Löschen](#aufbewahren-und-löschen).
@@ -356,7 +359,9 @@ abgearbeitet sind.
 1. Jede `.lagebuch`-Datei (ältere Versionen speicherten `.fwincident`), an
    allen Orten, an denen Einsätze gespeichert wurden (Anhaltspunkte liefern
    `recent.json` und `last-save-folder.json`), samt etwaiger `-wal`- und `-shm`-Dateien.
-2. Zu jeder Einsatzdatei den gleichnamigen `.files`-Ordner.
+2. Bei Einsatzdateien, die noch nie in einer neueren Version geöffnet wurden,
+   den gleichnamigen `.files`-Ordner. Auch ein beim Umwandeln zurückgebliebener
+   Rest (siehe „Die Einsatzdatei“) liegt dort.
 3. Aus dem Programmordner (`%AppData%\Lagebuch\` beziehungsweise
    `~/.config/Lagebuch/`):
    `masterdata.db`, `recent.json`, `last-save-folder.json`,
