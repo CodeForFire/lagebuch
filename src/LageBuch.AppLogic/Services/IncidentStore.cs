@@ -94,9 +94,6 @@ public sealed class IncidentStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         _fileStore.TryReadBytesAsync(path, storageFileName, cancellationToken);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) =>
-        _fileStore.ResolveDiskPath(path, storageFileName);
-
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         _fileStore.DeleteBytesAsync(path, storageFileName, cancellationToken);
 

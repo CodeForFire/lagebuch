@@ -659,6 +659,67 @@ public class FilesViewModelTests
         Assert.StartsWith("Anhang nicht entfernt: ", vm.ErrorMessage, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_failed_byte_delete_says_the_attachment_was_removed_but_its_data_was_not_wiped()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var session = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        store.DeleteFailure = new IOException("Datenträger voll");
+        Action? confirm = null;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (_, _, onConfirmed) => confirm = onConfirmed);
+        Assert.Single(vm.Files).RemoveCommand.Execute(null);
+
+        confirm!();
+        await WaitForAsync(() => vm.ErrorMessage is not null);
+
+        Assert.Equal(
+            "Anhang entfernt, Daten konnten nicht aus der Einsatzdatei gelöscht werden: Datenträger voll",
+            vm.ErrorMessage);
+        Assert.Empty(session.Incident.Files);
+    }
+
+    [Fact]
+    public async Task A_failed_byte_delete_with_other_attachments_still_present_reports_only_the_wipe_failure()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var session = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1 });
+        await session.AddFileAsync("lage.jpg", "image/jpeg", new byte[] { 2 });
+        store.DeleteFailure = new IOException("Datenträger voll");
+        Action? confirm = null;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (_, _, onConfirmed) => confirm = onConfirmed);
+        vm.Files[0].RemoveCommand.Execute(null);
+
+        confirm!();
+        await WaitForAsync(() => vm.ErrorMessage is not null);
+
+        Assert.StartsWith("Anhang entfernt, Daten konnten nicht", vm.ErrorMessage, StringComparison.Ordinal);
+        Assert.Single(session.Incident.Files);
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        for (var i = 0; i < 200 && !condition(); i++)
+        {
+            await Task.Yield();
+        }
+    }
+
     // Copying to disk or launching the viewer can fail (full disk, no registered handler); like
     // AddFileAsync and RemoveFileAsync, that belongs in ErrorMessage rather than escaping an async
     // command as an unobserved exception.

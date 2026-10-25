@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -294,6 +295,10 @@ public sealed class IncidentHost : IAsyncDisposable
         BoundPort = new Uri(app.Urls.First()).Port;
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A failed byte delete after a landed RemoveFileCommand surfaces as an explicit 500 to the client, whose banner names the code; the persistence exception types are not Sync.Hosting's to enumerate.")]
     private async Task<IResult> HandleCommand(SyncCommand command)
     {
         // A Kestrel request thread runs this. Apply on the UI thread so the host's authoritative
@@ -329,14 +334,26 @@ public sealed class IncidentHost : IAsyncDisposable
             });
 
             // The other half of RemoveFile's metadata/bytes split: CommandApplier only removed the
-            // domain record, so the attachment's bytes are cleaned up here — a pure disk delete
-            // against already-persisted state, like HandleUploadFile/HandleGetFile, so it doesn't
-            // need the UI-thread dispatch the mutation above uses. Best-effort (see
-            // IIncidentFileStore.DeleteBytesAsync) — never blocks or fails the metadata removal that
-            // already landed.
+            // domain record, so the attachment's bytes are deleted from the incident file here — a
+            // database write against already-persisted state, like HandleUploadFile/HandleGetFile,
+            // so it doesn't need the UI-thread dispatch the mutation above uses. The delete throws
+            // when the bytes cannot be wiped (IIncidentFileStore.DeleteBytesAsync). The metadata
+            // removal has landed and been broadcast by then, so the failure is answered with an
+            // explicit 500 rather than swallowed or reported as a rejected command. Be clear about what
+            // that costs: the removal DID land and the next snapshot shows the file gone, yet the
+            // client's banner reads as if the host refused the change, and the bytes may remain
+            // unwiped in the incident file. The host side is not notified either; surfacing it
+            // there is a follow-up.
             if (command is RemoveFileCommand && removedFile is not null)
             {
-                await _session.DeleteFileBytesAsync(IncidentFile.StorageFileName(removedFile.Id, removedFile.FileName));
+                try
+                {
+                    await _session.DeleteFileBytesAsync(IncidentFile.StorageFileName(removedFile.Id, removedFile.FileName));
+                }
+                catch (Exception)
+                {
+                    return Results.StatusCode(StatusCodes.Status500InternalServerError);
+                }
             }
 
             return result;
@@ -370,10 +387,10 @@ public sealed class IncidentHost : IAsyncDisposable
     }
 
     // The other half of the metadata/bytes split (issue #167 P1 #2): a client PUTs the raw attachment
-    // bytes here, keyed by the id its AddFileCommand already registered. A pure disk write against
+    // bytes here, keyed by the id its AddFileCommand already registered. A database write against
     // already-persisted domain state — like HandleGetFile, this doesn't need the UI-thread dispatch
-    // HandleCommand uses, and unlike the old inline byte write, it streams straight to disk (never a
-    // whole-file byte[] in memory here or in IncidentFileStore.SaveStreamAsync).
+    // HandleCommand uses, and unlike the old inline byte write, it streams straight into the incident
+    // file (never a whole-file byte[] in memory here or in IncidentFileStore.SaveStreamAsync).
     private async Task<IResult> HandleUploadFile(Guid id, HttpRequest request, CancellationToken cancellationToken)
     {
         var file = _session.Incident.Files.FirstOrDefault(f => f.Id == id);

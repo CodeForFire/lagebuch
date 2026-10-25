@@ -46,10 +46,16 @@ internal sealed class InMemoryStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
+    /// <summary>When set, the byte delete throws it, like a store whose wipe failed.</summary>
+    public Exception? DeleteFailure { get; set; }
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
     {
+        if (DeleteFailure is not null)
+        {
+            return Task.FromException(DeleteFailure);
+        }
+
         _files.Remove($"{path}/{storageFileName}");
         return Task.CompletedTask;
     }
@@ -493,8 +499,6 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
-
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;

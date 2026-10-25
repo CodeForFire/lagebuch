@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 30;
+    public const int CurrentVersion = 31;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -205,6 +205,11 @@ public static class Migrations
         if (version < 30)
         {
             ApplyV30(cn, tx);
+        }
+
+        if (version < 31)
+        {
+            ApplyV31(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -507,9 +512,9 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "checklist_items", "kind", "INTEGER NOT NULL DEFAULT 0");
     }
 
-    // Adds the metadata store for attached files (#62). Only metadata lives here — the actual
-    // bytes sit in a sibling ".files" folder next to the .lagebuch file, kept out of this
-    // full-rewrite-per-save table set so an unrelated edit never rewrites attachment content.
+    // Adds the metadata store for attached files (#62). Only metadata lives here. The bytes sat in
+    // a sibling ".files" folder when this shipped; they now live in incident_file_blobs, and
+    // LegacyAttachmentFolder imports an old folder on open.
     private static void ApplyV10(SqliteConnection cn, SqliteTransaction tx)
     {
         const string sql14 = """
@@ -905,6 +910,11 @@ public static class Migrations
             """;
         Exec(cn, tx, sql30);
     }
+
+    // The attachment bytes move into the Einsatzdatei: one row per stored file, outside the tables
+    // IncidentRepository rewrites on save.
+    private static void ApplyV31(SqliteConnection cn, SqliteTransaction tx) =>
+        IncidentFileBlobs.EnsureTable(cn, tx);
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

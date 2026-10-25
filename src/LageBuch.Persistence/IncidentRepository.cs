@@ -54,6 +54,9 @@ public sealed class IncidentRepository
         using var tx = cn.BeginTransaction();
         using var inserts = new InsertCommands(cn, tx);
 
+        // incident_file_blobs is deliberately absent: it holds the attachment bytes, which no save
+        // rewrites. IncidentFileStore owns that table; clearing it here would drop every photo on
+        // each incident save and make the save cost as much as the attachments weigh.
         foreach (var table in new[]
                  {
                     "incident_meta", "checklist_items", "checklist_lists", "etb_entries", "etb_entry_edits",
@@ -564,6 +567,7 @@ public sealed class IncidentRepository
         using (var migrateCn = SqliteConnectionFactory.OpenExisting(path))
         {
             Migrations.Migrate(migrateCn);
+            LegacyAttachmentFolder.Import(migrateCn, path);
         }
 
         MigratedPaths[Path.GetFullPath(path)] = 0;

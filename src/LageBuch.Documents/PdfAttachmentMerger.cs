@@ -16,9 +16,9 @@ public static class PdfAttachmentMerger
     /// that links its pages back to the matching row in the report's "Angehängte Dateien" list.
     /// QuestPDF's <c>DocumentOperation</c> works on file paths only (no in-memory overload), so the
     /// base report and each generated caption page are round-tripped through a temp file, but
-    /// attachments are merged straight from <paramref name="attachments"/>' paths — every attachment
-    /// already lives on disk (see issue #167 P1 #3), so there is no need to load it into memory and
-    /// write it back out to a temp copy first.
+    /// attachments are merged straight from <paramref name="attachments"/>' paths. The caller supplies
+    /// those paths: attachments live inside the incident file, so it writes each PDF to a private
+    /// temp copy for the duration of the export.
     /// </summary>
     public static byte[] Append(byte[] baseReport, IReadOnlyList<PdfAttachmentToMerge> attachments)
     {

@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain.Files;
+using LageBuch.Persistence;
 
 namespace LageBuch.AppLogic.Services;
 
@@ -27,9 +28,10 @@ public static class AttachmentTempPaths
     /// tree as already shareable and skips a second copy), and the <c>attachments</c> entry in the
     /// Android head's <c>file_paths.xml</c>, which is what makes the FileProvider willing to hand
     /// out a URI for it at all. XML cannot reference this constant, so that file carries a comment
-    /// pointing here; the other two use it directly.
+    /// pointing here; the other two use it directly. Its value comes from
+    /// <see cref="IncidentFileStore.TempFolderName"/>, whose upload spool lives in the same folder.
     /// </summary>
-    public const string RootFolderName = "lagebuch";
+    public const string RootFolderName = IncidentFileStore.TempFolderName;
 
     // Owner-only on Unix: the copies are decrypted attachment bytes, and the system temp directory
     // is shared with every other local user.
@@ -143,6 +145,49 @@ public static class AttachmentTempPaths
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // Still open in a viewer, most likely; the next start tries again.
+            }
+        }
+
+        SweepUploadSpools(root, modifiedBefore);
+    }
+
+    /// <summary>
+    /// An upload spool deletes itself on close, so one left here is a crashed run's: a client's
+    /// photo in the clear. One still in use is held open with no sharing on Windows and skipped;
+    /// on Unix deleting it only unlinks the name and the upload carries on.
+    /// </summary>
+    private static void SweepUploadSpools(string root, DateTime? modifiedBefore)
+    {
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(root, IncidentFileStore.SpoolFilePrefix + "*" + IncidentFileStore.SpoolFileExtension);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        foreach (var file in files)
+        {
+            var name = Path.GetFileNameWithoutExtension(file);
+            if (!Guid.TryParseExact(name[IncidentFileStore.SpoolFilePrefix.Length..], "N", out _))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (modifiedBefore is { } cutoff && File.GetLastWriteTimeUtc(file) >= cutoff)
+                {
+                    continue;
+                }
+
+                File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Still being uploaded; the next start tries again.
             }
         }
     }

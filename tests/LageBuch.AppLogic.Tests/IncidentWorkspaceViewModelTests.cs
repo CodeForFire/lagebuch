@@ -2292,8 +2292,6 @@ internal sealed class OrderRecordingStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => path;
-
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 

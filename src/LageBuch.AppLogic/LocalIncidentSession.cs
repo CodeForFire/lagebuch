@@ -112,41 +112,13 @@ public sealed class LocalIncidentSession : IIncidentSession
         Changed?.Invoke();
     }
 
-    // The host's export (a joined client uses SessionPdfExport instead, #465). Every attached
-    // file's bytes land in this device's own sibling folder the moment it's added —
-    // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
-    // network pull, only IIncidentStore.
+    // The host's export. The same path a joined client takes (#465): every attachment's bytes come
+    // out of the incident file through GetFileBytesAsync, and PDF attachments get a private temp
+    // copy for the merger, which can only read file paths.
     public async Task<byte[]> ExportPdfAsync(IIncidentPdfExporter exporter, IncidentPdfSections sections = IncidentPdfSections.All)
     {
         ArgumentNullException.ThrowIfNull(exporter);
-        var fileBytes = new Dictionary<Guid, byte[]>();
-        var pdfAttachmentPaths = new Dictionary<Guid, string>();
-        foreach (var file in Incident.Files)
-        {
-            var storageFileName = IncidentFile.StorageFileName(file.Id, file.FileName);
-            if (file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
-            {
-                // Merged straight from disk (see issue #167 P1 #3) — never loaded into fileBytes,
-                // which would otherwise round-trip every PDF attachment through memory twice.
-                var diskPath = _store.ResolveFileDiskPath(Path, storageFileName);
-                if (File.Exists(diskPath))
-                {
-                    pdfAttachmentPaths[file.Id] = diskPath;
-                }
-
-                continue;
-            }
-
-            var bytes = await _store.TryReadFileBytesAsync(Path, storageFileName);
-            if (bytes is not null)
-            {
-                fileBytes[file.Id] = bytes;
-            }
-        }
-
-        // One timestamp for the whole document: read once here rather than per section, so the
-        // Aufgaben section's overdue markers reflect the moment the export was asked for.
-        return exporter.Generate(Incident, _clock.Now, fileBytes, pdfAttachmentPaths, sections);
+        return (await SessionPdfExport.ExportAsync(this, exporter, _clock, sections)).Pdf;
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
@@ -292,9 +264,21 @@ public sealed class LocalIncidentSession : IIncidentSession
     {
         ArgumentNullException.ThrowIfNull(bytes);
         var file = Incident.AddFile(_clock, RequireOperator(), fileName, contentType, bytes.LongLength);
-        await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes, cancellationToken);
         Save();
-        Changed?.Invoke();
+
+        // The bytes live in the incident file, so the file and the incident_files row must exist
+        // before the write. A brand-new incident is still in the writer queue until this returns.
+        // Changed is raised either way: the domain and the saved metadata already hold the file,
+        // so a failed byte write must still refresh the views before it reaches the caller.
+        try
+        {
+            await _store.FlushAsync(cancellationToken);
+            await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes, cancellationToken);
+        }
+        finally
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>
@@ -305,8 +289,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     /// riding them on the command), so this is called from the upload handler, not
     /// <see cref="AddFileAsync"/>.
     /// </summary>
-    public Task SaveFileStreamAsync(string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
-        _store.SaveFileStreamAsync(Path, storageFileName, source, cancellationToken);
+    public async Task SaveFileStreamAsync(string storageFileName, Stream source, CancellationToken cancellationToken = default)
+    {
+        // The incident file must exist before bytes can go into it; see AddFileAsync.
+        await _store.FlushAsync(cancellationToken);
+        await _store.SaveFileStreamAsync(Path, storageFileName, source, cancellationToken);
+    }
 
     public async Task<byte[]?> GetFileBytesAsync(Guid fileId, CancellationToken cancellationToken = default)
     {
@@ -319,16 +307,28 @@ public sealed class LocalIncidentSession : IIncidentSession
     public async Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default)
     {
         var file = Incident.RemoveFile(_clock, RequireOperator(), fileId);
-        await _store.DeleteFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
+
+        // The metadata removal is persisted first, so a failing byte delete cannot leave the file
+        // with a row that memory no longer has. Save only queues the write, so it is flushed before
+        // the delete. The failure still reaches the caller; Changed is raised either way because
+        // the domain already changed.
         Save();
-        Changed?.Invoke();
+        try
+        {
+            await _store.FlushAsync(cancellationToken);
+            await _store.DeleteFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
+        }
+        finally
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>
     /// Deletes an attachment's bytes only, without touching the domain — used by the host (see
     /// <c>LageBuch.Sync.Hosting.IncidentHost</c>) after applying a joined client's
     /// <c>RemoveFileCommand</c> via <see cref="LageBuch.Sync.CommandApplier"/>, whose metadata
-    /// mutation already ran on the UI thread; this best-effort disk cleanup runs off it, mirroring
+    /// mutation already ran on the UI thread; this byte delete runs off it and throws if the bytes cannot be wiped, mirroring
     /// <see cref="SaveFileStreamAsync"/>'s split for <c>AddFileCommand</c>'s upload half.
     /// </summary>
     public Task DeleteFileBytesAsync(string storageFileName, CancellationToken cancellationToken = default) =>

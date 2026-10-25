@@ -46,15 +46,11 @@ public interface IIncidentStore
     /// never throws, so a caller degrades quietly.</summary>
     Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);
 
-    /// <summary>The real path on disk for an attached file, for APIs that require a file path
-    /// rather than bytes (QuestPDF's <c>DocumentOperation</c> — see issue #167 P1 #3). Does not
-    /// guarantee the file exists.</summary>
-    string ResolveFileDiskPath(string path, string storageFileName);
-
     /// <summary>
-    /// Deletes an attached file's bytes, best-effort — see
-    /// <c>LageBuch.Persistence.IIncidentFileStore.DeleteBytesAsync</c>. Never blocks or fails the
-    /// metadata removal (<c>Incident.RemoveFile</c>) that already happened.
+    /// Deletes an attached file's bytes from the incident file and wipes them — see
+    /// <c>LageBuch.Persistence.IIncidentFileStore.DeleteBytesAsync</c>. Throws when the bytes cannot
+    /// be removed; the metadata removal (<c>Incident.RemoveFile</c>) that already happened is not
+    /// undone, so the caller reports the failure rather than retrying the removal.
     /// </summary>
     Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);
 

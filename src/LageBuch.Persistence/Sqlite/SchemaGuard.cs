@@ -44,6 +44,7 @@ internal static class SchemaGuard
         "etb_entry_edits",
         "force_unit_edits",
         "force_units",
+        "incident_file_blobs",
         "incident_files",
         "incident_meta",
         "incident_tasks",
