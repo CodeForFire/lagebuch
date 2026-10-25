@@ -698,6 +698,8 @@ public sealed partial class HomeViewModel : ObservableObject
     // The remote workspace can't host (a client isn't hostable), so it gets a no-op host controller
     // and the "Im Netzwerk freigeben" toggle stays hidden. It does get the PDF exporter: a client
     // renders the synced state itself (#465). It gets no store, since it writes nothing locally.
+    // It runs on the host's clock, not this device's: every instant in the incident was stamped there,
+    // and the Atemschutz and Aufgaben countdowns measure against it.
     [SuppressMessage(
         "Reliability",
         "CA2000",
@@ -705,7 +707,7 @@ public sealed partial class HomeViewModel : ObservableObject
     private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md, string host)
     {
         var workspace = new IncidentWorkspaceViewModel(
-            session, _clock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController(), _pdfExporter, _lastPdfExport, remoteHost: host, alarmMute: _alarmMute);
+            session, session.HostClock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController(), _pdfExporter, _lastPdfExport, remoteHost: host, alarmMute: _alarmMute);
         WorkspaceOpened?.Invoke(workspace);
     }
 }

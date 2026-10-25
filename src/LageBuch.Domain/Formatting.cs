@@ -27,6 +27,20 @@ public static class Formatting
         return value.ToUpper(De);
     }
 
+    /// <summary>
+    /// How far this device's clock is off the host's, for a joined device's footer.
+    /// <paramref name="hostAhead"/> is the host's time minus this device's, so positive means this
+    /// device's clock is slow ("geht nach"). Seconds under a minute, whole minutes above.
+    /// </summary>
+    public static string ClockSkew(TimeSpan hostAhead)
+    {
+        var size = hostAhead.Duration();
+        var amount = size < TimeSpan.FromMinutes(1)
+            ? string.Create(De, $"{(int)size.TotalSeconds} s")
+            : string.Create(De, $"{(long)Math.Round(size.TotalMinutes, MidpointRounding.AwayFromZero)} min");
+        return $"Geräteuhr geht {amount} {(hostAhead > TimeSpan.Zero ? "nach" : "vor")}";
+    }
+
     public static string OrDash(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "—" : value;
 

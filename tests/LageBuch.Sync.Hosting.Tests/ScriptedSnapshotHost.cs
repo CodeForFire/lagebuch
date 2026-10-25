@@ -88,6 +88,13 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     /// </summary>
     public bool ServeOversizedSnapshot { get; set; }
 
+    /// <summary>
+    /// The host's clock as <c>GET /revision</c> reports it, read when the request is answered. The
+    /// wall clock by default, like the real host; a function returning null answers without it, which
+    /// is what a host older than protocol 14 does.
+    /// </summary>
+    public Func<DateTimeOffset?> HostTime { get; set; } = () => TimeProvider.System.GetUtcNow();
+
     public static async Task<ScriptedSnapshotHost> StartAsync(IncidentSnapshot initial, string version = "1.0.0")
     {
         var builder = WebApplication.CreateSlimBuilder();
@@ -126,7 +133,7 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
 
             return host.FailRevisionWith is { } status
                 ? Results.StatusCode((int)status)
-                : Results.Json(new RevisionInfo(host.Current.Revision, host.Current.Epoch), SyncJson.Options);
+                : Results.Json(new RevisionInfo(host.Current.Revision, host.Current.Epoch, host.HostTime()), SyncJson.Options);
         });
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(
             MasterDataJson.Serialize(MasterDataSet.Empty), "application/json"));

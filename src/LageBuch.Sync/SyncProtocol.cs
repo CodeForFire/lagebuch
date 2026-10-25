@@ -194,6 +194,13 @@ public static class SyncProtocol
     /// With it, a device learns it cannot confirm its Stand within one interval plus this.
     /// </summary>
     public static readonly TimeSpan ReconcileTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// The longest <see cref="RevisionPath"/> round trip whose <see cref="RevisionInfo.HostTime"/> still
+    /// counts. The host read its clock somewhere inside the round trip, so half of it is the error of
+    /// the estimate; a slower answer is dropped rather than averaged in, and the last good one stays.
+    /// </summary>
+    public static readonly TimeSpan MaxClockSampleRoundTrip = TimeSpan.FromSeconds(1);
 }
 
 /// <summary>
@@ -216,8 +223,12 @@ public sealed record VersionInfo(string Version, int Protocol = 0, int MinProtoc
 /// The host's current <see cref="IncidentSnapshot.Epoch"/> and <see cref="IncidentSnapshot.Revision"/>,
 /// served by <see cref="SyncProtocol.RevisionPath"/>. A joined client compares the pair against the
 /// one it last applied; any difference means re-fetch the snapshot (#295).
+/// <para>
+/// <see cref="HostTime"/> is the host's clock when it answered. Null from a host older than protocol
+/// 14, which leaves the client on its own clock.
+/// </para>
 /// </summary>
-public sealed record RevisionInfo(long Revision, Guid Epoch = default);
+public sealed record RevisionInfo(long Revision, Guid Epoch = default, DateTimeOffset? HostTime = null);
 
 /// <summary>
 /// Thrown when the host rejects the join because the supplied share PIN is wrong or missing (§ #64).

@@ -76,6 +76,12 @@ internal sealed class FakeTimeProvider : TimeProvider
 
     public override DateTimeOffset GetUtcNow() => UtcNow;
 
+    // The elapsed-time clock moves with UtcNow, so a round trip measured across an Advance lasts as
+    // long as the Advance said, not as long as the test happened to take.
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+    public override long GetTimestamp() => UtcNow.UtcTicks;
+
     /// <summary>Moves the clock on and fires every timer that came due, once each, on the caller's thread.</summary>
     public void Advance(TimeSpan by)
     {

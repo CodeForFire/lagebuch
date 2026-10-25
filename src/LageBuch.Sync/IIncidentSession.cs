@@ -35,6 +35,12 @@ public interface IIncidentSession
     /// </summary>
     bool IsRemote { get; }
 
+    /// <summary>
+    /// How far the authoritative device's clock is ahead of this one's. Zero on the device that owns
+    /// the incident; on a joined client, what the last reconcile pass measured.
+    /// </summary>
+    TimeSpan HostClockOffset { get; }
+
     /// <summary>Raised after the incident state changes (a local mutation, or a host broadcast).</summary>
     [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; Action matches the pervasive Action event convention (GoHomeRequested etc.).")]
     event Action? Changed;
