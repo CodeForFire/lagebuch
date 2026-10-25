@@ -567,6 +567,7 @@ public sealed class IncidentRepository
         using (var migrateCn = SqliteConnectionFactory.OpenExisting(path))
         {
             Migrations.Migrate(migrateCn);
+            LegacyAttachmentFolder.Import(migrateCn, path);
         }
 
         MigratedPaths[Path.GetFullPath(path)] = 0;
