@@ -49,6 +49,11 @@ public sealed record MasterDataSet(
     // Their structure and labels are copied into the incident (#337); nothing points back here.
     IReadOnlyList<Premises> Premises,
 
+    // Geräte offered in the Ausgabeliste: the Mobilteile, Westen and the AED the ELW hands out,
+    // each with how many there are. Only the chosen name lands in the incident; the count is a live
+    // rule, checked against today's Stammdaten.
+    IReadOnlyList<Device> Devices,
+
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
     IncidentSettings Settings)
@@ -72,6 +77,7 @@ public sealed record MasterDataSet(
         Array.Empty<Vehicle>(),
         Array.Empty<TextSnippet>(),
         Array.Empty<Premises>(),
+        Array.Empty<Device>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -94,7 +100,8 @@ public sealed record MasterDataSet(
         && Personnel.Count == 0
         && Vehicles.Count == 0
         && TextSnippets.Count == 0
-        && Premises.Count == 0;
+        && Premises.Count == 0
+        && Devices.Count == 0;
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -544,6 +551,25 @@ public sealed record Premises(
 }
 
 /// <summary>
+/// One Gerät the ELW hands out, and how many of it there are. The Ausgabeliste compares the count
+/// against what is still out, so a third Weste EL handed out when the ELW carries two is questioned
+/// before it is recorded. 0 means not counted: "Sonstiges (siehe Bemerkung)" has no stock to check.
+/// <para>
+/// Like <see cref="TruppType"/>, this does not throw on an impossible count; every entrance clamps
+/// through <see cref="ClampCount"/> instead, since the parse runs on input that crossed a trust
+/// boundary.
+/// </para>
+/// </summary>
+public sealed record Device(string Name, int Count)
+{
+    /// <summary>The largest count the editor offers and every entrance accepts.</summary>
+    public const int MaxCount = 999;
+
+    /// <summary><paramref name="count"/> forced into 0..<see cref="MaxCount"/>.</summary>
+    public static int ClampCount(int count) => Math.Clamp(count, 0, MaxCount);
+}
+
+/// <summary>
 /// One Trupp-Typ: its name, how many people it is crewed by, and the Einsatzzeit it defaults to.
 /// <para>
 /// Crew size and Einsatzzeit used to be decided by comparing the name against the compiled-in
@@ -956,6 +982,7 @@ public static class MasterDataJson
             vehicles,
             ParseTextSnippets(root),
             ParsePremises(root),
+            ParseDevices(root),
             ParseSettings(root));
     }
 
@@ -1070,6 +1097,28 @@ public static class MasterDataJson
 
         static int Int(JsonElement e, string prop, int fallback) =>
             e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : fallback;
+    }
+
+    /// <summary>
+    /// Reads the optional <c>devices</c> array: one object per Gerät with a required <c>name</c>
+    /// and an optional <c>count</c>, clamped rather than rejected for the reason
+    /// <see cref="ParseTruppTypes"/> gives. A bare string is a Gerät nobody counted.
+    /// </summary>
+    private static IReadOnlyList<Device> ParseDevices(JsonElement root)
+    {
+        if (!root.TryGetProperty("devices", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<Device>();
+        }
+
+        return arr.EnumerateArray()
+            .Select(x => x.ValueKind == JsonValueKind.String
+                ? new Device((x.GetString() ?? string.Empty).Trim(), 0)
+                : new Device(
+                    RequiredName(x, "Gerät").Trim(),
+                    Device.ClampCount(
+                        x.TryGetProperty("count", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetInt32() : 0)))
+            .ToList();
     }
 
     /// <summary>
@@ -1331,6 +1380,7 @@ public static class MasterDataJson
             }),
             unitStatus = set.UnitStatus,
             keywords = set.Keywords,
+            devices = set.Devices.Select(d => new { name = d.Name, count = d.Count }),
             districts = set.Districts,
             streets = set.Streets.Select(t => new { name = t.Name, district = t.District, postalCode = t.PostalCode, place = t.Place }),
             truppTypes = set.TruppTypes.Select(t => new

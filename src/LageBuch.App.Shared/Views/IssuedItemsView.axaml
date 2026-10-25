@@ -1,0 +1,296 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             x:Class="LageBuch.App.Shared.Views.IssuedItemsView"
+             x:DataType="vm:IssuedItemsViewModel">
+  <!-- Same dock idiom as InvolvedPartiesView: the fields run side by side on a wide window and
+       stack on a phone. Orientation and widths are Style setters rather than attributes, because a
+       local value in XAML outranks a Style setter and the narrow styles could never change them. -->
+  <UserControl.Styles>
+    <Style Selector="WrapPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Style Selector="WrapPanel#DockFields > HeaderedContentControl">
+      <Setter Property="Margin" Value="0,0,8,6" />
+    </Style>
+    <Style Selector="AutoCompleteBox#NewDeviceBox">
+      <Setter Property="Width" Value="200" />
+    </Style>
+    <Style Selector="TextBox#NewIssuedToBox">
+      <Setter Property="Width" Value="200" />
+    </Style>
+    <Style Selector="TextBox#NewPhoneBox">
+      <Setter Property="Width" Value="160" />
+    </Style>
+    <Style Selector="TextBox#NewDetailsBox">
+      <Setter Property="Width" Value="220" />
+    </Style>
+    <Style Selector="TextBox#NewRemarkBox">
+      <Setter Property="Width" Value="220" />
+    </Style>
+
+    <!-- A Gerät still out is what the end of an Einsatz is about: amber, the colour the app uses
+         for work still due, on the card's edge and in its status line. -->
+    <Style Selector="Border.row-card.out">
+      <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
+      <Setter Property="BorderThickness" Value="3,1,1,1" />
+    </Style>
+    <Style Selector="TextBlock.status-out">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- Both colours are Style setters: a local Foreground would outrank the .out style. -->
+    <Style Selector="TextBlock#SummaryText">
+      <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock#SummaryText.out">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- The stock hint under GERÄT, amber once none is left. -->
+    <Style Selector="TextBlock#DeviceStockText">
+      <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock#DeviceStockText.out">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="Panel#WorkspaceRoot.narrow WrapPanel#DockFields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow WrapPanel#DockFields > HeaderedContentControl">
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#IssuedItemsTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#NewDeviceBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewIssuedToBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewPhoneBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewDetailsBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewRemarkBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow HeaderedContentControl.field">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- Tab follows the screen, top to bottom (#695): each child is its own tab group, ranked by
+       TabIndex in the order it appears on screen, as in InvolvedPartiesView. -->
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <TextBlock Grid.Column="0" x:Name="IssuedItemsTitle" Text="AUSGABELISTE" Classes="overline" />
+      <TextBlock Grid.Column="1" x:Name="SummaryText" Classes="mono" FontSize="12"
+                 Classes.out="{Binding HasItemsOut}"
+                 Text="{Binding Summary}"
+                 IsVisible="{Binding Summary, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </Grid>
+
+    <!-- The phone's way in to the form, at the bottom edge where the thumb already is. -->
+    <Button KeyboardNavigation.TabIndex="2" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="+ GERÄT AUSGEBEN"
+            IsVisible="{Binding ShowComposerButton}"
+            Command="{Binding OpenComposerCommand}" />
+
+    <!-- Input dock. Enter submits from every field; focus then goes back to GERÄT (#540). -->
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
+            IsVisible="{Binding ShowComposer}"
+            b:EntryForm.SubmitCommand="{Binding AddCommand}"
+            b:EntryForm.FirstField="{Binding #NewDeviceBox}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
+           bottom of the window to the soft keyboard. Never scrolls on a wide window. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="6">
+          <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,4"
+                IsVisible="{Binding IsNarrow}">
+            <TextBlock Grid.Column="0" Text="GERÄT AUSGEBEN" Classes="overline" VerticalAlignment="Center" />
+            <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                    AutomationProperties.Name="Eingabe schließen"
+                    ToolTip.Tip="Eingabe schließen"
+                    Command="{Binding CloseComposerCommand}">
+              <PathIcon Width="13" Height="13"
+                        Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+            </Button>
+          </Grid>
+          <!-- A WrapPanel, not a horizontal StackPanel: five fields and the button do not fit one
+               line on a 1280px window, and a field pushed off the edge is a field nobody fills. -->
+          <WrapPanel x:Name="DockFields">
+            <!-- The Stammdaten's Geräte as suggestions, not a closed set: "Sonstiges" is in the
+                 list for a reason, so a Gerät the list lacks stays enterable. -->
+            <HeaderedContentControl Classes="field suggest required" Header="GERÄT"
+                                    Classes.invalid="{Binding IsNewDeviceMissing}">
+              <AutoCompleteBox x:Name="NewDeviceBox"
+                               PlaceholderText="z. B. Mobilteil 1"
+                               MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDeviceLength}"
+                               ItemsSource="{Binding DeviceOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               Text="{Binding NewDevice}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field required" Header="AUSGEGEBEN AN"
+                                    Classes.invalid="{Binding IsNewIssuedToMissing}">
+              <TextBox x:Name="NewIssuedToBox"
+                       MaxLength="{x:Static vm:IssuedItemsViewModel.MaxIssuedToLength}"
+                       PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
+                       Text="{Binding NewIssuedTo}" />
+            </HeaderedContentControl>
+            <!-- Plain text, as in the Beteiligte: a number is read out or typed into a phone. -->
+            <HeaderedContentControl Classes="field" Header="TELEFON">
+              <TextBox x:Name="NewPhoneBox"
+                       MaxLength="{x:Static vm:IssuedItemsViewModel.MaxPhoneLength}"
+                       PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                       Text="{Binding NewIssuedToPhone}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="ORGANISATION / KONTAKT">
+              <!-- Freitext: kein Platzhalter, siehe #137 -->
+              <TextBox x:Name="NewDetailsBox"
+                       MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDetailsLength}"
+                       Text="{Binding NewIssuedToDetails}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="BEMERKUNG">
+              <TextBox x:Name="NewRemarkBox"
+                       MaxLength="{x:Static vm:IssuedItemsViewModel.MaxRemarkLength}"
+                       Text="{Binding NewRemark}" />
+            </HeaderedContentControl>
+            <Button x:Name="IssueItemButton" Classes="signal dock-action" Content="AUSGEBEN"
+                    Command="{Binding AddCommand}" VerticalAlignment="Bottom" Margin="0,0,0,7" />
+          </WrapPanel>
+          <TextBlock x:Name="DeviceStockText" Classes="mono" FontSize="12" Margin="0,4,0,0"
+                     Classes.out="{Binding IsNewDeviceExhausted}"
+                     Text="{Binding NewDeviceStock}"
+                     IsVisible="{Binding NewDeviceStock, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock x:Name="DockErrorSummary" Classes="field-error"
+                     Text="{Binding NewItemError}"
+                     IsVisible="{Binding NewItemError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock DockPanel.Dock="Top" x:Name="EmptyText" Text="Noch keine Geräte ausgegeben."
+               Foreground="{StaticResource TextMutedBrush}"
+               IsVisible="{Binding !Items.Count}" />
+
+    <!-- One card per Gerät on every width, as the Beteiligte do. Stretch, never a centred MaxWidth
+         column, so the list cannot change width while it scrolls. -->
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" x:Name="IssuedItemsPanel"
+            Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True"
+            IsVisible="{Binding Items.Count}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="IssuedItemsList" ItemsSource="{Binding Items}" Margin="8"
+                      Grid.IsSharedSizeScope="True">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:IssuedItemRow">
+              <Border Classes="row-card" Classes.out="{Binding IsOut}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                  <TextBlock Grid.Column="0" Classes="mono" FontSize="13" FontWeight="SemiBold"
+                             VerticalAlignment="Top" Margin="0,7,0,0"
+                             Foreground="{StaticResource TextSecondaryBrush}"
+                             Text="{Binding Number}" />
+                  <!-- Each field pushes on LostFocus: the row rebuilds after every accepted write,
+                       so a per-keystroke push would rewrite the Einsatzdatei on every character
+                       and throw focus out of the box (#33). -->
+                  <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="GERÄT" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox Grid.Row="0" Grid.Column="1" FontWeight="SemiBold"
+                             AutomationProperties.Name="Gerät"
+                             MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDeviceLength}"
+                             Text="{Binding Device, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="AUSGEGEBEN AN" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox Grid.Row="1" Grid.Column="1"
+                             AutomationProperties.Name="Ausgegeben an"
+                             MaxLength="{x:Static vm:IssuedItemsViewModel.MaxIssuedToLength}"
+                             Text="{Binding IssuedTo, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="TELEFON" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Classes="mono"
+                             AutomationProperties.Name="Telefon"
+                             MaxLength="{x:Static vm:IssuedItemsViewModel.MaxPhoneLength}"
+                             Text="{Binding IssuedToPhone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="ORGANISATION" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox Grid.Row="3" Grid.Column="1"
+                             AutomationProperties.Name="Organisation / Kontakt"
+                             MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDetailsLength}"
+                             Text="{Binding IssuedToDetails, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="BEMERKUNG" Classes="overline" FontSize="10"
+                               VerticalAlignment="Top" Margin="0,8,12,0" />
+                    <TextBox Grid.Row="4" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True"
+                             AutomationProperties.Name="Bemerkung"
+                             MaxLength="{x:Static vm:IssuedItemsViewModel.MaxRemarkLength}"
+                             Text="{Binding Remark, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                      <TextBlock x:Name="IssuedStamp" Classes="mono" FontSize="11"
+                                 Foreground="{StaticResource TextMutedBrush}"
+                                 Text="{Binding IssuedDisplay}" />
+                      <TextBlock x:Name="OutMarker" Classes="mono status-out" FontSize="11"
+                                 Text="NOCH AUSGEGEBEN" IsVisible="{Binding IsOut}" />
+                      <TextBlock x:Name="ReturnedStamp" Classes="mono" FontSize="11"
+                                 Foreground="{StaticResource TextMutedBrush}"
+                                 Text="{Binding ReturnedDisplay}"
+                                 IsVisible="{Binding !IsOut}" />
+                    </StackPanel>
+                    <TextBlock Grid.Row="6" Grid.Column="1" Classes="field-error"
+                               Text="{Binding Error}"
+                               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </Grid>
+                  <StackPanel Grid.Column="2" VerticalAlignment="Top" Spacing="6"
+                              IsVisible="{Binding !IsReadOnly}">
+                    <!-- The one action that matters at the end of an Einsatz, so it is a word,
+                         not an icon. -->
+                    <Button x:Name="ReturnButton" Classes="signal" Content="ZURÜCK"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            IsVisible="{Binding IsOut}"
+                            Command="{Binding ReturnCommand}"
+                            ToolTip.Tip="Rückgabe erfassen" />
+                    <Button x:Name="UndoReturnButton" Classes="icon-btn card-action" HorizontalAlignment="Right"
+                            IsVisible="{Binding !IsOut}"
+                            Command="{Binding UndoReturnCommand}"
+                            ToolTip.Tip="Rückgabe zurücknehmen" AutomationProperties.Name="Rückgabe zurücknehmen">
+                      <PathIcon Data="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
+                    </Button>
+                    <Button Classes="icon-btn card-action" HorizontalAlignment="Right"
+                            Command="{Binding RemoveCommand}"
+                            ToolTip.Tip="Ausgabe entfernen" AutomationProperties.Name="Ausgabe entfernen">
+                      <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</UserControl>

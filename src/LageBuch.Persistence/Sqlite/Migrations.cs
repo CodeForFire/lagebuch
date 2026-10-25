@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 32;
+    public const int CurrentVersion = 33;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -219,6 +219,11 @@ public static class Migrations
             ApplyV32(cn, tx);
 
             // Stryker restore all
+        }
+
+        if (version < 33)
+        {
+            ApplyV33(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -933,6 +938,29 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_pressure_readings", "location", "TEXT");
 
         // Stryker restore all
+    }
+
+    // The Ausgabeliste: every Gerät the ELW handed out, to whom, and when it came back.
+    // returned_at and returned_by stay NULL while the Gerät is out. Ordinal keeps the issue order,
+    // as involved_parties does.
+    private static void ApplyV33(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql33 = """
+            CREATE TABLE IF NOT EXISTS issued_items (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                device TEXT NOT NULL,
+                issued_to TEXT NOT NULL,
+                issued_to_phone TEXT,
+                issued_to_details TEXT,
+                remark TEXT,
+                issued_by TEXT NOT NULL,
+                issued_at TEXT NOT NULL,
+                returned_at TEXT,
+                returned_by TEXT
+            );
+            """;
+        Exec(cn, tx, sql33);
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

@@ -29,6 +29,9 @@ public static class NavModules
     /// <summary>Beteiligte: the Einsatz's own address book of people who are not forces.</summary>
     public const string InvolvedParties = "involved";
 
+    /// <summary>Ausgabe: the Ausgabeliste of Geräte handed out and taken back.</summary>
+    public const string IssuedItems = "issued";
+
     /// <summary>Atemschutz.</summary>
     public const string Scba = "scba";
 
@@ -52,7 +55,7 @@ public static class NavModules
 
     /// <summary>Every built-in module, in the order the rail shipped with.</summary>
     public static IReadOnlyList<string> All { get; } =
-        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links, Contacts };
+        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links, Contacts, IssuedItems };
 
     /// <summary>
     /// Whether this build knows the key. A layout written by a newer build may name a module that
@@ -85,7 +88,8 @@ public static class NavLayout
     /// <summary>
     /// The rail as it shipped before it was configurable — Aufbau, the modules in their original
     /// order, then Abbau — plus the modules added since: Beteiligte beside Kräfte, Kontakte after
-    /// Links.
+    /// Links, Ausgabe after Kontakte. A new module goes last, because Ctrl+1…9 open the rail by
+    /// position: inserting one earlier would move the Atemschutz shortcut crews already know.
     /// </summary>
     /// <remarks>
     /// Stored as "no layout" rather than written into a fresh Stammdaten set on purpose. An empty
@@ -106,6 +110,7 @@ public static class NavLayout
         new NavEntry(NavModules.Files, null, true),
         new NavEntry(NavModules.Links, null, true),
         new NavEntry(NavModules.Contacts, null, true),
+        new NavEntry(NavModules.IssuedItems, null, true),
         new NavEntry(NavModules.Checklist, ChecklistDefaults.AbbauListId, true),
     };
 }

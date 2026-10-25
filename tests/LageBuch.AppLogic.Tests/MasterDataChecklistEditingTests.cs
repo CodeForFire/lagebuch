@@ -63,6 +63,17 @@ public class MasterDataChecklistEditingTests
     private static NavigationSection Nav(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<NavigationSection>().Single();
 
+    [Fact]
+    public void The_navigation_list_names_every_module_in_german_with_ausgabe_last()
+    {
+        var modules = Nav(Vm()).Rows.Where(r => r.ChecklistId is null).ToList();
+
+        Assert.Equal(
+            ["ETB", "Aufgaben", "Funktionen", "Kräfte", "Beteiligte", "Atemschutz", "CO-Messung", "Dateien", "Links", "Kontakte", "Ausgabe"],
+            modules.Select(r => r.Label));
+        Assert.All(modules, r => Assert.True(r.IsVisible));
+    }
+
     /// <summary>
     /// Saves, then reads the set back out of the reloaded sections — Save writes through the
     /// provider and reloads, so this is what actually reached Stammdaten.

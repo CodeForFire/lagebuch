@@ -1221,6 +1221,18 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public void SendSituationReport(Guid reportId, string dispatchCentreName) =>
         _inner.SendSituationReport(reportId, dispatchCentreName);
 
+    public void IssueItem(string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark) =>
+        _inner.IssueItem(device, issuedTo, issuedToPhone, issuedToDetails, remark);
+
+    public void UpdateIssuedItem(Guid itemId, string device, string issuedTo, string? issuedToPhone, string? issuedToDetails, string? remark) =>
+        _inner.UpdateIssuedItem(itemId, device, issuedTo, issuedToPhone, issuedToDetails, remark);
+
+    public void ReturnIssuedItem(Guid itemId) => _inner.ReturnIssuedItem(itemId);
+
+    public void UndoIssuedItemReturn(Guid itemId) => _inner.UndoIssuedItemReturn(itemId);
+
+    public void RemoveIssuedItem(Guid itemId) => _inner.RemoveIssuedItem(itemId);
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         _inner.UpdateTask(taskId, text, assignee, importance, urgency);
 

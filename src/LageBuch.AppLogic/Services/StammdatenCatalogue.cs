@@ -101,6 +101,17 @@ public static class StammdatenCatalogue
     }
 
     /// <summary>
+    /// The Gerät <paramref name="name"/> names, or null when the catalogue has no such row. A null
+    /// is not an error: a Gerät the Stammdaten do not list is handed out with no count to check.
+    /// </summary>
+    public static Device? Find(string? name, IReadOnlyList<Device> catalogue)
+    {
+        ArgumentNullException.ThrowIfNull(catalogue);
+
+        return FindByName(name, catalogue, entry => entry?.Name);
+    }
+
+    /// <summary>
     /// The Objekt <paramref name="name"/> names, or null when the catalogue has no such row (#420).
     /// A null is not an error: a Haus the Stammdaten do not know is added from what was typed.
     /// </summary>

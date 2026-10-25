@@ -692,6 +692,47 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void Issued_item_commands_issue_correct_return_and_remove_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var journalBefore = incident.Journal.Count;
+
+        ApplyOverWire(new IssueItemCommand(new OperatorDto("Client", "ELW 1"), "Mobilteil 1", "Erika Beispiel", "0171 0000001", null, null), incident, clock);
+        var issued = Assert.Single(incident.IssuedItems);
+        Assert.Equal("Client (ELW 1)", issued.IssuedBy);
+        Assert.Equal(clock.Now, issued.IssuedAt);
+
+        ApplyOverWire(new UpdateIssuedItemCommand(issued.Id, "Mobilteil 1", "Erika Beispiel", "0171 0000001", "THW OV Beispielstadt", null), incident, clock);
+        Assert.Equal("THW OV Beispielstadt", Assert.Single(incident.IssuedItems).IssuedToDetails);
+
+        ApplyOverWire(new ReturnIssuedItemCommand(new OperatorDto("Client", "ELW 1"), issued.Id), incident, clock);
+        Assert.Equal("Client (ELW 1)", Assert.Single(incident.IssuedItems).ReturnedBy);
+
+        ApplyOverWire(new UndoIssuedItemReturnCommand(issued.Id), incident, clock);
+        Assert.True(Assert.Single(incident.IssuedItems).IsOut);
+
+        ApplyOverWire(new RemoveIssuedItemCommand(issued.Id), incident, clock);
+        Assert.Empty(incident.IssuedItems);
+
+        // The recipient's name and phone number never reach the ETB.
+        Assert.Equal(journalBefore, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void An_oversized_issued_item_field_from_a_peer_is_refused_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var oversized = new string('1', Domain.Equipment.IssuedItem.MaxPhoneLength + 1);
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(new IssueItemCommand(new OperatorDto("Client", null), "AED", "Max Beispiel", oversized, null, null), incident, clock));
+
+        Assert.Empty(incident.IssuedItems);
+    }
+
+    [Fact]
     public void Situation_report_commands_draft_correct_and_send_on_the_host()
     {
         var clock = new FixedClock();

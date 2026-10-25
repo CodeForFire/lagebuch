@@ -382,10 +382,35 @@ public class MigrationsTests : IDisposable
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
         Migrations.Migrate(cn2);
-        Assert.Equal(32, Migrations.GetVersion(cn2));
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
 
         using var check = cn2.CreateCommand();
         check.CommandText = "SELECT location FROM scba_pressure_readings WHERE id = 'r';";
         Assert.Equal(DBNull.Value, check.ExecuteScalar());
+    }
+
+    [Fact]
+    public void V32_database_upgrades_to_v33_and_gains_the_issued_items_table()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (32);";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText =
+            "SELECT count(*) FROM pragma_table_info('issued_items') " +
+            "WHERE name IN ('id','ordinal','device','issued_to','issued_to_phone','issued_to_details','remark'," +
+            "'issued_by','issued_at','returned_at','returned_by');";
+        Assert.Equal(11L, (long)check.ExecuteScalar()!);
     }
 }

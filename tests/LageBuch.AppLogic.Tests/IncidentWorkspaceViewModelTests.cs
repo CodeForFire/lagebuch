@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -486,6 +487,107 @@ public class IncidentWorkspaceViewModelTests
             new NoopIncidentHostController());
 
         Assert.Equal(["Am Markt, 12345 Musterstadt", "Lindenweg, Süd, 12345 Musterstadt"], vm.SituationReports.LocationOptions);
+    }
+
+    [Fact]
+    public void Closing_with_a_geraet_still_out_says_how_many_have_not_come_back()
+    {
+        var vm = NewWorkspace(out _, out _);
+        foreach (var (device, to) in new[] { ("Mobilteil 1", "Erika Beispiel"), ("AED", "Max Beispiel") })
+        {
+            vm.IssuedItems.NewDevice = device;
+            vm.IssuedItems.NewIssuedTo = to;
+            vm.IssuedItems.AddCommand.Execute(null);
+        }
+
+        vm.CloseIncidentCommand.Execute(null);
+
+        Assert.StartsWith("ACHTUNG: 2 Gerät(e) noch nicht zurückgegeben. ", vm.PendingConfirm!.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Closing_with_a_trupp_under_air_and_a_geraet_out_names_both()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Beispiel", "Muster"), entryPressure: 300);
+        session.StartScbaTrupp(session.Incident.ScbaTrupps[0].Id);
+        session.IssueItem("AED", "Max Beispiel", null, null, null);
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        vm.CloseIncidentCommand.Execute(null);
+
+        Assert.Equal(
+            "ACHTUNG: 1 Atemschutztrupp(s) noch unter PA. ACHTUNG: 1 Gerät(e) noch nicht zurückgegeben. "
+            + "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?",
+            vm.PendingConfirm!.Message);
+    }
+
+    [Fact]
+    public void A_rebuild_announces_the_new_ausgabe()
+    {
+        var vm = NewWorkspace(out _, out _);
+        var before = vm.IssuedItems;
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.NotSame(before, vm.IssuedItems);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.IssuedItems), changed);
+    }
+
+    [Fact]
+    public void Closing_once_every_geraet_is_back_carries_no_warning()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.IssuedItems.NewDevice = "AED";
+        vm.IssuedItems.NewIssuedTo = "Max Beispiel";
+        vm.IssuedItems.AddCommand.Execute(null);
+        vm.IssuedItems.Items[0].ReturnCommand.Execute(null);
+
+        vm.CloseIncidentCommand.Execute(null);
+
+        Assert.Equal(
+            "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?",
+            vm.PendingConfirm!.Message);
+    }
+
+    [Fact]
+    public void The_ausgabe_offers_the_stammdaten_geraete()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md() with { Devices = [new Device("Mobilteil 1", 1), new Device("AED", 1)] },
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        Assert.Equal(["Mobilteil 1", "AED"], vm.IssuedItems.DeviceOptions);
     }
 
     [Fact]

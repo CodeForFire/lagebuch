@@ -416,6 +416,77 @@ public class MasterDataSectionTests
         Assert.Equal(1, changes);
     }
 
+    [Fact]
+    public void Devices_add_starts_a_row_at_one_and_flags_a_change()
+    {
+        var changes = 0;
+        var s = new DevicesSection("Geräte", Array.Empty<Device>(), () => changes++);
+        object? added = null;
+        s.RowAdded += (_, e) => added = e.Row;
+
+        s.AddCommand.Execute(null);
+
+        var row = Assert.Single(s.Rows);
+        Assert.Equal(string.Empty, row.Name);
+        Assert.Equal(1, row.Count);
+        Assert.Equal(1, changes);
+        Assert.Same(row, added); // the view focuses the new row's name from this
+    }
+
+    [Fact]
+    public void Devices_remove_of_a_row_from_elsewhere_changes_nothing()
+    {
+        var changes = 0;
+        var confirmations = 0;
+        var s = new DevicesSection("Geräte", new[] { new Device("AED", 1) }, () => changes++, (_, _) => confirmations++);
+
+        s.RemoveCommand.Execute(new DeviceRow("AED", 1, () => { }));
+
+        Assert.Single(s.Rows);
+        Assert.Equal(0, changes);
+        Assert.Equal(0, confirmations);
+    }
+
+    [Fact]
+    public void Devices_ToValues_trims_drops_blanks_keeps_the_first_spelling_and_clamps_the_count()
+    {
+        // The Ausgabeliste looks a Gerät up by name to check its Anzahl, so case-only duplicates
+        // would make that count a coin toss.
+        var s = new DevicesSection(
+            "Geräte",
+            new[]
+            {
+                new Device("  Weste EL  ", 2),
+                new Device("weste el", 5),
+                new Device("   ", 1),
+                new Device("HRT", 4),
+                new Device("Sonstiges", 0),
+            },
+            () => { });
+        s.Rows[3].Count = -1;
+        s.Rows[4].Count = 5000;
+
+        Assert.Equal(
+            new[] { new Device("Weste EL", 2), new Device("HRT", 0), new Device("Sonstiges", Device.MaxCount) },
+            s.ToValues());
+    }
+
+    [Fact]
+    public void Devices_editing_or_removing_a_row_flags_a_change()
+    {
+        var changes = 0;
+        var s = new DevicesSection(
+            "Geräte", new[] { new Device("AED", 1), new Device("Fernglas", 1), new Device("HRT", 4) }, () => changes++);
+
+        s.Rows[0].Count = 2;
+        s.Rows[0].Name = "AED Lifepak";
+        s.RemoveCommand.Execute(s.Rows[1]);
+
+        Assert.Equal(new[] { "AED Lifepak", "HRT" }, s.Rows.Select(r => r.Name));
+        Assert.Equal(3, changes);
+        Assert.Equal(Device.MaxCount, DeviceRow.MaxCount);
+    }
+
     // #470: the Funktionen editor became a typed section when the uniqueness moved onto the row,
     // the way #398 did for Trupp-Typen. It carries that section's normalization.
     [Fact]

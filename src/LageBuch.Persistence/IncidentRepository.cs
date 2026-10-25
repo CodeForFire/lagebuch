@@ -64,6 +64,7 @@ public sealed class IncidentRepository
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
                     "co_buildings", "co_dwellings", "co_readings", "involved_parties", "situation_reports",
+                    "issued_items",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -110,6 +111,7 @@ public sealed class IncidentRepository
         WriteTasks(inserts, incident);
         WriteInvolvedParties(inserts, incident);
         WriteSituationReports(inserts, incident);
+        WriteIssuedItems(inserts, incident);
 
         tx.Commit();
     }
@@ -451,6 +453,31 @@ public sealed class IncidentRepository
                     p("$dwellingLabel", (object?)party.DwellingLabel ?? DBNull.Value);
                     p("$where", (object?)party.Whereabouts ?? DBNull.Value);
                     p("$whereAt", (object?)party.WhereaboutsAt?.ToString(Iso) ?? DBNull.Value);
+                });
+        }
+    }
+
+    private static void WriteIssuedItems(InsertCommands inserts, Incident incident)
+    {
+        for (var i = 0; i < incident.IssuedItems.Count; i++)
+        {
+            var item = incident.IssuedItems[i];
+            Run(
+                inserts,
+                "INSERT INTO issued_items (id, ordinal, device, issued_to, issued_to_phone, issued_to_details, remark, issued_by, issued_at, returned_at, returned_by) VALUES ($id,$o,$dev,$to,$phone,$details,$remark,$by,$at,$rat,$rby);",
+                p =>
+                {
+                    p("$id", item.Id.ToString());
+                    p("$o", i);
+                    p("$dev", item.Device);
+                    p("$to", item.IssuedTo);
+                    p("$phone", (object?)item.IssuedToPhone ?? DBNull.Value);
+                    p("$details", (object?)item.IssuedToDetails ?? DBNull.Value);
+                    p("$remark", (object?)item.Remark ?? DBNull.Value);
+                    p("$by", item.IssuedBy);
+                    p("$at", item.IssuedAt.ToString(Iso));
+                    p("$rat", (object?)item.ReturnedAt?.ToString(Iso) ?? DBNull.Value);
+                    p("$rby", (object?)item.ReturnedBy ?? DBNull.Value);
                 });
         }
     }
@@ -861,6 +888,21 @@ public sealed class IncidentRepository
                 Str(r, 11),
                 NullableGuid(r, 12)));
 
+        var issuedItems = ReadAll(
+            cn,
+            "SELECT id, device, issued_to, issued_to_phone, issued_to_details, remark, issued_by, issued_at, returned_at, returned_by FROM issued_items ORDER BY ordinal;",
+            r => Domain.Equipment.IssuedItem.Rehydrate(
+                Guid.Parse(r.GetString(0)),
+                r.GetString(1),
+                r.GetString(2),
+                Str(r, 3),
+                Str(r, 4),
+                Str(r, 5),
+                ParseDate(r.GetString(7)),
+                r.GetString(6),
+                NullableDate(r, 8),
+                Str(r, 9)));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -895,7 +937,8 @@ public sealed class IncidentRepository
             meta[11] as string,
             meta[12] as string,
             meta[13] as string,
-            situationReports);
+            situationReports,
+            issuedItems);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

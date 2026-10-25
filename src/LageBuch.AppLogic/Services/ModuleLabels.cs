@@ -17,6 +17,7 @@ public static class ModuleLabels
             [NavModules.Roles] = "FUNKTIONEN",
             [NavModules.Forces] = "KRÄFTE",
             [NavModules.InvolvedParties] = "BETEILIGTE",
+            [NavModules.IssuedItems] = "AUSGABE",
             [NavModules.Scba] = "ATEMSCHUTZ",
             [NavModules.Co] = "CO-MESSUNG",
             [NavModules.Files] = "DATEIEN",

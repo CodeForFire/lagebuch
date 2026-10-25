@@ -2,6 +2,7 @@ using System.Globalization;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
+using LageBuch.Domain.Equipment;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
@@ -112,7 +113,18 @@ public static class SnapshotMapper
                 r.CreatedAt,
                 r.SentAt,
                 r.SentBy,
-                r.EtbEntryId)).ToList());
+                r.EtbEntryId)).ToList(),
+            IssuedItems: incident.IssuedItems.Select(i => new IssuedItemDto(
+                i.Id,
+                i.Device,
+                i.IssuedTo,
+                i.IssuedToPhone,
+                i.IssuedToDetails,
+                i.Remark,
+                i.IssuedAt,
+                i.IssuedBy,
+                i.ReturnedAt,
+                i.ReturnedBy)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -207,7 +219,18 @@ public static class SnapshotMapper
                 r.CreatedAt,
                 r.SentAt,
                 r.SentBy,
-                r.EtbEntryId)));
+                r.EtbEntryId)),
+            (snapshot.IssuedItems ?? []).Select(i => IssuedItem.Rehydrate(
+                i.Id,
+                i.Device,
+                i.IssuedTo,
+                i.IssuedToPhone,
+                i.IssuedToDetails,
+                i.Remark,
+                i.IssuedAt,
+                i.IssuedBy,
+                i.ReturnedAt,
+                i.ReturnedBy)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

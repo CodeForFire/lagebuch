@@ -138,4 +138,21 @@ public class ClosedIncidentReadOnlyTests : IDisposable
         Assert.Throws<IncidentClosedException>(
             () => loaded.AddInvolvedParty(clock, op, "Max Beispiel", null, null));
     }
+
+    [Fact]
+    public void A_closed_incident_keeps_its_issued_items_and_rejects_new_ones()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op);
+        incident.IssueItem(clock, op, "AED", "Max Beispiel", null, null, null);
+        incident.Close(clock, op);
+        IncidentRepository.Save(_path, incident);
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal("AED", Assert.Single(loaded.IssuedItems).Device);
+        Assert.Throws<IncidentClosedException>(
+            () => loaded.IssueItem(clock, op, "Fernglas", "Max Beispiel", null, null, null));
+    }
 }

@@ -57,7 +57,10 @@ public sealed record IncidentSnapshot(
 
     // Defaulted so every existing positional construction keeps compiling; a snapshot
     // without the key reads as "no Lagemeldungen" (#592).
-    IReadOnlyList<SituationReportDto>? SituationReports = null);
+    IReadOnlyList<SituationReportDto>? SituationReports = null,
+
+    // Defaulted the same way; a snapshot without the key reads as "nothing handed out".
+    IReadOnlyList<IssuedItemDto>? IssuedItems = null);
 
 public sealed record TimerDto(
     string Key,
@@ -182,6 +185,19 @@ public sealed record SituationReportDto(
     DateTimeOffset? SentAt,
     string? SentBy,
     Guid? EtbEntryId = null);
+
+/// <summary>One line of the Ausgabeliste on the wire; mirrors <see cref="LageBuch.Domain.Equipment.IssuedItem"/>.</summary>
+public sealed record IssuedItemDto(
+    Guid Id,
+    string Device,
+    string IssuedTo,
+    string? IssuedToPhone,
+    string? IssuedToDetails,
+    string? Remark,
+    DateTimeOffset IssuedAt,
+    string IssuedBy,
+    DateTimeOffset? ReturnedAt,
+    string? ReturnedBy);
 
 /// <summary>One Beteiligte/r on the wire; mirrors <see cref="LageBuch.Domain.Involved.InvolvedParty"/>.</summary>
 public sealed record InvolvedPartyDto(

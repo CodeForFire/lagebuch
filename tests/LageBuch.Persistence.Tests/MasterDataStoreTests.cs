@@ -34,6 +34,15 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_second_save_replaces_the_geraete_instead_of_adding_to_them()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Devices = new[] { new Device("Weste EL", 2) } });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Devices = new[] { new Device("AED", 1) } });
+
+        Assert.Equal(new[] { new Device("AED", 1) }, MasterDataStore.GetOrCreate(_path).Devices);
+    }
+
+    [Fact]
     public void Save_then_GetOrCreate_round_trips_every_category_including_personnel()
     {
         var set = MasterDataSet.Empty with
@@ -41,6 +50,7 @@ public class MasterDataStoreTests : IDisposable
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert" },
             Keywords = new[] { "B3 Person", "THL 1" },
+            Devices = new[] { new Device("Mobilteil 1", 1), new Device("Weste EAL", 3), new Device("Sonstiges", 0) },
             Districts = new[] { "Puch" },
             Streets = new[] { new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"), new Street("Am Sulzbogen") },
             ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
@@ -71,6 +81,7 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplates[1].Items);
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
         Assert.Equal(new[] { "B3 Person", "THL 1" }, reopened.Keywords);
+        Assert.Equal(new[] { new Device("Mobilteil 1", 1), new Device("Weste EAL", 3), new Device("Sonstiges", 0) }, reopened.Devices);
         Assert.Equal(new[] { "Puch" }, reopened.Districts);
         Assert.Equal(
             new[] { new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"), new Street("Am Sulzbogen") },

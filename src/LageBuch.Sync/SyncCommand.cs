@@ -61,6 +61,11 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(UpdateSituationReportCommand), "updateSituationReport")]
 [JsonDerivedType(typeof(RemoveSituationReportCommand), "removeSituationReport")]
 [JsonDerivedType(typeof(SendSituationReportCommand), "sendSituationReport")]
+[JsonDerivedType(typeof(IssueItemCommand), "issueItem")]
+[JsonDerivedType(typeof(UpdateIssuedItemCommand), "updateIssuedItem")]
+[JsonDerivedType(typeof(ReturnIssuedItemCommand), "returnIssuedItem")]
+[JsonDerivedType(typeof(UndoIssuedItemReturnCommand), "undoIssuedItemReturn")]
+[JsonDerivedType(typeof(RemoveIssuedItemCommand), "removeIssuedItem")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -212,6 +217,32 @@ public sealed record UpdateSituationReportCommand(
 public sealed record RemoveSituationReportCommand(Guid ReportId) : SyncCommand;
 
 public sealed record SendSituationReportCommand(OperatorDto Operator, Guid ReportId, string DispatchCentreName) : SyncCommand;
+
+// The Ausgabeliste. The issue and the return carry an operator, for the IssuedBy and ReturnedBy
+// stamps; a correction, an undone return or a removal records no author, like the Beteiligte. No
+// time on the wire: the host stamps both with its own clock. The domain caps every field, so an
+// oversized value from a peer is refused on the host.
+public sealed record IssueItemCommand(
+    OperatorDto Operator,
+    string Device,
+    string IssuedTo,
+    string? IssuedToPhone,
+    string? IssuedToDetails,
+    string? Remark) : SyncCommand;
+
+public sealed record UpdateIssuedItemCommand(
+    Guid ItemId,
+    string Device,
+    string IssuedTo,
+    string? IssuedToPhone,
+    string? IssuedToDetails,
+    string? Remark) : SyncCommand;
+
+public sealed record ReturnIssuedItemCommand(OperatorDto Operator, Guid ItemId) : SyncCommand;
+
+public sealed record UndoIssuedItemReturnCommand(Guid ItemId) : SyncCommand;
+
+public sealed record RemoveIssuedItemCommand(Guid ItemId) : SyncCommand;
 
 // No operator on the wire: a task correction is a silent edit (no ETB entry), like RenameFileCommand.
 public sealed record UpdateTaskCommand(
