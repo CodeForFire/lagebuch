@@ -339,8 +339,11 @@ public sealed class IncidentHost : IAsyncDisposable
             // so it doesn't need the UI-thread dispatch the mutation above uses. The delete throws
             // when the bytes cannot be wiped (IIncidentFileStore.DeleteBytesAsync). The metadata
             // removal has landed and been broadcast by then, so the failure is answered with an
-            // explicit 500 rather than swallowed or reported as a rejected command: the client's
-            // banner names the code, and the next snapshot already shows the file gone.
+            // explicit 500 rather than swallowed or reported as a rejected command. Be clear about what
+            // that costs: the removal DID land and the next snapshot shows the file gone, yet the
+            // client's banner reads as if the host refused the change, and the bytes may remain
+            // unwiped in the incident file. The host side is not notified either; surfacing it
+            // there is a follow-up.
             if (command is RemoveFileCommand && removedFile is not null)
             {
                 try

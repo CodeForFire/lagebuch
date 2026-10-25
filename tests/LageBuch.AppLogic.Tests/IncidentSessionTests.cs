@@ -398,17 +398,15 @@ public class IncidentSessionTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        var exporter = new TestPdfExporter();
-        var withoutAttachment = await session.ExportPdfAsync(exporter);
+        var pdf = new byte[] { 0x25, 0x50, 0x44, 0x46, 1, 2, 3 };
+        await session.AddFileAsync("bericht.pdf", "application/pdf", pdf);
+        var fileId = Assert.Single(session.Incident.Files).Id;
+        var exporter = new RecordingPdfExporter();
 
-        // Any valid PDF stands in for "an attached PDF" — the export itself already produces one.
-        await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
+        await session.ExportPdfAsync(exporter);
 
-        var withAttachment = await session.ExportPdfAsync(exporter);
-
-        Assert.True(
-            withAttachment.Length > withoutAttachment.Length,
-            $"Expected merging the attached PDF's pages to grow the export (without={withoutAttachment.Length}, with={withAttachment.Length}).");
+        Assert.Equal(fileId, exporter.PdfAttachmentId);
+        Assert.Equal(pdf, exporter.PdfAttachmentBytes);
     }
 
     [Fact]
@@ -482,15 +480,15 @@ public class IncidentSessionTests
                 path,
                 Array.Empty<(string, bool)>(),
                 Array.Empty<(string, bool)>());
-            var exporter = new TestPdfExporter();
-            var withoutAttachment = await session.ExportPdfAsync(exporter);
-            await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
+            var pdf = new byte[] { 0x25, 0x50, 0x44, 0x46, 4, 5, 6 };
+            await session.AddFileAsync("bericht.pdf", "application/pdf", pdf);
+            var fileId = Assert.Single(session.Incident.Files).Id;
+            var exporter = new RecordingPdfExporter();
 
-            var withAttachment = await session.ExportPdfAsync(exporter);
+            await session.ExportPdfAsync(exporter);
 
-            Assert.True(
-                withAttachment.Length > withoutAttachment.Length,
-                $"Expected merging the attached PDF's pages to grow the export (without={withoutAttachment.Length}, with={withAttachment.Length}).");
+            Assert.Equal(fileId, exporter.PdfAttachmentId);
+            Assert.Equal(pdf, exporter.PdfAttachmentBytes);
             await store.FlushAsync();
         }
         finally
@@ -498,6 +496,30 @@ public class IncidentSessionTests
             SqliteConnection.ClearAllPools();
             Directory.Delete(directory, recursive: true);
         }
+    }
+}
+
+// Records what the export hands the renderer for a PDF attachment. The bytes are read inside
+// Generate because the export deletes its temp copy as soon as Generate returns.
+internal sealed class RecordingPdfExporter : IIncidentPdfExporter
+{
+    public bool CanExport => true;
+
+    public Guid? PdfAttachmentId { get; private set; }
+
+    public byte[]? PdfAttachmentBytes { get; private set; }
+
+    public byte[] Generate(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        ArgumentNullException.ThrowIfNull(pdfAttachmentPaths);
+        foreach (var (id, path) in pdfAttachmentPaths)
+        {
+            PdfAttachmentId = id;
+            PdfAttachmentBytes = File.ReadAllBytes(path);
+        }
+
+        return new byte[] { 0x25 };
     }
 }
 

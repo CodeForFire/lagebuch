@@ -319,10 +319,11 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
     [SuppressMessage(
         "Design",
         "CA1031",
-        Justification = "Domain guards and disk-delete failures are heterogeneous; both surface as one error line, matching AddFileAsync.")]
+        Justification = "Domain guards and byte-delete failures are heterogeneous; both surface as one bound error line, matching AddFileAsync.")]
     private async Task RemoveFileAsync(Guid fileId)
     {
         ErrorMessage = null;
+        var existed = _session.Incident.Files.Any(f => f.Id == fileId);
         try
         {
             await _session.RemoveFileAsync(fileId);
@@ -330,7 +331,11 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Anhang nicht entfernt: {ex.Message}"; // German frame, cause kept (#602)
+            // German frame, cause kept (#602). A file that was there and is gone now was removed
+            // from the Einsatz; only wiping its bytes from the incident file failed.
+            ErrorMessage = existed && _session.Incident.Files.All(f => f.Id != fileId)
+                ? $"Anhang entfernt, Daten konnten nicht aus der Einsatzdatei gelöscht werden: {ex.Message}"
+                : $"Anhang nicht entfernt: {ex.Message}";
         }
     }
 

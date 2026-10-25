@@ -268,9 +268,17 @@ public sealed class LocalIncidentSession : IIncidentSession
 
         // The bytes live in the incident file, so the file and the incident_files row must exist
         // before the write. A brand-new incident is still in the writer queue until this returns.
-        await _store.FlushAsync(cancellationToken);
-        await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes, cancellationToken);
-        Changed?.Invoke();
+        // Changed is raised either way: the domain and the saved metadata already hold the file,
+        // so a failed byte write must still refresh the views before it reaches the caller.
+        try
+        {
+            await _store.FlushAsync(cancellationToken);
+            await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes, cancellationToken);
+        }
+        finally
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>
