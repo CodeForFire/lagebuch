@@ -562,7 +562,7 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Vehicles editor (#76): Wache + Funkrufname + Fahrzeugtelefon + Sitzplätze. -->
+              <!-- Vehicles editor (#76): Wache + Funkrufname + Fahrzeugtelefon + E-Mail + Sitzplätze. -->
               <DataTemplate x:DataType="vm:VehiclesSection">
                 <DockPanel Classes="add-below">
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
@@ -573,14 +573,15 @@
                        "Auto" would size to this Grid's own (empty) content instead of the row
                        template's buttons, leaving the header and row Grids to disagree on width
                        and dragging SITZPLÄTZE/ZF/EIGEN out of alignment with their columns. -->
-                  <Grid x:Name="VehiclesHeader" DockPanel.Dock="Top" ColumnDefinitions="*,*,*,150,70,70,32" Margin="0,0,0,6">
+                  <Grid x:Name="VehiclesHeader" DockPanel.Dock="Top" ColumnDefinitions="*,*,*,*,150,70,70,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="TELEFON" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="3" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="4" Text="ZF" Classes="overline" FontSize="10"
+                    <TextBlock Grid.Column="3" Text="E-MAIL" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="4" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="5" Text="ZF" Classes="overline" FontSize="10"
                                ToolTip.Tip="Zugführerfahrzeug" />
-                    <TextBlock Grid.Column="5" Text="EIGEN" Classes="overline" FontSize="10"
+                    <TextBlock Grid.Column="6" Text="EIGEN" Classes="overline" FontSize="10"
                                ToolTip.Tip="Eigenes Fahrzeug" />
                   </Grid>
                   <ScrollViewer>
@@ -598,7 +599,7 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
                           <Panel>
-                            <Grid Classes="vehicle-wide" ColumnDefinitions="*,*,*,150,70,70,32" Margin="0,0,0,6">
+                            <Grid Classes="vehicle-wide" ColumnDefinitions="*,*,*,*,150,70,70,32" Margin="0,0,0,6">
                               <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                    aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
                               <Grid Grid.Column="0" Margin="0,0,6,0">
@@ -626,20 +627,24 @@
                               <TextBox Grid.Column="2" Margin="0,0,6,0" AutomationProperties.Name="Telefon"
                                        PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                                        Text="{Binding Phone}" />
-                              <NumericUpDown Grid.Column="3" Width="90" Minimum="0" Maximum="99" Increment="1"
+                              <!-- Its mailbox: an address lists the vehicle in Kontakte as well. -->
+                              <TextBox Grid.Column="3" Margin="0,0,6,0" AutomationProperties.Name="E-Mail"
+                                       PlaceholderText="{x:Static md:AnonymizedExampleData.VehicleEmailPlaceholder}"
+                                       Text="{Binding Email}" />
+                              <NumericUpDown Grid.Column="4" Width="90" Minimum="0" Maximum="99" Increment="1"
                                              FormatString="0" Value="{Binding Seats}" VerticalAlignment="Center" />
                               <!-- Marks a command vehicle (ELW/KdoW) that carries the Zugführer: unlike
                                    Officer/Mannschaft this is not seat-derived, so it needs its own flag. -->
-                              <CheckBox Grid.Column="4" IsChecked="{Binding HasZugfuehrer}"
+                              <CheckBox Grid.Column="5" IsChecked="{Binding HasZugfuehrer}"
                                         VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Zugführerfahrzeug" />
                               <!-- Own vehicle or a neighbouring brigade's (#458). -->
-                              <CheckBox Grid.Column="5" IsChecked="{Binding IsOwn}"
+                              <CheckBox Grid.Column="6" IsChecked="{Binding IsOwn}"
                                         VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Eigenes Fahrzeug"
                                         AutomationProperties.Name="Eigenes Fahrzeug" />
                               <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                    DataContext, whose static type is object under compiled bindings, so a
                                    compiled $parent cast path won't resolve. -->
-                              <Button Grid.Column="6" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                              <Button Grid.Column="7" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                       AutomationProperties.Name="Entfernen"
                                       Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                       CommandParameter="{Binding}">
@@ -678,9 +683,13 @@
                                               Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                                   </Grid>
                                 </HeaderedContentControl>
-                                <HeaderedContentControl Grid.Row="1" Grid.ColumnSpan="2" Classes="field" Header="TELEFON">
+                                <HeaderedContentControl Grid.Row="1" Grid.Column="0" Classes="field" Header="TELEFON">
                                   <TextBox Text="{Binding Phone}" AutomationProperties.Name="Telefon"
                                            PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="1" Grid.Column="1" Classes="field" Header="E-MAIL">
+                                  <TextBox Text="{Binding Email}" AutomationProperties.Name="E-Mail"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.VehicleEmailPlaceholder}" />
                                 </HeaderedContentControl>
                                 <HeaderedContentControl Grid.Row="2" Grid.Column="0" Classes="field" Header="SITZPLÄTZE">
                                   <NumericUpDown Minimum="0" Maximum="99" Increment="1" FormatString="0"

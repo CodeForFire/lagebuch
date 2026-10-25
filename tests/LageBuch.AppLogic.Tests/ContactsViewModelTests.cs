@@ -417,6 +417,69 @@ public class ContactsViewModelTests
         Assert.Null(dialogs.DialedNumber);
     }
 
+    // A vehicle's mailbox -- the ELW's, a Wache's -- is somebody to reach as well, phone or not.
+    [Fact]
+    public void A_vehicle_with_only_an_email_address_is_listed()
+    {
+        var vm = new ContactsViewModel(
+            Array.Empty<Person>(),
+            new NoopContactDialogs(),
+            new[]
+            {
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 12/1", 2, Email: "elw1@ff-musterstadt.example"),
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 40/1", 9, Email: "   "),
+            });
+
+        var vehicle = Assert.Single(vm.VisibleContacts);
+        Assert.Equal("Florian Musterstadt 12/1", vehicle.Entry.Name);
+        Assert.True(vehicle.Entry.HasEmail);
+        Assert.False(vehicle.Entry.HasPhone);
+    }
+
+    [Fact]
+    public void A_vehicle_is_found_by_its_email_address()
+    {
+        var vm = new ContactsViewModel(
+            new[] { new Person("Mustermann", "Max", "KBR", "Land 1", "01 71 / 1 23 45 67") },
+            new NoopContactDialogs(),
+            new[] { new Vehicle("FF Musterstadt", "Florian Musterstadt 12/1", 2, Email: "elw1@ff-musterstadt.example") });
+
+        vm.FilterText = "elw1@";
+
+        Assert.Equal("Florian Musterstadt 12/1", Assert.Single(vm.VisibleContacts).Entry.Name);
+    }
+
+    [Fact]
+    public async Task Mailing_a_vehicle_hands_its_address_to_the_platform()
+    {
+        var dialogs = new NoopContactDialogs();
+        var vm = new ContactsViewModel(
+            Array.Empty<Person>(),
+            dialogs,
+            new[] { new Vehicle("FF Musterstadt", "Florian Musterstadt 12/1", 2, Email: "elw1@ff-musterstadt.example") });
+
+        await vm.MailCommand.ExecuteAsync(vm.Contacts[0]);
+
+        Assert.Null(vm.ErrorMessage);
+        Assert.Equal("elw1@ff-musterstadt.example", dialogs.MailedAddress);
+    }
+
+    // Imported like the roster, so a header-injecting address is stopped before the mail client.
+    [Fact]
+    public async Task A_vehicle_address_carrying_extra_headers_never_reaches_the_mail_client()
+    {
+        var dialogs = new NoopContactDialogs();
+        var vm = new ContactsViewModel(
+            Array.Empty<Person>(),
+            dialogs,
+            new[] { new Vehicle("FF Böse", "Florian Böse 1", 4, Email: "a@b.de?bcc=opfer@example.org") });
+
+        await vm.MailCommand.ExecuteAsync(vm.Contacts[0]);
+
+        Assert.NotNull(vm.ErrorMessage);
+        Assert.Null(dialogs.MailedAddress);
+    }
+
     // A blank field arrives from the importer as "" rather than null, so the view's per-field
     // visibility cannot be a null check.
     [Fact]

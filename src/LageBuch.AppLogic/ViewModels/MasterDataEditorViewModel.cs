@@ -277,18 +277,39 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         RefreshPersonnelConflicts();
     }
 
-    /// <summary>Recomputes the Funkrufnamen conflict list from the current rows.</summary>
+    /// <summary>
+    /// Recomputes what keeps the vehicles from being saved: duplicate Funkrufnamen, and vehicles
+    /// whose address Lagebuch could not open.
+    /// </summary>
+    /// <remarks>
+    /// Addresses follow <see cref="RefreshPersonnelConflicts"/>: checked on what SPEICHERN writes,
+    /// and named by the Funkrufname rather than the address.
+    /// </remarks>
     private void RefreshVehicleConflicts()
     {
-        var duplicates = _vehicles.ToValues()
+        var problems = new List<string>();
+        var vehicles = _vehicles.ToValues();
+        var duplicates = vehicles
             .Where(v => !string.IsNullOrWhiteSpace(v.CallSign))
             .GroupBy(v => v.CallSign.Trim(), StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)
             .ToArray();
-        VehicleConflicts = duplicates.Length == 0
-            ? null
-            : $"Doppelte Funkrufnamen: {string.Join(", ", duplicates)}";
+        if (duplicates.Length > 0)
+        {
+            problems.Add($"Doppelte Funkrufnamen: {string.Join(", ", duplicates)}");
+        }
+
+        var invalid = vehicles
+            .Where(v => v.HasEmail && !MailAddressValidator.TryGetMailtoUri(v.Email, out _))
+            .Select(v => v.CallSign)
+            .ToArray();
+        if (invalid.Length > 0)
+        {
+            problems.Add($"Ungültige E-Mail-Adresse: {string.Join(", ", invalid)}");
+        }
+
+        VehicleConflicts = problems.Count == 0 ? null : string.Join("\n", problems);
     }
 
     /// <summary>

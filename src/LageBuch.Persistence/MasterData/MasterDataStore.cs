@@ -161,7 +161,7 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_vehicles (wache, call_sign, seats, has_zugfuehrer, is_own, phone) VALUES ($w,$c,$s,$z,$o,$p);",
+                "INSERT INTO md_vehicles (wache, call_sign, seats, has_zugfuehrer, is_own, phone, email) VALUES ($w,$c,$s,$z,$o,$p,$e);",
                 p =>
                 {
                     p("$w", v.Wache);
@@ -170,6 +170,7 @@ public sealed class MasterDataStore
                     p("$z", v.HasZugfuehrer ? 1 : 0);
                     p("$o", v.IsOwn ? 1 : 0);
                     p("$p", (object?)v.Phone ?? DBNull.Value);
+                    p("$e", (object?)v.Email ?? DBNull.Value);
                 });
         }
 
@@ -312,7 +313,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL, place TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
-            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT);
+            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -427,6 +428,9 @@ public sealed class MasterDataStore
         // Widen an md_vehicles that predates the Fahrzeugtelefon. Every store a released build wrote
         // lacks it; NULL is "no number", which is what every vehicle there had.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "phone", "TEXT");
+
+        // The same for the vehicle's E-Mail, which came after it: NULL is "no address".
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "email", "TEXT");
 
         // Widen a pre-existing md_trupp_types that predates #398, when a Trupp-Typ was a bare name
         // and the crew size and Einsatzzeit were decided by comparing that name against a literal.
@@ -874,12 +878,12 @@ public sealed class MasterDataStore
     private static List<Vehicle> ReadVehicles(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT wache, call_sign, seats, has_zugfuehrer, is_own, phone FROM md_vehicles;";
+        cmd.CommandText = "SELECT wache, call_sign, seats, has_zugfuehrer, is_own, phone, email FROM md_vehicles;";
         using var r = cmd.ExecuteReader();
         var list = new List<Vehicle>();
         while (r.Read())
         {
-            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0, r.GetInt32(4) != 0, Str(r, 5)));
+            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0, r.GetInt32(4) != 0, Str(r, 5), Str(r, 6)));
         }
 
         return list;

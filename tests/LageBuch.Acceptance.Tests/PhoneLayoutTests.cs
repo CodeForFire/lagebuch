@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -362,9 +363,13 @@ public class PhoneLayoutTests
         Dispatcher.UIThread.RunJobs();
 
         var descendants = view.GetVisualDescendants().ToList();
-        Assert.True(descendants.OfType<Border>().Single(b => b.Classes.Contains("vehicle-narrow")).IsEffectivelyVisible);
+        var card = descendants.OfType<Border>().Single(b => b.Classes.Contains("vehicle-narrow"));
+        Assert.True(card.IsEffectivelyVisible);
         Assert.False(descendants.OfType<Grid>().Single(g => g.Classes.Contains("vehicle-wide")).IsEffectivelyVisible);
         Assert.False(Named<Grid>(view, "VehiclesHeader").IsEffectivelyVisible);
+        Assert.Contains(
+            card.GetVisualDescendants().OfType<TextBox>(),
+            t => t.IsEffectivelyVisible && AutomationProperties.GetName(t) == "E-Mail");
         AssertNothingOverflows(window, view);
     }
 

@@ -8,7 +8,7 @@ using LageBuch.Persistence.MasterData;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// Searchable view of the Personal Stammdaten, plus every Fahrzeug that carries a phone, shown as a
+/// Searchable view of the Personal Stammdaten, plus every Fahrzeug that carries a phone or an E-Mail, shown as a
 /// read-only tab in the incident workspace.
 /// It answers the question an Einsatzleitung actually asks over the radio — "wer ist zuständig für
 /// ABC?" — and then lets that person be reached. Like <see cref="LinksViewModel"/> it holds no
@@ -23,14 +23,14 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
     private readonly (ContactEntry Entry, string Haystack)[] _entries;
     private readonly IFileDialogService _dialogs;
 
-    // Of the vehicles, only those with a number are listed, after the people, in Stammdaten order:
-    // a vehicle without one is nobody to reach.
+    // Of the vehicles, only those with a number or an address are listed, after the people, in
+    // Stammdaten order: a vehicle with neither is nobody to reach.
     public ContactsViewModel(IReadOnlyList<Person> people, IFileDialogService dialogs, IReadOnlyList<Vehicle>? vehicles = null)
     {
         ArgumentNullException.ThrowIfNull(people);
         _dialogs = dialogs;
         Contacts = people.Select(ContactEntry.FromPerson)
-            .Concat((vehicles ?? Array.Empty<Vehicle>()).Where(v => v.HasPhone).Select(ContactEntry.FromVehicle))
+            .Concat((vehicles ?? Array.Empty<Vehicle>()).Where(v => v.HasPhone || v.HasEmail).Select(ContactEntry.FromVehicle))
             .ToArray();
         _entries = Contacts.Select(c => (c, HaystackFor(c))).ToArray();
         VisibleContacts = new ObservableCollection<ContactRow>(Contacts.Select(c => RowFor(c, Array.Empty<string>())));

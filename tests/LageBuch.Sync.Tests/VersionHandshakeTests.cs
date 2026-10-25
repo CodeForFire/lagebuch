@@ -193,7 +193,16 @@ public class VersionHandshakeTests
     {
         // 20 lets a client send the five Ausgabeliste commands. A host at 19 has none of them in its
         // command allowlist and would reject the Ausgabe, so a 19 and a 20 must not connect.
-        Assert.Equal(20, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 20, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 20, int.MaxValue);
+    }
+
+    [Fact]
+    public void A_vehicle_email_address_raises_the_protocol_to_twenty_one_but_not_the_floor()
+    {
+        // 21 adds email to the Stammdaten payload's vehicles. A peer at 20 skips the key and offers
+        // no mail to the vehicle, so it stays joinable.
+        Assert.Equal(21, SyncProtocol.ProtocolVersion);
         Assert.Equal(20, SyncProtocol.MinimumProtocolVersion);
     }
 }

@@ -4,7 +4,7 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// One editable Fahrzeug entry: Wache plus Funkrufname, Sitzplätze (#76), ZF-Flag and whether
-/// the vehicle is the brigade's own (#458), plus an optional Fahrzeugtelefon. Wache and
+/// the vehicle is the brigade's own (#458), plus an optional Fahrzeugtelefon and E-Mail. Wache and
 /// Funkrufname carry suggestion lists from the master data for the view's AutoCompleteBox --
 /// free text stays valid, so they are suggestions, not a closed set.
 /// </summary>
@@ -19,6 +19,7 @@ public sealed partial class VehicleRow : ObservableObject
         bool hasZugfuehrer,
         bool isOwn,
         string? phone,
+        string? email,
         IReadOnlyList<string> wacheOptions,
         IReadOnlyList<string> callSignOptions,
         Action onChanged)
@@ -30,6 +31,7 @@ public sealed partial class VehicleRow : ObservableObject
         _hasZugfuehrer = hasZugfuehrer;
         _isOwn = isOwn;
         _phone = phone;
+        _email = email;
         WacheOptions = wacheOptions;
         CallSignOptions = callSignOptions;
     }
@@ -52,6 +54,8 @@ public sealed partial class VehicleRow : ObservableObject
     private bool _isOwn;
     [ObservableProperty]
     private string? _phone;
+    [ObservableProperty]
+    private string? _email;
 
     partial void OnWacheChanged(string value) => _onChanged();
 
@@ -64,4 +68,6 @@ public sealed partial class VehicleRow : ObservableObject
     partial void OnIsOwnChanged(bool value) => _onChanged();
 
     partial void OnPhoneChanged(string? value) => _onChanged();
+
+    partial void OnEmailChanged(string? value) => _onChanged();
 }

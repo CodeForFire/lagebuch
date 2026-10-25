@@ -147,9 +147,10 @@ public class MasterDataEditorRenderTests
     }
 
     // The Fahrzeuge half of the same promise: on an ELW screen a vehicle is one row under the
-    // column header, Fahrzeugtelefon included, and the stacked phone card stays out of sight.
+    // column header, Fahrzeugtelefon and E-Mail included, and the stacked phone card stays out of
+    // sight.
     [AvaloniaFact]
-    public void A_wide_editor_keeps_the_wide_vehicle_rows_with_the_phone_column()
+    public void A_wide_editor_keeps_the_wide_vehicle_rows_with_the_phone_and_email_columns()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         vm.SelectedSection = vm.Sections.Single(s => s.Title == "Fahrzeuge");
@@ -167,6 +168,9 @@ public class MasterDataEditorRenderTests
         Assert.Contains(
             wide[0].GetVisualDescendants().OfType<TextBox>(),
             t => t.IsEffectivelyVisible && AutomationProperties.GetName(t) == "Telefon");
+        Assert.Contains(
+            wide[0].GetVisualDescendants().OfType<TextBox>(),
+            t => t.IsEffectivelyVisible && AutomationProperties.GetName(t) == "E-Mail");
     }
 
     // The ETB's checkbox being disabled is a promise the UI makes, not just a view-model flag:

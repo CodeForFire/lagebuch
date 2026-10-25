@@ -117,8 +117,13 @@ public static class SyncProtocol
     /// <c>issuedItems</c>, and the Stammdaten payload's <c>devices</c> with their counts. A host
     /// at 19 would reject those commands, so the floor rises to 20.
     /// </para>
+    /// <para>
+    /// 21: the Stammdaten payload carries <c>email</c> on vehicles. A peer at 20 skips the key and
+    /// offers no mail to the vehicle in its Kontakte, and a payload without it reads as no address,
+    /// so the floor stays at 20.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 20;
+    public const int ProtocolVersion = 21;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

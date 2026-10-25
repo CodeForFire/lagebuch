@@ -232,6 +232,21 @@ public class StammdatenRowRemovalTests
         Assert.NotNull(announced);
     }
 
+    // The Kinds above fill a vehicle by its phone; an address alone is just as much to lose.
+    [Fact]
+    public void Removing_a_vehicle_row_holding_only_an_email_address_asks_first()
+    {
+        var asked = 0;
+        var s = new VehiclesSection("Fahrzeuge", Array.Empty<Vehicle>(), Array.Empty<string>(), Array.Empty<string>(), () => { }, (_, _) => asked++);
+        s.AddCommand.Execute(null);
+        s.Rows[0].Email = "elw1@ff-musterstadt.example";
+
+        s.RemoveCommand.Execute(s.Rows[0]);
+
+        Assert.Equal(1, asked);
+        Assert.Single(s.Rows);
+    }
+
     [Fact]
     public void The_message_names_the_row_and_its_category()
     {

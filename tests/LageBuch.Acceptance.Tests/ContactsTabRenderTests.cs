@@ -152,6 +152,31 @@ public class ContactsTabRenderTests
         Capture(window, "kontakte-fahrzeug.png");
     }
 
+    // A vehicle's mailbox is enough to list it: the card shows no number, but the mail button.
+    [AvaloniaFact]
+    public void A_vehicle_with_only_an_email_address_is_listed_with_the_mail_button()
+    {
+        var md = MasterData() with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 11/1", 4, true, Phone: "01 71 / 2 34 56 78", Email: "kdow@ff-musterstadt.example"),
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 12/1", 2, Email: AnonymizedExampleData.VehicleEmailAddress),
+                new Vehicle("FF Musterstadt", "Florian Musterstadt 40/1", 9),
+            },
+        };
+        var (window, vm) = ShowWorkspace(md);
+        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
+
+        Assert.Equal(10, vm.Contacts.VisibleContacts.Count);
+        Assert.Equal("Florian Musterstadt 12/1", vm.Contacts.VisibleContacts[^1].Entry.Name);
+        var mailButtons = ContactsView(window).GetVisualDescendants().OfType<Button>()
+            .Where(b => b.IsEffectivelyVisible
+                && AutomationProperties.GetName(b) == $"E-Mail an {AnonymizedExampleData.VehicleEmailAddress} verfassen");
+        Assert.Single(mailButtons);
+        Capture(window, "kontakte-fahrzeug-email.png");
+    }
+
     // #700: the roster writes "01 71 / 1 23 45 67"; the card reads it the DIN 5008 way, and a
     // number with no global tel: form is plain text rather than a button that can only fail.
     [AvaloniaFact]
