@@ -112,6 +112,26 @@ public class IncidentSessionTests
     }
 
     [Fact]
+    public async Task SaveFileStreamAsync_stores_the_streamed_bytes_under_the_storage_name()
+    {
+        var store = new FakeStore();
+        var session = TestSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1 });
+        var file = Assert.Single(session.Incident.Files);
+        using var source = new MemoryStream(new byte[] { 7, 8, 9 });
+
+        await session.SaveFileStreamAsync(LageBuch.Domain.Files.IncidentFile.StorageFileName(file.Id, file.FileName), source);
+
+        Assert.Equal(new byte[] { 7, 8, 9 }, await session.GetFileBytesAsync(file.Id));
+    }
+
+    [Fact]
     public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
     {
         var store = new FakeStore();

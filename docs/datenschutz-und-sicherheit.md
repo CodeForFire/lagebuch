@@ -105,7 +105,8 @@ legten Anhänge in einem Ordner neben der Datei ab, der denselben Namen trug,
 ergänzt um die Endung `.files`. Beim ersten Öffnen übernimmt Lagebuch die dort
 liegenden Anhänge in die Einsatzdatei und entfernt den Ordner. Was in dem Ordner
 liegt, aber zu keinem Anhang gehört, bleibt dort; ebenso Verknüpfungen,
-Dateien über der Größengrenze und unlesbare Dateien. Solche Reste sind dann
+Dateien über der Größengrenze, unlesbare Dateien und Dateien, deren
+gespeicherte Größe nicht übereinstimmt. Solche Reste sind dann
 selbst zu löschen.
 
 ### Die Programmdaten auf dem Gerät
