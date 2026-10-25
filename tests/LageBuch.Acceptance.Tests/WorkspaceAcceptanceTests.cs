@@ -983,4 +983,46 @@ public class WorkspaceAcceptanceTests
         // TextSecondary is ever retuned: what must not come back is see-through audit text.
         Assert.Equal(255, actual.A);
     }
+
+    // The Lagemeldung tab had the defect #438 fixed in the Verlauf: its hint texts were painted
+    // with TextMuted (#65728580, ~40% alpha, ~1.9:1 over the dark panel). They tell the
+    // Lagebuchführer what NEUE LAGEMELDUNG does and that no report exists yet.
+    [AvaloniaFact]
+    public void Lagemeldung_hint_texts_are_not_painted_with_the_muted_disabled_token()
+    {
+        var vm = BuildWorkspace(out _);
+        var view = new SituationReportsView { DataContext = vm.EtbTabs.SituationReports };
+        var window = new Window { Content = view, Width = 1400, Height = 800 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        AssertPaintedWithTextSecondary(view.GetControl<TextBlock>("NoSelectionText"));
+        AssertPaintedWithTextSecondary(view.GetControl<TextBlock>("EmptyText"));
+    }
+
+    // The Buchstabier-Tafel's words are what gets read out over the radio, not decoration; at
+    // TextMuted they were the hardest thing on the tab to read.
+    [AvaloniaFact]
+    public void Spelling_table_words_are_not_painted_with_the_muted_disabled_token()
+    {
+        var view = new SpellingHelperView { DataContext = new SpellingHelperViewModel() };
+        var window = new Window { Content = view, Width = 400, Height = 800 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var table = view.GetControl<ItemsControl>("AlphabetTable");
+        var word = table.GetVisualDescendants().OfType<TextBlock>()
+            .First(t => string.Equals(t.Text, "Berta", StringComparison.Ordinal));
+
+        AssertPaintedWithTextSecondary(word);
+    }
+
+    private static void AssertPaintedWithTextSecondary(TextBlock text)
+    {
+        var expected = (Color)Application.Current!.FindResource("TextSecondaryColor")!;
+        var actual = Assert.IsAssignableFrom<ISolidColorBrush>(text.Foreground).Color;
+
+        Assert.Equal(expected, actual);
+        Assert.Equal(255, actual.A);
+    }
 }
