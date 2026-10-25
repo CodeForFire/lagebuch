@@ -34,6 +34,15 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_second_save_replaces_the_geraete_instead_of_adding_to_them()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Devices = new[] { new Device("Weste EL", 2) } });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Devices = new[] { new Device("AED", 1) } });
+
+        Assert.Equal(new[] { new Device("AED", 1) }, MasterDataStore.GetOrCreate(_path).Devices);
+    }
+
+    [Fact]
     public void Save_then_GetOrCreate_round_trips_every_category_including_personnel()
     {
         var set = MasterDataSet.Empty with

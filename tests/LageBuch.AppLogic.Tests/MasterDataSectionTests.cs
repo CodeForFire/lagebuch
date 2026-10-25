@@ -421,6 +421,8 @@ public class MasterDataSectionTests
     {
         var changes = 0;
         var s = new DevicesSection("Geräte", Array.Empty<Device>(), () => changes++);
+        object? added = null;
+        s.RowAdded += (_, e) => added = e.Row;
 
         s.AddCommand.Execute(null);
 
@@ -428,6 +430,21 @@ public class MasterDataSectionTests
         Assert.Equal(string.Empty, row.Name);
         Assert.Equal(1, row.Count);
         Assert.Equal(1, changes);
+        Assert.Same(row, added); // the view focuses the new row's name from this
+    }
+
+    [Fact]
+    public void Devices_remove_of_a_row_from_elsewhere_changes_nothing()
+    {
+        var changes = 0;
+        var confirmations = 0;
+        var s = new DevicesSection("Geräte", new[] { new Device("AED", 1) }, () => changes++, (_, _) => confirmations++);
+
+        s.RemoveCommand.Execute(new DeviceRow("AED", 1, () => { }));
+
+        Assert.Single(s.Rows);
+        Assert.Equal(0, changes);
+        Assert.Equal(0, confirmations);
     }
 
     [Fact]

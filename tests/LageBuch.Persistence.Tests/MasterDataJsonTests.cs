@@ -140,7 +140,7 @@ public class MasterDataJsonTests
     [Fact]
     public void A_Geraet_count_is_trimmed_clamped_and_defaults_to_not_counted()
     {
-        var set = MasterDataJson.Parse(
+        var set = Parse(
             """
             {
               "devices": [
@@ -166,9 +166,15 @@ public class MasterDataJsonTests
     }
 
     [Fact]
+    public void A_devices_value_that_is_not_a_list_reads_as_no_geraete()
+    {
+        Assert.Empty(Parse("""{ "devices": "AED" }""").Devices);
+    }
+
+    [Fact]
     public void A_Geraet_without_a_name_is_refused_in_German()
     {
-        var ex = Assert.Throws<JsonException>(() => MasterDataJson.Parse("""{ "devices": [{ "name": null, "count": 1 }] }"""));
+        var ex = Assert.Throws<JsonException>(() => Parse("""{ "devices": [{ "name": null, "count": 1 }] }"""));
 
         Assert.Equal("Gerät: \"name\" darf nicht null sein.", ex.Message);
     }
