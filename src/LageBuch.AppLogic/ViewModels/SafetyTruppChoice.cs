@@ -22,12 +22,11 @@ public sealed class SafetyTruppChoice
     /// <summary>The label for the "no Sicherheitstrupp designated" entry.</summary>
     public const string NoneDisplay = "— kein —";
 
-    public SafetyTruppChoice(Guid? id, string display, string? detail, bool isCurrent, Action<Guid?> onSelect)
+    public SafetyTruppChoice(Guid? id, string display, bool isCurrent, Action<Guid?> onSelect)
     {
         ArgumentNullException.ThrowIfNull(onSelect);
         Id = id;
         Display = display;
-        Detail = detail;
         IsCurrent = isCurrent;
         SelectCommand = new RelayCommand(() => onSelect(id));
     }
@@ -35,11 +34,8 @@ public sealed class SafetyTruppChoice
     /// <summary>The Trupp being designated, or null for "kein Sicherheitstrupp".</summary>
     public Guid? Id { get; }
 
-    /// <summary>The short label, e.g. "Trupp 3" — the full DisplayName does not fit the cell.</summary>
+    /// <summary>The Trupp's name, e.g. "Florian Musterstadt 44/1 · Sicherheitstrupp".</summary>
     public string Display { get; }
-
-    /// <summary>The Trupp-Art, shown dimmed beside the label, or null for the "kein" entry.</summary>
-    public string? Detail { get; }
 
     /// <summary>Whether this entry is the one currently in force, for the check mark.</summary>
     public bool IsCurrent { get; }

@@ -57,19 +57,19 @@ public class ScbaSafetyTruppTests
         session.Incident.Journal.Select(e => e.Text).ToList();
 
     [Fact]
-    public void Options_offer_kein_first_then_every_other_waiting_trupp_by_number()
+    public void Options_offer_kein_first_then_every_other_waiting_trupp_by_name()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
         var vm = Vm(clock, session);
-        var angriff = Register(vm, "Angriffstrupp");
-        Register(vm, "Wassertrupp");
+        var angriff = Register(vm, "Angriffstrupp", "FFB 1/40/1");
+        Register(vm, "Wassertrupp", "FFB 1/42/1");
         Register(vm, "Sicherheitstrupp");
 
         var options = Row(vm, angriff.Id).SafetyTruppChoices;
 
         Assert.Equal(SafetyTruppChoice.NoneDisplay, options[0].Display);
-        Assert.Equal(new[] { "— kein —", "Trupp 2", "Trupp 3" }, options.Select(o => o.Display));
+        Assert.Equal(new[] { "— kein —", "FFB 1/42/1 · Wassertrupp", "Sicherheitstrupp" }, options.Select(o => o.Display));
 
         // A Trupp is never offered as its own Sicherheitstrupp.
         Assert.DoesNotContain(options, o => o.Id == angriff.Id);
@@ -121,17 +121,17 @@ public class ScbaSafetyTruppTests
 
         var entry = session.Incident.Journal.Last();
         Assert.Equal(
-            "Sicherheitstrupp für FFB 1/40/1 · Trupp 1 (Angriffstrupp) festgelegt: Trupp 2 (Sicherheitstrupp)",
+            "Sicherheitstrupp für FFB 1/40/1 · Angriffstrupp festgelegt: FFB 1/44/1 · Sicherheitstrupp",
             entry.Text);
         Assert.Equal("FFB 1/44/1", entry.From);
         Assert.Equal("FFB 1/40/1", entry.To);
         Assert.Equal(sicherheit.Id, session.Incident.ScbaTrupps[0].SafetyTruppId);
     }
 
-    // The Funkrufname is optional, so the line has to read the same as it always did when the
-    // brigade did not type one -- no dangling separator, nothing missing (#417).
+    // The Funkrufname is optional, so without one the line names the Trupp-Art alone -- no
+    // dangling separator, nothing missing (#417).
     [Fact]
-    public void Lines_keep_their_old_wording_when_no_funkrufname_was_entered()
+    public void Lines_name_the_trupp_art_alone_when_no_funkrufname_was_entered()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -142,7 +142,7 @@ public class ScbaSafetyTruppTests
         Assign(vm, angriff.Id, sicherheit.Id);
 
         Assert.Equal(
-            "Sicherheitstrupp für Trupp 1 (Angriffstrupp) festgelegt: Trupp 2 (Sicherheitstrupp)",
+            "Sicherheitstrupp für Angriffstrupp festgelegt: Sicherheitstrupp",
             session.Incident.Journal.Last().Text);
     }
 
@@ -159,12 +159,12 @@ public class ScbaSafetyTruppTests
         Assign(vm, angriff.Id, first.Id);
         Assign(vm, angriff.Id, relief.Id);
 
-        // Three Trupps on one line but only a Von and an An column: without the Funkrufname in
-        // the text, "bisher" is the one crew the row does not identify (#417).
+        // Three Trupps on one line but only a Von and an An column, so each carries its
+        // Funkrufname in the text (#417).
         var entry = session.Incident.Journal.Last();
         Assert.Equal(
-            "Sicherheitstrupp für FFB 1/40/1 · Trupp 1 (Angriffstrupp) gewechselt: "
-            + "bisher FFB 1/44/1 · Trupp 2 (Sicherheitstrupp), jetzt Trupp 3 (Wassertrupp)",
+            "Sicherheitstrupp für FFB 1/40/1 · Angriffstrupp gewechselt: "
+            + "bisher FFB 1/44/1 · Sicherheitstrupp, jetzt FFB 1/42/1 · Wassertrupp",
             entry.Text);
         Assert.Equal("FFB 1/42/1", entry.From);
         Assert.Equal("FFB 1/40/1", entry.To);
@@ -182,9 +182,8 @@ public class ScbaSafetyTruppTests
         Assign(vm, angriff.Id, sicherheit.Id);
         Assign(vm, angriff.Id, null);
 
-        // The stood-down Trupp is who the entry is from, so the Von column already names it.
         Assert.Equal(
-            "Sicherheitstrupp für FFB 1/40/1 · Trupp 1 (Angriffstrupp) aufgehoben: bisher Trupp 2 (Sicherheitstrupp)",
+            "Sicherheitstrupp für FFB 1/40/1 · Angriffstrupp aufgehoben: bisher FFB 1/44/1 · Sicherheitstrupp",
             session.Incident.Journal.Last().Text);
         Assert.Null(session.Incident.ScbaTrupps[0].SafetyTruppId);
     }
@@ -204,7 +203,7 @@ public class ScbaSafetyTruppTests
         // The Sicherheitstrupp is named in neither the Von nor the An column of this line, so
         // the text is the only place its Funkrufname can appear (#417).
         Assert.Contains(
-            "Trupp 1 (Angriffstrupp) im Einsatz, Sicherheitstrupp: FFB 1/44/1 · Trupp 2 (Sicherheitstrupp)",
+            "FFB 1/40/1 · Angriffstrupp im Einsatz, Sicherheitstrupp: FFB 1/44/1 · Sicherheitstrupp",
             Journal(session));
     }
 
@@ -220,7 +219,7 @@ public class ScbaSafetyTruppTests
 
         // The whole point of #399: the Einsatzbericht has to be able to answer "was anyone standing
         // by?" with something other than silence.
-        Assert.Contains("Trupp 1 (Angriffstrupp) im Einsatz, ohne Sicherheitstrupp", Journal(session));
+        Assert.Contains("Angriffstrupp im Einsatz, ohne Sicherheitstrupp", Journal(session));
     }
 
     [Fact]
@@ -241,12 +240,12 @@ public class ScbaSafetyTruppTests
 
         var journal = Journal(session);
         Assert.Contains(
-            "Trupp 3 (Sicherheitstrupp) geht selbst unter Atemschutz — "
-            + "FFB 1/40/1 · Trupp 1 (Angriffstrupp) ist ohne Sicherheitstrupp",
+            "FFB 1/44/1 · Sicherheitstrupp geht selbst unter Atemschutz — "
+            + "FFB 1/40/1 · Angriffstrupp ist ohne Sicherheitstrupp",
             journal);
         Assert.Contains(
-            "Trupp 3 (Sicherheitstrupp) geht selbst unter Atemschutz — "
-            + "FFB 1/42/1 · Trupp 2 (Wassertrupp) ist ohne Sicherheitstrupp",
+            "FFB 1/44/1 · Sicherheitstrupp geht selbst unter Atemschutz — "
+            + "FFB 1/42/1 · Wassertrupp ist ohne Sicherheitstrupp",
             journal);
     }
 
@@ -452,8 +451,8 @@ public class ScbaSafetyTruppTests
         Assign(vm, second.Id, sicherheit.Id);
 
         // Shared cover is allowed and merely flagged — the Einsatzleiter decides, the app records.
-        Assert.Equal("deckt auch Trupp 2", Row(vm, first.Id).SafetyTruppHint);
-        Assert.Equal("deckt auch Trupp 1", Row(vm, second.Id).SafetyTruppHint);
+        Assert.Equal("deckt auch Wassertrupp", Row(vm, first.Id).SafetyTruppHint);
+        Assert.Equal("deckt auch Angriffstrupp", Row(vm, second.Id).SafetyTruppHint);
     }
 
     [Fact]

@@ -1,0 +1,1 @@
+Atemschutz names a Trupp by its Funkrufname and Trupp-Art instead of a running number, suggests only the Funkrufnamen of the Kräfte entered for the Einsatz, writes "Si." out as Sicherheitstrupp on screen and in the Bericht, and gives the Trupp column more room.

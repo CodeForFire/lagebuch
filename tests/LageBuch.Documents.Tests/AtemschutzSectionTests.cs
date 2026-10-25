@@ -109,7 +109,7 @@ public class AtemschutzSectionTests
         var clock = new FixedClock(Started);
         var incident = Incident.Start(clock, new SessionOperator("Huber"));
         var trupp = incident.AddScbaTrupp(clock, "AT", TruppMember.Crew("Ott", "Ast"), entryPressure: 300, callSign: "1/40");
-        var waiting = incident.AddScbaTrupp(clock, "ST", TruppMember.Crew("Kurz", "Lang"), entryPressure: 290);
+        var waiting = incident.AddScbaTrupp(clock, "ST", TruppMember.Crew("Kurz", "Lang"), entryPressure: 290, callSign: "1/44");
         incident.SetScbaSafetyTrupp(trupp.Id, waiting.Id);
         clock.Now = Started.AddMinutes(2);
         incident.StartScbaTrupp(clock, trupp.Id);
@@ -129,11 +129,29 @@ public class AtemschutzSectionTests
             "Atemschutzüberwachung",
             "Trupp Mannschaft",
             "Start Rückzug Ende Druck Start Druck akt.",
-            "Trupp 1 (AT) Si.-Trupp: Trupp 2 Ott / Ast 1/40",
+            "AT Ott / Ast 1/40",
             "22.06.2026 08:12 22.06.2026 08:25 22.06.2026 08:28 300 bar 220 bar 08:22",
+            "Sicherheitstrupp: 1/44 · ST",
             "Status: Abgenommen · Messreihe: 08:17 260 bar · 08:22 220 bar",
-            "Trupp 2 (ST) Kurz / Lang — — — — 290 bar 290 bar Status: Bereitgestellt");
-        Assert.Equal(1, PdfText.Count(text, "Si.-Trupp"));
+            "ST Kurz / Lang 1/44 — — — 290 bar 290 bar Status: Bereitgestellt");
+        Assert.Equal(1, PdfText.Count(text, "Sicherheitstrupp:"));
+        Assert.Equal(0, PdfText.Count(text, "Si.-Trupp"));
+    }
+
+    [Fact]
+    public void Safety_line_names_the_posted_trupp_and_is_absent_without_one()
+    {
+        var clock = new FixedClock(Started);
+        var incident = Incident.Start(clock, new SessionOperator("Huber"));
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Ott", "Ast"), entryPressure: 300);
+        var waiting = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Kurz", "Lang"), entryPressure: 290, callSign: "1/44");
+
+        Assert.Null(AtemschutzSection.SafetyLine(incident, trupp));
+
+        incident.SetScbaSafetyTrupp(trupp.Id, waiting.Id);
+
+        Assert.Equal("Sicherheitstrupp: 1/44 · Sicherheitstrupp", AtemschutzSection.SafetyLine(incident, trupp));
+        Assert.Null(AtemschutzSection.SafetyLine(incident, waiting));
     }
 
     [Fact]
