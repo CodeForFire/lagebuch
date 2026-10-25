@@ -405,20 +405,32 @@
           <DataGridTemplateColumn Header="AKTION" Width="300">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
-                <StackPanel Spacing="2" Margin="8,4" VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <!-- Einstiegsdruck is captured at Bereitstellen now, so this is purely the
-                         Druckkontrolle input while under air (Im Einsatz or Rückzug). Enter records
-                         it like DRUCK (#539). ClipValueToMinMax is load-bearing: without it a typed
-                         value above Maximum never reaches the binding, and the press recorded the
-                         previous one; see CoMessprotokollView's CO-WERT for the same trap. -->
-                    <NumericUpDown x:Name="PressureInput" Width="104" Minimum="0" Maximum="400"
-                                   ClipValueToMinMax="True" Value="{Binding PressureInput}"
-                                   FormatString="0" PlaceholderText="{Binding PressurePlaceholder}"
-                                   AutomationProperties.Name="Druck in bar"
-                                   Classes.invalid="{Binding HasPressureError}"
-                                   b:EnterSubmit.Command="{Binding RecordPressureCommand}"
-                                   IsEnabled="{Binding !IsReturned}" />
+                <!-- The Ort sits under the Druck, since the column has no room beside it, and Tab
+                     still goes Druck → Ort → button: Local ranks this grid's children by TabIndex. -->
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                      ColumnSpacing="6" RowSpacing="2" Margin="8,4" VerticalAlignment="Center"
+                      KeyboardNavigation.TabNavigation="Local">
+                  <!-- Einstiegsdruck is captured at Bereitstellen now, so this is purely the
+                       Druckkontrolle input while under air (Im Einsatz or Rückzug). Enter records
+                       it like DRUCK (#539). ClipValueToMinMax is load-bearing: without it a typed
+                       value above Maximum never reaches the binding, and the press recorded the
+                       previous one; see CoMessprotokollView's CO-WERT for the same trap. -->
+                  <NumericUpDown Grid.Row="0" Grid.Column="0" KeyboardNavigation.TabIndex="0"
+                                 x:Name="PressureInput" Width="104" Minimum="0" Maximum="400"
+                                 ClipValueToMinMax="True" Value="{Binding PressureInput}"
+                                 FormatString="0" PlaceholderText="{Binding PressurePlaceholder}"
+                                 AutomationProperties.Name="Druck in bar"
+                                 Classes.invalid="{Binding HasPressureError}"
+                                 b:EnterSubmit.Command="{Binding RecordPressureCommand}"
+                                 IsEnabled="{Binding !IsReturned}" />
+                  <TextBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" KeyboardNavigation.TabIndex="1"
+                           x:Name="LocationInput" Text="{Binding LocationInput}" PlaceholderText="{Binding LocationPlaceholder}"
+                           MaxLength="{x:Static vm:ScbaTruppRow.MaxLocationLength}"
+                           AutomationProperties.Name="Ort der Druckabfrage"
+                           b:EnterSubmit.Command="{Binding RecordPressureCommand}"
+                           IsEnabled="{Binding !IsReturned}" />
+                  <StackPanel Grid.Row="0" Grid.Column="1" KeyboardNavigation.TabIndex="2"
+                              Orientation="Horizontal" Spacing="6">
                     <!-- Each state puts its next button where the last one was, so every one of them ignores
                          the second press of a double-click (SinglePress, #601, #630). -->
                     <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}" b:SinglePress.IsEnabled="True"
@@ -432,11 +444,13 @@
                     <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsWithdrawing}" />
                   </StackPanel>
-                  <TextBlock Classes="pressureError" Text="{Binding PressureError}"
+                  <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                             Classes="pressureError" Text="{Binding PressureError}"
                              IsVisible="{Binding HasPressureError}" />
-                  <TextBlock Classes="pressureWarning" Text="{Binding PressureWarning}"
+                  <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                             Classes="pressureWarning" Text="{Binding PressureWarning}"
                              IsVisible="{Binding HasPressureWarning}" />
-                </StackPanel>
+                </Grid>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
@@ -496,6 +510,11 @@
                                  Classes.control="{Binding IsControlDue}" />
                     </StackPanel>
                   </WrapPanel>
+                  <!-- Its own line: a typed Ort can be long, and inside the WrapPanel it would not trim. -->
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Column="0" Text="Ort" Classes="cellLabel" ToolTip.Tip="Zuletzt gemeldeter Ort" />
+                    <TextBlock Grid.Column="1" Text="{Binding LocationDisplay}" TextTrimming="CharacterEllipsis" />
+                  </Grid>
 
                   <ItemsControl ItemsSource="{Binding MemberLines}" ToolTip.Tip="{Binding MembersDetail}">
                     <ItemsControl.ItemTemplate>
@@ -544,15 +563,22 @@
                              FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
                              TextWrapping="Wrap" IsVisible="{Binding HasSafetyTruppHint}" />
 
-                  <!-- The Druckkontrolle input and whatever the Trupp's state allows next. -->
-                  <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
-                    <NumericUpDown x:Name="PressureInput" Width="120" Minimum="0" Maximum="400"
+                  <!-- The Druckkontrolle input, its Ort, and whatever the Trupp's state allows next. -->
+                  <Grid ColumnDefinitions="120,*" ColumnSpacing="6">
+                    <NumericUpDown Grid.Column="0" x:Name="PressureInput" Minimum="0" Maximum="400"
                                    ClipValueToMinMax="True" Value="{Binding PressureInput}"
                                    FormatString="0" PlaceholderText="{Binding PressurePlaceholder}"
                                    AutomationProperties.Name="Druck in bar"
                                    Classes.invalid="{Binding HasPressureError}"
                                    b:EnterSubmit.Command="{Binding RecordPressureCommand}"
                                    IsEnabled="{Binding !IsReturned}" />
+                    <TextBox Grid.Column="1" x:Name="LocationInput" Text="{Binding LocationInput}" PlaceholderText="{Binding LocationPlaceholder}"
+                             MaxLength="{x:Static vm:ScbaTruppRow.MaxLocationLength}"
+                             AutomationProperties.Name="Ort der Druckabfrage"
+                             b:EnterSubmit.Command="{Binding RecordPressureCommand}"
+                             IsEnabled="{Binding !IsReturned}" />
+                  </Grid>
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
                     <!-- Each state puts its next button where the last one was, so every one of them ignores
                          the second press of a double-click (SinglePress, #601, #630). -->
                     <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}" b:SinglePress.IsEnabled="True"

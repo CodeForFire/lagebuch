@@ -30,6 +30,35 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void RecordScbaPressure_keeps_the_clients_Ort_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+
+        ApplyOverWire(new RecordScbaPressureCommand(trupp.Id, 250, "2. OG"), incident, clock);
+
+        Assert.Equal(new PressureReading(clock.Now, 250, "2. OG"), Assert.Single(trupp.PressureReadings));
+    }
+
+    [Fact]
+    public void RecordScbaPressure_refuses_an_oversized_Ort_from_a_peer()
+    {
+        // The host does not trust the client's form to have enforced the cap.
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+
+        Assert.Throws<ArgumentException>(() => ApplyOverWire(
+            new RecordScbaPressureCommand(trupp.Id, 250, new string('x', AtemschutzTrupp.MaxLocationLength + 1)),
+            incident,
+            clock));
+        Assert.Empty(trupp.PressureReadings);
+    }
+
+    [Fact]
     public void SetScbaSafetyTrupp_refuses_an_id_the_host_does_not_know()
     {
         var clock = new FixedClock();

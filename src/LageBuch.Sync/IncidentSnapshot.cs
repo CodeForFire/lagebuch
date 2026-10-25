@@ -120,7 +120,7 @@ public sealed record ForceUnitStrengthEditDto(
 
 public sealed record TruppMemberDto(TruppRole Role, string Name);
 
-public sealed record PressureReadingDto(DateTimeOffset Time, int Bar);
+public sealed record PressureReadingDto(DateTimeOffset Time, int Bar, string? Location = null);
 
 public sealed record ScbaTruppDto(
     Guid Id,

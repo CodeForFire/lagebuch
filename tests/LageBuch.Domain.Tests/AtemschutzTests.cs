@@ -776,4 +776,74 @@ public class AtemschutzTests
 
         Assert.Equal("ALARM", trupp.StatusLabel(T0.AddMinutes(30)));
     }
+
+    [Fact]
+    public void Druckabfrage_keeps_the_trimmed_Ort_with_its_reading()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+
+        incident.RecordScbaPressure(clock, trupp.Id, 250, "  2. OG, Treppenraum ");
+
+        Assert.Equal("2. OG, Treppenraum", Assert.Single(trupp.PressureReadings).Location);
+    }
+
+    [Fact]
+    public void Druckabfrage_with_a_blank_Ort_records_no_Ort()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+
+        incident.RecordScbaPressure(clock, trupp.Id, 250, "   ");
+
+        Assert.Null(Assert.Single(trupp.PressureReadings).Location);
+    }
+
+    [Fact]
+    public void Druckabfrage_refuses_an_Ort_over_the_limit_and_records_nothing()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+
+        var ex = Assert.Throws<ArgumentException>(() => incident.RecordScbaPressure(
+            clock, trupp.Id, 250, new string('x', AtemschutzTrupp.MaxLocationLength + 1)));
+        Assert.StartsWith("Ort ist länger als das Limit von 200 Zeichen.", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(trupp.PressureReadings);
+    }
+
+    [Fact]
+    public void Druckabfrage_keeps_an_Ort_exactly_at_the_limit()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+        var atLimit = new string('x', AtemschutzTrupp.MaxLocationLength);
+
+        incident.RecordScbaPressure(clock, trupp.Id, 250, atLimit);
+
+        Assert.Equal(atLimit, Assert.Single(trupp.PressureReadings).Location);
+    }
+
+    [Fact]
+    public void Latest_location_is_the_last_Ort_given_even_when_later_readings_have_none()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+        Assert.Null(trupp.LatestLocation);
+
+        incident.RecordScbaPressure(clock, trupp.Id, 250, "EG");
+        incident.RecordScbaPressure(clock, trupp.Id, 220, "1. OG");
+        incident.RecordScbaPressure(clock, trupp.Id, 200);
+
+        Assert.Equal("1. OG", trupp.LatestLocation);
+    }
 }

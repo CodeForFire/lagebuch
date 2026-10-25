@@ -103,7 +103,7 @@ public static class CommandApplier
                 incident.StartScbaTrupp(clock, c.TruppId);
                 break;
             case RecordScbaPressureCommand c:
-                incident.RecordScbaPressure(clock, c.TruppId, c.Bar);
+                incident.RecordScbaPressure(clock, c.TruppId, c.Bar, c.Location);
                 break;
             case WithdrawScbaTruppCommand c:
                 incident.WithdrawScbaTrupp(clock, c.TruppId);

@@ -154,7 +154,7 @@ public interface IIncidentSession
 
     void StartScbaTrupp(Guid truppId);
 
-    void RecordScbaPressure(Guid truppId, int bar);
+    void RecordScbaPressure(Guid truppId, int bar, string? location = null);
 
     void WithdrawScbaTrupp(Guid truppId);
 

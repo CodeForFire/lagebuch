@@ -63,6 +63,33 @@ public class AtemschutzSectionTests
     }
 
     [Fact]
+    public void Detail_line_puts_each_druckabfrages_ort_beside_its_pressure()
+    {
+        var (incident, trupp, clock) = UnderAir();
+        clock.Now = Started.AddMinutes(5);
+        incident.RecordScbaPressure(clock, trupp.Id, 260, "EG");
+        clock.Now = Started.AddMinutes(10);
+        incident.RecordScbaPressure(clock, trupp.Id, 220);
+
+        Assert.Equal(
+            "Status: Im Einsatz · Messreihe: 08:15 260 bar (EG) · 08:20 220 bar",
+            AtemschutzSection.DetailLine(trupp, Started.AddMinutes(11)));
+    }
+
+    // One reading with an Ort says something "Druck akt." does not, so it is not left out.
+    [Fact]
+    public void Detail_line_keeps_a_single_reading_that_has_an_ort()
+    {
+        var (incident, trupp, clock) = UnderAir();
+        clock.Now = Started.AddMinutes(4);
+        incident.RecordScbaPressure(clock, trupp.Id, 260, "2. OG");
+
+        Assert.Equal(
+            "Status: Im Einsatz · Messreihe: 08:14 260 bar (2. OG)",
+            AtemschutzSection.DetailLine(trupp, Started.AddMinutes(5)));
+    }
+
+    [Fact]
     public void Last_reading_time_is_that_of_the_latest_druckabfrage()
     {
         var (incident, trupp, clock) = UnderAir();

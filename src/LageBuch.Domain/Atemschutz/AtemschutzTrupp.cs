@@ -33,6 +33,9 @@ public sealed class AtemschutzTrupp
     public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;
 
+    /// <summary>The longest Ort a Druckabfrage keeps, the same as a Beteiligte/r's Aufenthaltsort.</summary>
+    public const int MaxLocationLength = 200;
+
     /// <summary>How far a reading may sit above the last one before it is questioned (#539).</summary>
     public const int PlausibleRiseToleranceBar = 10;
 
@@ -299,7 +302,11 @@ public sealed class AtemschutzTrupp
         StartTime = time;
     }
 
-    public void RecordPressure(DateTimeOffset time, int bar)
+    /// <summary>
+    /// Records a Druckkontrolle and, optionally, where the Trupp was at the time. A blank
+    /// <paramref name="location"/> records none.
+    /// </summary>
+    public void RecordPressure(DateTimeOffset time, int bar, string? location = null)
     {
         if (!(IsActive || IsWithdrawing))
         {
@@ -307,7 +314,13 @@ public sealed class AtemschutzTrupp
         }
 
         ValidatePressure(bar, nameof(bar));
-        _readings.Add(new PressureReading(time, bar));
+        var trimmed = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
+        if (trimmed is { Length: > MaxLocationLength })
+        {
+            throw new ArgumentException($"Ort ist länger als das Limit von {MaxLocationLength} Zeichen.", nameof(location));
+        }
+
+        _readings.Add(new PressureReading(time, bar, trimmed));
     }
 
     /// <summary>Begins the Trupp's Rückzug — still under air, on the way out.</summary>
@@ -353,6 +366,12 @@ public sealed class AtemschutzTrupp
 
     /// <summary>Most recent measured pressure, or the entry pressure if none recorded yet; null for a legacy row with neither.</summary>
     public int? LatestPressure => _readings.Count > 0 ? _readings[^1].Bar : EntryPressure;
+
+    /// <summary>
+    /// The last Ort a Druckabfrage gave, or null if none did. A later reading without one does not
+    /// clear it: the Trupp reported its air, not that it moved.
+    /// </summary>
+    public string? LatestLocation => _readings.LastOrDefault(r => r.Location is not null)?.Location;
 
     public DateTimeOffset? DueAt =>
         StartTime is { } start ? start + TimeSpan.FromMinutes(MaxDurationMinutes) : null;

@@ -108,6 +108,7 @@ internal static class SchemaGuard
         new("role_assignments", "to_time", "TEXT", false, null),
         new("role_assignments", "section", "TEXT", false, null),
         new("role_assignments", "phone", "TEXT", false, null),
+        new("scba_pressure_readings", "location", "TEXT", false, null),
         new("scba_trupps", "call_sign", "TEXT", false, null),
         new("scba_trupps", "task", "TEXT", false, null),
         new("scba_trupps", "start_time", "TEXT", false, null),

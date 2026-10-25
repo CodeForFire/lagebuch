@@ -1249,7 +1249,7 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void StartScbaTrupp(Guid truppId) => _inner.StartScbaTrupp(truppId);
 
-    public void RecordScbaPressure(Guid truppId, int bar) => _inner.RecordScbaPressure(truppId, bar);
+    public void RecordScbaPressure(Guid truppId, int bar, string? location = null) => _inner.RecordScbaPressure(truppId, bar, location);
 
     public void WithdrawScbaTrupp(Guid truppId) => _inner.WithdrawScbaTrupp(truppId);
 

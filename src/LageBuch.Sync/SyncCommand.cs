@@ -117,7 +117,8 @@ public sealed record AddScbaTruppCommand(
 
 public sealed record StartScbaTruppCommand(Guid TruppId) : SyncCommand;
 
-public sealed record RecordScbaPressureCommand(Guid TruppId, int Bar) : SyncCommand;
+// Location is optional on the wire (protocol 19): an older host ignores it and records the bar alone.
+public sealed record RecordScbaPressureCommand(Guid TruppId, int Bar, string? Location = null) : SyncCommand;
 
 /// <summary>Rückzug — the Trupp begins its withdrawal, still under air.</summary>
 public sealed record WithdrawScbaTruppCommand(Guid TruppId) : SyncCommand;

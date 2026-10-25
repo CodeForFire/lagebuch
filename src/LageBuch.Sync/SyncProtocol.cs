@@ -106,8 +106,13 @@ public static class SyncProtocol
     /// countdowns on host time and warns when its own clock is off. A client at 16 or 17 ignores the
     /// field and stays on its own clock, and a host there omits it, so the floor stays at 16.
     /// </para>
+    /// <para>
+    /// 19: <c>recordScbaPressure</c> may carry the <c>location</c> of the Druckabfrage, and the
+    /// snapshot's readings the same. A host at 16 to 18 ignores it -- the reading is recorded
+    /// without an Ort -- and a client there drops the snapshot's, so the floor stays at 16.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 18;
+    public const int ProtocolVersion = 19;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

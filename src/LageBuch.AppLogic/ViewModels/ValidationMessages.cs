@@ -78,6 +78,10 @@ public static class ValidationMessages
     /// </summary>
     public const string ControlPressure = "Druck eintragen";
 
+    /// <summary>A Druckkontrolle whose Ort is longer than the domain keeps. The field already stops
+    /// at that length; this is the view model's own guard, so the press says why instead of throwing.</summary>
+    public const string ControlLocationTooLong = "Ort zu lang — bitte kürzen";
+
     /// <summary>A PDF export with every section unticked, which would produce an empty document.</summary>
     public const string NoPdfSection = "Mindestens einen Abschnitt wählen";
 

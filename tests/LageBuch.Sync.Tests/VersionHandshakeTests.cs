@@ -175,7 +175,16 @@ public class VersionHandshakeTests
     {
         // 18 adds hostTime to /revision. A client at 16 or 17 ignores it and stays on its own clock,
         // and a host there omits it, which a newer client reads as unknown, so it stays joinable.
-        Assert.Equal(18, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 18, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 16, int.MaxValue);
+    }
+
+    [Fact]
+    public void An_ort_on_the_druckabfrage_raises_the_protocol_to_nineteen_but_not_the_floor()
+    {
+        // 19 adds location to recordScbaPressure and to the snapshot's readings. A peer at 16 to 18
+        // ignores the key and records the bar without an Ort, so it stays joinable.
+        Assert.Equal(19, SyncProtocol.ProtocolVersion);
         Assert.Equal(16, SyncProtocol.MinimumProtocolVersion);
     }
 }
