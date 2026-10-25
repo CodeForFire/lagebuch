@@ -140,17 +140,19 @@
         </HeaderedContentControl>
 
         <!-- The Einsatzdaten address first, then the Stammdaten Straßen; free text stays enterable. -->
-        <HeaderedContentControl Classes="field suggest" Header="EINSATZSTELLE">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-            <AutoCompleteBox Grid.Column="0" x:Name="LocationBox" Text="{Binding Location}" IsEnabled="{Binding IsEditable}"
+        <!-- The ABC button sits beside the field, not inside it: a suggest field pins its chevron
+             to the right edge of its whole content, which would put it on top of the button. -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+          <HeaderedContentControl Grid.Column="0" Classes="field suggest" Header="EINSATZSTELLE">
+            <AutoCompleteBox x:Name="LocationBox" Text="{Binding Location}" IsEnabled="{Binding IsEditable}"
                              ItemsSource="{Binding LocationOptions}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                              MaxLength="{x:Static vm:SituationReportsViewModel.MaxLocationLength}" />
-            <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Top"
-                    ToolTip.Tip="Einsatzstelle buchstabieren" AutomationProperties.Name="Einsatzstelle buchstabieren"
-                    Command="{Binding SpellFieldCommand}" CommandParameter="{Binding Location}" />
-          </Grid>
-        </HeaderedContentControl>
+          </HeaderedContentControl>
+          <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Bottom"
+                  ToolTip.Tip="Einsatzstelle buchstabieren" AutomationProperties.Name="Einsatzstelle buchstabieren"
+                  Command="{Binding SpellFieldCommand}" CommandParameter="{Binding Location}" />
+        </Grid>
 
         <HeaderedContentControl Classes="field" Header="LAGE">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
