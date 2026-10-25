@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -143,6 +144,31 @@ public class WorkspaceFocusTests
         Click(window, Named<TabItem>(window, "SituationReportTab"));
 
         window.AssertFocused(Named<Control>(window, "ReporterBox"));
+    }
+
+    // Leaving an edited field saves the draft while focus is on its way to the next control. The
+    // save used to hide the editor for a moment, so focus landed nowhere, and the control kept a
+    // focus adorner it never lost: the next Tab onto it crashed the app with "Border already has a
+    // visual parent AdornerLayer".
+    [AvaloniaFact]
+    public void Tab_from_an_edited_lagemeldung_field_lands_on_the_next_control_every_time()
+    {
+        var (window, _, vm) = ShowWorkspace();
+        vm.SituationReports.NewReportCommand.Execute(null);
+        Click(window, RailTab(window, "ETB"));
+        Click(window, Named<TabItem>(window, "SituationReportTab"));
+        var location = Named<AutoCompleteBox>(window, "LocationBox");
+        var spell = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => AutomationProperties.GetName(b) == "Einsatzstelle buchstabieren");
+
+        for (var lap = 0; lap < 2; lap++)
+        {
+            FocusByTab(location);
+            window.Type("x");
+            window.Tab();
+
+            window.AssertFocused(spell);
+        }
     }
 
     // Field test: the list a suggestion box used to open on focus covered the rows the

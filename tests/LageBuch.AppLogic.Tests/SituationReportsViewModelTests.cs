@@ -151,6 +151,54 @@ public class SituationReportsViewModelTests
         Assert.NotNull(vm.SelectedReport);
     }
 
+    // The commit runs while focus is moving to the next field: an editor hidden or disabled for
+    // the length of the refresh takes the focus target away, and the focus adorner Avalonia gives
+    // it then is never removed — the next Tab onto it crashed the app.
+    [Fact]
+    public void A_commit_keeps_the_editor_shown_and_editable_while_the_list_drops_its_selection()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        vm.Reports.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                vm.SelectedReport = null;
+            }
+        };
+        var seen = new List<(bool HasSelection, bool IsEditable, string Header)>();
+        vm.PropertyChanged += (_, _) => seen.Add((vm.HasSelection, vm.IsEditable, vm.EditorHeader));
+
+        vm.Location = "Blumenstraße 13";
+        vm.CommitCommand.Execute(null);
+
+        Assert.Equal("Blumenstraße 13", session.Incident.SituationReports[0].Location);
+        Assert.All(seen, s => Assert.Equal((true, true, "LAGEMELDUNG · ENTWURF"), s));
+    }
+
+    [Fact]
+    public void Choosing_no_report_and_then_one_announces_each_time_whether_the_editor_shows()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        var row = vm.SelectedReport;
+        var shown = new List<bool>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.HasSelection))
+            {
+                shown.Add(vm.HasSelection);
+            }
+        };
+
+        vm.SelectedReport = null;
+        vm.SelectedReport = row;
+
+        Assert.Equal([false, true], shown);
+    }
+
     [Fact]
     public void Send_asks_first_then_numbers_the_report_and_writes_the_funkspruch_to_the_etb()
     {
