@@ -101,8 +101,13 @@ public static class SyncProtocol
     /// optional <c>apartmentLabels</c> (#420). A peer at 16 skips the key and offers no Objekte, and
     /// a host there ignores the labels and creates the Haus without them, so the floor stays at 16.
     /// </para>
+    /// <para>
+    /// 18: <c>/revision</c> carries <c>hostTime</c>, the host's clock, so a joined client runs its
+    /// countdowns on host time and warns when its own clock is off. A client at 16 or 17 ignores the
+    /// field and stays on its own clock, and a host there omits it, so the floor stays at 16.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 17;
+    public const int ProtocolVersion = 18;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
@@ -225,7 +230,7 @@ public sealed record VersionInfo(string Version, int Protocol = 0, int MinProtoc
 /// one it last applied; any difference means re-fetch the snapshot (#295).
 /// <para>
 /// <see cref="HostTime"/> is the host's clock when it answered. Null from a host older than protocol
-/// 14, which leaves the client on its own clock.
+/// 18, which leaves the client on its own clock.
 /// </para>
 /// </summary>
 public sealed record RevisionInfo(long Revision, Guid Epoch = default, DateTimeOffset? HostTime = null);
