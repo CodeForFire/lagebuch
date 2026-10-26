@@ -212,7 +212,16 @@ public class VersionHandshakeTests
         // 22 lets a client send addCommandNode, updateCommandNode, dissolveCommandNode,
         // moveForceUnit, setFuehrungsstufe and updateLeadershipPost. A host at 21 has none of them
         // in its allowlist and would reject them, so a 21 and a 22 must not connect.
-        Assert.Equal(22, SyncProtocol.ProtocolVersion);
-        Assert.Equal(22, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 22, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 22, int.MaxValue);
+    }
+
+    [Fact]
+    public void Moving_an_abschnitt_raises_the_floor_to_protocol_twenty_three()
+    {
+        // moveCommandNode is a command a client may send and a host forwards. A peer at 22 has no
+        // such entry in its allowlist and would reject it, so a 22 and a 23 must not connect.
+        Assert.Equal(23, SyncProtocol.ProtocolVersion);
+        Assert.Equal(23, SyncProtocol.MinimumProtocolVersion);
     }
 }

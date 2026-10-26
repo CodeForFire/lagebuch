@@ -132,19 +132,21 @@ public static class SyncProtocol
     /// the six commands, so the floor rises to 22. <c>addCommandNode</c> also carries the optional
     /// <c>auftrag</c>, <c>standort</c>, <c>funkgruppe</c>, <c>rufname</c> and <c>telefon</c>, so an
     /// Abschnitt is created with its details in one command. <c>placeRoleAssignment</c> moves an
-    /// existing Funktion into an Abschnitt and a board slot, as <c>moveForceUnit</c> does for a unit,
-    /// and <c>moveCommandNode</c> reorders a node or moves it between the two levels. All of this
-    /// is one unreleased contract, renumbered above <c>main</c> together when it rebases.
+    /// existing Funktion into an Abschnitt and a board slot, as <c>moveForceUnit</c> does for a unit.
+    /// </para>
+    /// <para>
+    /// 23 adds <c>moveCommandNode</c>, which reorders a node or moves it between the two levels. A
+    /// peer at 22 would reject it, so the floor rises with it.
     /// </para>
     /// </summary>
-    public const int ProtocolVersion = 22;
+    public const int ProtocolVersion = 23;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 22;
+    public const int MinimumProtocolVersion = 23;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,
