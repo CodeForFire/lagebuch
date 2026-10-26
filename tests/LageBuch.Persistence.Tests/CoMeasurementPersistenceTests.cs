@@ -232,4 +232,17 @@ public class CoMeasurementPersistenceTests : IDisposable
 
         Assert.Equal(new long?[] { 1, 0, null }, stored);
     }
+
+    [Fact]
+    public void SaveLoad_round_trip_keeps_the_Schluesselnummer()
+    {
+        var incident = CreateIncidentWithEveryKeyState();
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, null, KeyAvailability.Available, "B-14");
+        IncidentRepository.Save(_path, incident);
+
+        var loaded = IncidentRepository.Load(_path);
+
+        var numbers = loaded.Dwellings.Where(d => d.FloorOrdinal == 0).OrderBy(d => d.ApartmentNumber).Select(d => d.KeyNumber);
+        Assert.Equal(new[] { "B-14", null, null }, numbers);
+    }
 }

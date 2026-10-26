@@ -280,4 +280,20 @@ public class CoApartmentRemovalViewModelTests
         Assert.Contains("120 ppm", pending.Rows.Single(r => r.ApartmentNumber == 4).Contents, StringComparison.Ordinal);
         Assert.True(pending.Rows.Single(r => r.ApartmentNumber == 4).CarriesData);
     }
+
+    // The picker is where the crew decides what to delete, so a held key has to say which one.
+    [Fact]
+    public void ThePickerNamesTheSchluesselnummerOfAHandedOverKey()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        session.SetDwellingDetails(buildingId, 0, 3, null, KeyAvailability.Available, "14");
+        session.SetDwellingDetails(buildingId, 0, 4, null, KeyAvailability.Available);
+
+        Row(vm, 0).ApartmentCount = 2;
+
+        var pending = vm.PendingApartmentRemoval!;
+        Assert.Equal("Schlüssel Nr. 14", pending.Rows.Single(r => r.ApartmentNumber == 3).Contents);
+        Assert.Equal("Schlüssel vorhanden", pending.Rows.Single(r => r.ApartmentNumber == 4).Contents);
+    }
 }

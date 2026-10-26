@@ -646,6 +646,36 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void Apply_UpdateDwellingDetails_records_the_Schluesselnummer()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Test", null);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        var buildingId = incident.Buildings[0].Id;
+
+        ApplyOverWire(new UpdateDwellingDetailsCommand(buildingId, 0, 1, null, true, "B-14"), incident, clock);
+
+        Assert.Equal("B-14", incident.Dwellings[0].KeyNumber);
+    }
+
+    // A peer is hostile input: a Schlüsselnummer of any length must not reach the incident file.
+    [Fact]
+    public void Apply_UpdateDwellingDetails_rejects_an_oversized_Schluesselnummer()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Test", null);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        var buildingId = incident.Buildings[0].Id;
+        var oversized = new string('9', 100_000);
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(new UpdateDwellingDetailsCommand(buildingId, 0, 1, null, true, oversized), incident, clock));
+        Assert.Null(incident.Dwellings[0].KeyNumber);
+    }
+
+    [Fact]
     public void A_client_minted_entry_id_lets_its_aufgabe_link_before_the_snapshot_returns()
     {
         // The joined device's HINZUFÜGEN & AUFGABE: it mints the entry's id, sends the entry, then

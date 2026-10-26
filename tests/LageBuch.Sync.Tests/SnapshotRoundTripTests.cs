@@ -483,6 +483,42 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void The_Schluesselnummer_survives_the_snapshot_over_the_wire()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Test", null);
+        var original = Incident.Start(clock, op);
+        original.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        original.SetDwellingDetails(original.Buildings[0].Id, 0, 1, null, KeyAvailability.Available, "B-14");
+
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(original))));
+
+        Assert.Equal("B-14", restored.Dwellings[0].KeyNumber);
+    }
+
+    [Fact]
+    public void A_DwellingDto_without_a_key_number_restores_none()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Test", null);
+        var original = Incident.Start(clock, op);
+        original.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        original.SetDwellingDetails(original.Buildings[0].Id, 0, 1, null, KeyAvailability.Available, "B-14");
+
+        var full = SyncJson.Serialize(SnapshotMapper.ToSnapshot(original));
+
+        // Guard against this test passing vacuously if the property is ever renamed on the wire.
+        Assert.Contains("\"keyNumber\"", full, StringComparison.Ordinal);
+
+        var json = full.Replace("\"keyNumber\"", "\"keyNumberRemoved\"", StringComparison.Ordinal);
+        var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Null(restored.Dwellings[0].KeyNumber);
+        Assert.Equal(KeyAvailability.Available, restored.Dwellings[0].KeyAvailable);
+    }
+
+    [Fact]
     public void A_tasks_source_entry_survives_the_snapshot()
     {
         var clock = new FixedClock();

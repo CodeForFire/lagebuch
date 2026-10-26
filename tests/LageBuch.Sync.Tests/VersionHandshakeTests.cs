@@ -221,7 +221,17 @@ public class VersionHandshakeTests
     {
         // moveCommandNode is a command a client may send and a host forwards. A peer at 22 has no
         // such entry in its allowlist and would reject it, so a 22 and a 23 must not connect.
-        Assert.Equal(23, SyncProtocol.ProtocolVersion);
-        Assert.Equal(23, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 23, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 23, int.MaxValue);
+    }
+
+    [Fact]
+    public void A_schluesselnummer_on_the_wohnung_raises_the_protocol_and_the_floor_to_twenty_four()
+    {
+        // 24 adds keyNumber to updateDwellingDetails and to the snapshot's Wohnungen. The command
+        // carries the whole detail state, so a peer at 23 would send it without the number and a
+        // host at 24 would read that as "cleared". It cannot stay joinable.
+        Assert.Equal(24, SyncProtocol.ProtocolVersion);
+        Assert.Equal(24, SyncProtocol.MinimumProtocolVersion);
     }
 }

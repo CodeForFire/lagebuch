@@ -1,0 +1,1 @@
+CO-Messung: a Wohnung whose key was handed over records the Schlüsselnummer on its tag, shown on the tile, in the editor and in the PDF, so the crew knows which key goes back where; joined devices must update to the same build to keep syncing.

@@ -71,6 +71,8 @@ public class CommandSerializationTests
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),
         new SetAddressCommand("Hauptstraße", "Puch", "1", "82256", "Fürstenfeldbruck"),
         new SetStatusCommand(null),
+        new UpdateDwellingDetailsCommand(Guid.NewGuid(), 0, 1, "Müller", true),
+        new UpdateDwellingDetailsCommand(Guid.NewGuid(), 0, 1, null, true, "B-14"),
         new CloseIncidentCommand(Op),
         new AddFileCommand(Op, Guid.NewGuid(), "brand.jpg", "image/jpeg", 4),
         new RenameFileCommand(Guid.NewGuid(), "Küchenbrand"),

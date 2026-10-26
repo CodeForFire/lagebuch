@@ -117,6 +117,21 @@ public class CoMessprotokollSectionTests
     }
 
     [Fact]
+    public void A_handed_over_key_prints_its_Schluesselnummer_in_both_lists()
+    {
+        var incident = TwoBuildings();
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 1, 2, "Erika", KeyAvailability.Available, "B-14");
+
+        var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
+
+        Assert.Contains("• Whg. 2, Erika: 40 ppm, Schlüssel: ja (Nr. B-14), Person(en) betroffen", text, StringComparison.Ordinal);
+        Assert.Contains(
+            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja (Nr. B-14), CO: 40 ppm",
+            text,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Without_an_affected_unit_there_is_no_Betroffene_Wohnungen_list()
     {
         var incident = CreateIncidentWithBuilding();

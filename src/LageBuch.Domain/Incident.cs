@@ -2074,7 +2074,7 @@ public sealed class Incident
         AppendSystemEntry(clock, op, $"Whg.-Status {location}: {CoMeasurementLabels.StatusText(status)}");
     }
 
-    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable)
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable, string? keyNumber = null)
     {
         EnsureOpen();
         if (!Enum.IsDefined(keyAvailable))
@@ -2082,9 +2082,14 @@ public sealed class Incident
             throw new ArgumentException("Unbekannte Schlüsselangabe.", nameof(keyAvailable));
         }
 
+        if (keyNumber is not null && keyNumber.Trim().Length > Dwelling.MaxKeyNumberLength)
+        {
+            throw new ArgumentException($"Die Schlüsselnummer darf höchstens {Dwelling.MaxKeyNumberLength} Zeichen lang sein.", nameof(keyNumber));
+        }
+
         var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
         var index = _dwellings.IndexOf(dwelling);
-        _dwellings[index] = dwelling.WithDetails(residentName, keyAvailable);
+        _dwellings[index] = dwelling.WithDetails(residentName, keyAvailable, keyNumber);
     }
 
     public void SetFloorDescription(Guid buildingId, int ordinal, string? description)
@@ -2266,7 +2271,11 @@ public sealed class Incident
             carried.Add("Messreihe");
         }
 
-        if (dwelling.KeyAvailable == KeyAvailability.Available)
+        if (dwelling.KeyNumber is not null)
+        {
+            carried.Add($"Schlüssel Nr. {dwelling.KeyNumber}");
+        }
+        else if (dwelling.KeyAvailable == KeyAvailability.Available)
         {
             carried.Add("Schlüssel vorhanden");
         }

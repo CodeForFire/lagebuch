@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 34;
+    public const int CurrentVersion = 35;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -231,6 +231,15 @@ public static class Migrations
         if (version < 34)
         {
             ApplyV34(cn, tx);
+
+            // Stryker restore all
+        }
+
+        // Stryker disable all : V35 only adds a nullable column that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 35)
+        {
+            ApplyV35(cn, tx);
 
             // Stryker restore all
         }
@@ -1003,6 +1012,16 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_rufname", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_telefon", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_funkgruppe", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The Schlüsselnummer of a key handed over at a CO-Messung. Additive and nullable: an older
+    // file's Wohnungen read back without one, which is what they had.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV35(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_dwellings", "key_number", "TEXT");
 
         // Stryker restore all
     }

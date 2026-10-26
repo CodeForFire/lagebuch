@@ -276,7 +276,7 @@ public interface IIncidentSession
 
     void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status);
 
-    void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable);
+    void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable, string? keyNumber = null);
 
     void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description);
 

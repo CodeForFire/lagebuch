@@ -384,7 +384,7 @@ public sealed class IncidentRepository
             var d = incident.Dwellings[i];
             Run(
                 inserts,
-                "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$cv);",
+                "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value, key_number) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$cv,$kn);",
                 p =>
                 {
                     p("$id", d.Id.ToString());
@@ -395,6 +395,7 @@ public sealed class IncidentRepository
                     p("$st", (int)d.Status);
                     p("$kv", Domain.CoMeasurement.KeyAvailabilityEncoding.ToNullableBool(d.KeyAvailable) is { } k ? (object)(k ? 1 : 0) : DBNull.Value);
                     p("$cv", (object?)d.CoValue ?? DBNull.Value);
+                    p("$kn", (object?)d.KeyNumber ?? DBNull.Value);
                 });
 
             for (var j = 0; j < d.Readings.Count; j++)
@@ -861,7 +862,7 @@ public sealed class IncidentRepository
 
         var dwellings = ReadAll(
             cn,
-            "SELECT id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value FROM co_dwellings ORDER BY floor_ordinal, apartment_number;",
+            "SELECT id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value, key_number FROM co_dwellings ORDER BY floor_ordinal, apartment_number;",
             r =>
             {
                 var id = Guid.Parse(r.GetString(0));
@@ -874,7 +875,8 @@ public sealed class IncidentRepository
                     (Domain.CoMeasurement.DwellingStatus)r.GetInt32(5),
                     Domain.CoMeasurement.KeyAvailabilityEncoding.FromNullableBool(r.IsDBNull(6) ? null : r.GetInt32(6) == 1),
                     NullableInt(r, 7),
-                    readingsByDwelling.TryGetValue(id, out var rs) ? rs : null);
+                    readingsByDwelling.TryGetValue(id, out var rs) ? rs : null,
+                    Str(r, 8));
             });
 
         var tasks = ReadAll(

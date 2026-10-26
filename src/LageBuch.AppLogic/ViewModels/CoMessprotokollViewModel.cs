@@ -46,6 +46,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         _coValue = dwelling.CoValue;
         _residentName = dwelling.ResidentName;
         _keyAvailable = dwelling.KeyAvailable;
+        _keyNumber = dwelling.KeyNumber;
         _label = CoMeasurementLabels.ApartmentLabel(building, dwelling.FloorOrdinal, dwelling.ApartmentNumber);
         Readings = dwelling.Readings;
         StatusBrush = GetStatusBrush(dwelling.Status);
@@ -72,6 +73,9 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 
     [ObservableProperty]
     private KeyAvailability _keyAvailable;
+
+    [ObservableProperty]
+    private string? _keyNumber;
 
     [ObservableProperty]
     private string _statusBrush;
@@ -125,6 +129,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 
             parts.Add(KeyAvailable switch
             {
+                KeyAvailability.Available when !string.IsNullOrWhiteSpace(KeyNumber) => $"Schlüssel Nr. {KeyNumber.Trim()}",
                 KeyAvailability.Available => "Schlüssel vorhanden",
                 KeyAvailability.NotAvailable => "Kein Schlüssel",
                 _ => "Schlüssel unbekannt",
@@ -139,8 +144,11 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         }
     }
 
+    /// <summary>The key glyph, followed by the Schlüsselnummer when one was noted, so the crew
+    /// reads off the tile which key goes back where.</summary>
     public string KeyDisplay => KeyAvailable switch
     {
+        KeyAvailability.Available when !string.IsNullOrWhiteSpace(KeyNumber) => $"\uD83D\uDD11 {KeyNumber.Trim()}",
         KeyAvailability.Available => "\uD83D\uDD11",
         KeyAvailability.NotAvailable => "\u2716",
         _ => string.Empty,
@@ -183,6 +191,12 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     }
 
     partial void OnKeyAvailableChanged(KeyAvailability value)
+    {
+        OnPropertyChanged(nameof(KeyDisplay));
+        OnPropertyChanged(nameof(TileTooltip));
+    }
+
+    partial void OnKeyNumberChanged(string? value)
     {
         OnPropertyChanged(nameof(KeyDisplay));
         OnPropertyChanged(nameof(TileTooltip));
@@ -243,6 +257,7 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
         OriginalCoValue = dwelling.CoValue;
         OriginalResidentName = dwelling.ResidentName;
         OriginalKeyAvailable = dwelling.KeyAvailable;
+        OriginalKeyNumber = dwelling.KeyNumber;
         OriginalLabel = CoMeasurementLabels.ApartmentLabel(building, dwelling.FloorOrdinal, dwelling.ApartmentNumber);
 
         // Newest first: during an Einsatz the question is "what is it now, and was it worse?",
@@ -253,6 +268,7 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
         _coValue = OriginalCoValue;
         _residentName = OriginalResidentName;
         _keyAvailable = OriginalKeyAvailable;
+        _keyNumber = OriginalKeyNumber;
         _label = OriginalLabel;
     }
 
@@ -283,10 +299,19 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsKeyAvailable))]
     [NotifyPropertyChangedFor(nameof(IsKeyNotAvailable))]
     [NotifyPropertyChangedFor(nameof(IsKeyUnknown))]
+    [NotifyPropertyChangedFor(nameof(IsKeyNumberEnabled))]
     private KeyAvailability _keyAvailable;
+
+    /// <summary>The Schlüsselnummer as typed. Kept while the radios move, so a slip to "Keiner"
+    /// and back does not lose it; only what FERTIG commits drops it (see Dwelling.WithDetails).</summary>
+    [ObservableProperty]
+    private string? _keyNumber;
 
     [ObservableProperty]
     private string _label;
+
+    /// <summary>A Schlüsselnummer only means something for a key the crew actually holds.</summary>
+    public bool IsKeyNumberEnabled => KeyAvailable == KeyAvailability.Available;
 
     // TwoWay radio bindings, as TasksViewModel's filter does: checking writes through to
     // KeyAvailable; writing false (the binding engine syncing the unchecked radios) is a no-op.
@@ -334,6 +359,8 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     public KeyAvailability OriginalKeyAvailable { get; }
 
+    public string? OriginalKeyNumber { get; }
+
     public string OriginalLabel { get; }
 
     /// <summary>
@@ -352,8 +379,11 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     // Normalized the same way Dwelling.WithDetails does, so clearing an already-empty name is not
     // mistaken for an edit and does not cost a save (or, on a joined device, a command POST).
+    // The Schlüsselnummer is compared as it would be stored: one typed under "Keiner" is not kept.
     public bool HasDetailChange =>
-        Normalize(ResidentName) != Normalize(OriginalResidentName) || KeyAvailable != OriginalKeyAvailable;
+        Normalize(ResidentName) != Normalize(OriginalResidentName)
+        || KeyAvailable != OriginalKeyAvailable
+        || StoredKeyNumber(KeyAvailable, KeyNumber) != StoredKeyNumber(OriginalKeyAvailable, OriginalKeyNumber);
 
     public bool HasLabelChange => Normalize(Label) != Normalize(OriginalLabel);
 
@@ -375,6 +405,9 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? StoredKeyNumber(KeyAvailability keyAvailable, string? keyNumber) =>
+        keyAvailable == KeyAvailability.Available ? Normalize(keyNumber) : null;
 
     partial void OnCoValueChanged(int? value)
     {
@@ -985,6 +1018,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         cell.CoValue = editor.CoValue;
         cell.ResidentName = editor.ResidentName;
         cell.KeyAvailable = editor.KeyAvailable;
+        cell.KeyNumber = editor.IsKeyNumberEnabled ? editor.KeyNumber : null;
         cell.Label = editor.Label;
     }
 
@@ -1126,7 +1160,11 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
             parts.Add("betroffen");
         }
 
-        if (dwelling.KeyAvailable == KeyAvailability.Available)
+        if (dwelling.KeyNumber is { } keyNumber)
+        {
+            parts.Add($"Schlüssel Nr. {keyNumber}");
+        }
+        else if (dwelling.KeyAvailable == KeyAvailability.Available)
         {
             parts.Add("Schlüssel vorhanden");
         }
@@ -1588,7 +1626,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         if (editor.HasDetailChange)
         {
             _session.SetDwellingDetails(
-                editor.BuildingId, editor.FloorOrdinal, editor.ApartmentNumber, editor.ResidentName, editor.KeyAvailable);
+                editor.BuildingId, editor.FloorOrdinal, editor.ApartmentNumber, editor.ResidentName, editor.KeyAvailable, editor.KeyNumber);
             wrote = true;
         }
 
