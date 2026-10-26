@@ -36,9 +36,12 @@
             </HeaderedContentControl>
             <HeaderedContentControl Grid.Column="1" Classes="field" Header="EINSATZNUMMER">
               <TextBox x:Name="IncidentDataNumberBox" Classes="mono" Text="{Binding IncidentNumber}"
-                       PlaceholderText="z. B. B 1.2 260715 123" />
+                       PlaceholderText="z. B. B 1.2 260715 123" GotFocus="OnNumberBoxGotFocus" />
             </HeaderedContentControl>
           </Grid>
+          <!-- #462: a number of another shape is pointed out, never refused. -->
+          <TextBlock x:Name="IncidentNumberFormatHint" Classes="secondary" TextWrapping="Wrap" Margin="0,-6,0,0"
+                     Text="{Binding IncidentNumberFormatHint}" IsVisible="{Binding ShowIncidentNumberFormatHint}" />
           <!-- #401: every address part is optional. Inside the home Gemeinde STRASSE, HAUSNR. and
                ORTSTEIL are enough; PLZ and ORT are for überörtliche Hilfe.
                #461: STRASSE and ORTSTEIL suggest the Stammdaten's Straßen and Ortsteile, like

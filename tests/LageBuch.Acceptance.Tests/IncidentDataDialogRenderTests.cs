@@ -302,4 +302,59 @@ public class IncidentDataDialogRenderTests
         Assert.Equal(1, closed);
         Assert.Equal("B3 Person", session.Incident.Keyword);
     }
+
+    // #462: an incident without a number opens with the Stammdaten's format pre-filled.
+    private static (Window Window, IncidentDataDialogViewModel Vm, LocalIncidentSession Session) PrefilledDialog()
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>(),
+            keyword: "B3P");
+        Assert.True(IncidentNumberFormat.TryParse("B 1.2 {JJMMTT} {NNN}", out var format));
+        var vm = new IncidentDataDialogViewModel(session, () => { }, incidentNumberFormat: format);
+        var window = new Window { Content = new IncidentDataDialogView { DataContext = vm }, Width = 560, Height = 520 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return (window, vm, session);
+    }
+
+    [AvaloniaFact]
+    public void Tabbing_into_a_pre_filled_number_lands_on_the_gap_so_typing_completes_it()
+    {
+        var (window, vm, session) = PrefilledDialog();
+        var prefill = vm.IncidentNumberPrefill!;
+        var box = Find<TextBox>(window, "IncidentDataNumberBox");
+        Assert.Equal(prefill, box.Text);
+
+        window.Press(PhysicalKey.Tab);
+        Dispatcher.UIThread.RunJobs();
+        window.AssertFocused(box);
+        window.Type("123");
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Equal(prefill + "123", session.Incident.IncidentNumber?.Value);
+    }
+
+    [AvaloniaFact]
+    public void A_number_of_another_shape_shows_the_format_hint()
+    {
+        var (window, vm, _) = PrefilledDialog();
+        var hint = Find<TextBlock>(window, "IncidentNumberFormatHint");
+        Assert.False(hint.IsEffectivelyVisible);
+
+        vm.IncidentNumber = "4711";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(hint.IsEffectivelyVisible);
+        Assert.Equal("Entspricht nicht dem Format B 1.2 {JJMMTT} {NNN}", hint.Text);
+
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "incident-data-dialog-format-hint.png"));
+    }
 }

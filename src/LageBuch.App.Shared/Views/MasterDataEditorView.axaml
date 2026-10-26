@@ -396,6 +396,17 @@
                                      Minimum="0" Maximum="400" Increment="5" FormatString="0" />
                       <TextBlock Grid.Column="2" Text="bar" Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
+                    <!-- #462: a template is wider than the 140px value column, so it gets the full width. -->
+                    <StackPanel Spacing="4" Margin="0,8,0,0">
+                      <TextBlock Text="Einsatznummer-Format" />
+                      <TextBox x:Name="IncidentNumberFormatBox" Classes="mono"
+                               Text="{Binding IncidentNumberFormat}"
+                               MaxLength="{x:Static md:IncidentSettings.MaxIncidentNumberFormatLength}"
+                               PlaceholderText="z. B. B 1.2 {JJMMTT} {NNN}"
+                               AutomationProperties.Name="Format der Einsatznummer" />
+                      <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                 Text="{}{JJMMTT} = Einsatzdatum, {NNN} = Lücke für die Nummer der Leitstelle. Ein neuer Einsatz bekommt den Rest vorausgefüllt." />
+                    </StackPanel>
                   </StackPanel>
                 </ScrollViewer>
               </DataTemplate>

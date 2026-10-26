@@ -21,6 +21,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly IReadOnlyList<Street> _streets;
+    private readonly IncidentNumberFormat? _incidentNumberFormat;
 
     // What the last recognised street filled in (#461), per field. A field still holding exactly
     // that may be refilled by the next street; anything else was typed and is never touched.
@@ -33,11 +34,13 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         Action onChanged,
         IReadOnlyList<string>? keywordOptions = null,
         IReadOnlyList<string>? districts = null,
-        IReadOnlyList<Street>? streets = null)
+        IReadOnlyList<Street>? streets = null,
+        IncidentNumberFormat? incidentNumberFormat = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _onChanged = onChanged;
+        _incidentNumberFormat = incidentNumberFormat;
         KeywordOptions = keywordOptions ?? [];
         _streets = streets ?? [];
         StreetOptions = Distinct(_streets.Select(s => s.Name));
@@ -46,6 +49,12 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         var incident = session.Incident;
         _keyword = incident.Keyword;
         _incidentNumber = incident.IncidentNumber?.Value;
+        if (_incidentNumber is null && incidentNumberFormat is not null)
+        {
+            (IncidentNumberPrefill, IncidentNumberCaretIndex) = incidentNumberFormat.Prefill(incident.StartedAt);
+            _incidentNumber = IncidentNumberPrefill;
+        }
+
         _street = incident.Street;
         _houseNumber = incident.HouseNumber;
         _postalCode = incident.PostalCode;
@@ -76,7 +85,29 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     private string? _keyword;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowIncidentNumberFormatHint))]
     private string? _incidentNumber;
+
+    /// <summary>
+    /// What the Stammdaten's Einsatznummer format typed in for an incident that has no number yet
+    /// (#462): prefix and date, with the Leitstelle's running number left as a gap. Null when nothing
+    /// was pre-filled. Never stored as it stands -- only once the Lagebuchführer has added to it.
+    /// </summary>
+    public string? IncidentNumberPrefill { get; }
+
+    /// <summary>Where the gap in <see cref="IncidentNumberPrefill"/> is, for the caret.</summary>
+    public int IncidentNumberCaretIndex { get; }
+
+    /// <summary>
+    /// A number that does not have the format's shape is only pointed out, never refused: an
+    /// überörtliche Leitstelle numbers its own way.
+    /// </summary>
+    public bool ShowIncidentNumberFormatHint =>
+        _incidentNumberFormat is not null
+        && NumberToSave is { } number
+        && !_incidentNumberFormat.Matches(number);
+
+    public string IncidentNumberFormatHint => $"Entspricht nicht dem Format {_incidentNumberFormat?.Template}";
 
     [ObservableProperty]
     private string? _street;
@@ -111,7 +142,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         {
             var incident = _session.Incident;
             return KeywordToSave != incident.Keyword
-                || Normalize(IncidentNumber) != incident.IncidentNumber?.Value
+                || NumberToSave != incident.IncidentNumber?.Value
                 || AddressDiffers(incident);
         }
     }
@@ -126,7 +157,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     {
         var incident = _session.Incident;
         var keyword = KeywordToSave;
-        var number = Normalize(IncidentNumber);
+        var number = NumberToSave;
 
         var changed = false;
         if (keyword != incident.Keyword)
@@ -186,6 +217,11 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     // In the Stammdaten's spelling when it matches one apart from case and whitespace, so "b3p"
     // records as "B3P"; otherwise exactly as typed.
     private string? KeywordToSave => Normalize(StammdatenCatalogue.Normalize(Keyword, KeywordOptions));
+
+    // The untouched pre-fill is no number at all: SPEICHERN after typing only the Stichwort must not
+    // store "B 1.2 260715 " (#462).
+    private string? NumberToSave =>
+        string.Equals(IncidentNumber, IncidentNumberPrefill, StringComparison.Ordinal) ? null : Normalize(IncidentNumber);
 
     private string? StreetToSave => Normalize(StammdatenCatalogue.Normalize(Street, StreetOptions));
 

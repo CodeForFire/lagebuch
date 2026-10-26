@@ -823,7 +823,10 @@ public class IncidentWorkspaceViewModelTests
 
     // --- Header hero + Einsatzdaten dialog (#69) ---------------------------------------------
     private static IncidentWorkspaceViewModel WorkspaceWith(
-        out FakeStore store, string? keyword = null, Domain.ValueObjects.IncidentNumber? number = null)
+        out FakeStore store,
+        string? keyword = null,
+        Domain.ValueObjects.IncidentNumber? number = null,
+        MasterDataSet? masterData = null)
     {
         store = new FakeStore();
         var clock = new FixedClock(T0);
@@ -840,7 +843,7 @@ public class IncidentWorkspaceViewModelTests
             session,
             clock,
             new FakeTicker(),
-            Md(),
+            masterData ?? Md(),
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
@@ -933,6 +936,20 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.NotNull(vm.PendingIncidentDataDialog);
         Assert.Equal("B3P", vm.PendingIncidentDataDialog!.Keyword);
+    }
+
+    [Theory]
+    [InlineData("B 1.2 {JJMMTT} {NNN}", "B 1.2 260622 ")]
+    [InlineData("B {XYZ}", null)]
+    [InlineData(null, null)]
+    public void EditIncidentData_pre_fills_the_number_from_the_stammdaten_format(string? template, string? expected)
+    {
+        var md = Md() with { Settings = IncidentSettings.Defaults with { IncidentNumberFormat = template } };
+        var vm = WorkspaceWith(out _, masterData: md);
+
+        vm.EditIncidentDataCommand.Execute(null);
+
+        Assert.Equal(expected, vm.PendingIncidentDataDialog!.IncidentNumber);
     }
 
     [Fact]

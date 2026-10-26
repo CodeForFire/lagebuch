@@ -1,0 +1,1 @@
+The Stammdaten take an Einsatznummer format such as `B 1.2 {JJMMTT} {NNN}`, and the Einsatzdaten dialog of an incident without a number opens with its prefix and date filled in, the caret on the gap for the Leitstelle's running number, and a non-blocking hint when a number does not match (#462).

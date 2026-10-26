@@ -648,6 +648,44 @@ public class MasterDataJsonTests
         Assert.Equal(IncidentSettings.MaxDispatchCentreNameLength, name.Length);
     }
 
+    // #462: the brigade's Einsatznummer template, as typed; IncidentNumberFormat reads its shape.
+    [Fact]
+    public void Parse_reads_the_incident_number_format()
+    {
+        var set = Parse("""{ "settings": { "incidentNumberFormat": "  B 1.2 {JJMMTT} {NNN} " } }""");
+
+        Assert.Equal("B 1.2 {JJMMTT} {NNN}", set.Settings.IncidentNumberFormat);
+    }
+
+    [Theory]
+    [InlineData("""{ "settings": { } }""")]
+    [InlineData("""{ "settings": { "incidentNumberFormat": "   " } }""")]
+    [InlineData("""{ "settings": { "incidentNumberFormat": 42 } }""")]
+    [InlineData("""{ "settings": { "incidentNumberFormat": null } }""")]
+    public void Parse_reads_no_incident_number_format_when_it_is_missing_or_unusable(string json)
+        => Assert.Null(Parse(json).Settings.IncidentNumberFormat);
+
+    [Fact]
+    public void Parse_caps_an_oversized_incident_number_format()
+    {
+        var huge = new string('N', 100_000);
+
+        var format = Parse($$"""{ "settings": { "incidentNumberFormat": "{{huge}}" } }""").Settings.IncidentNumberFormat;
+
+        Assert.Equal(IncidentSettings.MaxIncidentNumberFormatLength, format?.Length);
+    }
+
+    [Fact]
+    public void Serialize_round_trips_the_incident_number_format()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            Settings = IncidentSettings.Defaults with { IncidentNumberFormat = "B {JJMMTT} {NNN}" },
+        };
+
+        Assert.Equal("B {JJMMTT} {NNN}", Parse(MasterDataJson.Serialize(original)).Settings.IncidentNumberFormat);
+    }
+
     [Fact]
     public void Serialize_round_trips_the_dispatch_centre_name()
     {

@@ -481,6 +481,21 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
+    public void Editing_the_incident_number_format_marks_dirty_and_Save_persists_it()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+        var settings = Settings(vm);
+        Assert.Null(settings.IncidentNumberFormat);
+
+        settings.IncidentNumberFormat = "B 1.2 {JJMMTT} {NNN}";
+        Assert.True(vm.IsDirty);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("B 1.2 {JJMMTT} {NNN}", provider.Get().Settings.IncidentNumberFormat);
+    }
+
+    [Fact]
     public void Unticking_own_marks_dirty_and_Save_persists_the_foreign_flag()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty with

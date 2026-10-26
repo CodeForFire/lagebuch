@@ -124,6 +124,7 @@
     "ilsReminderIntervalMinutes": 15,
     "ilsReminderFollowUpIntervalMinutes": 30,
     "returnPressureBar": 50,
-    "dispatchCentreName": "ILS"
+    "dispatchCentreName": "ILS",
+    "incidentNumberFormat": "B 1.2 {JJMMTT} {NNN}"
   }
 }
