@@ -582,21 +582,21 @@ public class LeadershipBoardRenderTests
         return transfer;
     }
 
-    // The card's own: an Abschnitt's card holds its Unterabschnitte' cards, each with its own head and strip.
+    // The card's own head and strip, matched by its node so a lookup never strays into another card.
     private static Border HeaderOf(Border card) =>
-        card.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeCardHeader" && b.DataContext == card.DataContext);
+        card.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeCardHeader" && ReferenceEquals(b.DataContext, card.DataContext));
 
     private static Border IntoStripOf(Border card) =>
-        card.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeIntoStrip" && b.DataContext == card.DataContext);
+        card.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeIntoStrip" && ReferenceEquals(b.DataContext, card.DataContext));
 
     private static string[] TopLevelOrder(LocalIncidentSession session) =>
         [.. session.Incident.CommandNodes
             .Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, null))
             .Select(n => n.Name)];
 
-    // The card's own: an Abschnitt's card holds its Unterabschnitte' cards, each with its own SUMME.
+    // The card's own SUMME, matched by its node so a lookup never strays into another card.
     private static TextBlock SumOf(Border card) =>
-        card.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "NodeStrengthTotalText" && t.DataContext == card.DataContext);
+        card.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "NodeStrengthTotalText" && ReferenceEquals(t.DataContext, card.DataContext));
 
     [AvaloniaFact]
     public void Each_card_sums_its_kraefte_with_its_unterabschnitte_and_in_line_with_the_columns()
@@ -615,7 +615,7 @@ public class LeadershipBoardRenderTests
         // Dach hangs below Nord on the chart, so Nord's row says it counts it; its right edge lines up
         // with the STÄRKE column.
         TextBlock LabelOf(Border card) =>
-            card.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "NodeStrengthLabel" && t.DataContext == card.DataContext);
+            card.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "NodeStrengthLabel" && ReferenceEquals(t.DataContext, card.DataContext));
         Assert.Equal("SUMME INKL. UA", LabelOf(nord).Text);
         Assert.Equal("SUMME", LabelOf(Card(board.View, "Dach")).Text);
         var unitStrength = nord.GetVisualDescendants().OfType<TextBlock>()

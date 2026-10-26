@@ -109,7 +109,7 @@ public class ForcesAbschnittPickerTests
         Assert.Equal(2, pickers.Count);
         Assert.Equal(
             new[] { "Abschnitt 1 / Nord", "—" },
-            pickers.Select(p => (string)((TextBlock)p.Content!).Text!));
+            pickers.Select(p => ((TextBlock)p.Content!).Text!));
         Assert.All(pickers, p => Assert.False(string.IsNullOrEmpty(ToolTip.GetTip(p) as string)));
         Capture(window, "kraefte-abschnitt-after.png");
     }
@@ -147,7 +147,7 @@ public class ForcesAbschnittPickerTests
         Assert.False(picker.Flyout.IsOpen);
 
         Assert.Equal("Bereitstellung Marktplatz", vm.Forces[1].NodeLabel);
-        Assert.Equal("Bereitstellung Marktplatz", (string)((TextBlock)picker.Content!).Text!);
+        Assert.Equal("Bereitstellung Marktplatz", ((TextBlock)picker.Content!).Text!);
     }
 
     [AvaloniaFact]
@@ -160,7 +160,7 @@ public class ForcesAbschnittPickerTests
         Assert.Equal(2, pickers.Count);
         Assert.Equal(
             new[] { "Abschnitt 1 / Nord", NodeChoices.UnplacedLabel },
-            pickers.Select(p => (string)((TextBlock)p.Content!).Text!));
+            pickers.Select(p => ((TextBlock)p.Content!).Text!));
         Assert.Equal(2, cards.GetVisualDescendants().OfType<TextBlock>().Count(t => t.Text == "ABSCHNITT"));
         Capture(window, "kraefte-abschnitt-narrow.png");
     }

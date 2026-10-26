@@ -87,7 +87,7 @@ public class CommandNodeMoveTests
         incident.MoveCommandNode(clock, op, dach.Id, null, null);
 
         var moved = incident.FindCommandNode(dach.Id)!;
-        Assert.Equal((CommandNodeKind.Abschnitt, (Guid?)null), (moved.Kind, moved.ParentId));
+        Assert.Equal<(CommandNodeKind, Guid?)>((CommandNodeKind.Abschnitt, null), (moved.Kind, moved.ParentId));
         Assert.Equal(["Nord", "Dach"], LiveNames(incident));
         Assert.Equal("Unterabschnitt Dach als Abschnitt eingeordnet", incident.Journal[^1].Text);
     }

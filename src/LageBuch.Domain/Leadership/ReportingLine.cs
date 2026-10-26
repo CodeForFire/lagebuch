@@ -84,7 +84,8 @@ public static class ReportingLine
             }
         }
 
-        return groups.Select(g => (g.Section, (IReadOnlyList<RoleAssignment>)g.Assignments)).ToList();
+        return groups.Select<(string Section, List<RoleAssignment> Assignments), (string Section, IReadOnlyList<RoleAssignment> Assignments)>(
+            g => (g.Section, g.Assignments)).ToList();
     }
 
     // The Einsatzleitung is everyone with no node and no free-text Abschnitt. FUNKTIONEN stamps the

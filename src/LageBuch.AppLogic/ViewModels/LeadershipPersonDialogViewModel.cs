@@ -220,11 +220,12 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
     private void RefreshContactLock()
     {
         var holder = FindHolder(RoleToSave).Holder;
-        var locked = holder is not null && IsSamePerson(holder);
-        if (locked)
+        var locked = false;
+        if (holder is not null && IsSamePerson(holder))
         {
-            CallSign = holder?.CallSign;
-            Phone = holder?.Phone;
+            locked = true;
+            CallSign = holder.CallSign;
+            Phone = holder.Phone;
             _prefilledCallSign = CallSign;
             _prefilledPhone = Phone;
         }

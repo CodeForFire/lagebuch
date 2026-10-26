@@ -79,7 +79,7 @@ public class LeadershipBoardPersonTests
         opened[0].SaveCommand.Execute(null);
 
         var first = session.Incident.Roles.Single();
-        Assert.Equal(((Guid?)null, RoleSlot.Melder), (first.NodeId, first.Slot));
+        Assert.Equal<(Guid?, RoleSlot?)>((null, RoleSlot.Melder), (first.NodeId, first.Slot));
         Assert.Equal("Tobias Wagner", vm.El.Melder?.PersonName);
 
         vm.El.SetMelderCommand.Execute(null);

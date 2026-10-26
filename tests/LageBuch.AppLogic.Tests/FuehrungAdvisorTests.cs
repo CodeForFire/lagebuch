@@ -13,27 +13,23 @@ public class FuehrungAdvisorTests
     private static Incident WithShape(int abschnitte = 0, int partner = 0, int units = 0, int bereitstellung = 0)
     {
         var incident = Incident.Start(Clock, Op);
-        for (var i = 1; i <= abschnitte; i++)
-        {
-            incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, $"Abschnitt {i}");
-        }
-
-        for (var i = 1; i <= partner; i++)
-        {
-            incident.AddCommandNode(Clock, Op, CommandNodeKind.Partner, $"Partner {i}");
-        }
-
-        for (var i = 1; i <= bereitstellung; i++)
-        {
-            incident.AddCommandNode(Clock, Op, CommandNodeKind.Bereitstellung, $"BR {i}");
-        }
-
+        AddNodes(incident, CommandNodeKind.Abschnitt, abschnitte, "Abschnitt");
+        AddNodes(incident, CommandNodeKind.Partner, partner, "Partner");
+        AddNodes(incident, CommandNodeKind.Bereitstellung, bereitstellung, "BR");
         for (var i = 1; i <= units; i++)
         {
             incident.AddForceUnit(Clock, Op, $"FF {i}", 6);
         }
 
         return incident;
+    }
+
+    private static void AddNodes(Incident incident, CommandNodeKind kind, int count, string prefix)
+    {
+        for (var i = 1; i <= count; i++)
+        {
+            incident.AddCommandNode(Clock, Op, kind, $"{prefix} {i}");
+        }
     }
 
     [Fact]

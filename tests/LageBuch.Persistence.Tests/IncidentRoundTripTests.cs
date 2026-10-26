@@ -761,7 +761,7 @@ public class IncidentRoundTripTests : IDisposable
         var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(new[] { sued.Id, dach.Id, nord.Id }, loaded.CommandNodes.Select(n => n.Id));
-        Assert.Equal((CommandNodeKind.Abschnitt, (Guid?)null), (loaded.CommandNodes[1].Kind, loaded.CommandNodes[1].ParentId));
+        Assert.Equal<(CommandNodeKind, Guid?)>((CommandNodeKind.Abschnitt, null), (loaded.CommandNodes[1].Kind, loaded.CommandNodes[1].ParentId));
     }
 
     [Fact]

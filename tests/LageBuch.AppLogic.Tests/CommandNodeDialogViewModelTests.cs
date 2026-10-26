@@ -142,7 +142,7 @@ public class CommandNodeDialogViewModelTests
         vm.SaveCommand.Execute(null);
 
         var node = session.Incident.CommandNodes[^1];
-        Assert.Equal((CommandNodeKind.Unterabschnitt, "Dach", (Guid?)parent), (node.Kind, node.Name, node.ParentId));
+        Assert.Equal<(CommandNodeKind, string, Guid?)>((CommandNodeKind.Unterabschnitt, "Dach", parent), (node.Kind, node.Name, node.ParentId));
     }
 
     [Fact]

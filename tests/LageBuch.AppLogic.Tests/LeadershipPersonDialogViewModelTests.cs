@@ -258,7 +258,7 @@ public class LeadershipPersonDialogViewModelTests
         vm.SaveCommand.Execute(null);
 
         var now = Assert.Single(Running(session));
-        Assert.Equal(("EL", "Mustermann, Max", (Guid?)null, RoleSlot.Leiter), (now.Role, now.PersonName, now.NodeId, now.Slot));
+        Assert.Equal<(string, string?, Guid?, RoleSlot?)>(("EL", "Mustermann, Max", null, RoleSlot.Leiter), (now.Role, now.PersonName, now.NodeId, now.Slot));
     }
 
     [Fact]
@@ -570,7 +570,7 @@ public class LeadershipPersonDialogViewModelTests
         Assert.Equal("Mustermann, Max", board.El.Leiter?.PersonName);
         Assert.Null(board.Sections.Single().Leiter);
         var now = Assert.Single(Running(session));
-        Assert.Equal(((Guid?)null, (string?)null), (now.NodeId, now.Section));
+        Assert.Equal<(Guid?, string?)>((null, null), (now.NodeId, now.Section));
     }
 
     [Fact]
@@ -591,7 +591,7 @@ public class LeadershipPersonDialogViewModelTests
         vm.SaveCommand.Execute(null);
 
         var only = Assert.Single(session.Incident.Roles);
-        Assert.Equal((held, (DateTimeOffset?)null, RoleSlot.Leiter, "Florian Emmering 1/1"), (only.Id, only.To, only.Slot, only.CallSign));
+        Assert.Equal<(Guid, DateTimeOffset?, RoleSlot?, string?)>((held, null, RoleSlot.Leiter, "Florian Emmering 1/1"), (only.Id, only.To, only.Slot, only.CallSign));
         Assert.Equal("Musterfrau, Erika", board.El.Leiter?.PersonName);
         Assert.Equal(1, changes[0]);
         Assert.Equal(1, closed);
