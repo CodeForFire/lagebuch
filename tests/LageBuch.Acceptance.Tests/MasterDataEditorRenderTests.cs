@@ -326,15 +326,24 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
         var popup = box.GetVisualDescendants().OfType<Popup>().Single();
         Assert.True(popup.IsOpen);
-        Assert.Equal(
+
+        // Each row names where the format is from beside the template itself.
+        var rowTexts = popup.Child!.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.All(
             SettingsSection.IncidentNumberFormatSuggestions,
-            popup.Child!.GetVisualDescendants().OfType<ListBox>().Single().Items.Cast<string>());
+            s =>
+            {
+                Assert.Contains(s.Template, rowTexts);
+                Assert.Contains(s.Label, rowTexts);
+            });
 
         window.Press(PhysicalKey.ArrowDown);
         window.Press(PhysicalKey.Enter);
         Dispatcher.UIThread.RunJobs();
 
+        // Picking a row fills in the template alone, never its label.
         Assert.Equal("{A} 1.2 {JJMMTT} {NNNN}", settings.IncidentNumberFormat);
+        Assert.Equal("{A} 1.2 {JJMMTT} {NNNN}", box.Text);
         window.Close();
     }
 

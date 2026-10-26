@@ -405,10 +405,21 @@
                         <AutoCompleteBox x:Name="IncidentNumberFormatBox"
                                          Text="{Binding IncidentNumberFormat}"
                                          ItemsSource="{x:Static vm:SettingsSection.IncidentNumberFormatSuggestions}"
+                                         ValueMemberBinding="{Binding Template, DataType=vm:IncidentNumberFormatSuggestion}"
                                          FilterMode="None" MinimumPrefixLength="0"
                                          MaxLength="{x:Static md:IncidentSettings.MaxIncidentNumberFormatLength}"
                                          PlaceholderText="z. B. {A} 1.2 {JJMMTT} {NNNN}"
-                                         AutomationProperties.Name="Format der Einsatznummer" />
+                                         AutomationProperties.Name="Format der Einsatznummer">
+                          <!-- Each row says where the format is used; picking it fills in the template alone. -->
+                          <AutoCompleteBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IncidentNumberFormatSuggestion">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <TextBlock Grid.Column="0" Text="{Binding Template}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" Classes="secondary" />
+                              </Grid>
+                            </DataTemplate>
+                          </AutoCompleteBox.ItemTemplate>
+                        </AutoCompleteBox>
                       </HeaderedContentControl>
                       <TextBlock x:Name="IncidentNumberFormatError" Classes="field-error" TextWrapping="Wrap"
                                  Text="{Binding IncidentNumberFormatError}"

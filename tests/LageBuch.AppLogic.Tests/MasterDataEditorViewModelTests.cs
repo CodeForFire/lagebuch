@@ -532,9 +532,10 @@ public class MasterDataEditorViewModelTests
     {
         var suggestions = SettingsSection.IncidentNumberFormatSuggestions;
 
-        Assert.Equal("{A} 1.2 {JJMMTT} {NNNN}", suggestions[0]);
-        Assert.All(suggestions, s => Assert.True(IncidentNumberFormat.TryParse(s, out _), s));
-        Assert.All(suggestions, s => Assert.InRange(s.Length, 1, IncidentSettings.MaxIncidentNumberFormatLength));
+        Assert.Equal(new IncidentNumberFormatSuggestion("{A} 1.2 {JJMMTT} {NNNN}", "Bayern"), suggestions[0]);
+        Assert.Equal(["Bayern", "Baden-Württemberg", "Leitstellen-Schnittstelle UCRI"], suggestions.Select(s => s.Label));
+        Assert.All(suggestions, s => Assert.True(IncidentNumberFormat.TryParse(s.Template, out _), s.Template));
+        Assert.All(suggestions, s => Assert.InRange(s.Template.Length, 1, IncidentSettings.MaxIncidentNumberFormatLength));
     }
 
     [Fact]

@@ -51,11 +51,11 @@ public sealed partial class SettingsSection : EditorSection
     /// Baden-Württemberg, from the Landesfeuerwehrschule's F3 material ("B 240511 112"); and the
     /// Leitstellen-Schnittstelle UCRI's example ("2021-01-05-2553").
     /// </summary>
-    public static IReadOnlyList<string> IncidentNumberFormatSuggestions { get; } =
+    public static IReadOnlyList<IncidentNumberFormatSuggestion> IncidentNumberFormatSuggestions { get; } =
     [
-        "{A} 1.2 {JJMMTT} {NNNN}",
-        "{A} {JJMMTT} {NNN}",
-        "{JJJJ}-{MM}-{TT}-{NNNN}",
+        new("{A} 1.2 {JJMMTT} {NNNN}", "Bayern"),
+        new("{A} {JJMMTT} {NNN}", "Baden-Württemberg"),
+        new("{JJJJ}-{MM}-{TT}-{NNNN}", "Leitstellen-Schnittstelle UCRI"),
     ];
 
     /// <summary>
