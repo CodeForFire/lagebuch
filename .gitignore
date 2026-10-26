@@ -6,7 +6,6 @@ obj/
 *.user
 .vs/
 TestResults/
-coverage/
 StrykerOutput/
 *.trx
 artifacts/
