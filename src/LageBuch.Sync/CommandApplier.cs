@@ -79,6 +79,9 @@ public static class CommandApplier
             case PlaceRoleAssignmentCommand c:
                 incident.PlaceRoleAssignment(clock, Operator(c.Operator), c.AssignmentId, c.NodeId, c.Slot);
                 break;
+            case MoveCommandNodeCommand c:
+                incident.MoveCommandNode(clock, Operator(c.Operator), c.NodeId, c.ParentId, c.BeforeNodeId);
+                break;
             case MoveForceUnitCommand c:
                 incident.MoveForceUnit(clock, Operator(c.Operator), c.UnitId, c.NodeId);
                 break;

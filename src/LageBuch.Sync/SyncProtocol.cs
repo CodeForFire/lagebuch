@@ -132,7 +132,9 @@ public static class SyncProtocol
     /// the six commands, so the floor rises to 22. <c>addCommandNode</c> also carries the optional
     /// <c>auftrag</c>, <c>standort</c>, <c>funkgruppe</c>, <c>rufname</c> and <c>telefon</c>, so an
     /// Abschnitt is created with its details in one command. <c>placeRoleAssignment</c> moves an
-    /// existing Funktion into an Abschnitt and a board slot, as <c>moveForceUnit</c> does for a unit.
+    /// existing Funktion into an Abschnitt and a board slot, as <c>moveForceUnit</c> does for a unit,
+    /// and <c>moveCommandNode</c> reorders a node or moves it between the two levels. All of this
+    /// is one unreleased contract, renumbered above <c>main</c> together when it rebases.
     /// </para>
     /// </summary>
     public const int ProtocolVersion = 22;

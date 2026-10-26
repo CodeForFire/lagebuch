@@ -14,7 +14,7 @@ namespace LageBuch.Acceptance.Tests;
 public class PdfExportOptionsRenderTests
 {
     [AvaloniaFact]
-    public void Dialog_renders_with_all_eleven_sections_checked_by_default()
+    public void Dialog_renders_with_all_twelve_sections_checked_by_default()
     {
         var dialogVm = new PdfExportOptionsViewModel(_ => Task.CompletedTask);
 
@@ -23,7 +23,7 @@ public class PdfExportOptionsRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(11, dialogVm.Items.Count);
+        Assert.Equal(12, dialogVm.Items.Count);
         Assert.All(dialogVm.Items, i => Assert.True(i.IsSelected));
 
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");

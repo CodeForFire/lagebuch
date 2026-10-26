@@ -99,6 +99,21 @@ public sealed record CommandNode
             Telefon = Clean(telefon, MaxPhoneLength, "Telefon"),
         };
 
+    /// <summary>
+    /// Returns a copy at its new level: under <paramref name="parentId"/> an Unterabschnitt, at the
+    /// top an Abschnitt. A Bereitstellung only ever moves among the top level and stays one.
+    /// </summary>
+    public CommandNode MovedTo(Guid? parentId) => Kind switch
+    {
+        CommandNodeKind.Abschnitt or CommandNodeKind.Unterabschnitt => this with
+        {
+            Kind = parentId is null ? CommandNodeKind.Abschnitt : CommandNodeKind.Unterabschnitt,
+            ParentId = parentId,
+        },
+        _ when parentId is null => this,
+        _ => throw new InvalidOperationException("Nur ein Abschnitt liegt in einem Abschnitt."),
+    };
+
     /// <summary>Returns a copy dissolved at <paramref name="at"/>; a node can be dissolved only once.</summary>
     public CommandNode DissolvedAtTime(DateTimeOffset at)
     {

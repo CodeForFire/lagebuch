@@ -14,15 +14,17 @@ internal static class RowReconciler
     /// <summary>
     /// Makes <paramref name="rows"/> mirror <paramref name="items"/>, in order. Never raises a Reset
     /// and never replaces a row by index. O(n²) through <c>IndexOf</c>, which costs nothing at the
-    /// tens of rows an Einsatz holds.
+    /// tens of rows an Einsatz holds. The key is an id for every row the incident holds by id; a
+    /// row derived from text (a free-text Abschnitt) is keyed by that text.
     /// </summary>
-    public static void Reconcile<TRow, TItem>(
+    public static void Reconcile<TRow, TItem, TKey>(
         ObservableCollection<TRow> rows,
         IReadOnlyList<TItem> items,
-        Func<TRow, Guid> rowId,
-        Func<TItem, Guid> itemId,
+        Func<TRow, TKey> rowId,
+        Func<TItem, TKey> itemId,
         Func<TItem, TRow> create,
         Action<TRow, TItem> update)
+        where TKey : notnull
     {
         ArgumentNullException.ThrowIfNull(rows);
         ArgumentNullException.ThrowIfNull(items);
@@ -61,11 +63,12 @@ internal static class RowReconciler
     }
 
     // Rows before 'from' are already placed, so the search starts there.
-    private static int IndexOf<TRow>(ObservableCollection<TRow> rows, Func<TRow, Guid> rowId, Guid id, int from)
+    private static int IndexOf<TRow, TKey>(ObservableCollection<TRow> rows, Func<TRow, TKey> rowId, TKey id, int from)
+        where TKey : notnull
     {
         for (var i = from; i < rows.Count; i++)
         {
-            if (rowId(rows[i]) == id)
+            if (EqualityComparer<TKey>.Default.Equals(rowId(rows[i]), id))
             {
                 return i;
             }

@@ -93,7 +93,11 @@ public class WorkspaceNavItemsTests
                 new NavEntry(NavModules.Files, null, true),
             });
 
-        Assert.Equal(new[] { "ETB", "NACHBEREITUNG", "DATEIEN" }, Headers(vm).Take(3));
+        // The modules the layout predates slot in behind their default predecessors, so the
+        // layout's own three entries keep their relative order rather than their positions.
+        var headers = Headers(vm).ToList();
+        Assert.True(headers.IndexOf("ETB") < headers.IndexOf("NACHBEREITUNG"));
+        Assert.True(headers.IndexOf("NACHBEREITUNG") < headers.IndexOf("DATEIEN"));
     }
 
     [Fact]

@@ -33,14 +33,6 @@ public sealed class ModuleIconConverter : IValueConverter
     private const string TasksPath =
         "M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 15h-2v-2h2v2zm0-4h-2V8h2v6zm-1-9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z";
 
-    // Funktionen: a person with a badge.
-    private const string RolesPath =
-        "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z";
-
-    // Kräfte: a vehicle.
-    private const string ForcesPath =
-        "M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z";
-
     // Beteiligte: a telephone handset — what the list is for is calling these people back.
     private const string InvolvedPartiesPath =
         "M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z";
@@ -52,6 +44,10 @@ public sealed class ModuleIconConverter : IValueConverter
     // Atemschutz: the stopwatch from ScbaControlBar — the Druckabfrage clock.
     private const string ScbaPath =
         "M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z";
+
+    // Führung: an org chart — one box over a bar that branches into two.
+    private const string LeadershipPath =
+        "M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3z";
 
     // CO-Messung: a gauge.
     private const string CoPath =
@@ -75,11 +71,10 @@ public sealed class ModuleIconConverter : IValueConverter
         {
             NavModules.Etb => EtbPath,
             NavModules.Tasks => TasksPath,
-            NavModules.Roles => RolesPath,
-            NavModules.Forces => ForcesPath,
             NavModules.InvolvedParties => InvolvedPartiesPath,
             NavModules.IssuedItems => IssuedItemsPath,
             NavModules.Scba => ScbaPath,
+            NavModules.Leadership => LeadershipPath,
             NavModules.Co => CoPath,
             NavModules.Files => FilesPath,
             NavModules.Links => LinksPath,

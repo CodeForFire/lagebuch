@@ -96,6 +96,12 @@ public interface IIncidentSession
 
     void DissolveCommandNode(Guid nodeId);
 
+    /// <summary>
+    /// Moves a node under <paramref name="parentId"/> (null: the top level), before
+    /// <paramref name="beforeNodeId"/> (null: at the end); see <c>Incident.MoveCommandNode</c>.
+    /// </summary>
+    void MoveCommandNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId);
+
     /// <summary>Places a unit in a node; a null <paramref name="nodeId"/> returns it to "nicht zugeordnet".</summary>
     void MoveForceUnit(Guid unitId, Guid? nodeId);
 

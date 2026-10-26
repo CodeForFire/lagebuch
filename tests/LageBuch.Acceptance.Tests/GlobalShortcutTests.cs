@@ -26,7 +26,7 @@ public class GlobalShortcutTests
 
     private static readonly NavEntry[] ReorderedNavigation =
     [
-        new(NavModules.Forces, null, true),
+        new(NavModules.Leadership, null, true),
         new(NavModules.Scba, null, true),
         new(NavModules.Etb, null, true),
         new(NavModules.Tasks, null, true),
@@ -101,7 +101,7 @@ public class GlobalShortcutTests
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
-    public void The_digit_of_Kraeftes_rail_position_selects_it_and_focuses_its_first_field(bool reorderedRail)
+    public void The_digit_of_Fuehrungs_rail_position_opens_kraefte_where_it_was_left_and_focuses_its_first_field(bool reorderedRail)
     {
         var masterData = WorkspaceRenderHelper.MasterData();
         if (reorderedRail)
@@ -110,14 +110,15 @@ public class GlobalShortcutTests
         }
 
         var (window, _, vm) = ShowShell(masterData: masterData);
+        vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.ForcesTab;
         vm.SelectedNavItem = vm.NavItems.Single(i => i.ModuleKey == NavModules.Etb);
         Dispatcher.UIThread.RunJobs();
         FocusByTab(SelectedRailTab(window));
-        var position = vm.NavItems.IndexOf(vm.NavItems.Single(i => i.ModuleKey == NavModules.Forces));
+        var position = vm.NavItems.IndexOf(vm.NavItems.Single(i => i.ModuleKey == NavModules.Leadership));
 
         PressAndSettle(window, DigitKeys[position], RawInputModifiers.Control);
 
-        Assert.Equal("KRÄFTE", vm.SelectedNavItem?.Header);
+        Assert.Equal("FÜHRUNG", vm.SelectedNavItem?.Header);
         window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
     }
 
@@ -125,6 +126,7 @@ public class GlobalShortcutTests
     public void Ctrl_N_from_Kraefte_focuses_VON()
     {
         var (window, _, vm) = ShowShell(masterData: WorkspaceRenderHelper.MasterData() with { Navigation = ReorderedNavigation });
+        vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.ForcesTab;
         PressAndSettle(window, PhysicalKey.Digit1, RawInputModifiers.Control);
         window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
 

@@ -60,7 +60,7 @@ public class LinksTabRenderTests
     {
         var (window, _) = ShowWorkspace();
 
-        Assert.Equal(13, WorkspaceRenderHelper.RailHeaders(window).Count);
+        Assert.Equal(12, WorkspaceRenderHelper.RailHeaders(window).Count);
         Capture(window, "links-before.png");
     }
 
