@@ -1134,9 +1134,10 @@ public class IncidentWorkspaceViewModelTests
 
     // The Einsatznummer is usually unknown until ILS calls back (#69), so falling back to it for
     // the suggested export name meant most exports proposed the literal "Einsatz.pdf" -- the
-    // incident already has a name (its own .lagebuch file), so the export should reuse that.
+    // incident already has a name (its own .lagebuch file), so the export reuses that behind an
+    // "Einsatz-" prefix that says what the file is.
     [Fact]
-    public async Task ExportPdf_suggests_the_incidents_own_file_name()
+    public async Task ExportPdf_suggests_Einsatz_followed_by_the_incidents_own_file_name()
     {
         var dialogs = new FakeDialogs { ExportPath = null };
         var vm = NewWorkspace(out _, out _, dialogs);
@@ -1144,7 +1145,7 @@ public class IncidentWorkspaceViewModelTests
         vm.ExportPdfCommand.Execute(null);
         await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
 
-        Assert.Equal("x.pdf", dialogs.LastSuggestedExportName);
+        Assert.Equal("Einsatz-x.pdf", dialogs.LastSuggestedExportName);
     }
 
     [Fact]
@@ -1574,7 +1575,7 @@ public class IncidentWorkspaceViewModelTests
 
         // No .lagebuch on a client, so the name comes from the start time, formatted the way
         // HomeViewModel names a new incident's file.
-        Assert.Equal("20260622-0900.pdf", dialogs.LastSuggestedExportName);
+        Assert.Equal("Einsatz-20260622-0900.pdf", dialogs.LastSuggestedExportName);
         var bytes = await File.ReadAllBytesAsync(exportPath);
         Assert.Equal(0x25, bytes[0]); // %PDF
         Assert.Equal($"PDF exportiert: {Path.GetFileName(exportPath)}", vm.ExportStatus);
