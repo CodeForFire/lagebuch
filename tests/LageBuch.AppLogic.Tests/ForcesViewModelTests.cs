@@ -1044,7 +1044,7 @@ public class ForcesViewModelTests
 
         row.NodeChoices.Single(c => c.NodeId == nord.Id).SelectCommand.Execute(null);
 
-        Assert.Equal(nord.Id, session.Incident.Forces[0].NodeId);
+        Assert.Equal(nord.Id, session.Incident.Forces.Single(f => f.Id == row.Id).NodeId);
         Assert.Equal(1, changes[0]);
         Assert.Equal("Nord", row.NodeLabel);
         Assert.Equal("Nord", row.NodeCellLabel);
@@ -1102,6 +1102,68 @@ public class ForcesViewModelTests
         session.AddCommandNode(CommandNodeKind.Bereitstellung, "Marktplatz");
 
         Assert.All(vm.Forces, r => Assert.Contains(r.NodeChoices, c => c.Label == "Marktplatz"));
+    }
+
+    // Feedback from an Übung: the Kräfte list reads in the order the units arrived, but a
+    // Lagebuchführer looks a unit up by the Funkrufname that was just called over the radio.
+    [Fact]
+    public void Forces_are_listed_by_Funkrufname_in_numeric_order()
+    {
+        var vm = NewVm();
+        foreach (var callSign in new[] { "Florian Musterstadt 40/1", "Florian Musterstadt 2/1", "Florian Musterstadt 10/1" })
+        {
+            vm.NewBrigade = "FF Musterstadt";
+            vm.NewCallSign = callSign;
+            vm.NewMannschaftCount = 6;
+            vm.AddForceCommand.Execute(null);
+        }
+
+        Assert.Equal(
+            new[] { "Florian Musterstadt 2/1", "Florian Musterstadt 10/1", "Florian Musterstadt 40/1" },
+            vm.Forces.Select(r => r.CallSign));
+    }
+
+    [Fact]
+    public void A_unit_already_in_the_Einsatz_is_listed_by_Funkrufname_when_the_tab_opens()
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddForceUnit("FF Musterstadt", 6, "Florian Musterstadt 30/1");
+        session.AddForceUnit("FF Musterdorf", 6, "florian musterdorf 42/1");
+
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+
+        Assert.Equal(
+            new[] { "florian musterdorf 42/1", "Florian Musterstadt 30/1" },
+            vm.Forces.Select(r => r.CallSign));
+    }
+
+    [Fact]
+    public void A_unit_without_a_Funkrufname_is_listed_last()
+    {
+        // The dock refuses one since #220, but an older Einsatzdatei can still hold it.
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddForceUnit("FF Musterstadt", 6);
+        session.AddForceUnit("FF Musterdorf", 6);
+        session.AddForceUnit("FF Musterstadt", 6, "Florian Musterstadt 30/1");
+
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+
+        // Among themselves they go by Wache.
+        Assert.Equal(
+            new[] { ("FF Musterstadt", "Florian Musterstadt 30/1"), ("FF Musterdorf", null), ("FF Musterstadt", null) },
+            vm.Forces.Select(r => (r.Brigade, r.CallSign)));
     }
 
     private static ForcesViewModel NewVm()

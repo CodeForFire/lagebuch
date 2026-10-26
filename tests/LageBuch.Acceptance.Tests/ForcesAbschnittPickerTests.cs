@@ -108,7 +108,7 @@ public class ForcesAbschnittPickerTests
         var pickers = Pickers(grid);
         Assert.Equal(2, pickers.Count);
         Assert.Equal(
-            new[] { "Abschnitt 1 / Nord", "—" },
+            new[] { "—", "Abschnitt 1 / Nord" }, // by Funkrufname: Aich before Emmering
             pickers.Select(p => ((TextBlock)p.Content!).Text!));
         Assert.All(pickers, p => Assert.False(string.IsNullOrEmpty(ToolTip.GetTip(p) as string)));
         Capture(window, "kraefte-abschnitt-after.png");
@@ -118,7 +118,7 @@ public class ForcesAbschnittPickerTests
     public void The_flyout_lists_the_choices_marks_the_current_one_and_places_the_unit()
     {
         var (_, view, vm) = Show(narrow: false);
-        var picker = Pickers(view.GetControl<DataGrid>("ForcesGrid"))[1];
+        var picker = Pickers(view.GetControl<DataGrid>("ForcesGrid"))[0]; // Aich, unplaced
 
         picker.Flyout!.ShowAt(picker);
         Dispatcher.UIThread.RunJobs();
@@ -146,7 +146,7 @@ public class ForcesAbschnittPickerTests
         // A Button inside a Flyout does not dismiss it, and the kept row never rebuilds the popup.
         Assert.False(picker.Flyout.IsOpen);
 
-        Assert.Equal("Bereitstellung Marktplatz", vm.Forces[1].NodeLabel);
+        Assert.Equal("Bereitstellung Marktplatz", vm.Forces[0].NodeLabel);
         Assert.Equal("Bereitstellung Marktplatz", ((TextBlock)picker.Content!).Text!);
     }
 
@@ -159,7 +159,7 @@ public class ForcesAbschnittPickerTests
         var pickers = Pickers(cards);
         Assert.Equal(2, pickers.Count);
         Assert.Equal(
-            new[] { "Abschnitt 1 / Nord", NodeChoices.UnplacedLabel },
+            new[] { NodeChoices.UnplacedLabel, "Abschnitt 1 / Nord" },
             pickers.Select(p => ((TextBlock)p.Content!).Text!));
         Assert.Equal(2, cards.GetVisualDescendants().OfType<TextBlock>().Count(t => t.Text == "ABSCHNITT"));
         Capture(window, "kraefte-abschnitt-narrow.png");

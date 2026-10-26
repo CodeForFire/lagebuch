@@ -1,0 +1,1 @@
+The Kräfte list is sorted by Funkrufname, an emptied Stärke field no longer turns red, the Stärke korrigieren buttons line up down the list, and ÜBERNEHMEN or Enter closes the editor after applying the correction.

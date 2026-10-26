@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -370,7 +371,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         _masterVehicles = masterData.Vehicles;
         IsReadOnly = session.IsReadOnly;
         StatusOptions = masterData.UnitStatus;
-        Forces = new ObservableCollection<ForceRow>(session.Incident.Forces.Select(ToRow));
+        Forces = new ObservableCollection<ForceRow>(ByCallSign(session.Incident.Forces).Select(ToRow));
         TotalPersonnel = session.Incident.TotalPersonnel;
         TotalScba = session.Incident.TotalScba;
         RefreshVehicleOptions(); // no longer brigade-filtered (#215) -- populate right away
@@ -390,7 +391,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
     {
         RowReconciler.Reconcile(
             Forces,
-            _session.Incident.Forces,
+            ByCallSign(_session.Incident.Forces),
             r => r.Id,
             f => f.Id,
             ToRow,
@@ -405,6 +406,22 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         RefreshVehicleOptions(); // taken vehicles reappear once their row is gone
         OnPropertyChanged(nameof(IsDuplicateCallSign));
     }
+
+    // Numeric-aware, so "…/2/1" comes before "…/10/1", and case-blind like the duplicate check.
+    private static readonly StringComparer CallSignOrder =
+        StringComparer.Create(CultureInfo.InvariantCulture, CompareOptions.NumericOrdering | CompareOptions.IgnoreCase);
+
+    /// <summary>
+    /// The list reads by Funkrufname, the name a unit is called by over the radio, not in the order
+    /// the units arrived. Only the view sorts: the incident keeps its own order. A unit without a
+    /// Funkrufname -- only an older Einsatzdatei can hold one (#220) -- goes last, by Wache.
+    /// </summary>
+    private static List<Domain.ForceUnit> ByCallSign(IEnumerable<Domain.ForceUnit> forces) =>
+        forces
+            .OrderBy(f => string.IsNullOrWhiteSpace(f.CallSign))
+            .ThenBy(f => f.CallSign?.Trim(), CallSignOrder)
+            .ThenBy(f => f.Brigade, CallSignOrder)
+            .ToList();
 
     public bool IsReadOnly { get; }
 

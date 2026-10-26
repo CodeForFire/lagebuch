@@ -80,9 +80,9 @@ public class ForcesFlyoutKeyboardTests
     }
 
     [AvaloniaFact]
-    public void Enter_in_a_strength_field_applies_the_correction()
+    public void Enter_in_a_strength_field_applies_the_correction_and_closes_the_flyout()
     {
-        var (window, vm, _) = OpenStrengthFlyout();
+        var (window, vm, flyoutButton) = OpenStrengthFlyout();
 
         // The flyout's fields are unnamed, so locate ZUGFÜHRER (ZF) by its HeaderedContentControl
         // header rather than by tree order -- the DataGrid's own cell controls and the input
@@ -101,6 +101,7 @@ public class ForcesFlyoutKeyboardTests
         var updated = Assert.Single(vm.Forces);
         Assert.Equal(1, updated.ZugfuehrerCount); // keyboard-only submit committed the edit
         Assert.True(updated.HasHistory);
+        Assert.False(flyoutButton.Flyout!.IsOpen); // and the editor is done, like ÜBERNEHMEN
     }
 
     // #651: the flyout's fields are the row's own counts, so a value typed and then dismissed
@@ -212,6 +213,84 @@ public class ForcesFlyoutKeyboardTests
         Assert.False(flyout.IsOpen);
         window.AssertFocused(flyoutButton);
     }
+
+    // Feedback from an Übung: ÜBERNEHMEN committed the correction but left the editor open, so
+    // the Lagebuchführer could not tell it had been taken and closed it with Esc to be sure.
+    [AvaloniaFact]
+    public void Uebernehmen_applies_the_correction_and_closes_the_flyout()
+    {
+        var (window, vm, flyoutButton) = OpenStrengthFlyout();
+        var zfBox = StrengthBox(window, "ZUGFÜHRER (ZF)");
+        zfBox.Focus();
+        zfBox.SelectAll();
+        window.KeyTextInput("1");
+        Dispatcher.UIThread.RunJobs();
+
+        var apply = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Content as string == "ÜBERNEHMEN");
+        apply.Focus();
+        window.Press(PhysicalKey.Space);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(flyoutButton.Flyout!.IsOpen);
+        Assert.Equal(1, Assert.Single(vm.Forces).ZugfuehrerCount);
+    }
+
+    // Feedback from an Übung: emptying a count in the editor turned the field red, because the
+    // binding could not turn "" into a number. An empty field is 0 -- clearing AGT is how every
+    // Trupp is withdrawn.
+    [AvaloniaFact]
+    public void Emptying_a_strength_field_shows_no_error_and_applies_as_zero()
+    {
+        var (window, vm, flyoutButton) = OpenStrengthFlyout();
+        var row = Assert.Single(vm.Forces);
+        var mannBox = StrengthBox(window, "MANN");
+        Assert.Equal("6", mannBox.Text);
+        mannBox.Focus();
+        mannBox.SelectAll();
+        window.Press(PhysicalKey.Backspace);
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "forces-strength-emptied.png");
+
+        Assert.Equal(string.Empty, mannBox.Text);
+        Assert.False(DataValidationErrors.GetHasErrors(mannBox), "the emptied field is flagged as invalid");
+        Assert.Null(row.MannschaftCount);
+
+        // The field is still the editor's: the correction from 6 to 0 counts.
+        row.ZugfuehrerCount = 1;
+        window.Press(PhysicalKey.Enter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(flyoutButton.Flyout!.IsOpen);
+        Assert.Equal("1/0/0/1", Assert.Single(vm.Forces).StrengthText);
+    }
+
+    [AvaloniaFact]
+    public void Emptying_a_count_in_the_dock_shows_no_error()
+    {
+        var vm = BuildForcesVm(out _);
+        var view = new ForcesView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1200, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var scbaBox = view.GetControl<TextBox>("ScbaBox");
+        scbaBox.Focus();
+        window.KeyTextInput("2");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2, vm.NewScbaCount);
+
+        window.Press(PhysicalKey.Backspace);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(DataValidationErrors.GetHasErrors(scbaBox), "the emptied field is flagged as invalid");
+        Assert.Null(vm.NewScbaCount);
+    }
+
+    private static TextBox StrengthBox(Window window, string header) =>
+        window.GetVisualDescendants().OfType<HeaderedContentControl>()
+            .Single(h => (h.Header as string) == header)
+            .GetVisualDescendants().OfType<TextBox>().Single();
 
     // Opt-in PNG capture for the PR's before/after pair; a plain test run writes nothing.
     private static void Capture(Window window, string name)
