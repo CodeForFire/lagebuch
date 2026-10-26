@@ -1,10 +1,11 @@
 {
   "_comment": "Fiktive Demo-Stammdaten für die Probefahrt. Alle Wachen, Fahrzeuge, Namen und Nummern sind erfunden. Importieren über STAMMDATEN → IMPORTIEREN, dann SPEICHERN.",
   "roles": [
-    { "name": "EL", "uniqueness": "uniquePerIncident" },
-    { "name": "EAL", "uniqueness": "multiple" },
+    { "name": "EL", "uniqueness": "uniquePerIncident", "slot": "leiter" },
+    { "name": "EAL", "uniqueness": "multiple", "slot": "leiter" },
     { "name": "ZF", "uniqueness": "multiple" },
     { "name": "GF", "uniqueness": "multiple" },
+    { "name": "Melder", "uniqueness": "multiple", "slot": "melder" },
     { "name": "AS-Überwachung", "uniqueness": "multiple" },
     { "name": "Presse", "uniqueness": "multiple" }
   ],
@@ -96,6 +97,12 @@
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 14/1", "seats": 9, "hasZugfuehrer": false },
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 42/1", "seats": 9, "hasZugfuehrer": false },
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 47/1", "seats": 6, "hasZugfuehrer": false }
+  ],
+  "talkGroups": [
+    { "name": "FW_MUSTER", "number": "1000", "kind": "tmo", "note": "Einsatzstelle" },
+    { "name": "RD_MUSTER", "number": "1001", "kind": "tmo", "note": null },
+    { "name": "301_F", "number": null, "kind": "dmo", "note": "Atemschutzüberwachung" },
+    { "name": "302_F", "number": null, "kind": "dmo", "note": null }
   ],
   "personnel": [
     { "lastName": "Mustermann", "firstName": "Max", "role": "EL", "callSign": "Florian Musterstadt 11/1", "phone": "01 71 / 1 23 45 67", "email": "max.mustermann@ff-musterstadt.example", "note": "Kreisbrandrat, KBI Vertretung" },

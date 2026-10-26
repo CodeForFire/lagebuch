@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Persistence.Tests;
@@ -1063,4 +1064,84 @@ public class MasterDataJsonTests
 
         Assert.Equal(AnonymizedExampleData.Premises, Parse(MasterDataJson.Serialize(set)).Premises);
     }
+
+    [Fact]
+    public void Talk_groups_round_trip_through_json()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TalkGroups = new[]
+            {
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+            },
+        };
+
+        var reparsed = Parse(MasterDataJson.Serialize(original));
+
+        Assert.Equal(original.TalkGroups, reparsed.TalkGroups);
+        Assert.Equal("TMO FW_MUSTER 1000", reparsed.TalkGroups[0].Display);
+        Assert.Equal("DMO 301_F", reparsed.TalkGroups[1].Display);
+    }
+
+    [Fact]
+    public void Missing_talk_groups_read_as_empty() =>
+        Assert.Empty(Parse("""{ "roles": ["EL"] }""").TalkGroups);
+
+    [Fact]
+    public void Talk_group_without_or_with_unknown_kind_reads_as_tmo_and_blank_optionals_as_null()
+    {
+        var set = Parse("""
+            { "talkGroups": [
+              { "name": "A", "number": "", "note": "  " },
+              { "name": "B", "kind": "satellite" },
+              { "name": "C", "kind": "DMO" } ] }
+            """);
+
+        Assert.Equal(TalkGroupKind.Tmo, set.TalkGroups[0].Kind);
+        Assert.Null(set.TalkGroups[0].Number);
+        Assert.Null(set.TalkGroups[0].Note);
+        Assert.Equal(TalkGroupKind.Tmo, set.TalkGroups[1].Kind);
+        Assert.Equal(TalkGroupKind.Dmo, set.TalkGroups[2].Kind);
+    }
+
+    [Fact]
+    public void Role_without_slot_reads_as_none()
+    {
+        var set = Parse("""{ "roles": ["EL", { "name": "ZF", "slot": "unbekannt" }, { "name": "Y" }] }""");
+
+        Assert.All(set.Roles, r => Assert.Equal(RoleSlot.None, r.Slot));
+    }
+
+    [Fact]
+    public void Role_slot_round_trips()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            Roles = new[] { new Role("EL", RoleUniqueness.UniquePerIncident, RoleSlot.Leiter), new Role("Melder", RoleUniqueness.Multiple, RoleSlot.Melder), new Role("ZF") },
+        };
+
+        var json = MasterDataJson.Serialize(original);
+
+        Assert.Contains("\"slot\": \"leiter\"", json, StringComparison.Ordinal);
+        Assert.Equal(original.Roles, Parse(json).Roles);
+    }
+
+    [Fact]
+    public void Talk_group_name_over_200_is_rejected()
+    {
+        var json = "{ \"talkGroups\": [{ \"name\": \"" + new string('x', 201) + "\" }] }";
+
+        var ex = Assert.Throws<JsonException>(() => Parse(json));
+        Assert.Contains("Funkgruppe", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(200, Parse(json.Replace(new string('x', 201), new string('x', 200), StringComparison.Ordinal)).TalkGroups[0].Name.Length);
+    }
+
+    [Fact]
+    public void Talk_group_with_a_null_name_is_a_json_exception() =>
+        Assert.Throws<JsonException>(() => Parse("""{ "talkGroups": [{ "name": null }] }"""));
+
+    [Fact]
+    public void A_set_holding_only_talk_groups_is_not_empty() =>
+        Assert.False((MasterDataSet.Empty with { TalkGroups = new[] { new TalkGroup("A", null, TalkGroupKind.Tmo) } }).IsEmpty);
 }

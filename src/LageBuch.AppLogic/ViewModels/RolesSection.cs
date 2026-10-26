@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -18,7 +19,7 @@ public sealed partial class RolesSection : EditorSection
         : base(title, requestConfirm)
     {
         _onChanged = onChanged;
-        Rows = new ObservableCollection<RoleRow>(roles.Select(r => NewRow(r.Name, r.Uniqueness)));
+        Rows = new ObservableCollection<RoleRow>(roles.Select(r => NewRow(r.Name, r.Uniqueness, r.Slot)));
     }
 
     public ObservableCollection<RoleRow> Rows { get; }
@@ -40,6 +41,21 @@ public sealed partial class RolesSection : EditorSection
             .Select(v => new UniquenessOption(v, Label(v)))
             .ToArray();
 
+    /// <summary>The Führungstafel posts, "—" (none) first, then in enum order.</summary>
+    internal static IReadOnlyList<SlotOption> SlotChoices { get; } =
+        Enum.GetValues<RoleSlot>()
+            .Select(v => new SlotOption(v, SlotLabel(v)))
+            .ToArray();
+
+    private static string SlotLabel(RoleSlot slot) => slot switch
+    {
+        RoleSlot.Leiter => "Leiter",
+        RoleSlot.Melder => "Melder",
+        RoleSlot.Fuehrungsassistent => "Führungsassistent",
+        RoleSlot.Fachberater => "Fachberater",
+        _ => "—",
+    };
+
     private static string Label(RoleUniqueness uniqueness) => uniqueness switch
     {
         RoleUniqueness.UniquePerIncident => "einmal je Einsatz",
@@ -47,13 +63,13 @@ public sealed partial class RolesSection : EditorSection
         _ => "mehrfach",
     };
 
-    private RoleRow NewRow(string name, RoleUniqueness uniqueness) =>
-        new(name, uniqueness, _onChanged);
+    private RoleRow NewRow(string name, RoleUniqueness uniqueness, RoleSlot slot) =>
+        new(name, uniqueness, slot, _onChanged);
 
     [RelayCommand]
     private void Add()
     {
-        var row = NewRow(string.Empty, RoleUniqueness.Multiple);
+        var row = NewRow(string.Empty, RoleUniqueness.Multiple, RoleSlot.None);
         Rows.Add(row);
         _onChanged();
         OnRowAdded(row);
@@ -94,7 +110,7 @@ public sealed partial class RolesSection : EditorSection
             var name = row.Name?.Trim() ?? string.Empty;
             if (name.Length > 0 && seen.Add(name))
             {
-                result.Add(new Role(name, row.Uniqueness));
+                result.Add(new Role(name, row.Uniqueness, row.Slot));
             }
         }
 

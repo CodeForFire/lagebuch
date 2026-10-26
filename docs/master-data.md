@@ -92,6 +92,17 @@ The address is not copied, because a Haus in the CO-Messprotokoll has none. It
 tells two Objekte apart in the list. Out-of-range numbers are clamped, rows
 without a name are skipped, a second Objekt of the same name (ignoring case) is
 dropped, and a list holds at most 500 Objekte.
+## Funkgruppen and the Führungstafel slot of a Funktion
+
+`talkGroups` lists the Funkgruppen a Führungsstelle works on: each has a `name`, an
+optional `number`, a `kind` (`"tmo"` or `"dmo"`, TMO when missing or unknown) and an
+optional `note`. A name is required and at most 200 characters. The editor shows them in
+a **Funkgruppen** section, and an Einsatz copies the text it uses, so renaming or
+deleting a group here never changes a past Einsatz.
+
+A role may carry an optional `slot` — `leiter`, `melder`, `fuehrungsassistent` or
+`fachberater` — the post on the Führungstafel its holder fills. A missing or unknown
+slot means none.
 
 ## Kontakte: die Notiz ist das Suchfeld
 

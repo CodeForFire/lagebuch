@@ -1,5 +1,6 @@
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync.Tests;
@@ -17,6 +18,18 @@ public class CommandSerializationTests
         new AssignRoleCommand(Op, "EL", "Huber", "FFB 1", DateTimeOffset.UnixEpoch, null, "Abschnitt", "0171"),
         new TransferRoleCommand(Op, Guid.NewGuid(), "Schmidt", "FFB 12/2", "0172"),
         new EditRolePhoneCommand(Op, Guid.NewGuid(), "0173"),
+        new AssignRoleCommand(Op, "Abschnittsleiter", "Huber", null, null, null, null, null, Guid.NewGuid(), RoleSlot.Leiter),
+        new AddCommandNodeCommand(Op, CommandNodeKind.Abschnitt, "Nord", null),
+        new AddCommandNodeCommand(Op, CommandNodeKind.Unterabschnitt, "Nord 1", Guid.NewGuid()),
+        new UpdateCommandNodeCommand(Op, Guid.NewGuid(), "Nord", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"),
+        new DissolveCommandNodeCommand(Op, Guid.NewGuid()),
+        new MoveForceUnitCommand(Op, Guid.NewGuid(), Guid.NewGuid()),
+        new MoveForceUnitCommand(Op, Guid.NewGuid(), null),
+        new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), Guid.NewGuid(), RoleSlot.Leiter),
+        new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), null, RoleSlot.None),
+        new SetFuehrungsstufeCommand(Op, Fuehrungsstufe.C),
+        new SetFuehrungsstufeCommand(Op, null),
+        new UpdateLeadershipPostCommand(Op, "Feuerwehrhaus", "Florian EL", "0172", "TG 1"),
         new SetInvolvedPartyDwellingCommand(Guid.NewGuid(), Guid.NewGuid()),
         new SetInvolvedPartyDwellingCommand(Guid.NewGuid(), null),
         new SetInvolvedPartyWhereaboutsCommand(Guid.NewGuid(), "im RTW Rotkreuz Musterstadt 71/1"),
@@ -321,5 +334,56 @@ public class CommandSerializationTests
 
         Assert.Contains($"\"$type\":\"{discriminator}\"", json, StringComparison.Ordinal);
         Assert.Equal(command.GetType(), SyncJson.Deserialize<SyncCommand>(json).GetType());
+    }
+
+    [Fact]
+    public void Add_command_node_round_trips_its_details_and_reads_a_payload_without_them()
+    {
+        var json = SyncJson.Serialize<SyncCommand>(new AddCommandNodeCommand(
+            Op, CommandNodeKind.Abschnitt, "Nord", null, "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"));
+        var back = Assert.IsType<AddCommandNodeCommand>(SyncJson.Deserialize<SyncCommand>(json));
+        Assert.Equal("Brandbekämpfung", back.Auftrag);
+        Assert.Equal("Hauptstraße", back.Standort);
+        Assert.Equal("TG 2", back.Funkgruppe);
+        Assert.Equal("Florian Nord", back.Rufname);
+        Assert.Equal("0171", back.Telefon);
+
+        const string Old = "{\"$type\":\"addCommandNode\",\"operator\":{\"name\":\"Muster\",\"callSign\":\"FFB 1\"},\"kind\":\"Abschnitt\",\"name\":\"Nord\",\"parentId\":null}";
+        var old = Assert.IsType<AddCommandNodeCommand>(SyncJson.Deserialize<SyncCommand>(Old));
+        Assert.Equal("Nord", old.Name);
+        Assert.Null(old.Auftrag);
+        Assert.Null(old.Standort);
+        Assert.Null(old.Funkgruppe);
+        Assert.Null(old.Rufname);
+        Assert.Null(old.Telefon);
+    }
+
+    [Fact]
+    public void Placement_commands_use_their_discriminators_and_enums_travel_by_name()
+    {
+        var json = SyncJson.Serialize<SyncCommand>(new AddCommandNodeCommand(Op, CommandNodeKind.Bereitstellung, "BR", null));
+        Assert.Contains("\"$type\":\"addCommandNode\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"kind\":\"Bereitstellung\"", json, StringComparison.Ordinal);
+
+        Assert.Contains(
+            "\"$type\":\"updateCommandNode\"",
+            SyncJson.Serialize<SyncCommand>(new UpdateCommandNodeCommand(Op, Guid.NewGuid(), "N", null, null, null, null, null)),
+            StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"dissolveCommandNode\"", SyncJson.Serialize<SyncCommand>(new DissolveCommandNodeCommand(Op, Guid.NewGuid())), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"moveForceUnit\"", SyncJson.Serialize<SyncCommand>(new MoveForceUnitCommand(Op, Guid.NewGuid(), null)), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"placeRoleAssignment\"", SyncJson.Serialize<SyncCommand>(new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), null, RoleSlot.Leiter)), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"setFuehrungsstufe\"", SyncJson.Serialize<SyncCommand>(new SetFuehrungsstufeCommand(Op, Fuehrungsstufe.B)), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"updateLeadershipPost\"", SyncJson.Serialize<SyncCommand>(new UpdateLeadershipPostCommand(Op, null, null, null, null)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Legacy_assignRole_without_node_and_slot_deserializes_as_unplaced()
+    {
+        const string json = """{"$type":"assignRole","operator":{"name":"M","callSign":null},"role":"EL","personName":"H","callSign":null,"from":null,"to":null,"section":null,"phone":null}""";
+
+        var c = Assert.IsType<AssignRoleCommand>(SyncJson.Deserialize<SyncCommand>(json));
+
+        Assert.Null(c.NodeId);
+        Assert.Equal(RoleSlot.None, c.Slot);
     }
 }

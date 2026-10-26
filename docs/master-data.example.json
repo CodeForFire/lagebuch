@@ -1,10 +1,11 @@
 {
   "roles": [
-    { "name": "EL", "uniqueness": "uniquePerIncident" },
-    { "name": "EAL", "uniqueness": "multiple" },
+    { "name": "EL", "uniqueness": "uniquePerIncident", "slot": "leiter" },
+    { "name": "EAL", "uniqueness": "multiple", "slot": "leiter" },
     { "name": "ZF", "uniqueness": "multiple" },
     { "name": "GF", "uniqueness": "multiple" },
-    { "name": "Abschnittsleiter", "uniqueness": "uniquePerSection" }
+    { "name": "Melder", "uniqueness": "multiple", "slot": "melder" },
+    { "name": "Abschnittsleiter", "uniqueness": "uniquePerSection", "slot": "leiter" }
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz"],
   "keywords": ["B2", "B3", "B3 Person", "THL 1", "THL 2 VU eingeklemmt", "ABC 1"],
@@ -100,6 +101,12 @@
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false, "isOwn": true },
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true, "phone": "01 71 / 2 34 56 78", "email": "kdow@ff-musterstadt.example" },
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false }
+  ],
+  "talkGroups": [
+    { "name": "FW_MUSTER", "number": "1000", "kind": "tmo", "note": "Einsatzstelle" },
+    { "name": "RD_MUSTER", "number": "1001", "kind": "tmo", "note": null },
+    { "name": "301_F", "number": null, "kind": "dmo", "note": "Atemschutzüberwachung" },
+    { "name": "302_F", "number": null, "kind": "dmo", "note": null }
   ],
   "personnel": [
     { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000", "isOwn": true, "email": "max.mustermann@ff-musterstadt.example", "note": "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz" },

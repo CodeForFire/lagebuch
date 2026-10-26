@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 33;
+    public const int CurrentVersion = 34;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -224,6 +224,15 @@ public static class Migrations
         if (version < 33)
         {
             ApplyV33(cn, tx);
+        }
+
+        // Stryker disable all : V34 only adds a table and nullable columns that SchemaGuard.Reconcile
+        // below adds identically on every open; see V26.
+        if (version < 34)
+        {
+            ApplyV34(cn, tx);
+
+            // Stryker restore all
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -961,6 +970,41 @@ public static class Migrations
             );
             """;
         Exec(cn, tx, sql33);
+    }
+
+    // The Führungsorganisation (Abschnitte, Bereitstellung, partner Einsatzleitungen) and where each
+    // unit and Funktion sits in it. Placement ids carry no foreign key, as V22's safety_trupp_id: an
+    // older file reads as "nicht zugeordnet", and a node a foreign build left dangling is shown as
+    // unknown rather than refused. The Einsatzleitung's own post lives on incident_meta.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV34(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql34 = """
+            CREATE TABLE IF NOT EXISTS command_nodes (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                parent_id TEXT,
+                auftrag TEXT,
+                standort TEXT,
+                funkgruppe TEXT,
+                rufname TEXT,
+                telefon TEXT,
+                dissolved_at TEXT
+            );
+            """;
+        Exec(cn, tx, sql34);
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "node_id", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "role_assignments", "node_id", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "role_assignments", "slot", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "fuehrungsstufe", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_standort", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_rufname", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_telefon", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_funkgruppe", "TEXT");
+
+        // Stryker restore all
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

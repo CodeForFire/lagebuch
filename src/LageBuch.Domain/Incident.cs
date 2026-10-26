@@ -4,6 +4,7 @@ using LageBuch.Domain.Equipment;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
@@ -27,6 +28,7 @@ public sealed class Incident
     private readonly List<InvolvedParty> _involvedParties = new();
     private readonly List<SituationReport> _situationReports = new();
     private readonly List<IssuedItem> _issuedItems = new();
+    private readonly List<CommandNode> _commandNodes = new();
 
     private Incident()
     {
@@ -96,6 +98,15 @@ public sealed class Incident
 
     /// <summary>How many Geräte are still out, i.e. not yet given back.</summary>
     public int ItemsOut => _issuedItems.Count(i => i.IsOut);
+
+    /// <summary>Abschnitte, Unterabschnitte, Bereitstellungen and partner Einsatzleitungen in creation order, dissolved ones included.</summary>
+    public IReadOnlyList<CommandNode> CommandNodes => _commandNodes;
+
+    /// <summary>The Führungsstufe of the Einsatz, or null while none is set.</summary>
+    public Fuehrungsstufe? Fuehrungsstufe { get; private set; }
+
+    /// <summary>How the Einsatzleitung can be reached. Never null; <see cref="LeadershipPost.Empty"/> until filled.</summary>
+    public LeadershipPost LeadershipPost { get; private set; } = LeadershipPost.Empty;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -169,7 +180,10 @@ public sealed class Incident
         string? postalCode = null,
         string? place = null,
         IEnumerable<SituationReport>? situationReports = null,
-        IEnumerable<IssuedItem>? issuedItems = null)
+        IEnumerable<IssuedItem>? issuedItems = null,
+        IEnumerable<CommandNode>? commandNodes = null,
+        Fuehrungsstufe? fuehrungsstufe = null,
+        LeadershipPost? leadershipPost = null)
     {
         var incident = new Incident
         {
@@ -186,10 +200,12 @@ public sealed class Incident
             Status = status,
             ClosedAt = closedAt,
             ClosedBy = closedBy,
+            Fuehrungsstufe = fuehrungsstufe is { } stufe && Enum.IsDefined(stufe) ? stufe : null,
+            LeadershipPost = leadershipPost ?? LeadershipPost.Empty,
         };
         incident._checklists.AddRange(checklists);
         incident._journal.AddRange(journal);
-        incident._roles.AddRange(roles);
+        incident._roles.AddRange(roles.Select(r => Enum.IsDefined(r.Slot) ? r : r with { Slot = RoleSlot.None }));
         incident._forces.AddRange(forces);
         incident._scbaTrupps.AddRange(scbaTrupps);
         incident._audit.AddRange(audit);
@@ -201,6 +217,7 @@ public sealed class Incident
         incident._involvedParties.AddRange(involvedParties);
         incident._situationReports.AddRange(situationReports ?? []);
         incident._issuedItems.AddRange(issuedItems ?? []);
+        incident._commandNodes.AddRange(CommandNodeRepair.Resolve(commandNodes ?? Enumerable.Empty<CommandNode>()));
         return incident;
     }
 
@@ -493,13 +510,34 @@ public sealed class Incident
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? section = null,
-        string? phone = null)
+        string? phone = null,
+        Guid? nodeId = null,
+        RoleSlot slot = RoleSlot.None)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var assignment = RoleAssignment.Create(role, personName, callSign, from, to, section, phone);
+        if (!Enum.IsDefined(slot))
+        {
+            throw new ArgumentOutOfRangeException(nameof(slot), slot, "Unbekannter Posten.");
+        }
+
+        // Any node kind may hold a Funktion: Bereitstellung and partner Einsatzleitungen have a
+        // Leiter on the sheet too. The node's name wins over a free-text section; the rename
+        // propagation keeps Section equal to it, so FindRunningRoleHolder needs no change.
+        if (nodeId is { } id)
+        {
+            var node = FindCommandNode(id) ?? throw new KeyNotFoundException($"Abschnitt {id} nicht gefunden.");
+            if (!node.IsLive)
+            {
+                throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+            }
+
+            section = node.Name;
+        }
+
+        var assignment = RoleAssignment.Create(role, personName, callSign, from, to, section, phone, nodeId, slot);
         _roles.Add(assignment);
         AppendSystemEntry(clock, op, $"Funktion {assignment.Role} zugewiesen: {assignment.PersonName}");
         return assignment;
@@ -569,11 +607,68 @@ public sealed class Incident
             from: clock.Now,
             to: null,
             section: ended.Section,
-            phone: newPhone);
+            phone: newPhone,
+            nodeId: ended.NodeId,
+            slot: ended.Slot);
         _roles.Add(next);
 
         AppendSystemEntry(clock, op, $"Funktion {ended.Role} übergeben: {ended.PersonName} → {next.PersonName}");
         return next;
+    }
+
+    /// <summary>
+    /// Moves a running Funktion into a live node and a board slot, or to the Einsatzleitung when
+    /// <paramref name="nodeId"/> is null (Section cleared). The counterpart of
+    /// <see cref="MoveForceUnit"/> for a Funktion recorded before the board placed it; placing it
+    /// where it already is writes nothing.
+    /// </summary>
+    public RoleAssignment PlaceRoleAssignment(
+        IClock clock, SessionOperator op, Guid assignmentId, Guid? nodeId, RoleSlot slot)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        if (!Enum.IsDefined(slot))
+        {
+            throw new ArgumentOutOfRangeException(nameof(slot), slot, "Unbekannter Posten.");
+        }
+
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Funktionszuweisung {assignmentId} nicht gefunden.");
+        }
+
+        var previous = _roles[index];
+        if (previous.To is not null)
+        {
+            throw new InvalidOperationException("Funktionszuweisung ist bereits beendet.");
+        }
+
+        string? section = null;
+        if (nodeId is { } id)
+        {
+            var node = FindCommandNode(id) ?? throw new KeyNotFoundException($"Abschnitt {id} nicht gefunden.");
+            if (!node.IsLive)
+            {
+                throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+            }
+
+            section = node.Name;
+        }
+
+        if (previous.NodeId == nodeId && previous.Slot == slot
+            && string.Equals(previous.Section, section, StringComparison.Ordinal))
+        {
+            return previous;
+        }
+
+        var updated = previous with { NodeId = nodeId, Section = section, Slot = slot };
+        _roles[index] = updated;
+        AppendSystemEntry(
+            clock, op, $"Funktion {updated.Role} ({updated.PersonName}) → {section ?? "Einsatzleitung"}");
+        return updated;
     }
 
     /// <summary>
@@ -683,6 +778,301 @@ public sealed class Incident
 
         return updated;
     }
+
+    /// <summary>Sets or clears the Führungsstufe. A no-op when unchanged.</summary>
+    public void SetFuehrungsstufe(IClock clock, SessionOperator op, Fuehrungsstufe? stufe)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        if (stufe is { } given && !Enum.IsDefined(given))
+        {
+            throw new ArgumentOutOfRangeException(nameof(stufe), given, "Unbekannte Führungsstufe.");
+        }
+
+        if (Fuehrungsstufe == stufe)
+        {
+            return;
+        }
+
+        Fuehrungsstufe = stufe;
+        AppendSystemEntry(
+            clock,
+            op,
+            stufe is { } value ? $"Führungsstufe {value} festgelegt" : "Führungsstufe aufgehoben");
+    }
+
+    /// <summary>
+    /// Corrects how the Einsatzleitung can be reached. Only a Funkgruppe change reaches the ETB;
+    /// Standort, Rufname and Telefon are working data and stay silent, like a node's.
+    /// </summary>
+    public LeadershipPost UpdateLeadershipPost(
+        IClock clock,
+        SessionOperator op,
+        string? standort,
+        string? rufname,
+        string? telefon,
+        string? funkgruppe)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var updated = new LeadershipPost(standort, rufname, telefon, funkgruppe).Normalized();
+        var previous = LeadershipPost;
+        LeadershipPost = updated;
+
+        if (updated.Funkgruppe is not null
+            && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
+        {
+            AppendSystemEntry(clock, op, $"Funkgruppe Einsatzleitung: {updated.Funkgruppe}");
+        }
+
+        return updated;
+    }
+
+    /// <summary>The node with <paramref name="id"/>, or null when this incident has none by that id.</summary>
+    public CommandNode? FindCommandNode(Guid id) => _commandNodes.Find(n => n.Id == id);
+
+    /// <summary>
+    /// Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung. An Unterabschnitt
+    /// must lie in a live Abschnitt of this incident; live siblings (same parent) have unique names.
+    /// </summary>
+    public CommandNode AddCommandNode(
+        IClock clock,
+        SessionOperator op,
+        CommandNodeKind kind,
+        string name,
+        Guid? parentId = null,
+        string? auftrag = null,
+        string? standort = null,
+        string? funkgruppe = null,
+        string? rufname = null,
+        string? telefon = null)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        // The wire also accepts a raw integer for an enum, so a peer can send a kind that is none.
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unbekannte Art des Abschnitts.");
+        }
+
+        var node = CommandNode.Create(kind, name, parentId);
+
+        // WithDetails trims, maps blank to null and enforces the caps, exactly as an update does; it
+        // runs before anything is added so a refused detail leaves the incident untouched.
+        if (!string.IsNullOrWhiteSpace(auftrag) || !string.IsNullOrWhiteSpace(standort)
+            || !string.IsNullOrWhiteSpace(funkgruppe) || !string.IsNullOrWhiteSpace(rufname)
+            || !string.IsNullOrWhiteSpace(telefon))
+        {
+            node = node.WithDetails(node.Name, auftrag, standort, funkgruppe, rufname, telefon);
+        }
+
+        CommandNode? parent = null;
+        if (parentId is { } pid)
+        {
+            parent = FindCommandNode(pid)
+                ?? throw new KeyNotFoundException($"Abschnitt {pid} nicht gefunden.");
+            if (parent.Kind != CommandNodeKind.Abschnitt || !parent.IsLive)
+            {
+                throw new ArgumentException("Ein Unterabschnitt liegt in einem bestehenden Abschnitt.", nameof(parentId));
+            }
+        }
+
+        EnsureNameFree(node.Name, node.ParentId, node.Id);
+        _commandNodes.Add(node);
+
+        var text = kind switch
+        {
+            CommandNodeKind.Unterabschnitt => $"Unterabschnitt gebildet: {node.Name} in {parent?.Name}",
+            CommandNodeKind.Bereitstellung => $"Bereitstellung eingerichtet: {node.Name}",
+            CommandNodeKind.Partner => $"Einsatzleitung eingetragen: {node.Name}",
+            _ => $"Abschnitt gebildet: {node.Name}",
+        };
+        AppendSystemEntry(clock, op, text);
+        if (node.Auftrag is not null)
+        {
+            AppendSystemEntry(clock, op, AuftragText(node));
+        }
+
+        if (node.Funkgruppe is not null)
+        {
+            AppendSystemEntry(clock, op, FunkgruppeText(node));
+        }
+
+        return node;
+    }
+
+    private static string AuftragText(CommandNode node) => node.Auftrag is null
+        ? $"Auftrag {node.Name} aufgehoben"
+        : $"Auftrag {node.Name}: {node.Auftrag}";
+
+    private static string FunkgruppeText(CommandNode node) => $"Funkgruppe {node.Name}: {node.Funkgruppe}";
+
+    /// <summary>
+    /// Corrects a node's name and details. Rename, Auftrag and Funkgruppe changes reach the ETB;
+    /// Standort, Rufname and Telefon are working data and stay silent, like a unit's Bemerkung.
+    /// </summary>
+    public CommandNode UpdateCommandNode(
+        IClock clock,
+        SessionOperator op,
+        Guid nodeId,
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindCommandNodeIndex(nodeId);
+        var previous = _commandNodes[index];
+        if (!previous.IsLive)
+        {
+            throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+        }
+
+        var updated = previous.WithDetails(name, auftrag, standort, funkgruppe, rufname, telefon);
+        EnsureNameFree(updated.Name, updated.ParentId, updated.Id);
+        _commandNodes[index] = updated;
+
+        if (!string.Equals(previous.Name, updated.Name, StringComparison.Ordinal))
+        {
+            AppendSystemEntry(clock, op, $"{KindLabel(updated.Kind)} umbenannt: {previous.Name} → {updated.Name}");
+
+            // Running Funktionen follow the rename; ended ones keep the name they held on the day.
+            for (var i = 0; i < _roles.Count; i++)
+            {
+                if (_roles[i].NodeId == nodeId && _roles[i].To is null)
+                {
+                    _roles[i] = _roles[i] with { Section = updated.Name };
+                }
+            }
+        }
+
+        if (!string.Equals(previous.Auftrag, updated.Auftrag, StringComparison.Ordinal))
+        {
+            AppendSystemEntry(clock, op, AuftragText(updated));
+        }
+
+        if (updated.Funkgruppe is not null
+            && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
+        {
+            AppendSystemEntry(clock, op, FunkgruppeText(updated));
+        }
+
+        return updated;
+    }
+
+    /// <summary>
+    /// Dissolves a node; it stays in <see cref="CommandNodes"/> as history. Refused while units sit
+    /// on it or a live Unterabschnitt lies under it.
+    /// </summary>
+    public CommandNode DissolveCommandNode(IClock clock, SessionOperator op, Guid nodeId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindCommandNodeIndex(nodeId);
+        var node = _commandNodes[index];
+        if (node.IsLive
+            && (_forces.Exists(f => f.NodeId == nodeId)
+                || _roles.Exists(r => r.NodeId == nodeId && r.To is null)
+                || _commandNodes.Exists(n => n.IsLive && n.ParentId == nodeId)))
+        {
+            throw new InvalidOperationException("Abschnitt ist nicht leer.");
+        }
+
+        var dissolved = node.DissolvedAtTime(clock.Now);
+        _commandNodes[index] = dissolved;
+        AppendSystemEntry(clock, op, $"{KindLabel(dissolved.Kind)} aufgelöst: {dissolved.Name}");
+        return dissolved;
+    }
+
+    /// <summary>
+    /// Places a unit in a live node, or takes it out of its node when <paramref name="nodeId"/> is
+    /// null. Moving it where it already is writes nothing.
+    /// </summary>
+    public ForceUnit MoveForceUnit(IClock clock, SessionOperator op, Guid unitId, Guid? nodeId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+        }
+
+        CommandNode? target = null;
+        if (nodeId is { } id)
+        {
+            target = FindCommandNode(id) ?? throw new KeyNotFoundException($"Abschnitt {id} nicht gefunden.");
+            if (!target.IsLive)
+            {
+                throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+            }
+
+            if (target.Kind == CommandNodeKind.Partner)
+            {
+                throw new InvalidOperationException(
+                    "Einsatzleitungen anderer Organisationen führen keine eigenen Einheiten.");
+            }
+        }
+
+        var previous = _forces[index];
+        if (previous.NodeId == nodeId)
+        {
+            return previous;
+        }
+
+        var updated = previous.WithNode(nodeId);
+        _forces[index] = updated;
+
+        var oldName = previous.NodeId is { } old ? FindCommandNode(old)?.Name : null;
+        var text = target is not null
+            ? $"{Label(updated)} → {target.Name}"
+            : $"{Label(updated)}: Abschnitt aufgehoben (vorher {oldName ?? "unbekannt"})";
+        AppendSystemEntry(clock, op, text, from: updated.CallSign);
+        return updated;
+    }
+
+    private int FindCommandNodeIndex(Guid nodeId)
+    {
+        var index = _commandNodes.FindIndex(n => n.Id == nodeId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Abschnitt {nodeId} nicht gefunden.");
+    }
+
+    // Live siblings share the parent; every top-level node shares the null parent's namespace.
+    private void EnsureNameFree(string name, Guid? parentId, Guid exceptId)
+    {
+        if (_commandNodes.Exists(n =>
+                n.IsLive && n.Id != exceptId && n.ParentId == parentId
+                && string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Name ist bereits vergeben.");
+        }
+    }
+
+    private static string KindLabel(CommandNodeKind kind) => kind switch
+    {
+        CommandNodeKind.Unterabschnitt => "Unterabschnitt",
+        CommandNodeKind.Bereitstellung => "Bereitstellung",
+        CommandNodeKind.Partner => "Einsatzleitung",
+        _ => "Abschnitt",
+    };
+
+    private static string Label(ForceUnit unit) =>
+        unit.CallSign is null ? unit.Brigade : $"{unit.Brigade} ({unit.CallSign})";
 
     /// <summary>
     /// Corrects a unit's Stärke (Führungskraft / Gesamt / davon AGT) in place, keeping its identity
@@ -802,6 +1192,18 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// <see cref="FindRunningRoleHolder(string, string?)"/>, keyed on the Abschnitt <em>node</em> when
+    /// one is given. Names are only unique among siblings, so two Unterabschnitte called "Nord" under
+    /// different Abschnitte carry the same Section text; matching on it would hand one's holder to
+    /// the other. With a <paramref name="nodeId"/> only running assignments placed in that node
+    /// match and the Section text is ignored; with null this is the Section lookup unchanged.
+    /// </summary>
+    public RoleAssignment? FindRunningRoleHolder(string role, string? section, Guid? nodeId) =>
+        nodeId is { } id
+            ? FirstRunningRoleHolder(role, _ => true, assignment => assignment.NodeId == id)
+            : FindRunningRoleHolder(role, section);
+
+    /// <summary>
     /// The running assignment holding <paramref name="role"/> in <em>any</em> Abschnitt, or null when
     /// nobody holds it. This is the question a Funktion marked unique once per <c>Einsatz</c> asks:
     /// one Einsatzleiter for the whole Einsatz, whatever the Abschnitt either of them is typed into.
@@ -818,7 +1220,8 @@ public sealed class Incident
 
     // One loop for both public forms, so liveness, the role comparison and the first-match rule
     // cannot drift apart between them; only the Abschnitt test differs.
-    private RoleAssignment? FirstRunningRoleHolder(string role, Func<string?, bool> sectionMatches)
+    private RoleAssignment? FirstRunningRoleHolder(
+        string role, Func<string?, bool> sectionMatches, Func<RoleAssignment, bool>? also = null)
     {
         var wanted = role?.Trim();
         if (string.IsNullOrEmpty(wanted))
@@ -830,7 +1233,8 @@ public sealed class Incident
         {
             if (assignment.To is null
                 && string.Equals(assignment.Role?.Trim(), wanted, StringComparison.OrdinalIgnoreCase)
-                && sectionMatches(assignment.Section))
+                && sectionMatches(assignment.Section)
+                && (also is null || also(assignment)))
             {
                 return assignment;
             }

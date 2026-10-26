@@ -2,6 +2,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync.Tests;
@@ -800,5 +801,153 @@ public class CommandApplierTests
             ApplyOverWire(new RemoveSituationReportCommand(sent.Id), incident, clock));
 
         Assert.Equal("Lage", Assert.Single(incident.SituationReports).Situation);
+    }
+
+    [Fact]
+    public void Add_command_node_with_details_over_the_wire_creates_the_node_with_them_for_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var adder = new OperatorDto("Maier", "FFB 2");
+        var entries = incident.Journal.Count;
+
+        ApplyOverWire(
+            new AddCommandNodeCommand(adder, CommandNodeKind.Abschnitt, "Nord", null, "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"),
+            incident,
+            clock);
+
+        var node = Assert.Single(incident.CommandNodes);
+        Assert.Equal("Brandbekämpfung", node.Auftrag);
+        Assert.Equal("Hauptstraße", node.Standort);
+        Assert.Equal("TG 2", node.Funkgruppe);
+        Assert.Equal("Florian Nord", node.Rufname);
+        Assert.Equal("0171", node.Telefon);
+        Assert.Equal(entries + 3, incident.Journal.Count);
+        Assert.All(incident.Journal.Skip(entries), e => Assert.Equal("Maier (FFB 2)", e.EnteredBy));
+    }
+
+    [Fact]
+    public void Abschnitt_commands_over_the_wire_form_update_move_and_dissolve_attributed_to_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var host = new SessionOperator("Host", "FFB 1");
+        var unit = incident.AddForceUnit(clock, host, "Aich", 9, "Aich 42/1", null, null, 4);
+        var adder = new OperatorDto("Maier", "FFB 2");
+        var editor = new OperatorDto("Bauer", "FFB 3");
+        var mover = new OperatorDto("Schuster", "FFB 4");
+        var dissolver = new OperatorDto("Lang", "FFB 5");
+
+        ApplyOverWire(new AddCommandNodeCommand(adder, CommandNodeKind.Abschnitt, "Nord", null), incident, clock);
+        var node = Assert.Single(incident.CommandNodes);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+
+        var entries = incident.Journal.Count;
+        ApplyOverWire(new UpdateCommandNodeCommand(editor, node.Id, "Nordseite", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"), incident, clock);
+        var updated = incident.CommandNodes.Single();
+        Assert.Equal("Nordseite", updated.Name);
+        Assert.Equal("Brandbekämpfung", updated.Auftrag);
+        Assert.Equal("TG 2", updated.Funkgruppe);
+
+        // Rename, Auftrag and Funkgruppe each write a line; all three belong to the sender.
+        Assert.Equal(entries + 3, incident.Journal.Count);
+        Assert.All(incident.Journal.Skip(entries), e => Assert.Equal("Bauer (FFB 3)", e.EnteredBy));
+
+        entries = incident.Journal.Count;
+        ApplyOverWire(new MoveForceUnitCommand(mover, unit.Id, node.Id), incident, clock);
+        Assert.Equal(node.Id, incident.Forces.Single().NodeId);
+        Assert.Equal(entries + 1, incident.Journal.Count);
+        Assert.Equal("Schuster (FFB 4)", incident.Journal[^1].EnteredBy);
+
+        entries = incident.Journal.Count;
+        ApplyOverWire(new MoveForceUnitCommand(dissolver, unit.Id, null), incident, clock);
+        Assert.Null(incident.Forces.Single().NodeId);
+        Assert.Equal(entries + 1, incident.Journal.Count);
+        Assert.Equal("Lang (FFB 5)", incident.Journal[^1].EnteredBy);
+
+        ApplyOverWire(new DissolveCommandNodeCommand(adder, node.Id), incident, clock);
+        Assert.False(incident.CommandNodes.Single().IsLive);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Fact]
+    public void Fuehrungsstufe_and_leadership_post_over_the_wire_are_set_and_attributed()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var client = new OperatorDto("Maier", "FFB 2");
+
+        ApplyOverWire(new SetFuehrungsstufeCommand(client, Fuehrungsstufe.C), incident, clock);
+        Assert.Equal(Fuehrungsstufe.C, incident.Fuehrungsstufe);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+
+        ApplyOverWire(new UpdateLeadershipPostCommand(client, "Feuerwehrhaus", "Florian EL", "0172", "TG 1"), incident, clock);
+        Assert.Equal("Feuerwehrhaus", incident.LeadershipPost.Standort);
+        Assert.Equal("TG 1", incident.LeadershipPost.Funkgruppe);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+
+        ApplyOverWire(new SetFuehrungsstufeCommand(client, null), incident, clock);
+        Assert.Null(incident.Fuehrungsstufe);
+    }
+
+    [Fact]
+    public void AssignRole_over_the_wire_places_the_funktion_in_the_abschnitt()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var node = incident.AddCommandNode(clock, new SessionOperator("Host", "FFB 1"), CommandNodeKind.Abschnitt, "Nord");
+
+        ApplyOverWire(
+            new AssignRoleCommand(new OperatorDto("Maier", "FFB 2"), "Abschnittsleiter", "Huber", null, null, null, null, null, node.Id, RoleSlot.Leiter),
+            incident,
+            clock);
+
+        var role = Assert.Single(incident.Roles);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+        Assert.Equal(node.Id, role.NodeId);
+        Assert.Equal(RoleSlot.Leiter, role.Slot);
+        Assert.Equal("Nord", role.Section);
+    }
+
+    [Fact]
+    public void PlaceRoleAssignment_over_the_wire_moves_the_funktion_attributed_to_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var host = new SessionOperator("Host", "FFB 1");
+        var node = incident.AddCommandNode(clock, host, CommandNodeKind.Abschnitt, "Nord");
+        var role = incident.AssignRole(clock, host, "Abschnittsleiter", "Huber");
+
+        ApplyOverWire(
+            new PlaceRoleAssignmentCommand(new OperatorDto("Maier", "FFB 2"), role.Id, node.Id, RoleSlot.Leiter),
+            incident,
+            clock);
+
+        var placed = Assert.Single(incident.Roles);
+        Assert.Equal(node.Id, placed.NodeId);
+        Assert.Equal(RoleSlot.Leiter, placed.Slot);
+        Assert.Equal("Nord", placed.Section);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Theory]
+    [InlineData("""{"$type":"addCommandNode","operator":{"name":"M","callSign":null},"kind":99,"name":"Nord","parentId":null}""")]
+    [InlineData("""{"$type":"setFuehrungsstufe","operator":{"name":"M","callSign":null},"stufe":7}""")]
+    [InlineData("""{"$type":"assignRole","operator":{"name":"M","callSign":null},"role":"AL","personName":"H","callSign":null,"from":null,"to":null,"section":null,"phone":null,"nodeId":null,"slot":42}""")]
+    [InlineData("""{"$type":"placeRoleAssignment","operator":{"name":"M","callSign":null},"assignmentId":"00000000-0000-0000-0000-000000000001","nodeId":null,"slot":42}""")]
+    public void A_hostile_peer_sending_an_integer_outside_the_enum_is_refused_and_the_incident_is_unchanged(string json)
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var entries = incident.Journal.Count;
+
+        // JsonStringEnumConverter also reads integers, so the value deserializes; the domain must refuse it.
+        var command = SyncJson.Deserialize<SyncCommand>(json);
+        Assert.Throws<ArgumentOutOfRangeException>(() => CommandApplier.Apply(command, incident, clock));
+
+        Assert.Empty(incident.CommandNodes);
+        Assert.Empty(incident.Roles);
+        Assert.Null(incident.Fuehrungsstufe);
+        Assert.Equal(entries, incident.Journal.Count);
     }
 }

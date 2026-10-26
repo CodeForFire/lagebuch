@@ -2,6 +2,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
@@ -60,7 +61,16 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<SituationReportDto>? SituationReports = null,
 
     // Defaulted the same way; a snapshot without the key reads as "nothing handed out".
-    IReadOnlyList<IssuedItemDto>? IssuedItems = null);
+    IReadOnlyList<IssuedItemDto>? IssuedItems = null,
+
+    // Defaulted like InvolvedParties: a snapshot without the keys reads as no Abschnitte, no
+    // Führungsstufe and an empty Einsatzleitung post.
+    IReadOnlyList<CommandNodeDto>? CommandNodes = null,
+    Fuehrungsstufe? Fuehrungsstufe = null,
+    string? ElStandort = null,
+    string? ElRufname = null,
+    string? ElTelefon = null,
+    string? ElFunkgruppe = null);
 
 public sealed record TimerDto(
     string Key,
@@ -97,7 +107,11 @@ public sealed record RoleAssignmentDto(
     DateTimeOffset? From,
     DateTimeOffset? To,
     string? Section,
-    string? Phone);
+    string? Phone,
+
+    // Where the Funktion sits and the post it holds; absent reads as unplaced.
+    Guid? NodeId = null,
+    RoleSlot Slot = RoleSlot.None);
 
 public sealed record ForceUnitDto(
     Guid Id,
@@ -109,7 +123,8 @@ public sealed record ForceUnitDto(
     string? Notes,
     int OfficerCount,
     IReadOnlyList<ForceUnitStrengthEditDto> Edits,
-    int ZugfuehrerCount = 0);
+    int ZugfuehrerCount = 0,
+    Guid? NodeId = null);
 
 // Mirrors Domain.ForceUnitStrengthEdit: one prior Stärke retained on correction (#76), the
 // force-row sibling of EtbEntryEditDto.
@@ -204,6 +219,11 @@ public sealed record InvolvedPartyDto(
     Guid Id, string Name, string? Phone, string? Notes, string CreatedBy, DateTimeOffset CreatedAt,
     Guid? DwellingId = null, string? DwellingLabel = null,
     string? Whereabouts = null, DateTimeOffset? WhereaboutsAt = null);
+
+/// <summary>One Abschnitt (or Bereitstellung, partner Einsatzleitung) on the wire; mirrors <see cref="CommandNode"/>.</summary>
+public sealed record CommandNodeDto(
+    Guid Id, CommandNodeKind Kind, string Name, Guid? ParentId, string? Auftrag, string? Standort,
+    string? Funkgruppe, string? Rufname, string? Telefon, DateTimeOffset? DissolvedAt);
 
 public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,

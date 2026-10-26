@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -22,10 +23,18 @@ public class MasterDataEditorRenderTests
             // reaches the picker rather than only that a ComboBox exists.
             Roles = new[]
             {
-                new Role("EL", RoleUniqueness.UniquePerIncident),
-                new Role("EAL", RoleUniqueness.UniquePerSection),
+                new Role("EL", RoleUniqueness.UniquePerIncident, RoleSlot.Leiter),
+                new Role("EAL", RoleUniqueness.UniquePerSection, RoleSlot.Leiter),
+                new Role("Melder", RoleUniqueness.Multiple, RoleSlot.Melder),
                 new Role("ZF"),
                 new Role("GF"),
+            },
+            TalkGroups = new[]
+            {
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
+                new TalkGroup("RD_MUSTER", "1001", TalkGroupKind.Tmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, "Atemschutzüberwachung"),
+                new TalkGroup("302_F", null, TalkGroupKind.Dmo),
             },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
             Keywords = new[] { "B3 Person", "THL 1" },
@@ -108,8 +117,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 12 data categories, and this fixture's 2.
-        Assert.Equal(14, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 13 data categories, and this fixture's 2.
+        Assert.Equal(15, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -451,7 +460,7 @@ public class MasterDataEditorRenderTests
 
         // Captured before the assertions: the picker assertion below is the one that fails on a
         // build without the template, and a PNG from a run that never got there proves nothing.
-        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var frame = window.CaptureRenderedFrame()!)
         {
@@ -465,13 +474,13 @@ public class MasterDataEditorRenderTests
             .OfType<TextBox>()
             .Where(t => t.GetVisualAncestors().All(a => a is not ComboBox))
             .Select(t => t.Text);
-        Assert.Equal(new[] { "EL", "EAL", "ZF", "GF" }, rowNames);
+        Assert.Equal(new[] { "EL", "EAL", "Melder", "ZF", "GF" }, rowNames);
 
         // One picker per row, each carrying that row's own mode. Asserted as a value, not as
         // presence: the mode used to be dropped on load and defaulted on save, so a ComboBox that
         // merely exists would have passed.
-        var pickers = view.GetVisualDescendants().OfType<ComboBox>().ToList();
-        Assert.Equal(4, pickers.Count);
+        var pickers = UniquenessPickers(view);
+        Assert.Equal(5, pickers.Count);
         Assert.Equal(
             new object?[]
             {
@@ -479,8 +488,17 @@ public class MasterDataEditorRenderTests
                 RoleUniqueness.UniquePerSection,
                 RoleUniqueness.Multiple,
                 RoleUniqueness.Multiple,
+                RoleUniqueness.Multiple,
             },
             pickers.Select(c => c.SelectedValue));
+
+        // The Führungstafel slot picker carries each row's own post, "—" for none.
+        Assert.Equal(
+            new object?[] { RoleSlot.Leiter, RoleSlot.Leiter, RoleSlot.Melder, RoleSlot.None, RoleSlot.None },
+            view.GetVisualDescendants().OfType<ComboBox>()
+                .Where(c => AutomationProperties.GetName(c) == "Auf der Führungstafel")
+                .Select(c => c.SelectedValue));
+        Assert.Contains("AUF DER FÜHRUNGSTAFEL", view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
 
         // The item template renders the German label, so the selection is readable and not a bare
         // enum.
@@ -488,6 +506,91 @@ public class MasterDataEditorRenderTests
         Assert.Contains("einmal je Einsatz", labels);
         Assert.Contains("einmal je Abschnitt", labels);
         Assert.Contains("mehrfach", labels);
+    }
+
+    // Phone width (the app's narrow breakpoint is 640): the name field of a Funktion or a
+    // Funkgruppe must stay wide enough to read and type in.
+    [AvaloniaTheory]
+    [InlineData("Rollen", "stammdaten-rollen-narrow.png")]
+    [InlineData("Funkgruppen", "stammdaten-funkgruppen-narrow.png")]
+    public void Rollen_and_Funkgruppen_keep_a_usable_name_field_at_phone_width(string title, string file)
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == title);
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 400, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        // On a phone picking a category steps into it; the selection above ran before the view
+        // measured itself as narrow, so step in explicitly.
+        Assert.True(vm.IsNarrow);
+        vm.IsDetailOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, file));
+        }
+
+        var name = view.GetVisualDescendants().OfType<TextBox>()
+            .First(t => t.GetVisualAncestors().All(a => a is not ComboBox));
+        Assert.True(name.Bounds.Width >= 90, $"{title}: the name field is only {name.Bounds.Width:F0}px wide at 400px");
+
+        if (title == "Rollen")
+        {
+            // Both picker pairs of a block start on the same left edge on a phone.
+            var first = view.GetVisualDescendants().OfType<ComboBox>()
+                .First(c => AutomationProperties.GetName(c) == "Eindeutigkeit");
+            var second = view.GetVisualDescendants().OfType<ComboBox>()
+                .First(c => AutomationProperties.GetName(c) == "Auf der Führungstafel");
+            var left1 = first.TranslatePoint(default, view)!.Value.X;
+            var left2 = second.TranslatePoint(default, view)!.Value.X;
+            Assert.True(Math.Abs(left1 - left2) <= 1.0, $"Eindeutigkeit starts at {left1:F0}, Führungstafel at {left2:F0}");
+        }
+    }
+
+    private static List<ComboBox> UniquenessPickers(Control view) =>
+        view.GetVisualDescendants().OfType<ComboBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Eindeutigkeit")
+            .ToList();
+
+    [AvaloniaFact]
+    public void Funkgruppen_section_renders_name_number_kind_and_note_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Funkgruppen");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-funkgruppen.png"));
+        }
+
+        var texts = view.GetVisualDescendants().OfType<TextBox>()
+            .Where(t => t.GetVisualAncestors().All(a => a is not ComboBox))
+            .Select(t => t.Text)
+            .ToList();
+        Assert.Contains("FW_MUSTER", texts);
+        Assert.Contains("301_F", texts);
+        Assert.Contains("Atemschutzüberwachung", texts);
+
+        var kinds = view.GetVisualDescendants().OfType<ComboBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Art der Funkgruppe")
+            .Select(c => c.SelectedValue);
+        Assert.Equal(
+            new object?[] { TalkGroupKind.Tmo, TalkGroupKind.Tmo, TalkGroupKind.Dmo, TalkGroupKind.Dmo },
+            kinds);
+        var labels = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.Contains("NUMMER", labels);
+        Assert.Contains("ART", labels);
     }
 
     // The other half of the same binding: choosing a mode in the view has to reach the row the
@@ -504,8 +607,8 @@ public class MasterDataEditorRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var pickers = view.GetVisualDescendants().OfType<ComboBox>().ToList();
-        Assert.Equal(4, pickers.Count);
+        var pickers = UniquenessPickers(view);
+        Assert.Equal(5, pickers.Count);
 
         pickers[0].SelectedValue = RoleUniqueness.UniquePerSection;
         Dispatcher.UIThread.RunJobs();
@@ -577,7 +680,7 @@ public class MasterDataEditorRenderTests
                 Assert.True(moveButtons == 0, $"{section.Title} still offers moving rows up and down");
             }
 
-            if (section.Title is "Rollen" or "Einheiten-Status" or "Trupp-Typen" or "Links" or "Fahrzeuge" or "Aufbau")
+            if (section.Title is "Rollen" or "Einheiten-Status" or "Trupp-Typen" or "Links" or "Fahrzeuge" or "Funkgruppen" or "Aufbau")
             {
                 // The sample has rows here, so the check above is not vacuous.
                 Assert.True(removeButtons > 0, $"{section.Title} shows no rows to check");
@@ -818,7 +921,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(14, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(15, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -878,7 +981,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(14, rows.Length);
+        Assert.Equal(15, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";
@@ -899,7 +1002,7 @@ public class MasterDataEditorRenderTests
         var view = new MasterDataEditorView { DataContext = vm };
 
         // Tall enough for every category and this fixture's two Checklisten; grows with the rail.
-        var window = new Window { Content = view, Width = 1080, Height = 1160 };
+        var window = new Window { Content = view, Width = 1080, Height = 1190 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 

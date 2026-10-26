@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 using Microsoft.Data.Sqlite;
 
@@ -951,5 +952,48 @@ public class MasterDataStoreTests : IDisposable
         SqliteConnection.ClearAllPools();
 
         Assert.Equal(new Premises("Haus A", FloorCount: 50), Assert.Single(MasterDataStore.GetOrCreate(_path).Premises));
+    }
+
+    [Fact]
+    public void Store_round_trips_talk_groups_and_slots()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Roles = new[] { new Role("EL", RoleUniqueness.UniquePerIncident, RoleSlot.Leiter), new Role("ZF") },
+            TalkGroups = new[]
+            {
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+            },
+        };
+        MasterDataStore.Save(_path, set);
+
+        var reopened = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(set.Roles, reopened.Roles);
+        Assert.Equal(set.TalkGroups, reopened.TalkGroups);
+        Assert.False(reopened.IsEmpty);
+    }
+
+    [Fact]
+    public void Store_opens_a_pre_slot_md_roles()
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_roles (value TEXT NOT NULL, uniqueness TEXT);
+                INSERT INTO md_roles (value, uniqueness) VALUES ('EL', 'uniquePerIncident');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new Role("EL", RoleUniqueness.UniquePerIncident), Assert.Single(set.Roles));
+        Assert.Empty(set.TalkGroups);
     }
 }

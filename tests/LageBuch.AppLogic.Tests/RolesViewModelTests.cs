@@ -8,6 +8,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
@@ -612,6 +613,23 @@ public class RolesViewModelTests
         Assert.Equal(
             string.Format(CultureInfo.InvariantCulture, HeldInSection, "EL", "Abschnitt Nord", "Müller"),
             vm.ConflictHint);
+    }
+
+    [Fact]
+    public void Assigning_a_funktion_copies_its_slot_from_the_stammdaten()
+    {
+        var clock = new FixedClock(T0);
+        var md = Md() with { Roles = new[] { new Role("EL", RoleUniqueness.Multiple, RoleSlot.Leiter) } };
+        var session = TestSession.StartNew(
+            new FakeStore(), clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new RolesViewModel(session, clock, md, () => { }) { NewRole = " el ", NewPersonName = "Müller" };
+        vm.AddRoleCommand.Execute(null);
+        vm.NewRole = "Unbekannt";
+        vm.NewPersonName = "Huber";
+        vm.AddRoleCommand.Execute(null);
+
+        Assert.Equal(RoleSlot.Leiter, session.Incident.Roles.Single(r => r.Role == "EL").Slot);
+        Assert.Equal(RoleSlot.None, session.Incident.Roles.Single(r => r.Role == "Unbekannt").Slot);
     }
 
     [Fact]

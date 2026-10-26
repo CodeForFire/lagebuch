@@ -122,15 +122,27 @@ public static class SyncProtocol
     /// offers no mail to the vehicle in its Kontakte, and a payload without it reads as no address,
     /// so the floor stays at 20.
     /// </para>
+    /// <para>
+    /// 22: the Führungsorganisation. A client may send <c>addCommandNode</c>,
+    /// <c>updateCommandNode</c>, <c>dissolveCommandNode</c>, <c>moveForceUnit</c>,
+    /// <c>setFuehrungsstufe</c> and <c>updateLeadershipPost</c>, and <c>assignRole</c> carries
+    /// <c>nodeId</c> and <c>slot</c>. A snapshot carries <c>commandNodes</c>, <c>fuehrungsstufe</c>
+    /// and the Einsatzleitung's post, its units and Funktionen carry <c>nodeId</c>, and the
+    /// Stammdaten payload gains <c>talkGroups</c> and a role <c>slot</c>. A host at 21 would reject
+    /// the six commands, so the floor rises to 22. <c>addCommandNode</c> also carries the optional
+    /// <c>auftrag</c>, <c>standort</c>, <c>funkgruppe</c>, <c>rufname</c> and <c>telefon</c>, so an
+    /// Abschnitt is created with its details in one command. <c>placeRoleAssignment</c> moves an
+    /// existing Funktion into an Abschnitt and a board slot, as <c>moveForceUnit</c> does for a unit.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 21;
+    public const int ProtocolVersion = 22;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 20;
+    public const int MinimumProtocolVersion = 22;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

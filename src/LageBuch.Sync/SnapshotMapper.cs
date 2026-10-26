@@ -6,6 +6,7 @@ using LageBuch.Domain.Equipment;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
@@ -48,7 +49,7 @@ public static class SnapshotMapper
                 e.From,
                 e.To,
                 e.Edits.Select(x => new EtbEntryEditDto(x.PreviousText, x.EditedBy, x.EditedAt)).ToList())).ToList(),
-            incident.Roles.Select(r => new RoleAssignmentDto(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)).ToList(),
+            incident.Roles.Select(r => new RoleAssignmentDto(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone, r.NodeId, r.Slot)).ToList(),
             incident.Forces.Select(f => new ForceUnitDto(
                 f.Id,
                 f.Brigade,
@@ -59,7 +60,8 @@ public static class SnapshotMapper
                 f.Notes,
                 f.OfficerCount,
                 f.Edits.Select(x => new ForceUnitStrengthEditDto(x.PreviousOfficerCount, x.PreviousPersonnelCount, x.PreviousScbaCount, x.EditedBy, x.EditedAt, x.PreviousZugfuehrerCount)).ToList(),
-                f.ZugfuehrerCount)).ToList(),
+                f.ZugfuehrerCount,
+                f.NodeId)).ToList(),
             incident.ScbaTrupps.Select(ToDto).ToList(),
             incident.Audit.Select(a => new AuditEventDto(a.At, a.Action, a.By)).ToList(),
             incident.Timers.Select(t => new TimerDto(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)).ToList(),
@@ -124,7 +126,14 @@ public static class SnapshotMapper
                 i.IssuedAt,
                 i.IssuedBy,
                 i.ReturnedAt,
-                i.ReturnedBy)).ToList());
+                i.ReturnedBy)).ToList(),
+            CommandNodes: incident.CommandNodes.Select(n => new CommandNodeDto(
+                n.Id, n.Kind, n.Name, n.ParentId, n.Auftrag, n.Standort, n.Funkgruppe, n.Rufname, n.Telefon, n.DissolvedAt)).ToList(),
+            Fuehrungsstufe: incident.Fuehrungsstufe,
+            ElStandort: incident.LeadershipPost.Standort,
+            ElRufname: incident.LeadershipPost.Rufname,
+            ElTelefon: incident.LeadershipPost.Telefon,
+            ElFunkgruppe: incident.LeadershipPost.Funkgruppe);
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -154,7 +163,7 @@ public static class SnapshotMapper
                 e.From,
                 e.To,
                 e.Edits.Select(x => new EtbEntryEdit(x.PreviousText, x.EditedBy, x.EditedAt)))),
-            snapshot.Roles.Select(r => new RoleAssignment(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)),
+            snapshot.Roles.Select(r => new RoleAssignment(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone, r.NodeId, r.Slot)),
             snapshot.Forces.Select(f => ForceUnit.Rehydrate(
                 f.Id,
                 f.Brigade,
@@ -165,7 +174,8 @@ public static class SnapshotMapper
                 f.Notes,
                 f.OfficerCount,
                 f.Edits.Select(x => new ForceUnitStrengthEdit(x.PreviousOfficerCount, x.PreviousPersonnelCount, x.PreviousScbaCount, x.EditedBy, x.EditedAt, x.PreviousZugfuehrerCount)),
-                f.ZugfuehrerCount)),
+                f.ZugfuehrerCount,
+                f.NodeId)),
             snapshot.ScbaTrupps.Select(FromDto),
             snapshot.Audit.Select(a => new AuditEvent(a.At, a.Action, a.By)),
             snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)),
@@ -230,7 +240,11 @@ public static class SnapshotMapper
                 i.IssuedAt,
                 i.IssuedBy,
                 i.ReturnedAt,
-                i.ReturnedBy)));
+                i.ReturnedBy)),
+            (snapshot.CommandNodes ?? []).Select(n => CommandNode.Rehydrate(
+                n.Id, n.Kind, n.Name, n.ParentId, n.Auftrag, n.Standort, n.Funkgruppe, n.Rufname, n.Telefon, n.DissolvedAt)),
+            snapshot.Fuehrungsstufe,
+            new LeadershipPost(snapshot.ElStandort, snapshot.ElRufname, snapshot.ElTelefon, snapshot.ElFunkgruppe));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

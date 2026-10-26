@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -64,7 +65,7 @@ public sealed class IncidentRepository
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
                     "co_buildings", "co_dwellings", "co_readings", "involved_parties", "situation_reports",
-                    "issued_items",
+                    "issued_items", "command_nodes",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -72,7 +73,7 @@ public sealed class IncidentRepository
 
         Run(
             inserts,
-            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$houseNumber,$postalCode,$place);",
+            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, fuehrungsstufe, el_standort, el_rufname, el_telefon, el_funkgruppe) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$houseNumber,$postalCode,$place,$stufe,$elStandort,$elRufname,$elTelefon,$elFunkgruppe);",
             p =>
             {
                 p("$id", incident.Id.ToString());
@@ -92,6 +93,11 @@ public sealed class IncidentRepository
                 p("$houseNumber", (object?)incident.HouseNumber ?? DBNull.Value);
                 p("$postalCode", (object?)incident.PostalCode ?? DBNull.Value);
                 p("$place", (object?)incident.Place ?? DBNull.Value);
+                p("$stufe", incident.Fuehrungsstufe is { } stufe ? LeadershipKeys.StufeKey(stufe) : DBNull.Value);
+                p("$elStandort", (object?)incident.LeadershipPost.Standort ?? DBNull.Value);
+                p("$elRufname", (object?)incident.LeadershipPost.Rufname ?? DBNull.Value);
+                p("$elTelefon", (object?)incident.LeadershipPost.Telefon ?? DBNull.Value);
+                p("$elFunkgruppe", (object?)incident.LeadershipPost.Funkgruppe ?? DBNull.Value);
             });
 
         for (var i = 0; i < incident.Checklists.Count; i++)
@@ -112,6 +118,7 @@ public sealed class IncidentRepository
         WriteInvolvedParties(inserts, incident);
         WriteSituationReports(inserts, incident);
         WriteIssuedItems(inserts, incident);
+        WriteCommandNodes(inserts, incident);
 
         tx.Commit();
     }
@@ -162,7 +169,7 @@ public sealed class IncidentRepository
             var r = incident.Roles[i];
             Run(
                 inserts,
-                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph);",
+                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone, node_id, slot) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph,$node,$slot);",
                 p =>
                 {
                     p("$id", r.Id.ToString());
@@ -174,6 +181,8 @@ public sealed class IncidentRepository
                     p("$to", (object?)r.To?.ToString(Iso) ?? DBNull.Value);
                     p("$sec", (object?)r.Section ?? DBNull.Value);
                     p("$ph", (object?)r.Phone ?? DBNull.Value);
+                    p("$node", (object?)r.NodeId?.ToString() ?? DBNull.Value);
+                    p("$slot", (object?)LeadershipKeys.SlotKey(r.Slot) ?? DBNull.Value);
                 });
         }
     }
@@ -185,7 +194,7 @@ public sealed class IncidentRepository
             var f = incident.Forces[i];
             Run(
                 inserts,
-                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc);",
+                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc,$node);",
                 p =>
                 {
                     p("$id", f.Id.ToString());
@@ -198,6 +207,7 @@ public sealed class IncidentRepository
                     p("$n", (object?)f.Notes ?? DBNull.Value);
                     p("$oc", f.OfficerCount);
                     p("$zc", f.ZugfuehrerCount);
+                    p("$node", (object?)f.NodeId?.ToString() ?? DBNull.Value);
                 });
 
             for (var j = 0; j < f.Edits.Count; j++)
@@ -432,6 +442,31 @@ public sealed class IncidentRepository
         }
     }
 
+    private static void WriteCommandNodes(InsertCommands inserts, Incident incident)
+    {
+        for (var i = 0; i < incident.CommandNodes.Count; i++)
+        {
+            var n = incident.CommandNodes[i];
+            Run(
+                inserts,
+                "INSERT INTO command_nodes (id, ordinal, kind, name, parent_id, auftrag, standort, funkgruppe, rufname, telefon, dissolved_at) " + "VALUES ($id,$o,$kind,$name,$parent,$auftrag,$standort,$funk,$ruf,$tel,$dissolved);",
+                p =>
+                {
+                    p("$id", n.Id.ToString());
+                    p("$o", i);
+                    p("$kind", LeadershipKeys.KindKey(n.Kind));
+                    p("$name", n.Name);
+                    p("$parent", (object?)n.ParentId?.ToString() ?? DBNull.Value);
+                    p("$auftrag", (object?)n.Auftrag ?? DBNull.Value);
+                    p("$standort", (object?)n.Standort ?? DBNull.Value);
+                    p("$funk", (object?)n.Funkgruppe ?? DBNull.Value);
+                    p("$ruf", (object?)n.Rufname ?? DBNull.Value);
+                    p("$tel", (object?)n.Telefon ?? DBNull.Value);
+                    p("$dissolved", (object?)n.DissolvedAt?.ToString(Iso) ?? DBNull.Value);
+                });
+        }
+    }
+
     private static void WriteInvolvedParties(InsertCommands inserts, Incident incident)
     {
         for (var i = 0; i < incident.InvolvedParties.Count; i++)
@@ -616,7 +651,7 @@ public sealed class IncidentRepository
 
         var meta = ReadRow(
             cn,
-            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place FROM incident_meta LIMIT 1;");
+            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, fuehrungsstufe, el_standort, el_rufname, el_telefon, el_funkgruppe FROM incident_meta LIMIT 1;");
 
         // One query per table, grouped in C# -- the same shape as editsByEntry below. Items whose
         // list_id matches no list row are dropped: V23 fills list_id for every row it finds, so a
@@ -670,7 +705,7 @@ public sealed class IncidentRepository
 
         var roles = ReadAll(
             cn,
-            "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone FROM role_assignments ORDER BY ordinal;",
+            "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone, node_id, slot FROM role_assignments ORDER BY ordinal;",
             r => new Domain.RoleAssignment(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -679,7 +714,9 @@ public sealed class IncidentRepository
                 NullableDate(r, 4),
                 NullableDate(r, 5),
                 Str(r, 6),
-                Str(r, 7)));
+                Str(r, 7),
+                NullableGuid(r, 8),
+                LeadershipKeys.SlotFrom(Str(r, 9))));
 
         var strengthEditsByUnit = ReadAll(
             cn,
@@ -691,7 +728,7 @@ public sealed class IncidentRepository
 
         var forces = ReadAll(
             cn,
-            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count FROM force_units ORDER BY ordinal;",
+            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id FROM force_units ORDER BY ordinal;",
             r => Domain.ForceUnit.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -702,7 +739,8 @@ public sealed class IncidentRepository
                 Str(r, 6),
                 r.GetInt32(7),
                 strengthEditsByUnit.TryGetValue(Guid.Parse(r.GetString(0)), out var eds) ? eds : null,
-                r.GetInt32(8)));
+                r.GetInt32(8),
+                NullableGuid(r, 9)));
 
         var membersByTrupp = ReadAll(
             cn,
@@ -903,6 +941,21 @@ public sealed class IncidentRepository
                 NullableDate(r, 8),
                 Str(r, 9)));
 
+        var commandNodes = ReadAll(
+            cn,
+            "SELECT id, kind, name, parent_id, auftrag, standort, funkgruppe, rufname, telefon, dissolved_at FROM command_nodes ORDER BY ordinal;",
+            r => Domain.Leadership.CommandNode.Rehydrate(
+                Guid.Parse(r.GetString(0)),
+                LeadershipKeys.KindFrom(Str(r, 1)),
+                r.GetString(2),
+                NullableGuid(r, 3),
+                Str(r, 4),
+                Str(r, 5),
+                Str(r, 6),
+                Str(r, 7),
+                Str(r, 8),
+                NullableDate(r, 9)));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -938,7 +991,10 @@ public sealed class IncidentRepository
             meta[12] as string,
             meta[13] as string,
             situationReports,
-            issuedItems);
+            issuedItems,
+            commandNodes,
+            LeadershipKeys.StufeFrom(meta[14] as string),
+            new Domain.Leadership.LeadershipPost(meta[15] as string, meta[16] as string, meta[17] as string, meta[18] as string));
     }
 
     private static DateTimeOffset ParseDate(string s) =>

@@ -1,6 +1,7 @@
 using System.Net;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Sync.Hosting.Tests;
@@ -104,6 +105,26 @@ public class MasterDataSyncTests
             await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
 
         Assert.Equal("Kreisleitstelle", set.Settings.DispatchCentreName);
+    }
+
+    [Fact]
+    public async Task Host_serves_its_talk_groups_and_role_slots()
+    {
+        var clock = new FixedClock();
+        var hostSet = MasterDataSet.Empty with
+        {
+            Roles = new[] { new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection, RoleSlot.Leiter) },
+            TalkGroups = new[] { new TalkGroup("FW_MUSTER", "401", TalkGroupKind.Dmo, "Einsatzstelle") },
+        };
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
+        await using var _ = host;
+
+        using var http = Client(port, TestHost.DefaultPin);
+        var set = MasterDataJson.Parse(
+            await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
+
+        Assert.Equal(RoleSlot.Leiter, Assert.Single(set.Roles).Slot);
+        Assert.Equal(new TalkGroup("FW_MUSTER", "401", TalkGroupKind.Dmo, "Einsatzstelle"), Assert.Single(set.TalkGroups));
     }
 
     [Fact]
