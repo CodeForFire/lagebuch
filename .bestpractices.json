@@ -76,7 +76,7 @@
   "test_invocation_status": "Met",
   "test_invocation_justification": "dotnet test, or make test, optionally narrowed with PROJECT= and FILTER=.",
   "test_most_status": "Met",
-  "test_most_justification": "Coverage is collected on every CI run and summarised into the job summary: https://github.com/CodeForFire/lagebuch/blob/main/.github/workflows/ci.yml",
+  "test_most_justification": "Measured by mutation testing (Stryker.NET), which checks that the tests notice a change, not only that they run a line: every pull request fails below 80% on the lines it changes in Domain, Documents, Persistence, AppLogic and Osm, and a weekly run over those and Sync fails when a project drops below its floor: https://github.com/CodeForFire/lagebuch/blob/main/.github/workflows/mutation.yml. Line coverage, last measured on 2026-10-26, was 95.7% (84.9% of branches).",
   "test_continuous_integration_status": "Met",
   "test_continuous_integration_justification": "GitHub Actions builds and tests on Ubuntu and Windows for every push and pull request: https://github.com/CodeForFire/lagebuch/blob/main/.github/workflows/ci.yml",
   "test_policy_status": "Met",
