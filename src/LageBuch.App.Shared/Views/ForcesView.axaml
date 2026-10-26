@@ -4,6 +4,7 @@
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
+             xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
              x:Class="LageBuch.App.Shared.Views.ForcesView"
              x:DataType="vm:ForcesViewModel">
   <!-- Keyed off the "narrow" class on IncidentWorkspaceView's root Panel (#685). Field widths live in Styles rather than as Width=
@@ -225,24 +226,26 @@
                                   Classes.invalid="{Binding NewStrengthError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
                  0 und lässt den Platzhalter stehen. Kein Beispiel-Platzhalter: das Label sagt bereits,
-                 was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden. -->
+                 was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden.
+                 OptionalCountConverter makes an emptied box write null back; without it the
+                 binding cannot turn "" into an int? and marks the field invalid. -->
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBox x:Name="ZugfuehrerBox" Width="60"
                        ToolTip.Tip="Zugführer" AutomationProperties.Name="Zugführer"
-                       Text="{Binding NewZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
+                       Text="{Binding NewZugfuehrerCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
               <TextBox x:Name="OfficerBox" Width="60"
                        ToolTip.Tip="Gruppenführer" AutomationProperties.Name="Gruppenführer"
-                       Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
+                       Text="{Binding NewOfficerCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
               <TextBox x:Name="MannschaftBox" Width="60"
                        ToolTip.Tip="Mannschaft" AutomationProperties.Name="Mannschaft"
-                       Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
+                       Text="{Binding NewMannschaftCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
             </StackPanel>
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="DAVON AGT"
                                   ToolTip.Tip="Atemschutzgeräteträger"
                                   Classes.invalid="{Binding NewScbaCountError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBox x:Name="ScbaBox"
-                     Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
+                     Text="{Binding NewScbaCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="STATUS">
             <ComboBox x:Name="StatusBox"
@@ -276,7 +279,7 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="ForcesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="ForcesGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" b:GridCellFocus.IsEnabled="True" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid x:Name="ForcesGrid" Grid.IsSharedSizeScope="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" b:GridCellFocus.IsEnabled="True" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
@@ -294,11 +297,19 @@
           <DataGridTemplateColumn Header="STÄRKE" Width="190">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
-                <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,4" VerticalAlignment="Center">
+                <!-- A shared-size column rather than a StackPanel: the pencil sat right after the
+                     numbers and moved with their width, so the buttons read ragged down the grid.
+                     ForcesGrid is the IsSharedSizeScope. -->
+                <Grid Margin="6,4" VerticalAlignment="Center">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ForceStrength" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
                   <!-- Gesamt split out as its own run, bold+underlined, same idiom as the header
                        tile's TotalStrengthPrefixText/TotalPersonnel split (#233): no Run/Inlines
                        idiom exists here to bold part of one TextBlock's text. -->
-                  <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center"
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center"
                               ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt">
                     <TextBlock Text="{Binding StrengthPrefixText}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" TextDecorations="Underline"
@@ -307,39 +318,38 @@
                   <!-- Vector icon, not a Unicode glyph: the button font (Oswald) carries neither
                        ✎ nor ✕, so a text affordance only appeared where the OS happened to have a
                        fallback. Same idiom as the ETB grid's row actions. -->
-                  <Button Classes="icon-btn" IsVisible="{Binding !IsReadOnly}"
+                  <Button Grid.Column="1" Margin="6,0,0,0" Classes="icon-btn" IsVisible="{Binding !IsReadOnly}"
                           b:RowKeys.Role="Primary"
                           ToolTip.Tip="Stärke korrigieren (Enter)" AutomationProperties.Name="Stärke korrigieren">
                     <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                     <Button.Flyout>
-                      <Flyout Placement="BottomEdgeAlignedLeft" Closed="OnStrengthFlyoutClosed">
-                          <StackPanel Spacing="8" MinWidth="180">
-                          <!-- One KeyBinding covers all four fields below: Avalonia checks a
-                               control's KeyBindings while the KeyDown bubbles up from whichever
-                               descendant has focus, so this doesn't need repeating per TextBox. -->
-                          <StackPanel.KeyBindings>
-                            <KeyBinding Gesture="Enter" Command="{Binding ApplyStrengthEditCommand}" />
-                          </StackPanel.KeyBindings>
+                      <Flyout Placement="BottomEdgeAlignedLeft"
+                              Opened="OnStrengthFlyoutOpened" Closed="OnStrengthFlyoutClosed">
+                          <!-- One KeyDown handler covers all four fields below: the key bubbles up
+                               from whichever descendant has focus. Enter and ÜBERNEHMEN go through
+                               code-behind rather than a Command binding, because applying also
+                               closes the flyout, and only the view can close it. -->
+                          <StackPanel Spacing="8" MinWidth="180" KeyDown="OnStrengthEditorKeyDown">
                           <TextBlock Text="Stärke korrigieren" Classes="overline" />
                           <HeaderedContentControl Classes="field" Header="ZUGFÜHRER (ZF)">
-                            <TextBox Text="{Binding ZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
+                            <TextBox Text="{Binding ZugfuehrerCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
                           </HeaderedContentControl>
                           <HeaderedContentControl Classes="field" Header="GRUPPENFÜHRER (GF)">
-                            <TextBox Text="{Binding OfficerCount}" b:IntegerOnly.IsEnabled="True" />
+                            <TextBox Text="{Binding OfficerCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
                           </HeaderedContentControl>
                           <HeaderedContentControl Classes="field" Header="MANN">
-                            <TextBox Text="{Binding MannschaftCount}" b:IntegerOnly.IsEnabled="True" />
+                            <TextBox Text="{Binding MannschaftCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
                           </HeaderedContentControl>
                           <HeaderedContentControl Classes="field" Header="DAVON AGT">
-                            <TextBox Text="{Binding ScbaCount}" b:IntegerOnly.IsEnabled="True" />
+                            <TextBox Text="{Binding ScbaCount, Converter={x:Static conv:OptionalCountConverter.Instance}}" b:IntegerOnly.IsEnabled="True" />
                           </HeaderedContentControl>
                           <Button Classes="signal" Content="ÜBERNEHMEN"
-                                  Command="{Binding ApplyStrengthEditCommand}" />
+                                  Click="OnApplyStrengthClicked" />
                         </StackPanel>
                       </Flyout>
                     </Button.Flyout>
                   </Button>
-                  <Button Content="Verlauf" Padding="6,2" IsVisible="{Binding HasHistory}">
+                  <Button Grid.Column="2" Margin="6,0,0,0" Content="Verlauf" Padding="6,2" IsVisible="{Binding HasHistory}">
                     <Button.Flyout>
                       <!-- Opened: nothing in this read-only list is focusable, so without
                            grabbing focus here, Escape's built-in Flyout light-dismiss has no
@@ -361,7 +371,7 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
-                </StackPanel>
+                </Grid>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>

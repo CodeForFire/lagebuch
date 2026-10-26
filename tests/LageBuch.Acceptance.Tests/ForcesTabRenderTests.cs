@@ -185,6 +185,39 @@ public class ForcesTabRenderTests
     // 12,0 padding and the button's own margin, far short of the ~25px the button needed, so the
     // content was squeezed to zero width and the button rendered as an empty pill. Both are now
     // PathIcons like the ETB grid's, so the affordance is drawn from bundled vector data.
+    // Feedback from an Übung: the pencil sat right after each row's Stärke text, so it moved
+    // with the width of the numbers and the column of buttons read ragged.
+    [AvaloniaFact]
+    public void Strength_edit_buttons_line_up_across_rows()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        foreach (var (callSign, mannschaft) in new[] { ("FFB 12/1", 12), ("FFB 11/1", 2) })
+        {
+            vm.Forces.NewBrigade = "Aich";
+            vm.Forces.NewCallSign = callSign;
+            vm.Forces.NewOfficerCount = 1;
+            vm.Forces.NewMannschaftCount = mannschaft;
+            vm.Forces.AddForceCommand.Execute(null);
+        }
+
+        Dispatcher.UIThread.RunJobs();
+        window.Measure(new Size(1920, 1032));
+        window.Arrange(new Rect(0, 0, 1920, 1032));
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "forces-edit-buttons-aligned.png");
+
+        var grid = view.GetControl<DataGrid>("ForcesGrid");
+        var lefts = grid.GetVisualDescendants().OfType<Button>()
+            .Where(b => AutomationProperties.GetName(b) == "Stärke korrigieren")
+            .Select(b => b.TranslatePoint(default, grid)?.X ?? double.NaN)
+            .ToList();
+
+        Assert.Equal(2, lefts.Count);
+        Assert.True(
+            Math.Abs(lefts[0] - lefts[1]) <= 1.0,
+            $"the Stärke korrigieren buttons sit at x={lefts[0]} and x={lefts[1]}");
+    }
+
     [AvaloniaFact]
     public void Both_row_action_buttons_render_a_laid_out_icon()
     {
