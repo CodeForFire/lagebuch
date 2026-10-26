@@ -161,8 +161,12 @@ one note on why the trust model around the middle two is where it is.
   exported PDF report that goes to the Akte. The coordinates are typically a
   private address, often the same one whose resident is already named in the
   CO-Messprotokoll. PNG, WebP and GIF metadata chunks are equally untouched.
-  Stripping on ingest is planned
-  ([#384](../../issues/384)).
+  This is deliberate, not pending work ([#384](../../issues/384)): for a
+  photo of the Einsatzstelle, position and time add nothing the report does
+  not already state; the personal data that matters is in the pixels; and
+  stripping would mean either re-encoding evidence or hand-parsing untrusted
+  image formats. A pasted image is re-encoded as PNG and arrives without
+  metadata.
 - **Attachment copies exist outside the incident file for a while.** A
   joining device caches the attachments it pulls in `attachment-cache/` and
   deletes them when it leaves the incident ([#382](../../issues/382)); opening

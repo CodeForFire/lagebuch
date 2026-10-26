@@ -74,7 +74,13 @@ nicht im ETB.
 **Fotos enthalten mehr als das Bild.** Lagebuch entfernt keine
 EXIF-Metadaten aus angehängten Bildern. Ein mit dem Diensthandy aufgenommenes
 Foto behält damit unter Umständen GPS-Koordinaten, Aufnahmezeit und Gerätemodell
-– auch im exportierten PDF-Bericht.
+– auch im exportierten PDF-Bericht. Das ist bewusst so: Ort und Zeit eines
+Fotos von der Einsatzstelle stehen ohnehin im Bericht, und die eigentlich
+personenbezogenen Daten – Gesichter, Kennzeichen, das Innere einer Wohnung –
+stecken im Bild selbst, nicht in seinen Metadaten. Ein eingefügtes Bild
+(Zwischenablage) wird neu als PNG gespeichert und hat danach keine Metadaten
+mehr. Wer ein Foto ohne Metadaten anhängen will, entfernt sie vorher am Handy
+oder fügt das Bild ein, statt die Datei anzuhängen.
 
 ### Woher die Stammdaten kommen
 
@@ -426,8 +432,8 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
 - **Der Name in „Wer dokumentiert?“ wird nicht überprüft.** Er dient der
   Zuordnung in der Anzeige, nicht der Berechtigung. Ein verbundenes Gerät kann
   einen beliebigen Namen angeben.
-- **EXIF-Daten in Fotos werden nicht entfernt** – siehe oben. Das Entfernen
-  beim Anhängen ist geplant
+- **EXIF-Daten in angehängten Fotos werden nicht entfernt** – siehe oben.
+  Das ist eine bewusste Entscheidung, keine offene Aufgabe
   ([Issue #384](https://github.com/CodeForFire/lagebuch/issues/384)).
 - **Das Dateiformat ist vor Version 1.0 nicht eingefroren.** Ältere Dateien
   werden beim Öffnen migriert; ab 1.0 gilt die Zusage, dass eine Datei dauerhaft
