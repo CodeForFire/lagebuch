@@ -1,0 +1,1 @@
+A joined device whose link to the host has gone silent now returns to Home within a few seconds of leaving the Einsatz, where it used to sit on the workspace for two minutes waiting for the host to acknowledge the disconnect.

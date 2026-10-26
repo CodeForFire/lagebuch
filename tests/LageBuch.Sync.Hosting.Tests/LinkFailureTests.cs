@@ -216,8 +216,26 @@ public class LinkFailureTests
 
         Assert.Equal(RemoteIncidentSession.CommandLostReason, await rejection.Task.WaitAsync(TimeSpan.FromSeconds(10)));
 
-        // The client is disposed before the relay, and stopping a hub over a link still silent waits
-        // two minutes for an answer that cannot come.
+        // The client is disposed before the relay, and over a link still silent its stop would wait
+        // out a grace period on the fake clock, which nothing here advances.
+        relay.Resume();
+    }
+
+    [Fact]
+    public async Task Leaving_over_a_link_gone_silent_does_not_wait_for_the_host_to_answer()
+    {
+        // Back to Home waits for the joined client's connection to be torn down, and a link gone
+        // silent never answers the close.
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+        await using var relay = FaultyRelay.Start(port);
+        await using var client = await ConnectAsync(relay);
+        var workspace = Workspace(client, clock);
+
+        relay.Pause();
+        await Within(workspace.LeaveAsync().AsTask(), "leaving the Einsatz");
         relay.Resume();
     }
 }

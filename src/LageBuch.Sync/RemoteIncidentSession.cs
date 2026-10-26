@@ -42,6 +42,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </summary>
     public const string CommandLostReason = "Verbindung zum Host unterbrochen – bitte prüfen und ggf. neu eingeben.";
 
+    // How long leaving waits for the host to acknowledge the hub's close. A host on the LAN answers
+    // in milliseconds; one that has not answered by then is not going to.
+    private static readonly TimeSpan CloseGrace = TimeSpan.FromSeconds(2);
+
     private readonly HttpClient _http;
     private readonly HttpClientHandler _handler;
     private readonly HubConnection _hub;
@@ -60,6 +64,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // Orders this device's commands (see SendAsync) by guarding _lastSend.
     private readonly object _sendOrderGate = new();
     private readonly CancellationTokenSource _reconcileCts = new();
+
+    // Cancels every request the hub's transport still has open once the polite stop in DisposeAsync
+    // has had CloseGrace: on a link gone silent nothing else ends them before SignalR's own 120 s.
+    private readonly CancellationTokenSource _transportAbort = new();
 
     // Created with the session rather than inside the loop, so it exists the moment ConnectAsync returns:
     // a tick that comes due before Task.Run has scheduled the loop is then held by the timer rather than
@@ -315,7 +323,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     // failed with ObjectDisposedException, every command with it, until the policy
                     // gave up and the session ended. The wrapper is SignalR's to dispose; the handler
                     // stays this session's, released in DisposeAsync.
-                    o.HttpMessageHandlerFactory = _ => new BorrowedHandler(handler);
+                    // SignalR asks for a handler when the hub starts and on each reconnect, both after
+                    // the session exists, so its abort token is there to hand over.
+                    o.HttpMessageHandlerFactory = _ => new BorrowedHandler(handler, created?._transportAbort.Token ?? CancellationToken.None);
                 })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
@@ -1229,11 +1239,25 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         // The hub's transport uses _handler (via HttpMessageHandlerFactory) for as long as it's
         // running, so it must be torn down first; only then are the HttpClient and the handler it
         // doesn't own (disposeHandler: false, above) both disposed here explicitly.
-        await _hub.DisposeAsync();
+        // The stop POSTs a close to the host and waits for it; over a link gone silent that wait is
+        // SignalR's 120 s HTTP timeout, and leaving the Einsatz waits with it. The host does not need
+        // the close — it sees the connection drop — so after CloseGrace the requests are cancelled.
+        var stopped = _hub.DisposeAsync().AsTask();
+        try
+        {
+            await stopped.WaitAsync(CloseGrace, _time);
+        }
+        catch (TimeoutException)
+        {
+            await _transportAbort.CancelAsync();
+            await stopped;
+        }
+
         _http.Dispose();
         _handler.Dispose();
         _reconcileTimer.Dispose();
         _reconcileCts.Dispose();
+        _transportAbort.Dispose();
 
         // Last, once nothing can fetch into it any more: the host's files do not outlive the session
         // on this device (#382).
@@ -1250,8 +1274,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         "Usage",
         "CA2215",
         Justification = "Deliberately does not call base.Dispose: DelegatingHandler.Dispose disposes the inner handler, which is exactly what must not happen here — the session owns it and disposes it in DisposeAsync.")]
-    private sealed class BorrowedHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    private sealed class BorrowedHandler(HttpMessageHandler inner, CancellationToken abort) : DelegatingHandler(inner)
     {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, abort);
+            return await base.SendAsync(request, linked.Token);
+        }
+
         protected override void Dispose(bool disposing)
         {
         }
