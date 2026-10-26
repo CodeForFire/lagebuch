@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -493,6 +494,58 @@ public class MasterDataEditorViewModelTests
         vm.SaveCommand.Execute(null);
 
         Assert.Equal("B 1.2 {JJMMTT} {NNN}", provider.Get().Settings.IncidentNumberFormat);
+    }
+
+    // Field report: "{A} 1.2 {LLMMTT} {NNNN}" was saved without a word, and the dialog then
+    // pre-filled nothing. A template the dialog cannot read says so where it is typed.
+    [Theory]
+    [InlineData("{A} 1.2 {LLMMTT} {NNNN}")]
+    [InlineData("B 1.2 {JJMMTT")]
+    [InlineData("B 1.2 260715")]
+    public void An_unreadable_einsatznummer_format_names_the_placeholders(string template)
+    {
+        var settings = Settings(Vm(new InMemoryProvider(MasterDataSet.Empty)));
+
+        settings.IncidentNumberFormat = template;
+
+        Assert.NotNull(settings.IncidentNumberFormatError);
+        Assert.Contains("{JJMMTT}", settings.IncidentNumberFormatError, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("{A} 1.2 {JJMMTT} {NNNN}")]
+    public void A_blank_or_readable_einsatznummer_format_shows_no_error(string? template)
+    {
+        var settings = Settings(Vm(new InMemoryProvider(MasterDataSet.Empty)));
+        settings.IncidentNumberFormat = "{LL}";
+
+        settings.IncidentNumberFormat = template;
+
+        Assert.Null(settings.IncidentNumberFormatError);
+    }
+
+    [Fact]
+    public void The_einsatznummer_format_suggestions_start_with_bayern_and_all_parse()
+    {
+        var suggestions = SettingsSection.IncidentNumberFormatSuggestions;
+
+        Assert.Equal("{A} 1.2 {JJMMTT} {NNNN}", suggestions[0]);
+        Assert.All(suggestions, s => Assert.True(IncidentNumberFormat.TryParse(s, out _), s));
+        Assert.All(suggestions, s => Assert.InRange(s.Length, 1, IncidentSettings.MaxIncidentNumberFormatLength));
+    }
+
+    [Fact]
+    public void An_unreadable_einsatznummer_format_from_the_store_shows_its_error_on_open()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Settings = MasterDataSet.Empty.Settings with { IncidentNumberFormat = "{A} 1.2 {LLMMTT} {NNNN}" },
+        });
+
+        Assert.NotNull(Settings(Vm(provider)).IncidentNumberFormatError);
     }
 
     [Fact]

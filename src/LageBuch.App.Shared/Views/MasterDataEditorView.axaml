@@ -396,14 +396,23 @@
                                      Minimum="0" Maximum="400" Increment="5" FormatString="0" />
                       <TextBlock Grid.Column="2" Text="bar" Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
-                    <!-- #462: a template is wider than the 140px value column, so it gets the full width. -->
+                    <!-- #462: a template is wider than the 140px value column, so it gets the full width.
+                         Known formats are suggested, Bayern's first; any other stays typeable. -->
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                      <TextBlock Text="Einsatznummer-Format" />
-                      <TextBox x:Name="IncidentNumberFormatBox" Classes="mono"
-                               Text="{Binding IncidentNumberFormat}"
-                               MaxLength="{x:Static md:IncidentSettings.MaxIncidentNumberFormatLength}"
-                               PlaceholderText="z. B. {A} 1.2 {JJMMTT} {NNNN}"
-                               AutomationProperties.Name="Format der Einsatznummer" />
+                      <HeaderedContentControl x:Name="IncidentNumberFormatField" Classes="field suggest"
+                                              Header="EINSATZNUMMER-FORMAT"
+                                              Classes.invalid="{Binding IncidentNumberFormatError, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <AutoCompleteBox x:Name="IncidentNumberFormatBox"
+                                         Text="{Binding IncidentNumberFormat}"
+                                         ItemsSource="{x:Static vm:SettingsSection.IncidentNumberFormatSuggestions}"
+                                         FilterMode="None" MinimumPrefixLength="0"
+                                         MaxLength="{x:Static md:IncidentSettings.MaxIncidentNumberFormatLength}"
+                                         PlaceholderText="z. B. {A} 1.2 {JJMMTT} {NNNN}"
+                                         AutomationProperties.Name="Format der Einsatznummer" />
+                      </HeaderedContentControl>
+                      <TextBlock x:Name="IncidentNumberFormatError" Classes="field-error" TextWrapping="Wrap"
+                                 Text="{Binding IncidentNumberFormatError}"
+                                 IsVisible="{Binding IncidentNumberFormatError, Converter={x:Static ObjectConverters.IsNotNull}}" />
                       <TextBlock Classes="secondary" TextWrapping="Wrap"
                                  Text="{}{A} = Einsatzart aus dem Stichwort (B, T, R …), {JJMMTT} = Einsatzdatum, {NNNN} = Lücke für die laufende Nummer der Leitstelle. Ein neuer Einsatz bekommt den Rest vorausgefüllt." />
                     </StackPanel>

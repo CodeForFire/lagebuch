@@ -1,8 +1,10 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -267,6 +269,73 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-einstellungen.png"));
+    }
+
+    // #462 field report: "{LLMMTT}" was saved without a word and the dialog pre-filled nothing.
+    // The error shows under the field while the template is unreadable and goes once it is fixed.
+    [AvaloniaFact]
+    public void An_unreadable_einsatznummer_format_shows_an_error_under_the_field()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var settings = vm.Sections.OfType<SettingsSection>().Single();
+        vm.SelectedSection = settings;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var error = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "IncidentNumberFormatError");
+        var field = view.GetVisualDescendants().OfType<HeaderedContentControl>().Single(h => h.Name == "IncidentNumberFormatField");
+        Assert.False(error.IsEffectivelyVisible);
+        Assert.DoesNotContain("invalid", field.Classes);
+
+        settings.IncidentNumberFormat = "{A} 1.2 {LLMMTT} {NNNN}";
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(error.IsEffectivelyVisible);
+        Assert.Contains("invalid", field.Classes);
+        Assert.StartsWith("Format nicht lesbar", error.Text, StringComparison.Ordinal);
+
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-einsatznummer-format-error.png"));
+        }
+
+        settings.IncidentNumberFormat = "{A} 1.2 {JJMMTT} {NNNN}";
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(error.IsEffectivelyVisible);
+    }
+
+    // #462: the field suggests the known formats, Bayern's first; picking one fills the template.
+    [AvaloniaFact]
+    public void The_einsatznummer_format_field_suggests_the_known_formats()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var settings = vm.Sections.OfType<SettingsSection>().Single();
+        vm.SelectedSection = settings;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var box = view.GetVisualDescendants().OfType<AutoCompleteBox>().Single(b => b.Name == "IncidentNumberFormatBox");
+        Assert.Equal(SettingsSection.IncidentNumberFormatSuggestions, box.ItemsSource);
+
+        box.Focus();
+        box.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        var popup = box.GetVisualDescendants().OfType<Popup>().Single();
+        Assert.True(popup.IsOpen);
+        Assert.Equal(
+            SettingsSection.IncidentNumberFormatSuggestions,
+            popup.Child!.GetVisualDescendants().OfType<ListBox>().Single().Items.Cast<string>());
+
+        window.Press(PhysicalKey.ArrowDown);
+        window.Press(PhysicalKey.Enter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("{A} 1.2 {JJMMTT} {NNNN}", settings.IncidentNumberFormat);
+        window.Close();
     }
 
     [AvaloniaFact]

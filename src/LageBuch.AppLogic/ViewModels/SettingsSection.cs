@@ -41,7 +41,31 @@ public sealed partial class SettingsSection : EditorSection
 
     /// <summary>The Einsatznummer template the EINSATZDATEN dialog pre-fills from, if any (#462).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IncidentNumberFormatError))]
     private string? _incidentNumberFormat;
+
+    /// <summary>
+    /// Formats offered in the field, Bayern's first. Each is a published example, not a standard:
+    /// every Leitstelle numbers its own way, so the field stays free text. In order: Bayern
+    /// (Einsatzart, the spec's version 1.2, date, running number: "R 1.2 260715 0042");
+    /// Baden-Württemberg, from the Landesfeuerwehrschule's F3 material ("B 240511 112"); and the
+    /// Leitstellen-Schnittstelle UCRI's example ("2021-01-05-2553").
+    /// </summary>
+    public static IReadOnlyList<string> IncidentNumberFormatSuggestions { get; } =
+    [
+        "{A} 1.2 {JJMMTT} {NNNN}",
+        "{A} {JJMMTT} {NNN}",
+        "{JJJJ}-{MM}-{TT}-{NNNN}",
+    ];
+
+    /// <summary>
+    /// Why the dialog will pre-fill nothing from <see cref="IncidentNumberFormat"/>, or null when it
+    /// is blank or readable. Saving is not refused: the template is kept so it can be corrected.
+    /// </summary>
+    public string? IncidentNumberFormatError =>
+        string.IsNullOrWhiteSpace(IncidentNumberFormat) || Domain.ValueObjects.IncidentNumberFormat.TryParse(IncidentNumberFormat, out _)
+            ? null
+            : "Format nicht lesbar, es wird nichts vorausgefüllt. Platzhalter: {A}, {JJMMTT} oder {JJJJ}, {MM}, {TT}, {NNNN}.";
 
     partial void OnIlsReminderIntervalMinutesChanged(int value) => _onChanged();
 
