@@ -97,8 +97,8 @@ public class IncidentDataDialogRenderTests
         Assert.Equal("Nebenstr.", session.Incident.Street);
     }
 
-    // #652: Esc with typed Einsatzdaten asks first, focus on ABBRECHEN, so a reflex Enter keeps
-    // editing; VERWERFEN then closes without saving.
+    // #652: Esc with typed Einsatzdaten asks first, focus on ZURÜCK, so a reflex Enter keeps editing.
+    // A second Esc leaves without saving, as ABBRECHEN does: there is always a way out.
     [AvaloniaFact]
     public void Escape_after_typing_asks_before_discarding()
     {
@@ -129,8 +129,39 @@ public class IncidentDataDialogRenderTests
 
         window.Press(PhysicalKey.Escape);
         Dispatcher.UIThread.RunJobs();
-        Find<Button>(window, "IncidentDataDiscardButton").Command!.Execute(null);
+        Assert.True(Find<Border>(window, "IncidentDataDiscardPanel").IsEffectivelyVisible);
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
 
+        Assert.Equal(1, closed);
+        Assert.Equal("Hauptstr.", session.Incident.Street);
+    }
+
+    // Field report: the dialog could not be left. The question's way back to the form said
+    // ABBRECHEN, so pressing it to leave went round in a loop. ABBRECHEN means leave everywhere:
+    // in the question it discards and closes, and the way back says ZURÜCK.
+    [AvaloniaFact]
+    public void Abbrechen_in_the_discard_question_leaves_and_zurueck_goes_back()
+    {
+        var closed = 0;
+        var session = Session();
+        var dialogVm = new IncidentDataDialogViewModel(session, () => { });
+        dialogVm.Closed += (_, _) => closed++;
+        var window = new Window { Content = new IncidentDataDialogView { DataContext = dialogVm }, Width = 560, Height = 560 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        Find<AutoCompleteBox>(window, "IncidentDataStreetBox").Text = "Nebenstr.";
+        var leave = Find<Button>(window, "IncidentDataDiscardButton");
+        var back = Find<Button>(window, "IncidentDataKeepEditingButton");
+        Assert.Equal("ABBRECHEN", leave.Content);
+        Assert.Equal("ZURÜCK", back.Content);
+
+        Find<Button>(window, "IncidentDataCancelButton").Command!.Execute(null);
+        back.Command!.Execute(null);
+        Assert.Equal(0, closed);
+
+        Find<Button>(window, "IncidentDataCancelButton").Command!.Execute(null);
+        leave.Command!.Execute(null);
         Assert.Equal(1, closed);
         Assert.Equal("Hauptstr.", session.Incident.Street);
     }
