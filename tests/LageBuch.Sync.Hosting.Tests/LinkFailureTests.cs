@@ -215,5 +215,9 @@ public class LinkFailureTests
         time.Advance(SyncProtocol.CommandTimeout);
 
         Assert.Equal(RemoteIncidentSession.CommandLostReason, await rejection.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        // The client is disposed before the relay, and stopping a hub over a link still silent waits
+        // two minutes for an answer that cannot come.
+        relay.Resume();
     }
 }
