@@ -1503,10 +1503,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually still
         // unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf". A
         // joined client has no file, so it names the PDF the same way from the incident's start.
+        // The "Einsatz-" prefix says what the file is once it sits among other downloads.
         var baseName = _local is not null
             ? Path.GetFileNameWithoutExtension(_local.Path)
             : _session.Incident.StartedAt.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
-        var suggested = baseName + ".pdf";
+        var suggested = "Einsatz-" + baseName + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
         {
