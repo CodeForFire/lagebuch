@@ -54,6 +54,7 @@ public sealed record MasterDataSet(
     // each with how many there are. Only the chosen name lands in the incident; the count is a live
     // rule, checked against today's Stammdaten.
     IReadOnlyList<Device> Devices,
+
     // Funkgruppen (TMO/DMO) offered as suggestions on the Führungstafel. Only the chosen text
     // lands in an incident, so renaming one here never changes a past Einsatz.
     IReadOnlyList<TalkGroup> TalkGroups,

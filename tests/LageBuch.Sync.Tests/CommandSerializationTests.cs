@@ -334,6 +334,8 @@ public class CommandSerializationTests
 
         Assert.Contains($"\"$type\":\"{discriminator}\"", json, StringComparison.Ordinal);
         Assert.Equal(command.GetType(), SyncJson.Deserialize<SyncCommand>(json).GetType());
+    }
+
     [Fact]
     public void Add_command_node_round_trips_its_details_and_reads_a_payload_without_them()
     {

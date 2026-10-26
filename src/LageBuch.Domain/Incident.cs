@@ -4,8 +4,8 @@ using LageBuch.Domain.Equipment;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
-using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -98,6 +98,7 @@ public sealed class Incident
 
     /// <summary>How many Geräte are still out, i.e. not yet given back.</summary>
     public int ItemsOut => _issuedItems.Count(i => i.IsOut);
+
     /// <summary>Abschnitte, Unterabschnitte, Bereitstellungen and partner Einsatzleitungen in creation order, dissolved ones included.</summary>
     public IReadOnlyList<CommandNode> CommandNodes => _commandNodes;
 

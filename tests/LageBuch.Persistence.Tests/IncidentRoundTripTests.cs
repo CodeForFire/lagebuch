@@ -846,9 +846,9 @@ public class IncidentRoundTripTests : IDisposable
         incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", "TBZ 2");
         IncidentRepository.Save(_path, incident);
 
-        // Roll the file back to the V29 shape: no V30 columns, no command_nodes table.
+        // Roll the file back to the V33 shape: no V34 columns, no command_nodes table.
         ExecRaw(
-            "UPDATE schema_version SET version = 29; DROP TABLE command_nodes;" +
+            "UPDATE schema_version SET version = 33; DROP TABLE command_nodes;" +
             "ALTER TABLE force_units DROP COLUMN node_id;" +
             "ALTER TABLE role_assignments DROP COLUMN node_id; ALTER TABLE role_assignments DROP COLUMN slot;" +
             "ALTER TABLE incident_meta DROP COLUMN fuehrungsstufe; ALTER TABLE incident_meta DROP COLUMN el_standort;" +

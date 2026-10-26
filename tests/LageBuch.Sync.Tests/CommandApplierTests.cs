@@ -801,6 +801,9 @@ public class CommandApplierTests
             ApplyOverWire(new RemoveSituationReportCommand(sent.Id), incident, clock));
 
         Assert.Equal("Lage", Assert.Single(incident.SituationReports).Situation);
+    }
+
+    [Fact]
     public void Add_command_node_with_details_over_the_wire_creates_the_node_with_them_for_the_sender()
     {
         var clock = new FixedClock();
