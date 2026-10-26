@@ -924,5 +924,13 @@
     <!-- Einsatzdaten overlay (Stichwort, Einsatznummer, Adresse) from the header's pencil -->
     <ContentControl Content="{Binding PendingIncidentDataDialog}"
                     IsVisible="{Binding PendingIncidentDataDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Abschnitt overlay (form, edit, the Einsatzleitung's post) from the FÜHRUNG board -->
+    <ContentControl Content="{Binding PendingCommandNodeDialog}"
+                    IsVisible="{Binding PendingCommandNodeDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Person overlay (Leiter, Melder, Führungsassistenz, Fachberater) from the FÜHRUNG board -->
+    <ContentControl Content="{Binding PendingLeadershipPersonDialog}"
+                    IsVisible="{Binding PendingLeadershipPersonDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>

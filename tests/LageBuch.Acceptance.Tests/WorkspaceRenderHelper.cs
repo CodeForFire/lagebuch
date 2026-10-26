@@ -143,6 +143,10 @@ internal static class WorkspaceRenderHelper
     /// the same at any width. Rendered text stays the fallback for a tab whose item is a bare
     /// string rather than a nav view model.
     /// </para>
+    /// <para>
+    /// ORGANISATION, FUNKTIONEN and KRÄFTE are tabs inside the FÜHRUNG rail entry, not rail
+    /// entries of their own; naming one opens FÜHRUNG and then that tab, the way a user gets there.
+    /// </para>
     /// </remarks>
     public static TabControl SelectTab(Window window, string header)
     {
@@ -155,6 +159,15 @@ internal static class WorkspaceRenderHelper
                 Dispatcher.UIThread.RunJobs();
                 return tabs;
             }
+        }
+
+        if (FuehrungTabs.Contains(header))
+        {
+            SelectTab(window, "FÜHRUNG");
+            var strip = LeadershipTabStrip(window);
+            strip.SelectedItem = strip.Items.OfType<TabItem>().Single(t => Equals(t.Header, header));
+            Dispatcher.UIThread.RunJobs();
+            return tabs;
         }
 
         var shown = string.Join(
@@ -182,6 +195,13 @@ internal static class WorkspaceRenderHelper
     public static TabControl ModuleTabStrip(Window window) =>
         SelectedTabContent(window).GetVisualDescendants().OfType<TabControl>()
             .Single(t => t.Classes.Contains("module-tabs"));
+
+    private static readonly string[] FuehrungTabs = ["ORGANISATION", "FUNKTIONEN", "KRÄFTE"];
+
+    /// <summary>The tab strip inside the FÜHRUNG rail entry; FÜHRUNG must be the open entry.</summary>
+    public static TabControl LeadershipTabStrip(Window window) =>
+        SelectedTabContent(window).GetVisualDescendants().OfType<TabControl>()
+            .Single(t => t.Name == "LeadershipTabStrip");
 
     /// <summary>The realized visual of the selected tab's content.</summary>
     /// <remarks>

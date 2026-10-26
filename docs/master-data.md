@@ -208,6 +208,12 @@ Eine leere Navigation bedeutet „Standard": die Reihenfolge, mit der Lagebuch
 ausgeliefert wird. Das ist Absicht — so taucht ein Modul, das eine spätere
 Version ergänzt, bei allen auf, die die Liste nie angefasst haben.
 
+**Funktionen** und **Kräfte** sind keine eigenen Einträge mehr, sondern Reiter
+von **Führung** — neben der Führungsorganisation. Eine früher gespeicherte
+Navigation, die sie noch einzeln nennt, zeigt Führung an der Stelle des ersten
+der drei Einträge; eingeblendet ist es, wenn einer von ihnen eingeblendet war.
+Beim nächsten Speichern der Navigation steht es so auch in den Stammdaten.
+
 Beim Öffnen eines älteren Einsatzes gilt: Was die Navigation nennt und der
 Einsatz hat, wird gezeigt; was sie nennt, der Einsatz aber nicht hat, entfällt;
 und eine Checkliste, die der Einsatz hat, die Navigation aber nicht kennt, wird

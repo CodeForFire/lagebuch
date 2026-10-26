@@ -21,6 +21,7 @@ public enum IncidentPdfSections
     InvolvedParties = 1 << 8,
     SituationReports = 1 << 9,
     IssuedItems = 1 << 10,
+    Fuehrungsorganisation = 1 << 11,
     All = Checklist | Etb | Roles | Forces | Tasks | Atemschutz | CoMessprotokoll | Files | InvolvedParties
-        | SituationReports | IssuedItems,
+        | SituationReports | IssuedItems | Fuehrungsorganisation,
 }

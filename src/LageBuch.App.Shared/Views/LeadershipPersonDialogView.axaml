@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.LeadershipPersonDialogView"
+             x:DataType="vm:LeadershipPersonDialogViewModel">
+  <!-- The Abschnitt dialog's shell (CommandNodeDialogView): MaxWidth, a 16px scrim inset and a
+       ScrollViewer, so it fits a phone. Initial focus is left to the first tab stop, FUNKTION. -->
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CancelCommand}" b:Overlay.PrimaryCommand="{Binding SaveCommand}">
+    <Border x:Name="PersonDialogCard" MaxWidth="480" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="26,22,26,24" Spacing="12">
+            <TextBlock x:Name="PersonDialogTitle" Text="{Binding Title}" Classes="display" FontSize="20"
+                       TextWrapping="Wrap" />
+            <!-- Suggestions, not a closed set: an ad-hoc or mutual-aid Funktion must stay enterable,
+                 as in FUNKTIONEN. -->
+            <HeaderedContentControl Classes="field suggest required" Header="FUNKTION"
+                                    ctrl:Field.Error="{Binding RoleError}">
+              <AutoCompleteBox x:Name="PersonDialogRoleBox" ItemsSource="{Binding RoleOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                               AutomationProperties.Name="Funktion"
+                               IsEnabled="{Binding IsRoleEditable}"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
+                               Text="{Binding Role}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field suggest required" Header="NAME"
+                                    ctrl:Field.Error="{Binding PersonError}">
+              <AutoCompleteBox x:Name="PersonDialogNameBox" ItemsSource="{Binding PersonOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                               AutomationProperties.Name="Name"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
+                               Text="{Binding PersonName}" />
+            </HeaderedContentControl>
+            <Grid ColumnDefinitions="3*,2*" ColumnSpacing="12">
+              <HeaderedContentControl Grid.Column="0" Classes="field suggest" Header="FUNKRUFNAME">
+                <AutoCompleteBox x:Name="PersonDialogCallSignBox" ItemsSource="{Binding CallSignOptions}"
+                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                                 AutomationProperties.Name="Funkrufname"
+                                 PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                 IsEnabled="{Binding IsContactEditable}"
+                                 Text="{Binding CallSign}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Grid.Column="1" Classes="field" Header="HANDYNUMMER">
+                <TextBox x:Name="PersonDialogPhoneBox" Classes="mono" Text="{Binding Phone}" MaxLength="50"
+                         IsReadOnly="{Binding !IsContactEditable}"
+                         AutomationProperties.Name="Handynummer" />
+              </HeaderedContentControl>
+            </Grid>
+            <!-- Information, not a refusal: the press hands over instead of assigning. Same amber
+                 as FUNKTIONEN's RoleConflictHint. -->
+            <TextBlock x:Name="PersonDialogHandoverText"
+                       FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                       TextWrapping="Wrap"
+                       Text="{Binding HandoverText}"
+                       IsVisible="{Binding HandoverText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock x:Name="PersonDialogSaveError" Classes="field-error" TextWrapping="Wrap"
+                       Text="{Binding SaveError}"
+                       IsVisible="{Binding SaveError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <!-- Left, primary first (#694): the actions start under the fields they save. -->
+            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0"
+                        IsVisible="{Binding !IsDiscardConfirmOpen}">
+              <Button x:Name="PersonDialogSaveButton" Classes="signal" Content="{Binding PrimaryText}"
+                      Command="{Binding SaveCommand}" />
+              <Button x:Name="PersonDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+            </StackPanel>
+            <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. ABBRECHEN means
+                 leave here too, as does a second Esc; ZURÜCK, focused, goes back to the form. -->
+            <Border x:Name="PersonDialogDiscardPanel" Margin="0,8,0,0"
+                    IsVisible="{Binding IsDiscardConfirmOpen}"
+                    b:Overlay.IsInline="True"
+                    b:Overlay.CancelCommand="{Binding ConfirmDiscardCommand}"
+                    b:Overlay.InitialFocus="{Binding #PersonDialogKeepEditingButton}"
+                    BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+              <StackPanel Spacing="8">
+                <TextBlock Text="ÄNDERUNGEN VERWERFEN?" Classes="overline" />
+                <TextBlock Text="Die Eingaben sind noch nicht gespeichert." TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
+                  <Button x:Name="PersonDialogDiscardButton" Classes="signal" Content="ABBRECHEN"
+                          Command="{Binding ConfirmDiscardCommand}" />
+                  <Button x:Name="PersonDialogKeepEditingButton" Content="ZURÜCK"
+                          Command="{Binding CancelDiscardCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

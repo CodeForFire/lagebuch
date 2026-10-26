@@ -20,11 +20,15 @@ public static class NavModules
     /// <summary>Aufgaben.</summary>
     public const string Tasks = "tasks";
 
-    /// <summary>Funktionen.</summary>
-    public const string Roles = "roles";
-
-    /// <summary>Kräfte.</summary>
-    public const string Forces = "forces";
+    /// <summary>
+    /// Führung: the Führungsorganisation board, with Funktionen and Kräfte as its other two tabs.
+    /// </summary>
+    /// <remarks>
+    /// Funktionen (<c>"roles"</c>) and Kräfte (<c>"forces"</c>) were rail entries of their own
+    /// before they became tabs here; <c>NavigationLayout.FoldLegacyFuehrung</c> turns a layout
+    /// that still names them into this one entry.
+    /// </remarks>
+    public const string Leadership = "leadership";
 
     /// <summary>Beteiligte: the Einsatz's own address book of people who are not forces.</summary>
     public const string InvolvedParties = "involved";
@@ -55,7 +59,7 @@ public static class NavModules
 
     /// <summary>Every built-in module, in the order the rail shipped with.</summary>
     public static IReadOnlyList<string> All { get; } =
-        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links, Contacts, IssuedItems };
+        new[] { Etb, Tasks, Leadership, InvolvedParties, Scba, Co, Files, Links, Contacts, IssuedItems };
 
     /// <summary>
     /// Whether this build knows the key. A layout written by a newer build may name a module that
@@ -87,9 +91,10 @@ public static class NavLayout
 {
     /// <summary>
     /// The rail as it shipped before it was configurable — Aufbau, the modules in their original
-    /// order, then Abbau — plus the modules added since: Beteiligte beside Kräfte, Kontakte after
-    /// Links, Ausgabe after Kontakte. A new module goes last, because Ctrl+1…9 open the rail by
-    /// position: inserting one earlier would move the Atemschutz shortcut crews already know.
+    /// order, then Abbau — plus the changes since: Führung in the place Funktionen and Kräfte had,
+    /// Beteiligte beside it, Kontakte after Links, Ausgabe after Kontakte. A new module otherwise
+    /// goes last, because Ctrl+1…9 open the rail by position: inserting one earlier would move the
+    /// Atemschutz shortcut crews already know.
     /// </summary>
     /// <remarks>
     /// Stored as "no layout" rather than written into a fresh Stammdaten set on purpose. An empty
@@ -102,8 +107,7 @@ public static class NavLayout
         new NavEntry(NavModules.Checklist, ChecklistDefaults.AufbauListId, true),
         new NavEntry(NavModules.Etb, null, true),
         new NavEntry(NavModules.Tasks, null, true),
-        new NavEntry(NavModules.Roles, null, true),
-        new NavEntry(NavModules.Forces, null, true),
+        new NavEntry(NavModules.Leadership, null, true),
         new NavEntry(NavModules.InvolvedParties, null, true),
         new NavEntry(NavModules.Scba, null, true),
         new NavEntry(NavModules.Co, null, true),

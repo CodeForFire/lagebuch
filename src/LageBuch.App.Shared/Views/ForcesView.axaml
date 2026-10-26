@@ -51,11 +51,6 @@
     <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#DockFields">
       <Setter Property="Orientation" Value="Vertical" />
     </Style>
-    <!-- The bottom bar already says KRÄFTE; dropping the heading gives the Gesamtstärke tile
-         the whole line, which it needs at 388px. -->
-    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#ForcesTitle">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#TotalStrengthPrefixText">
       <Setter Property="FontSize" Value="19" />
     </Style>
@@ -107,7 +102,6 @@
        the order it appears on screen. -->
   <DockPanel KeyboardNavigation.TabNavigation="Local">
     <Grid KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" x:Name="ForcesTitle" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Top" />
       <!-- Total strength readout im ZF/GF/Mannschaft/Gesamt-Format (#76, #216), AGT-Anteil daneben.
            Gesamt is bold+underlined by binding it as a separate TextBlock after the plain prefix
            (see ForcesViewModel.TotalStrengthPrefixText); no Run/Inlines idiom exists here to bold
@@ -135,6 +129,11 @@
         </WrapPanel>
       </Border>
     </Grid>
+
+    <!-- Why an Abschnitt pick was refused (a peer dissolved it a moment ago); the list stays as it is. -->
+    <TextBlock x:Name="ForcesActionError" Classes="field-error" DockPanel.Dock="Top" Margin="0,0,0,10"
+               Text="{Binding ActionError}"
+               IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <!-- The phone's way in to the dock, at the bottom edge where the thumb already is. -->
     <Button KeyboardNavigation.TabIndex="3" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
@@ -281,6 +280,14 @@
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
+          <DataGridTemplateColumn Header="ABSCHNITT" Width="170">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <ctrl:NodeChoicePicker Margin="6,4" Choices="{Binding NodeChoices}" Label="{Binding NodeCellLabel}"
+                                       IsEnabled="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <!-- Stärke im 1/1/2-Format; die Zahlen bleiben nach dem Eintrag korrigierbar (#76),
                gebündelt in einem Editor, damit eine Korrektur ein Protokolleintrag bleibt.
                Verlauf zeigt die Wert-Historie der Einheit. -->
@@ -455,6 +462,11 @@
                                ToolTip.Tip="Atemschutzgeräteträger" />
                     <TextBlock Text="{Binding ScbaCount}" VerticalAlignment="Center" />
                   </StackPanel>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <TextBlock Grid.Column="0" Text="ABSCHNITT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                    <ctrl:NodeChoicePicker Grid.Column="1" Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}"
+                                           IsEnabled="{Binding !IsReadOnly}" />
+                  </Grid>
                   <ComboBox HorizontalAlignment="Stretch"
                             ItemsSource="{Binding StatusOptions}"
                             SelectedItem="{Binding Status}"

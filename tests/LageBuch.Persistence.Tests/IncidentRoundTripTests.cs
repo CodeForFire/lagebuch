@@ -744,6 +744,26 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(clock.Now, loaded.CommandNodes[3].DissolvedAt);
     }
 
+    // Order on the board is list order, stored as each node's ordinal; a move has to survive reopening.
+    [Fact]
+    public void A_moved_node_keeps_its_place_and_level_after_reopening()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var sued = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Süd");
+        var dach = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Dach", nord.Id);
+        incident.MoveCommandNode(clock, op, sued.Id, null, nord.Id);
+        incident.MoveCommandNode(clock, op, dach.Id, null, nord.Id);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(new[] { sued.Id, dach.Id, nord.Id }, loaded.CommandNodes.Select(n => n.Id));
+        Assert.Equal<(CommandNodeKind, Guid?)>((CommandNodeKind.Abschnitt, null), (loaded.CommandNodes[1].Kind, loaded.CommandNodes[1].ParentId));
+    }
+
     [Fact]
     public void Unit_and_role_node_ids_and_slot_round_trip()
     {

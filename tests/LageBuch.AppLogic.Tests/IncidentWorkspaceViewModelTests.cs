@@ -983,6 +983,63 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void The_boards_dialog_is_hosted_as_an_overlay_until_it_closes()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.Leadership.AddAbschnittCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingCommandNodeDialog);
+        Assert.Equal("Abschnitt bilden", vm.PendingCommandNodeDialog!.Title);
+
+        vm.PendingCommandNodeDialog.SaveCommand.Execute(null);
+
+        Assert.Null(vm.PendingCommandNodeDialog);
+        Assert.Single(vm.Leadership.Sections);
+    }
+
+    [Fact]
+    public void The_boards_person_dialog_is_hosted_as_an_overlay_until_it_closes()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.Leadership.El.SetLeiterCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingLeadershipPersonDialog);
+        Assert.Equal("EL festlegen", vm.PendingLeadershipPersonDialog!.Title);
+
+        vm.PendingLeadershipPersonDialog.Role = "EL";
+        vm.PendingLeadershipPersonDialog.PersonName = "Mustermann, Max";
+        vm.PendingLeadershipPersonDialog.SaveCommand.Execute(null);
+
+        Assert.Null(vm.PendingLeadershipPersonDialog);
+        Assert.Equal("Mustermann, Max", vm.Leadership.El.Leiter?.PersonName);
+    }
+
+    [Fact]
+    public void A_replaced_or_dropped_person_dialog_stops_following_the_session()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.Leadership.El.SetLeiterCommand.Execute(null);
+        var first = vm.PendingLeadershipPersonDialog!;
+        var raised = 0;
+        first.PropertyChanged += (_, _) => raised++;
+
+        vm.Leadership.AddFachberaterCommand.Execute(null);
+        var second = vm.PendingLeadershipPersonDialog!;
+        second.Role = "Fachberater THW";
+        second.PersonName = "Mustermann, Max";
+        second.SaveCommand.Execute(null);
+
+        Assert.Equal(0, raised);
+
+        vm.Leadership.AddFachberaterCommand.Execute(null);
+        Assert.NotNull(vm.PendingLeadershipPersonDialog);
+        vm.Dispose();
+        Assert.Null(vm.PendingLeadershipPersonDialog);
+    }
+
+    [Fact]
     public void CloseIncident_prompts_for_confirmation_before_closing()
     {
         var vm = NewWorkspace(out _, out _);
@@ -2134,6 +2191,62 @@ public class IncidentWorkspaceViewModelTests
         Assert.NotSame(checklist, vm.SelectedNavItem);
         Assert.True(vm.SelectedNavItem!.IsChecklist);
         Assert.Equal(checklist.Header, vm.SelectedNavItem.Header);
+    }
+
+    // --- Führung: the board, Funktionen and Kräfte as tabs of one rail entry -------------------
+    [Fact]
+    public void Fuehrung_is_one_rail_entry_holding_the_board_funktionen_and_kraefte()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+
+        var fuehrung = Assert.Single(vm.NavItems, i => i.ModuleKey == NavModules.Leadership);
+        Assert.Same(vm.LeadershipTabs, fuehrung.Content);
+        Assert.Equal("FÜHRUNG", fuehrung.Header);
+        Assert.Same(vm.Leadership, vm.LeadershipTabs.Board);
+        Assert.Same(vm.Roles, vm.LeadershipTabs.Roles);
+        Assert.Same(vm.Forces, vm.LeadershipTabs.Forces);
+        Assert.Null(NavItemFor(vm, vm.Roles));
+        Assert.Null(NavItemFor(vm, vm.Forces));
+        Assert.Null(NavItemFor(vm, vm.Leadership));
+    }
+
+    [Fact]
+    public void Fuehrung_opens_on_the_organisation_tab()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+
+        Assert.Equal(LeadershipTabsViewModel.OrganisationTab, vm.LeadershipTabs.SelectedTabIndex);
+    }
+
+    // A read-only flip synced from another device rebuilds every module; the Lagebuchführer must
+    // not be thrown back from Kräfte to the board by something done elsewhere.
+    [Fact]
+    public void Rebuilding_after_close_keeps_the_open_fuehrung_tab()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+        vm.SelectedNavItem = NavItemFor(vm, vm.LeadershipTabs);
+        vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.ForcesTab;
+        var replaced = vm.LeadershipTabs;
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.NotSame(replaced, vm.LeadershipTabs);
+        Assert.Same(NavItemFor(vm, vm.LeadershipTabs), vm.SelectedNavItem);
+        Assert.Equal(LeadershipTabsViewModel.ForcesTab, vm.LeadershipTabs.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void A_phone_layout_reaches_every_fuehrung_tab()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+
+        vm.IsNarrow = true;
+
+        Assert.True(vm.LeadershipTabs.IsNarrow);
+        Assert.True(vm.Leadership.IsNarrow);
+        Assert.True(vm.Roles.IsNarrow);
+        Assert.True(vm.Forces.IsNarrow);
     }
 
     [Fact]
