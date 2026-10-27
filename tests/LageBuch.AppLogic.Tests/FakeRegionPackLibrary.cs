@@ -14,6 +14,12 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
     /// <summary>When set, an install waits for it, so a test can look at the section mid-download.</summary>
     public TaskCompletionSource? InstallGate { get; set; }
 
+    /// <summary>When set, fetching the catalogue waits for it.</summary>
+    public TaskCompletionSource? CatalogGate { get; set; }
+
+    /// <summary>Called as a removal starts, so a test can look at the section at that moment.</summary>
+    public Action? Removing { get; set; }
+
     public int InstallCount { get; private set; }
 
     public static RegionPackInfo Pack(string slug, string name, string builtAt = "2026-08-31") =>
@@ -21,8 +27,15 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
 
     public void Preinstall(RegionPackInfo info) => _installed.Add(new InstalledRegionPack(info, Path.Join("regions", info.Slug)));
 
-    public Task<IReadOnlyList<RegionPackInfo>> GetCatalogAsync(CancellationToken cancellationToken = default) =>
-        Failure is { } failure ? Task.FromException<IReadOnlyList<RegionPackInfo>>(failure) : Task.FromResult(Catalogue);
+    public async Task<IReadOnlyList<RegionPackInfo>> GetCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        if (CatalogGate is { } gate)
+        {
+            await gate.Task;
+        }
+
+        return Failure is { } failure ? throw failure : Catalogue;
+    }
 
     public IReadOnlyList<InstalledRegionPack> GetInstalled() => _installed.ToList();
 
@@ -48,6 +61,7 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
 
     public void Remove(InstalledRegionPack pack)
     {
+        Removing?.Invoke();
         if (Failure is { } failure)
         {
             throw failure;

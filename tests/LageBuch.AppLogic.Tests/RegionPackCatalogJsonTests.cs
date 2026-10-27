@@ -50,6 +50,13 @@ public class RegionPackCatalogJsonTests
     [InlineData("\"sizeBytes\": 15782458", "\"sizeBytes\": -1")]
     [InlineData("\"sizeBytes\": 15782458", "\"sizeBytes\": \"big\"")]
     [InlineData("\"name\": \"Landkreis Fürstenfeldbruck\",", "")]
+    [InlineData("\"name\": \"Landkreis Fürstenfeldbruck\"", "\"name\": 5")]
+    [InlineData("\"name\": \"Landkreis Fürstenfeldbruck\"", "\"name\": \"   \"")]
+    [InlineData("\"sizeBytes\": 15782458", "\"sizeBytes\": 0")]
+    [InlineData("\"maxLat\": 48.2967233", "\"maxLat\": 48.0877067")]
+    [InlineData("\"maxLon\": 11.4128816", "\"maxLon\": 10.9930275")]
+    [InlineData("\"minLat\": 48.0877067", "\"minLat\": \"48.0877067\"")]
+    [InlineData("\"minLat\": 48.0877067, ", "")]
     public void An_entry_with_a_missing_or_impossible_field_is_skipped_and_the_rest_kept(string field, string replacement)
     {
         var broken = Ffb.Replace(field, replacement, StringComparison.Ordinal);
@@ -58,6 +65,32 @@ public class RegionPackCatalogJsonTests
         var pack = Assert.Single(Catalogue($"[{broken},{sta}]"));
 
         Assert.Equal("sta", pack.Slug);
+    }
+
+    [Fact]
+    public void A_name_at_the_length_cap_is_kept_and_one_past_it_skips_the_entry()
+    {
+        var atCap = Ffb.Replace("Landkreis Fürstenfeldbruck", new string('a', 300), StringComparison.Ordinal);
+        var pastCap = Ffb.Replace("Landkreis Fürstenfeldbruck", new string('a', 301), StringComparison.Ordinal)
+            .Replace("\"slug\": \"ffb\"", "\"slug\": \"sta\"", StringComparison.Ordinal);
+
+        var pack = Assert.Single(Catalogue($"[{atCap},{pastCap}]"));
+
+        Assert.Equal("ffb", pack.Slug);
+    }
+
+    [Fact]
+    public void A_bounding_box_spanning_the_whole_globe_is_on_it()
+    {
+        var world = Ffb.Replace(
+            "{ \"minLat\": 48.0877067, \"minLon\": 10.9930275, \"maxLat\": 48.2967233, \"maxLon\": 11.4128816 }",
+            "{ \"minLat\": -90, \"minLon\": -180, \"maxLat\": 90, \"maxLon\": 180 }",
+            StringComparison.Ordinal);
+
+        var pack = Assert.Single(Catalogue($"[{world}]"));
+
+        Assert.Equal(-90, pack.MinLatitude, precision: 6);
+        Assert.Equal(180, pack.MaxLongitude, precision: 6);
     }
 
     // .NET's '$' matches before a trailing newline; the slug check must not.

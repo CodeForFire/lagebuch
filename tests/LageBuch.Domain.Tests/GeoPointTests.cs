@@ -25,6 +25,28 @@ public class GeoPointTests
     public void A_position_off_the_globe_is_refused(double latitude, double longitude) =>
         Assert.Throws<ArgumentOutOfRangeException>(() => new GeoPoint(latitude, longitude));
 
+    [Theory]
+    [InlineData(90, 180)]
+    [InlineData(-90, -180)]
+    public void The_poles_and_the_date_line_are_on_the_globe(double latitude, double longitude)
+    {
+        var point = new GeoPoint(latitude, longitude);
+
+        Assert.Equal(latitude, point.Latitude, precision: 6);
+        Assert.Equal(longitude, point.Longitude, precision: 6);
+    }
+
+    [Theory]
+    [InlineData(91, 0, "latitude", "Latitude must lie between -90 and 90 degrees.")]
+    [InlineData(0, 181, "longitude", "Longitude must lie between -180 and 180 degrees.")]
+    public void A_refused_position_names_the_coordinate_and_its_range(double latitude, double longitude, string parameter, string message)
+    {
+        var e = Assert.Throws<ArgumentOutOfRangeException>(() => new GeoPoint(latitude, longitude));
+
+        Assert.Equal(parameter, e.ParamName);
+        Assert.StartsWith(message, e.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Two_points_at_the_same_place_are_equal() =>
         Assert.Equal(new GeoPoint(48, 11), new GeoPoint(48, 11));
