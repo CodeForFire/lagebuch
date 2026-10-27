@@ -1,0 +1,1 @@
+A joined client's upload is now spooled only into a temp folder that is owner-only and not a symbolic link, the same checks the folder for opened attachments already had, so another local user can no longer plant that folder in advance (#763).

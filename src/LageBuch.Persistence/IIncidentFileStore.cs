@@ -59,8 +59,6 @@ public sealed class IncidentFileStore : IIncidentFileStore
     /// <inheritdoc cref="SpoolFilePrefix"/>
     public const string SpoolFileExtension = ".tmp";
 
-    private const UnixFileMode OwnerOnlyDirectory = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-
     private readonly long _maxReadBytes;
     private readonly string _spoolDirectory;
 
@@ -184,16 +182,8 @@ public sealed class IncidentFileStore : IIncidentFileStore
 
     private string CreateSpoolPath()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            // The per-user temp directory's ACL already keeps other users out.
-            Directory.CreateDirectory(_spoolDirectory);
-        }
-        else
-        {
-            Directory.CreateDirectory(_spoolDirectory, OwnerOnlyDirectory);
-        }
-
+        // Another local user can create the folder first, as a link or wide open (#763).
+        PrivateTempFolder.Ensure(_spoolDirectory);
         return Path.Join(_spoolDirectory, $"{SpoolFilePrefix}{Guid.NewGuid():N}{SpoolFileExtension}");
     }
 

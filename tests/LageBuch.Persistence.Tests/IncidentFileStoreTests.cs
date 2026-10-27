@@ -311,6 +311,47 @@ public class IncidentFileStoreTests : IDisposable
         Assert.Empty(Directory.GetFiles(spoolRoot, "*", SearchOption.AllDirectories));
     }
 
+    // #763: another local user plants the spool folder as a link before Lagebuch first creates it.
+    // The upload must not spool a client's photo wherever the link points.
+    [Fact]
+    public async Task An_upload_refuses_a_spool_folder_that_is_a_symlink()
+    {
+        var name = Attach("link.jpg");
+        var spoolRoot = Path.Join(_dir, "spool");
+        var outside = Path.Join(_dir, "outside");
+        Directory.CreateDirectory(outside);
+        Directory.CreateSymbolicLink(spoolRoot, outside);
+        var store = new IncidentFileStore(IncidentFile.MaxSizeBytes, spoolRoot);
+        await using var source = new NonSeekableStream(new byte[] { 1, 2, 3 });
+
+        await Assert.ThrowsAsync<IOException>(() => store.SaveStreamAsync(_incidentPath, name, source));
+
+        Assert.Empty(Directory.GetFileSystemEntries(outside));
+        Assert.Equal(0, BlobRowCount());
+    }
+
+    // #763: a spool folder an older build or another user left readable by others is tightened
+    // before a spool goes into it.
+    [Fact]
+    public async Task An_upload_tightens_a_spool_folder_readable_by_others()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // The per-user temp directory's ACL keeps other users out there.
+        }
+
+        var name = Attach("wide.jpg");
+        var spoolRoot = Path.Join(_dir, "spool");
+        Directory.CreateDirectory(spoolRoot);
+        File.SetUnixFileMode(spoolRoot, (UnixFileMode)0x1FF); // 0777
+        var store = new IncidentFileStore(IncidentFile.MaxSizeBytes, spoolRoot);
+        await using var source = new NonSeekableStream(new byte[] { 1, 2, 3 });
+
+        await store.SaveStreamAsync(_incidentPath, name, source);
+
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(spoolRoot));
+    }
+
     // Under the app's own temp folder, where the startup sweep finds what a crash left behind.
     [Fact]
     public async Task The_upload_spool_lives_in_the_lagebuch_temp_folder()
