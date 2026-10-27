@@ -291,6 +291,15 @@ public class MapPacksSectionTests
     }
 
     [Fact]
+    public void A_pack_installed_before_the_catalogue_named_its_area_is_offered_as_an_update()
+    {
+        var row = new AvailableMapPackRow(Ffb with { BoundaryUrl = "https://example.org/boundaries/ffb.geojson" }, Ffb);
+
+        Assert.False(row.IsCurrent);
+        Assert.Equal("AKTUALISIEREN", row.ActionLabel);
+    }
+
+    [Fact]
     public void A_rebuild_with_the_same_version_but_another_checksum_is_offered_as_an_update()
     {
         var row = new AvailableMapPackRow(Ffb with { Sha256 = new string('b', 64) }, Ffb);

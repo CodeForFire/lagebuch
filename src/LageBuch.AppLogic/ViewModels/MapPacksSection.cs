@@ -223,8 +223,14 @@ public sealed class AvailableMapPackRow(RegionPackInfo info, RegionPackInfo? ins
 
     public string Detail => MapPacksSection.Detail(Info);
 
-    /// <summary>The device holds exactly this edition; there is nothing to download.</summary>
-    public bool IsCurrent => installed is not null && installed.Version == Info.Version && string.Equals(installed.Sha256, Info.Sha256, StringComparison.Ordinal);
+    /// <summary>
+    /// The device holds exactly this edition; there is nothing to download. A pack installed before
+    /// the catalogue named its area is not, so AKTUALISIEREN fetches the area too.
+    /// </summary>
+    public bool IsCurrent => installed is not null
+        && installed.Version == Info.Version
+        && string.Equals(installed.Sha256, Info.Sha256, StringComparison.Ordinal)
+        && string.Equals(installed.BoundaryUrl, Info.BoundaryUrl, StringComparison.Ordinal);
 
     public string ActionLabel => installed is null ? "HERUNTERLADEN" : IsCurrent ? "INSTALLIERT" : "AKTUALISIEREN";
 }
