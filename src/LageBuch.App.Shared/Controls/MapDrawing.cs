@@ -96,7 +96,7 @@ public static class MapDrawing
         const double margin = 40;
         var topLeft = ToGeo(center, zoom, size, new Point(-margin, -margin));
         var bottomRight = ToGeo(center, zoom, size, new Point(size.Width + margin, size.Height + margin));
-        var radius = zoom >= WaterLabelsMinZoom ? 7 : 5;
+        var radius = zoom >= WaterLabelsMinZoom ? 7.0 : 5.0;
         var typeface = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
         foreach (var point in points)
         {
