@@ -129,6 +129,8 @@ public sealed record GasDefinition(
     private static string Cut(string? value, int max)
     {
         var trimmed = (value ?? string.Empty).Trim();
+
+        // Stryker disable once Equality : cutting a string of exactly max characters to max yields the same string.
         return trimmed.Length > max ? trimmed[..max].TrimEnd() : trimmed;
     }
 }
