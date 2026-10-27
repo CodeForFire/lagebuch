@@ -123,6 +123,10 @@ renders from the incident alone. Keep it that way.
 
 ## Sync protocol version
 
+[`docs/sync-architecture.md`](docs/sync-architecture.md) describes how the
+network sync works end to end; this section is the rule for changing its
+contract.
+
 Two devices are allowed to sync when their **wire contracts** overlap, never
 when their app versions match. `SyncProtocol.ProtocolVersion` and
 `SyncProtocol.MinimumProtocolVersion` in `src/LageBuch.Sync/SyncProtocol.cs` are
