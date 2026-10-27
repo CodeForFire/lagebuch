@@ -36,10 +36,19 @@ internal sealed class InMemoryStore : IIncidentStore
         return Task.CompletedTask;
     }
 
+    /// <summary>When set, the streamed save throws it once the body is read, like a store that
+    /// refuses bytes whose attachment was removed meanwhile.</summary>
+    public Exception? SaveFailure { get; set; }
+
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default)
     {
         using var ms = new MemoryStream();
         await source.CopyToAsync(ms, cancellationToken);
+        if (SaveFailure is not null)
+        {
+            throw SaveFailure;
+        }
+
         await SaveFileBytesAsync(path, storageFileName, ms.ToArray(), cancellationToken);
     }
 

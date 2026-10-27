@@ -1,0 +1,1 @@
+Attachment bytes that no attachment names any more, left behind by a crash or a failed wipe during a removal, are now wiped when the Einsatz is opened, and an upload whose attachment was removed while it arrived is refused instead of stored (#761).

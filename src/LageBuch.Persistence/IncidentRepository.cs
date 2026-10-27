@@ -632,6 +632,7 @@ public sealed class IncidentRepository
         {
             Migrations.Migrate(migrateCn);
             LegacyAttachmentFolder.Import(migrateCn, path);
+            IncidentFileBlobs.DeleteDetached(migrateCn);
         }
 
         MigratedPaths[Path.GetFullPath(path)] = 0;
