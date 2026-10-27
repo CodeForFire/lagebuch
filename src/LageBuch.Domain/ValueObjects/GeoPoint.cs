@@ -26,4 +26,15 @@ public sealed record GeoPoint
     public double Latitude { get; }
 
     public double Longitude { get; }
+
+    /// <summary>
+    /// The point, or null when either coordinate is missing or off the globe. For coordinates read
+    /// from a file or a sync peer, where a bad value must cost the position, not the Einsatz.
+    /// </summary>
+    public static GeoPoint? TryCreate(double? latitude, double? longitude) =>
+        latitude is { } lat && longitude is { } lon
+        && double.IsFinite(lat) && lat is >= -90 and <= 90
+        && double.IsFinite(lon) && lon is >= -180 and <= 180
+            ? new GeoPoint(lat, lon)
+            : null;
 }

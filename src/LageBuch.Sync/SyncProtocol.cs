@@ -150,15 +150,20 @@ public static class SyncProtocol
     /// at 24 skips the key and pre-fills no Einsatznummer, and a payload without it reads as no
     /// format, so the floor stays at 24.
     /// </para>
+    /// <para>
+    /// 26: the Lagekarte. A client may send <c>setIncidentLocation</c> and <c>placeForceUnit</c>,
+    /// which a host at 25 does not know, so the floor rises to 26. The snapshot carries the
+    /// Einsatzort and each unit's position as optional numbers.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 25;
+    public const int ProtocolVersion = 26;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 24;
+    public const int MinimumProtocolVersion = 26;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

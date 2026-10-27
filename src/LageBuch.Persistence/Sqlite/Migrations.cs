@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 35;
+    public const int CurrentVersion = 36;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -240,6 +240,15 @@ public static class Migrations
         if (version < 35)
         {
             ApplyV35(cn, tx);
+
+            // Stryker restore all
+        }
+
+        // Stryker disable all : V36 only adds nullable columns that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 36)
+        {
+            ApplyV36(cn, tx);
 
             // Stryker restore all
         }
@@ -1022,6 +1031,19 @@ public static class Migrations
     private static void ApplyV35(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_dwellings", "key_number", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The Lagekarte: where the Einsatzort is marked and where each unit stands. Additive and
+    // nullable: an older file's Einsatz and units read back as not on the map, which they were not.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV36(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "location_lat", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "location_lon", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "position_lat", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "position_lon", "REAL");
 
         // Stryker restore all
     }

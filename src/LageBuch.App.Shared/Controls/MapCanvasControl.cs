@@ -36,14 +36,21 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<ICommand?> ViewChangedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(ViewChangedCommand));
 
+    public static readonly StyledProperty<ICommand?> TappedCommandProperty =
+        AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(TappedCommand));
+
     // An arrow key moves the map by a fifth of a tile.
     private const double PanStep = WebMercator.TileSizePixels / 5.0;
+
+    // A finger rests a little unsteadily; a press that moves less than this is a tap, not a pan.
+    private const double TapSlop = 6;
 
     private readonly MapTileCache _tiles = new();
 
     // Where a drag started, on screen and on the map; null while no drag is under way.
     private Point? _dragStart;
     private GeoPoint? _dragStartCenter;
+    private bool _dragMoved;
 
     // A pinch reports its scale relative to where it began, so the zoom is derived from the start.
     private int? _pinchStartZoom;
@@ -93,6 +100,17 @@ public sealed class MapCanvasControl : Control
         set => SetValue(ViewChangedCommandProperty, value);
     }
 
+    /// <summary>Invoked with the <see cref="GeoPoint"/> under a tap or click that did not pan.</summary>
+    public ICommand? TappedCommand
+    {
+        get => GetValue(TappedCommandProperty);
+        set => SetValue(TappedCommandProperty, value);
+    }
+
+    /// <summary>The position under <paramref name="screen"/>, or null before the map has a centre.</summary>
+    public GeoPoint? ScreenToGeo(Point screen) =>
+        Center is { } center ? MapDrawing.ToGeo(center, Zoom, Bounds.Size, screen) : null;
+
     /// <summary>Each zoom level doubles the scale, so a pinch to twice the size is one level in.</summary>
     public static int PinchScaleToZoomDelta(double relativeScale) =>
         (int)Math.Round(Math.Log2(Math.Max(relativeScale, 0.01)));
@@ -141,6 +159,7 @@ public sealed class MapCanvasControl : Control
 
         _dragStart = e.GetPosition(this);
         _dragStartCenter = Center;
+        _dragMoved = false;
         e.Pointer.Capture(this);
         e.Handled = true;
     }
@@ -156,6 +175,12 @@ public sealed class MapCanvasControl : Control
 
         // The map moves with the hand, so the centre moves against it.
         var position = e.GetPosition(this);
+        if (!_dragMoved && Math.Abs(position.X - start.X) < TapSlop && Math.Abs(position.Y - start.Y) < TapSlop)
+        {
+            return;
+        }
+
+        _dragMoved = true;
         var (x, y) = WebMercator.ToWorldPixel(startCenter, Zoom);
         Report(WebMercator.ToGeo(x - (position.X - start.X), y - (position.Y - start.Y), Zoom), Zoom);
         e.Handled = true;
@@ -170,7 +195,13 @@ public sealed class MapCanvasControl : Control
             return;
         }
 
+        var tapped = !_dragMoved && _pinchStartZoom is null ? ScreenToGeo(e.GetPosition(this)) : null;
         EndDrag(e.Pointer);
+        if (tapped is not null && TappedCommand?.CanExecute(tapped) == true)
+        {
+            TappedCommand.Execute(tapped);
+        }
+
         e.Handled = true;
     }
 

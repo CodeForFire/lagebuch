@@ -240,7 +240,16 @@ public class VersionHandshakeTests
     {
         // 25 adds incidentNumberFormat to the Stammdaten payload's settings (#462). A peer at 24
         // skips the key and pre-fills no Einsatznummer, so it stays joinable.
-        Assert.Equal(25, SyncProtocol.ProtocolVersion);
-        Assert.Equal(24, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 25, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 24, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_Lagekarte_raises_the_protocol_and_the_floor_to_twenty_six()
+    {
+        // 26 adds setIncidentLocation and placeForceUnit, commands a client may send. A host at 25
+        // has neither in its allowlist and would reject them, so a 25 and a 26 must not connect.
+        Assert.Equal(26, SyncProtocol.ProtocolVersion);
+        Assert.Equal(26, SyncProtocol.MinimumProtocolVersion);
     }
 }

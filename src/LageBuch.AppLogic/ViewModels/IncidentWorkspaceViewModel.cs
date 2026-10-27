@@ -5,6 +5,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -32,6 +33,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
     private readonly AlarmMute? _alarmMute;
+    private readonly IRegionPackLibrary? _mapPacks;
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly ILastPdfExportStore? _lastPdfExportStore;
@@ -54,9 +56,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly List<ChecklistViewModel> _checklists = new();
     private bool _disposed;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null)
     {
         ArgumentNullException.ThrowIfNull(session);
+        _mapPacks = mapPacks;
         _session = session;
         _local = session as LocalIncidentSession;
         _clock = clock;
@@ -575,6 +578,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// <summary>The Führung rail entry, which shows <see cref="Leadership"/>, <see cref="Roles"/> and <see cref="Forces"/> as tabs.</summary>
     public LeadershipTabsViewModel LeadershipTabs { get; private set; } = null!;
 
+    public LagekarteViewModel Lagekarte { get; private set; } = null!;
+
     public ScbaViewModel Scba { get; private set; } = null!;
 
     public FilesViewModel Files { get; private set; } = null!;
@@ -975,6 +980,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         IssuedItems?.Dispose();
         SituationReports?.Dispose();
         Leadership?.Dispose();
+        Lagekarte?.Dispose();
         if (Scba is not null)
         {
             // Not covered by Dispose: the workspace owns this subscription, and an outgoing
@@ -1061,7 +1067,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OpenCommandNodeDialog,
             OpenLeadershipPersonDialog);
 
-        LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, reopenTab);
+        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks);
+
+        LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, Lagekarte, reopenTab);
 
         IssuedItems = new IssuedItemsViewModel(_session, OnChanged, _masterData.Devices, RequestConfirm);
 

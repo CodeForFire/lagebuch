@@ -500,6 +500,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
         Send(new MoveForceUnitCommand(Op(), unitId, nodeId));
 
+    public void SetIncidentLocation(GeoPoint? location) =>
+        Send(new SetIncidentLocationCommand(Op(), location?.Latitude, location?.Longitude));
+
+    public void PlaceForceUnit(Guid unitId, GeoPoint? position) =>
+        Send(new PlaceForceUnitCommand(Op(), unitId, position?.Latitude, position?.Longitude));
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Send(new PlaceRoleAssignmentCommand(Op(), assignmentId, nodeId, slot));
 

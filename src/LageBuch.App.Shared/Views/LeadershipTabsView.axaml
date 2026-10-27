@@ -15,5 +15,7 @@
              Content="{Binding Roles}" />
     <TabItem x:Name="ForcesTab" Header="KRÄFTE" AutomationProperties.Name="Kräfte"
              Content="{Binding Forces}" />
+    <TabItem x:Name="MapTab" Header="KARTE" AutomationProperties.Name="Karte"
+             Content="{Binding Map}" />
   </TabControl>
 </UserControl>

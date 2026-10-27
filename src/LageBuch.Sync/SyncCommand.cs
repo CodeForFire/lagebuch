@@ -25,6 +25,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(DissolveCommandNodeCommand), "dissolveCommandNode")]
 [JsonDerivedType(typeof(MoveCommandNodeCommand), "moveCommandNode")]
 [JsonDerivedType(typeof(MoveForceUnitCommand), "moveForceUnit")]
+[JsonDerivedType(typeof(SetIncidentLocationCommand), "setIncidentLocation")]
+[JsonDerivedType(typeof(PlaceForceUnitCommand), "placeForceUnit")]
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
 [JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
 [JsonDerivedType(typeof(UpdateLeadershipPostCommand), "updateLeadershipPost")]
@@ -131,6 +133,12 @@ public sealed record MoveCommandNodeCommand(OperatorDto Operator, Guid NodeId, G
 
 /// <summary>Places a unit in a node, or back to "nicht zugeordnet" when NodeId is null.</summary>
 public sealed record MoveForceUnitCommand(OperatorDto Operator, Guid UnitId, Guid? NodeId) : SyncCommand;
+
+/// <summary>Marks the Einsatzort on the Lagekarte; both coordinates null takes the mark off.</summary>
+public sealed record SetIncidentLocationCommand(OperatorDto Operator, double? Latitude, double? Longitude) : SyncCommand;
+
+/// <summary>Puts a unit on the Lagekarte; both coordinates null takes it off.</summary>
+public sealed record PlaceForceUnitCommand(OperatorDto Operator, Guid UnitId, double? Latitude, double? Longitude) : SyncCommand;
 
 /// <summary>Places a running Funktion in a node and board slot; a null NodeId is the Einsatzleitung.</summary>
 public sealed record PlaceRoleAssignmentCommand(OperatorDto Operator, Guid AssignmentId, Guid? NodeId, RoleSlot Slot) : SyncCommand;

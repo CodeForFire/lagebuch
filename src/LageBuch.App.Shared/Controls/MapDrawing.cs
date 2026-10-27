@@ -61,6 +61,21 @@ public static class MapDrawing
         }
     }
 
+    /// <summary>Where <paramref name="point"/> lands on a map of <paramref name="size"/> centred on <paramref name="center"/>.</summary>
+    public static Point ToScreen(GeoPoint center, int zoom, Size size, GeoPoint point)
+    {
+        var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
+        var (x, y) = WebMercator.ToWorldPixel(point, zoom);
+        return new Point(x - centerX + (size.Width / 2), y - centerY + (size.Height / 2));
+    }
+
+    /// <summary>The inverse of <see cref="ToScreen"/>.</summary>
+    public static GeoPoint ToGeo(GeoPoint center, int zoom, Size size, Point screen)
+    {
+        var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
+        return WebMercator.ToGeo(centerX + screen.X - (size.Width / 2), centerY + screen.Y - (size.Height / 2), zoom);
+    }
+
     /// <summary>
     /// For a zoom past the pack's finest, the ancestor tile at that finest zoom and the part of it
     /// covering this tile: a blurrier but still placed map instead of nothing. Null when the zoom is

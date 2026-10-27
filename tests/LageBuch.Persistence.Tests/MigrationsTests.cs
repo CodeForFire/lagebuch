@@ -473,10 +473,52 @@ public class MigrationsTests : IDisposable
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
         Migrations.Migrate(cn2);
-        Assert.Equal(35, Migrations.GetVersion(cn2));
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
 
         using var check = cn2.CreateCommand();
         check.CommandText = "SELECT key_number FROM co_dwellings WHERE id = 'd';";
         Assert.Equal(DBNull.Value, check.ExecuteScalar());
+    }
+
+    [Fact]
+    public void V35_database_upgrades_to_v36_and_nothing_in_it_is_on_the_lagekarte()
+    {
+        // A V35 file: today's schema minus the Lagekarte columns, with an Einsatz and a unit in it.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE incident_meta DROP COLUMN location_lat;
+                ALTER TABLE incident_meta DROP COLUMN location_lon;
+                ALTER TABLE force_units DROP COLUMN position_lat;
+                ALTER TABLE force_units DROP COLUMN position_lon;
+                INSERT INTO incident_meta (id, started_at, state) VALUES ('i', '2026-10-27T14:00:00+01:00', 0);
+                INSERT INTO force_units (id, ordinal, brigade, personnel_count) VALUES ('u', 0, 'Aich', 6);
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (35);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(36, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT location_lat, location_lon FROM incident_meta WHERE id = 'i';";
+        using (var r = check.ExecuteReader())
+        {
+            Assert.True(r.Read());
+            Assert.True(r.IsDBNull(0) && r.IsDBNull(1));
+        }
+
+        check.CommandText = "SELECT position_lat, position_lon FROM force_units WHERE id = 'u';";
+        using (var r = check.ExecuteReader())
+        {
+            Assert.True(r.Read());
+            Assert.True(r.IsDBNull(0) && r.IsDBNull(1));
+        }
     }
 }
