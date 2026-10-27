@@ -107,6 +107,8 @@ public sealed partial class MapPacksSection : EditorSection
             var installed = await _library.InstallAsync(row.Info, new Progress<double>(p => Progress = p));
             Status = $"„{row.Info.Name}“ ist installiert.";
             Refresh();
+
+            // Stryker disable once Linq : Refresh just listed the pack the library installed, so the row is always there.
             SelectedPack = Installed.FirstOrDefault(i => i.Pack.Info.Slug == installed.Info.Slug);
             MarkInstalled(installed.Info);
         }
@@ -129,6 +131,7 @@ public sealed partial class MapPacksSection : EditorSection
             return;
         }
 
+        // Stryker disable once Boolean : a pack row is never one the section added blank, so isBlank changes nothing.
         RemoveAfterConfirm(row, row.Name, isBlank: false, () =>
         {
             if (ReferenceEquals(SelectedPack, row))

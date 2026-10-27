@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Sqlite;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -39,6 +40,60 @@ public class MapViewportTests
         viewport.ZoomOutCommand.Execute(null);
         Assert.Equal(MapViewport.MaxZoom - 1, viewport.Zoom);
         Assert.True(viewport.ZoomInCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void The_zoom_out_button_stops_at_the_coarsest_zoom()
+    {
+        var viewport = new MapViewport();
+
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, MapViewport.MinZoom + 1));
+        Assert.True(viewport.ZoomOutCommand.CanExecute(null));
+
+        viewport.ZoomOutCommand.Execute(null);
+
+        Assert.False(viewport.ZoomOutCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void No_view_change_leaves_the_view_as_it_was()
+    {
+        var viewport = new MapViewport();
+        viewport.ChangeViewCommand.Execute(new MapViewChange(new GeoPoint(48.1, 11.2), 15));
+
+        viewport.ChangeViewCommand.Execute(null);
+
+        Assert.Equal(new GeoPoint(48.1, 11.2), viewport.Center);
+        Assert.Equal(15, viewport.Zoom);
+    }
+
+    [Fact]
+    public void A_pack_is_shown_centred_one_zoom_finer_than_its_coarsest_tiles()
+    {
+        var folder = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
+        try
+        {
+            // Far from where an empty viewport starts. MBTiles stores XYZ row 300 at zoom 10 as 1023 - 300.
+            using (var cn = SqliteConnectionFactory.OpenReadWrite(Path.Join(folder, InstalledRegionPack.TilesFileName)))
+            using (var cmd = cn.CreateCommand())
+            {
+                cmd.CommandText = "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);" +
+                    "INSERT INTO tiles VALUES (10, 200, 723, x'00');";
+                cmd.ExecuteNonQuery();
+            }
+
+            var viewport = new MapViewport();
+            viewport.Show(new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"), folder));
+
+            var expected = WebMercator.CenterOfTiles(10, 200, 200, 300, 300);
+            Assert.Equal(11, viewport.Zoom);
+            Assert.Equal(expected.Latitude, viewport.Center.Latitude, precision: 6);
+            Assert.Equal(expected.Longitude, viewport.Center.Longitude, precision: 6);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     }
 
     [Fact]

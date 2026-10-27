@@ -71,6 +71,8 @@ public sealed class MbTilesFileSource : IMapTileSource
                 "SELECT zoom_level, MIN(tile_column), MAX(tile_column), MIN(tile_row), MAX(tile_row) " +
                 "FROM tiles WHERE zoom_level = (SELECT MIN(zoom_level) FROM tiles) GROUP BY zoom_level;";
             using var reader = cmd.ExecuteReader();
+
+            // Stryker disable once Block : without a row GetInt32 throws, and the catch below returns the same null.
             if (!reader.Read())
             {
                 return null;

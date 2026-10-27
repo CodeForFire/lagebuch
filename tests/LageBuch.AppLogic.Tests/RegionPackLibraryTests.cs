@@ -70,9 +70,28 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task A_pack_announced_larger_than_the_cap_is_refused_before_any_request()
     {
-        await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(RegionPackLibrary.MaxPackBytes + 1)));
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(RegionPackLibrary.MaxPackBytes + 1)));
+
+        Assert.Equal("Das Kartenpaket ist größer als 1024 MB und wird nicht geladen.", e.Message);
+        Assert.Equal(0, _handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_pack_announced_as_empty_is_refused_before_any_request()
+    {
+        await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(0)));
 
         Assert.Equal(0, _handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_pack_announced_at_exactly_the_cap_is_requested()
+    {
+        _handler.Respond(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(RegionPackLibrary.MaxPackBytes)));
+
+        Assert.Equal(1, _handler.Requests);
     }
 
     [Fact]
@@ -84,12 +103,74 @@ public sealed class RegionPackLibraryTests : IDisposable
         await library.InstallAsync(Pack(v1.Length));
 
         // No Content-Length, so only counting the bytes as they arrive can catch it.
-        _handler.Respond(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new MemoryStream(new byte[4096])) });
+        _handler.Respond(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new DeclaredLengthContent(new byte[4096], declaredLength: null) });
         var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(100)));
 
         Assert.Contains("größer als angekündigt", e.Message, StringComparison.Ordinal);
         Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).TilesPath));
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public async Task Leftovers_of_an_interrupted_install_do_not_block_the_next_one()
+    {
+        var v1 = Zip(("region.mbtiles", "tiles-v1"));
+        _handler.Respond(_ => Ok(v1));
+        var library = Library();
+        await library.InstallAsync(Pack(v1.Length));
+
+        // What an install killed halfway leaves behind.
+        Directory.CreateDirectory(Path.Join(Root, ".ffb.staging"));
+        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.staging", "region.mbtiles"), "half");
+        Directory.CreateDirectory(Path.Join(Root, ".ffb.previous"));
+        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.previous", "region.mbtiles"), "old");
+        var v2 = Zip(("region.mbtiles", "tiles-v2"));
+        _handler.Respond(_ => Ok(v2));
+        var installed = await library.InstallAsync(Pack(v2.Length));
+
+        Assert.Equal("tiles-v2", await File.ReadAllTextAsync(installed.TilesPath));
+        Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public async Task An_install_reports_progress_from_nothing_to_done()
+    {
+        var zip = Zip(("region.mbtiles", "tiles"));
+        _handler.Respond(_ => Ok(zip));
+        var progress = new RecordingProgress();
+
+        await Library().InstallAsync(Pack(zip.Length), progress);
+
+        Assert.Equal(0, progress.Reports[0], precision: 6);
+        Assert.Equal(1, progress.Reports[^1], precision: 6);
+    }
+
+    [Fact]
+    public async Task The_download_fills_nine_tenths_of_the_bar_by_the_bytes_the_server_announced()
+    {
+        // Two read chunks. The catalogue overstates the size; the bar follows the Content-Length.
+        var body = new byte[2 * 81920];
+        _handler.Respond(_ => Ok(body));
+        var progress = new RecordingProgress();
+
+        await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(4L * body.Length), progress));
+
+        Assert.Collection(
+            progress.Reports,
+            p => Assert.Equal(0, p, precision: 6),
+            p => Assert.Equal(0.45, p, precision: 6),
+            p => Assert.Equal(0.9, p, precision: 6));
+    }
+
+    [Fact]
+    public async Task A_pack_folder_that_cannot_be_created_is_reported_in_german()
+    {
+        await File.WriteAllTextAsync(Root, "a file where the folder belongs");
+        _handler.Respond(_ => Ok(Zip(("region.mbtiles", "tiles"))));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(10)));
+
+        Assert.Equal("Das Kartenpaket konnte nicht gespeichert werden. Freien Speicher prüfen.", e.Message);
     }
 
     [Fact]
@@ -167,6 +248,45 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Fact]
+    public async Task A_server_that_does_not_answer_in_time_is_reported_in_german()
+    {
+        _handler.Respond(_ => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout."));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().GetCatalogAsync());
+
+        Assert.Equal("Die Liste der Kartenpakete hat nicht rechtzeitig geantwortet. Später erneut versuchen.", e.Message);
+    }
+
+    [Fact]
+    public async Task A_catalogue_address_given_to_the_library_is_the_one_fetched()
+    {
+        var address = new Uri("https://example.org/regions.json");
+        Uri? requested = null;
+        _handler.Respond(r =>
+        {
+            requested = r.RequestUri;
+            return Ok(Encoding.UTF8.GetBytes("[]"));
+        });
+
+        await new RegionPackLibrary(_http, Root, address).GetCatalogAsync();
+
+        Assert.Equal(address, requested);
+    }
+
+    [Fact]
+    public async Task A_catalogue_announced_larger_than_its_cap_is_refused_before_its_body_is_read()
+    {
+        _handler.Respond(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new DeclaredLengthContent(Encoding.UTF8.GetBytes("[]"), RegionPackLibrary.MaxCatalogBytes + 1),
+        });
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().GetCatalogAsync());
+
+        Assert.Equal("Die Liste der Kartenpakete ist größer als angekündigt. Download abgebrochen.", e.Message);
+    }
+
+    [Fact]
     public async Task The_catalogue_is_fetched_and_read()
     {
         _handler.Respond(r =>
@@ -231,6 +351,29 @@ public sealed class RegionPackLibraryTests : IDisposable
         Assert.Empty(library.GetInstalled());
     }
 
+    [Fact]
+    public async Task A_pack_that_cannot_be_deleted_is_reported_by_name()
+    {
+        var zip = Zip(("region.mbtiles", "tiles"));
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+        var installed = await library.InstallAsync(Pack(zip.Length));
+
+        var e = WhileUndeletable(installed, () => Assert.Throws<RegionPackException>(() => library.Remove(installed)));
+
+        Assert.Equal("„Landkreis Fürstenfeldbruck“ konnte nicht gelöscht werden. Wird die Karte gerade angezeigt?", e.Message);
+    }
+
+    [Fact]
+    public void Removing_a_pack_whose_name_is_no_safe_slug_deletes_nothing_even_inside_the_pack_folder()
+    {
+        var other = Directory.CreateDirectory(Path.Join(Root, "KEEP")).FullName;
+
+        Assert.Throws<RegionPackException>(() => Library().Remove(new InstalledRegionPack(Pack(1) with { Slug = "KEEP" }, other)));
+
+        Assert.True(Directory.Exists(other));
+    }
+
     [Theory]
     [InlineData("..")]
     [InlineData("../keep")]
@@ -250,6 +393,30 @@ public sealed class RegionPackLibraryTests : IDisposable
     private static RegionPackInfo Pack(long size) =>
         new("Landkreis Fürstenfeldbruck", "ffb", "https://example.org/ffb.zip", size, 48.08, 10.99, 48.29, 11.41, "2026-08-31", "© OpenStreetMap contributors");
 
+    // Windows refuses to delete a file someone holds open; Unix refuses to unlink from a folder
+    // without write permission.
+    private T WhileUndeletable<T>(InstalledRegionPack pack, Func<T> act)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            using (new FileStream(pack.TilesPath, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                return act();
+            }
+        }
+
+        var mode = File.GetUnixFileMode(Root);
+        File.SetUnixFileMode(Root, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        try
+        {
+            return act();
+        }
+        finally
+        {
+            File.SetUnixFileMode(Root, mode);
+        }
+    }
+
     private static HttpResponseMessage Ok(byte[] body) => new(HttpStatusCode.OK) { Content = new ByteArrayContent(body) };
 
     private static byte[] Zip(params (string Name, string Content)[] entries)
@@ -265,6 +432,33 @@ public sealed class RegionPackLibraryTests : IDisposable
         }
 
         return buffer.ToArray();
+    }
+
+    private sealed class RecordingProgress : IProgress<double>
+    {
+        public List<double> Reports { get; } = [];
+
+        public void Report(double value) => Reports.Add(value);
+    }
+
+    // A body sent with no Content-Length (null), or with one that need not be true.
+    private sealed class DeclaredLengthContent : HttpContent
+    {
+        private readonly byte[] _body;
+
+        public DeclaredLengthContent(byte[] body, long? declaredLength)
+        {
+            _body = body;
+            Headers.ContentLength = declaredLength;
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => stream.WriteAsync(_body).AsTask();
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
     }
 
     private sealed class FakeHandler : HttpMessageHandler
