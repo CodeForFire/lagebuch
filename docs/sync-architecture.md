@@ -612,6 +612,34 @@ does not share `HttpClient.DefaultRequestHeaders`), and
 SignalR first POSTs `/hub/negotiate`, then tries transports in order:
 **WebSockets → Server-Sent Events → Long Polling**.
 
+**Why three transports.** Lagebuch never chose them. They are SignalR's
+built-in negotiation, and neither end configures it: the host calls
+`AddSignalR()` and `MapHub`, the client calls `WithUrl`, and nobody sets
+`HttpTransportType`, `Transports` or `SkipNegotiation`. The chain exists for
+the web, where proxies and middleboxes break WebSockets. SignalR was adopted
+in #57 as a ready-made push channel, and the fallbacks came with it.
+
+For this hub they matter less than usual:
+
+| Transport | Host → client | Client → host | Reached in practice |
+|---|---|---|---|
+| WebSockets | one socket | same socket | no, fails today (#781) |
+| Server-Sent Events | long-lived GET stream | one POST per message | **yes, on every connect** |
+| Long polling | held GETs, repeated | one POST per message | never seen; only if SSE also fails |
+
+- **The hub carries almost nothing.** `IncidentHub` has no methods. Its only
+  job is the `snapshot` push. Commands go over `POST /command`, catch-up over
+  `/revision` and `/snapshot`. Client → host on the hub is only SignalR's
+  pings and the close. The cheap client → host stream WebSockets offers buys
+  almost nothing here.
+- **SSE is exactly the shape that is used:** a server → client stream. That is
+  why the fallback has gone unnoticed.
+- **Long polling is effectively untested.** Even with no push channel at all,
+  the 10 s reconcile poll (§9) would keep a device converging.
+- **The cost sits at the edges.** Every connect and reconnect pays for the
+  failed WebSocket attempt and a second negotiate. Teardown also differs per
+  transport, which is why #778 needed `CloseGrace`.
+
 ```mermaid
 flowchart LR
     subgraph client["Client"]
@@ -667,6 +695,16 @@ The first diagnostic step is to log the `WebSocketException`'s inner
 exception. The test target is a client connecting over WebSockets against the
 real host that still refuses a host whose certificate changed, with
 `LinkFailureTests` passing over WebSockets.
+
+**An alternative worth weighing first.** Given what the hub carries, the
+transport could instead be declared explicitly:
+`options.Transports = HttpTransportType.ServerSentEvents`. That is one line.
+It removes the failed handshake and the second negotiate, and it leaves no
+WebSocket TLS path to keep pinned. Whichever way #781 goes, dropping long
+polling from the allowed set keeps an untested path from being reached by
+accident. Once the inner exception has confirmed the cause, compare "pin
+WebSockets properly" with "declare SSE the transport" before writing the fix:
+the second puts far less code near the certificates.
 
 ## 14. Protocol versioning
 
