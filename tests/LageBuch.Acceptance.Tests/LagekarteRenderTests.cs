@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -51,6 +52,51 @@ public sealed class LagekarteRenderTests : IDisposable
         Directory.CreateDirectory(shots);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(shots, "fuehrung-karte.png"));
+    }
+
+    [AvaloniaFact]
+    public void Close_up_the_packs_hydranten_are_drawn_and_the_note_says_they_are_from_OSM()
+    {
+        var (window, view, vm, _) = Show();
+        WaitForWaterPoints(vm);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(4, view.GetVisualDescendants().OfType<MapCanvasControl>().Single().WaterPoints?.Count);
+        Assert.True(view.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "WaterPointsToggle").IsVisible);
+        var note = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "WaterPointsNote");
+        Assert.True(note.IsVisible);
+        Assert.Equal("Hydranten aus OpenStreetMap – nicht amtlich.", note.Text);
+
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-hydranten.png"));
+    }
+
+    [AvaloniaFact]
+    public async Task Searching_an_address_and_clicking_the_hit_marks_the_Einsatzort_there()
+    {
+        var (window, view, vm, session) = Show();
+        var box = view.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "AddressQueryBox");
+        box.Text = "Musterstr 1";
+        await vm.SearchAddressCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var list = view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "AddressHitList");
+        Assert.Equal(3, list.ItemCount);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(Shots(), "fuehrung-karte-adresse.png"));
+        }
+
+        var first = list.GetVisualDescendants().OfType<Button>().First();
+        Assert.Equal("Musterstraße 1, 82256 Musterstadt", Avalonia.Automation.AutomationProperties.GetName(first));
+        var at = MiddleOf(first, window);
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(FictionalRegionPack.Musterstrasse1, session.Incident.Location);
+        Assert.Equal(0, list.ItemCount);
     }
 
     [AvaloniaFact]
@@ -151,6 +197,23 @@ public sealed class LagekarteRenderTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         return (window, view, vm, session);
     }
+
+    private static string Shots()
+    {
+        var shots = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(shots);
+        return shots;
+    }
+
+    // The pack's water.geojson is read off the UI thread; its result arrives as a dispatcher job.
+    private static void WaitForWaterPoints(LagekarteViewModel vm) =>
+        Assert.True(SpinWait.SpinUntil(
+            () =>
+            {
+                Dispatcher.UIThread.RunJobs();
+                return vm.WaterPoints is not null || vm.WaterPointsError is not null;
+            },
+            TimeSpan.FromSeconds(10)));
 
     private static Point MiddleOf(Visual visual, Window window) =>
         visual.TranslatePoint(new Point(visual.Bounds.Width / 2, visual.Bounds.Height / 2), window)

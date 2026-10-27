@@ -36,6 +36,10 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<ICommand?> ViewChangedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(ViewChangedCommand));
 
+    /// <summary>Hydranten and other Wasserentnahmestellen drawn over the tiles; null draws none.</summary>
+    public static readonly StyledProperty<IReadOnlyList<WaterPoint>?> WaterPointsProperty =
+        AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<WaterPoint>?>(nameof(WaterPoints));
+
     public static readonly StyledProperty<ICommand?> TappedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(TappedCommand));
 
@@ -57,7 +61,7 @@ public sealed class MapCanvasControl : Control
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, WaterPointsProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
@@ -85,6 +89,12 @@ public sealed class MapCanvasControl : Control
     {
         get => GetValue(ZoomProperty);
         set => SetValue(ZoomProperty, value);
+    }
+
+    public IReadOnlyList<WaterPoint>? WaterPoints
+    {
+        get => GetValue(WaterPointsProperty);
+        set => SetValue(WaterPointsProperty, value);
     }
 
     public bool WheelZoomNeedsControl
@@ -127,6 +137,10 @@ public sealed class MapCanvasControl : Control
         // Missing tiles are painted too, so the whole control stays hit-testable for a drag.
         _tiles.Use(TileSource);
         MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size);
+        if (WaterPoints is { } water)
+        {
+            MapDrawing.DrawWaterPoints(context, water, center, Zoom, Bounds.Size);
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

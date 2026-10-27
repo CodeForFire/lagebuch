@@ -124,7 +124,7 @@ public class MapCanvasControlTests
         Assert.True(viewport.Center.Longitude > before.Longitude);
     }
 
-    [Theory]
+    [AvaloniaTheory]
     [InlineData(1.0, 0)]
     [InlineData(2.0, 1)]
     [InlineData(4.0, 2)]
@@ -134,7 +134,39 @@ public class MapCanvasControlTests
     public void A_pinch_to_twice_the_size_is_one_zoom_level(double scale, int delta) =>
         Assert.Equal(delta, MapCanvasControl.PinchScaleToZoomDelta(scale));
 
-    [Fact]
+    [AvaloniaFact]
+    public void A_hydrant_is_a_red_dot_from_zoom_15_and_an_open_water_point_a_blue_square()
+    {
+        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var east = WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).X + 60, WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).Y, 15);
+        control.WaterPoints =
+        [
+            new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100"),
+            new WaterPoint(east, WaterPointKind.Saugstelle, string.Empty),
+        ];
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, MapDrawing.WaterPointsMinZoom));
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(Color.FromRgb(0xD3, 0x2F, 0x2F), PixelAt(frame, 200, 150));
+        Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 260, 150));
+    }
+
+    [AvaloniaFact]
+    public void Further_out_than_zoom_15_no_water_point_is_drawn()
+    {
+        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        control.WaterPoints = [new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100")];
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, MapDrawing.WaterPointsMinZoom - 1));
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(Colors.SteelBlue, PixelAt(frame, 200, 150));
+    }
+
+    [AvaloniaFact]
     public void An_overzoomed_tile_reads_its_quarter_of_the_parent()
     {
         // Zoom 16, tile (3, 1) lies in the right half, top half of zoom-15 tile (1, 0).
@@ -144,7 +176,7 @@ public class MapCanvasControlTests
         Assert.Equal(new Rect(128, 128, 128, 128), source);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Within_the_pack_s_zoom_nothing_is_overzoomed() => Assert.Null(MapDrawing.Overzoom(15, 3, 1, 15));
 
     private static (Window Window, MapCanvasControl Control, MapViewport Viewport) Show(IMapTileSource? tiles)

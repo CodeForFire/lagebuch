@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using LageBuch.Persistence.Map;
 
 namespace LageBuch.AppLogic.Services.Map;
 
@@ -182,6 +183,36 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
             TryDelete(zipPath);
             TryDeleteDirectory(staging);
         }
+    }
+
+    public async Task<IReadOnlyList<WaterPoint>> GetWaterPointsAsync(InstalledRegionPack pack, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pack);
+        byte[] json;
+        try
+        {
+            if (new FileInfo(pack.WaterPath).Length > WaterPointsGeoJson.MaxFileBytes)
+            {
+                throw new RegionPackException("Die Wasserentnahmestellen des Kartenpakets sind zu groß und werden nicht gezeigt.");
+            }
+
+            json = await File.ReadAllBytesAsync(pack.WaterPath, cancellationToken);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw new RegionPackException("Die Wasserentnahmestellen des Kartenpakets sind nicht lesbar.", e);
+        }
+
+        return await Task.Run(() => WaterPointsGeoJson.Parse(json), cancellationToken)
+            ?? throw new RegionPackException("Die Wasserentnahmestellen des Kartenpakets sind beschädigt.");
+    }
+
+    public Task<IReadOnlyList<AddressHit>> SearchAddressesAsync(InstalledRegionPack pack, string query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pack);
+        ArgumentNullException.ThrowIfNull(query);
+        var index = new AddressIndex(pack.AddressesPath);
+        return Task.Run(() => index.Search(query), cancellationToken);
     }
 
     public void Remove(InstalledRegionPack pack)

@@ -147,7 +147,7 @@ Anwendungsdaten.
 | `trust.json` | die gespeicherten Schlüssel-Fingerabdrücke der Gegenstellen |
 | `host-key.pem` | der private Schlüssel, mit dem dieses Gerät sich beim Freigeben ausweist; entsteht bei der ersten Freigabe, unter Linux und macOS nur für den eigenen Benutzer lesbar |
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
-| `regions/` | die heruntergeladenen Kartenpakete (Kartenkacheln eines Landkreises aus OpenStreetMap); keine Einsatzdaten |
+| `regions/` | die heruntergeladenen Kartenpakete: Karte, Hydranten und Adressen eines Landkreises aus OpenStreetMap, Geländehöhen aus dem DGM5 der Bayerischen Vermessungsverwaltung; keine Einsatzdaten |
 | `crashes/` | Absturzberichte, höchstens fünf, ohne Fehlertexte und ohne Einsatzdaten (siehe unten) |
 
 Beim Öffnen eines Anhangs legt Lagebuch zusätzlich eine Arbeitskopie im
@@ -180,11 +180,15 @@ dem Bediener ausgelöst:
    angetippt wird, geht er an das Teilen-Menü von Android; wohin, bestimmt die
    dort gewählte App. Er enthält keine Fehlertexte und keine Einsatzdaten.
 5. **Kartenpakete.** Unter Stammdaten → Karten lädt LISTE LADEN das
-   Verzeichnis der Kartenpakete und HERUNTERLADEN ein Paket von GitHub
-   (`raw.githubusercontent.com` und `github.com`). Dabei sieht GitHub die
+   Verzeichnis der Kartenpakete aus `CodeForFire/lagebuch-geodata` und
+   HERUNTERLADEN ein Paket von GitHub (`raw.githubusercontent.com`,
+   `github.com` und dessen Download-Server). Dabei sieht GitHub die
    IP-Adresse des Geräts und welches Paket geladen wird – keine Einsatzdaten.
-   Danach zeichnet Lagebuch die Karte ausschließlich aus dem Paket auf dem
-   Gerät; kein Kartenserver erfährt, wo ein Einsatz liegt.
+   Lagebuch prüft jedes Paket vor dem Entpacken gegen die Prüfsumme im
+   Verzeichnis. Danach zeichnet Lagebuch Karte und Hydranten ausschließlich aus
+   dem Paket auf dem Gerät, und die Adresssuche auf der Lagekarte fragt nur das
+   Paket, keinen Suchdienst; niemand außerhalb des Geräts erfährt, wo ein
+   Einsatz liegt.
 
 Nicht vorhanden sind: Nutzungsstatistiken, automatisch versandte Absturzberichte, Updateprüfungen,
 Werbe- oder Analysebibliotheken sowie Schriftarten oder Kartenkacheln, die während

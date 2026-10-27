@@ -346,7 +346,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task A_catalogue_address_given_to_the_library_is_the_one_fetched()
     {
-        var address = new Uri("https://example.org/regions.json");
+        var address = new Uri("https://example.org/packs.json");
         Uri? requested = null;
         _handler.Respond(r =>
         {
@@ -406,6 +406,52 @@ public sealed class RegionPackLibraryTests : IDisposable
 
         await Assert.ThrowsAsync<RegionPackException>(() => Library().GetCatalogAsync());
     }
+
+    [Fact]
+    public async Task An_installed_packs_water_points_are_read_from_its_file()
+    {
+        var pack = WithWater("""{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2, 48.1]}, "properties": {"emergency": "fire_hydrant"}}]}""");
+
+        var point = Assert.Single(await Library().GetWaterPointsAsync(pack));
+
+        Assert.Equal(WaterPointKind.Hydrant, point.Kind);
+    }
+
+    [Fact]
+    public async Task Water_points_that_are_no_feature_collection_are_reported_as_damaged()
+    {
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().GetWaterPointsAsync(WithWater("<html>")));
+
+        Assert.Equal("Die Wasserentnahmestellen des Kartenpakets sind beschädigt.", e.Message);
+    }
+
+    [Fact]
+    public async Task A_pack_without_its_water_file_reports_it_unreadable()
+    {
+        var pack = new InstalledRegionPack(Pack(1), Directory.CreateDirectory(Path.Join(Root, "ffb")).FullName);
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().GetWaterPointsAsync(pack));
+
+        Assert.Equal("Die Wasserentnahmestellen des Kartenpakets sind nicht lesbar.", e.Message);
+    }
+
+    [Fact]
+    public async Task A_water_file_larger_than_its_cap_is_never_read()
+    {
+        var pack = WithWater(string.Empty);
+        await using (var file = new FileStream(pack.WaterPath, FileMode.Open))
+        {
+            file.SetLength(WaterPointsGeoJson.MaxFileBytes + 1);
+        }
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().GetWaterPointsAsync(pack));
+
+        Assert.Equal("Die Wasserentnahmestellen des Kartenpakets sind zu groß und werden nicht gezeigt.", e.Message);
+    }
+
+    [Fact]
+    public async Task A_pack_without_its_address_file_finds_nothing() =>
+        Assert.Empty(await Library().SearchAddressesAsync(WithWater("{}"), "Hauptstraße 1"));
 
     [Fact]
     public void Without_a_pack_folder_nothing_is_installed() => Assert.Empty(Library().GetInstalled());
@@ -475,6 +521,13 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     private RegionPackLibrary Library() => new(_http, Root);
+
+    private InstalledRegionPack WithWater(string json)
+    {
+        var folder = Directory.CreateDirectory(Path.Join(Root, "ffb")).FullName;
+        File.WriteAllText(Path.Join(folder, InstalledRegionPack.WaterFileName), json);
+        return new InstalledRegionPack(Pack(1), folder);
+    }
 
     private static RegionPackInfo Pack(long size) =>
         new("Landkreis Fürstenfeldbruck", "ffb", 1, "https://example.org/ffb-v1.zip", size, new string('a', 64), 10.95, 48.06, 11.45, 48.32, 11, 17, "2026-10-27T20:15:49Z", "© OpenStreetMap-Mitwirkende (ODbL)");

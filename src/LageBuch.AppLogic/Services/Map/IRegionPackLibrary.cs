@@ -1,3 +1,5 @@
+using LageBuch.Persistence.Map;
+
 namespace LageBuch.AppLogic.Services.Map;
 
 /// <summary>
@@ -21,6 +23,16 @@ public interface IRegionPackLibrary
     /// </summary>
     /// <exception cref="RegionPackException">The download or installation failed; an older copy stays in place.</exception>
     Task<InstalledRegionPack> InstallAsync(RegionPackInfo pack, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>The Hydranten and other Wasserentnahmestellen of an installed pack, read off the UI thread.</summary>
+    /// <exception cref="RegionPackException">The pack's <c>water.geojson</c> is missing, too large or no FeatureCollection.</exception>
+    Task<IReadOnlyList<WaterPoint>> GetWaterPointsAsync(InstalledRegionPack pack, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The addresses of an installed pack matching <paramref name="query"/>, best first, searched
+    /// off the UI thread. Empty when nothing matches or the pack's address file is unreadable.
+    /// </summary>
+    Task<IReadOnlyList<AddressHit>> SearchAddressesAsync(InstalledRegionPack pack, string query, CancellationToken cancellationToken = default);
 
     /// <summary>Deletes an installed pack from the device.</summary>
     /// <exception cref="RegionPackException">The pack's folder could not be deleted.</exception>

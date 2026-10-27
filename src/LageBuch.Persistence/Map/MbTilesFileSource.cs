@@ -4,7 +4,7 @@ using LageBuch.Persistence.Sqlite;
 namespace LageBuch.Persistence.Map;
 
 /// <summary>
-/// Reads the <c>region.mbtiles</c> of a Kartenpaket: a SQLite file with the standard
+/// Reads the <c>map.mbtiles</c> of a Kartenpaket: a SQLite file with the standard
 /// <c>tiles(zoom_level, tile_column, tile_row, tile_data)</c> table. MBTiles numbers rows in the
 /// TMS scheme (row 0 is south), so every read flips the row into XYZ.
 /// </summary>

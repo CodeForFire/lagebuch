@@ -1,4 +1,5 @@
 using LageBuch.AppLogic.Services.Map;
+using LageBuch.Persistence.Map;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -21,6 +22,17 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
     public Action? Removing { get; set; }
 
     public int InstallCount { get; private set; }
+
+    /// <summary>Every pack's water points; a pack missing here has none.</summary>
+    public Dictionary<string, IReadOnlyList<WaterPoint>> WaterPoints { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>When set, reading water points fails with it.</summary>
+    public RegionPackException? WaterFailure { get; set; }
+
+    /// <summary>Every pack's addresses; a search returns those whose street starts with the query's first word.</summary>
+    public Dictionary<string, IReadOnlyList<AddressHit>> Addresses { get; } = new(StringComparer.Ordinal);
+
+    public List<string> Searches { get; } = new();
 
     public static RegionPackInfo Pack(string slug, string name, int version = 1) =>
         new(name, slug, version, $"https://example.org/{slug}.zip", 16 * 1024 * 1024, new string('a', 64), 10.99, 48.08, 11.41, 48.29, 11, 17, "2026-10-27T20:15:49Z", "© OpenStreetMap contributors");
@@ -57,6 +69,21 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
         var installed = new InstalledRegionPack(pack, Path.Join("regions", pack.Slug));
         _installed.Add(installed);
         return installed;
+    }
+
+    public Task<IReadOnlyList<WaterPoint>> GetWaterPointsAsync(InstalledRegionPack pack, CancellationToken cancellationToken = default) =>
+        WaterFailure is { } failure
+            ? Task.FromException<IReadOnlyList<WaterPoint>>(failure)
+            : Task.FromResult(WaterPoints.GetValueOrDefault(pack.Info.Slug) ?? []);
+
+    public Task<IReadOnlyList<AddressHit>> SearchAddressesAsync(InstalledRegionPack pack, string query, CancellationToken cancellationToken = default)
+    {
+        Searches.Add($"{pack.Info.Slug}:{query}");
+        var first = query.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+        IReadOnlyList<AddressHit> hits = (Addresses.GetValueOrDefault(pack.Info.Slug) ?? [])
+            .Where(a => first.Length > 0 && a.Street.StartsWith(first, StringComparison.Ordinal))
+            .ToList();
+        return Task.FromResult(hits);
     }
 
     public void Remove(InstalledRegionPack pack)

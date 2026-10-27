@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Map;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -12,15 +13,20 @@ namespace LageBuch.AppLogic.ViewModels;
 /// The KARTE tab in Führung: the Einsatzort and the units on an offline map. Placing works by
 /// picking what to place and then tapping the map, the same on a desk and on a tablet; a marker
 /// already on the map is dragged to move it. Positions live in the incident, so they sync and
-/// survive another device's Kartenpaket -- the pack is only the backdrop.
+/// survive another device's Kartenpaket -- the pack is only the backdrop. The pack also brings
+/// the Hydranten drawn over the map and the addresses an Einsatzort can be found by, offline.
 /// </summary>
 public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware, IDisposable
 {
     /// <summary>Close enough to see which building, far enough to see the street around it.</summary>
     public const int EinsatzortZoom = 17;
 
+    /// <summary>The most address hits listed; a longer list is a query that needs another word.</summary>
+    public const int MaxAddressHits = 20;
+
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
+    private readonly IRegionPackLibrary? _library;
     private readonly IReadOnlyList<InstalledRegionPack> _packs;
     private InstalledRegionPack? _shownPack;
 
@@ -31,7 +37,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         _session = session;
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
+        _library = mapPacks;
         _packs = InstalledPacks(mapPacks);
+        _addressQuery = session.Incident.Location is null ? RecordedAddress(session.Incident) : string.Empty;
         Refresh();
         ShowPackFor(FirstMark());
         if (session.Incident.Location is { } location)
@@ -64,6 +72,47 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     public string EinsatzortLabel => HasEinsatzort ? "EINSATZORT VERSETZEN" : "EINSATZORT SETZEN";
 
     public bool HasNoUnits => Units.Count == 0;
+
+    /// <summary>The shown pack's Wasserentnahmestellen; null until read, or when they could not be.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VisibleWaterPoints))]
+    [NotifyPropertyChangedFor(nameof(HasWaterPoints))]
+    [NotifyPropertyChangedFor(nameof(WaterPointsNote))]
+    private IReadOnlyList<WaterPoint>? _waterPoints;
+
+    /// <summary>The HYDRANTEN switch. Belongs to this screen, not to the Einsatz: nothing is stored.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VisibleWaterPoints))]
+    [NotifyPropertyChangedFor(nameof(WaterPointsNote))]
+    private bool _showWaterPoints = true;
+
+    /// <summary>Said under the map whenever hydrants are drawn: OSM is not the Wasserversorger's register.</summary>
+    public string? WaterPointsNote => ShowWaterPoints && HasWaterPoints ? "Hydranten aus OpenStreetMap – nicht amtlich." : null;
+
+    /// <summary>What the map draws: the water points while the switch is on.</summary>
+    public IReadOnlyList<WaterPoint>? VisibleWaterPoints => ShowWaterPoints ? WaterPoints : null;
+
+    public bool HasWaterPoints => WaterPoints is { Count: > 0 };
+
+    /// <summary>Why the water points are missing, in German; the map works on without them.</summary>
+    [ObservableProperty]
+    private string? _waterPointsError;
+
+    /// <summary>Offline address search needs a pack's address list.</summary>
+    public bool CanSearchAddresses => _packs.Count > 0;
+
+    /// <summary>Prefilled with the Einsatz's recorded address while no Einsatzort is marked.</summary>
+    [ObservableProperty]
+    private string _addressQuery;
+
+    public ObservableCollection<LagekarteAddressRow> AddressHits { get; } = new();
+
+    public bool HasAddressHits => AddressHits.Count > 0;
+
+    [ObservableProperty]
+    private string? _addressStatus;
+
+    public string AddressHint => CanEdit ? "Treffer antippen: setzt den Einsatzort." : "Treffer antippen: zeigt die Adresse.";
 
     [ObservableProperty]
     private bool _isNarrow;
@@ -152,6 +201,72 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
     }
 
+    /// <summary>Looks the query up in every installed pack, the shown one first.</summary>
+    [RelayCommand]
+    private async Task SearchAddressAsync()
+    {
+        ClearAddressHits();
+        var query = AddressQuery.Trim();
+        if (query.Length == 0 || _library is null || _packs.Count == 0)
+        {
+            return;
+        }
+
+        var hits = new List<LagekarteAddressRow>();
+        foreach (var pack in _packs.OrderBy(p => ReferenceEquals(p, _shownPack) ? 0 : 1))
+        {
+            foreach (var hit in await _library.SearchAddressesAsync(pack, query))
+            {
+                hits.Add(new LagekarteAddressRow(hit, _packs.Count > 1 ? pack.Info.Name : null));
+            }
+        }
+
+        foreach (var hit in hits.Take(MaxAddressHits))
+        {
+            AddressHits.Add(hit);
+        }
+
+        OnPropertyChanged(nameof(HasAddressHits));
+
+        if (AddressHits.Count == 0)
+        {
+            AddressStatus = "Keine Adresse gefunden. Straße und Hausnummer prüfen.";
+        }
+    }
+
+    /// <summary>A hit picked from the list: marks the Einsatzort there, or only shows it on a read-only Einsatz.</summary>
+    [RelayCommand]
+    private void ChooseAddress(LagekarteAddressRow? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        ClearAddressHits();
+        if (CanEdit)
+        {
+            Placing = null;
+            if (!Place(null, row.Position))
+            {
+                return;
+            }
+        }
+        else
+        {
+            ShowPackFor(row.Position);
+        }
+
+        Map.ChangeViewCommand.Execute(new MapViewChange(row.Position, Math.Max(Map.Zoom, EinsatzortZoom)));
+    }
+
+    private void ClearAddressHits()
+    {
+        AddressHits.Clear();
+        AddressStatus = null;
+        OnPropertyChanged(nameof(HasAddressHits));
+    }
+
     [RelayCommand]
     private void CenterOnEinsatzort()
     {
@@ -181,7 +296,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
     }
 
-    private void Place(Guid? unitId, GeoPoint position)
+    private bool Place(Guid? unitId, GeoPoint position)
     {
         var placed = unitId is { } id
             ? Run(() => _session.PlaceForceUnit(id, position))
@@ -190,6 +305,8 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         {
             ShowPackFor(position);
         }
+
+        return placed;
     }
 
     private bool Run(Action command)
@@ -272,7 +389,43 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         {
             Map.ChangeViewCommand.Execute(view);
         }
+
+        // Fire-and-forget on purpose: a failure lands in WaterPointsError, never in the map.
+        _ = LoadWaterPointsAsync(pack);
     }
+
+    private async Task LoadWaterPointsAsync(InstalledRegionPack pack)
+    {
+        WaterPoints = null;
+        WaterPointsError = null;
+        if (_library is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var points = await _library.GetWaterPointsAsync(pack);
+            if (ReferenceEquals(pack, _shownPack))
+            {
+                WaterPoints = points;
+            }
+        }
+        catch (RegionPackException e)
+        {
+            if (ReferenceEquals(pack, _shownPack))
+            {
+                WaterPointsError = e.Message;
+            }
+        }
+    }
+
+    // "Hauptstraße 12 Maisach": what the search reads as street, house number and Ort. Without a
+    // house number the Ort would read as part of the street, so it is left out then.
+    private static string RecordedAddress(Incident incident) =>
+        incident.Street is not { } street ? string.Empty
+        : incident.HouseNumber is not { } number ? street
+        : string.Join(' ', new[] { street, number, incident.Place }.OfType<string>());
 
     private static IReadOnlyList<InstalledRegionPack> InstalledPacks(IRegionPackLibrary? library)
     {
@@ -286,6 +439,22 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             return [];
         }
     }
+}
+
+/// <summary>An address found in a Kartenpaket, as the search list shows it.</summary>
+public sealed class LagekarteAddressRow(AddressHit hit, string? packName)
+{
+    public GeoPoint Position { get; } = hit.Position;
+
+    /// <summary>"Hauptstraße 12a".</summary>
+    public string Title { get; } = Formatting.Address(hit.Street, null, hit.HouseNumber) ?? hit.Street;
+
+    /// <summary>"Ortsteil, 82216 Maisach", and the pack's name when several are installed.</summary>
+    public string Detail { get; } = string.Join(
+        " · ",
+        new[] { Formatting.Address(null, hit.Suburb == hit.City ? null : hit.Suburb, null, hit.Postcode, hit.City), packName }.OfType<string>());
+
+    public string AutomationName => Detail.Length == 0 ? Title : $"{Title}, {Detail}";
 }
 
 /// <summary>What a tap on the map is about to place: a unit, or the Einsatzort when <see cref="UnitId"/> is null.</summary>

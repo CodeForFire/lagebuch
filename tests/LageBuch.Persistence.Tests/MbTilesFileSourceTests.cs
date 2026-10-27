@@ -7,7 +7,7 @@ public sealed class MbTilesFileSourceTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
 
-    private string PackPath => Path.Join(_dir, "region.mbtiles");
+    private string PackPath => Path.Join(_dir, "map.mbtiles");
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);
 

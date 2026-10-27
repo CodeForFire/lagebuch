@@ -2,6 +2,7 @@ using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Map;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -10,6 +11,7 @@ public class LagekarteViewModelTests
     private static readonly DateTimeOffset T0 = new(2026, 10, 27, 14, 0, 0, TimeSpan.FromHours(1));
     private static readonly GeoPoint Marktplatz = new(48.1785, 11.2555);
     private static readonly GeoPoint Amperbruecke = new(48.17633, 11.25881);
+    private static readonly AddressHit Hauptstrasse12 = new("Hauptstraße", "12", "82256", "Fürstenfeldbruck", string.Empty, Marktplatz);
 
     [Fact]
     public void A_tap_after_picking_the_Einsatzort_marks_it_there()
@@ -191,6 +193,200 @@ public class LagekarteViewModelTests
 
         Assert.Single(vm.Markers);
         Assert.True(vm.Units.Single().IsPlaced);
+    }
+
+    [Fact]
+    public void The_shown_packs_water_points_are_drawn_until_the_switch_is_turned_off()
+    {
+        var library = FfbLibrary();
+        var hydrant = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100");
+        library.WaterPoints["ffb"] = [hydrant];
+        var (session, _, _) = Open();
+
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+
+        Assert.True(vm.HasWaterPoints);
+        Assert.Equal([hydrant], vm.VisibleWaterPoints);
+        Assert.Equal("Hydranten aus OpenStreetMap – nicht amtlich.", vm.WaterPointsNote);
+
+        vm.ShowWaterPoints = false;
+
+        Assert.Null(vm.VisibleWaterPoints);
+        Assert.Null(vm.WaterPointsNote);
+        Assert.True(vm.HasWaterPoints);
+    }
+
+    [Fact]
+    public void Water_points_that_cannot_be_read_are_reported_and_the_map_stays()
+    {
+        var library = FfbLibrary();
+        library.WaterFailure = new RegionPackException("Die Wasserentnahmestellen des Kartenpakets sind beschädigt.");
+        var (session, _, _) = Open();
+
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+
+        Assert.Equal("Die Wasserentnahmestellen des Kartenpakets sind beschädigt.", vm.WaterPointsError);
+        Assert.False(vm.HasWaterPoints);
+        Assert.Null(vm.WaterPointsNote);
+        Assert.NotNull(vm.Map.TileSource);
+    }
+
+    [Fact]
+    public void A_pack_without_water_points_shows_no_switch_and_no_note()
+    {
+        var (session, _, _) = Open();
+
+        using var vm = new LagekarteViewModel(session, () => { }, FfbLibrary());
+
+        Assert.False(vm.HasWaterPoints);
+        Assert.Null(vm.WaterPointsNote);
+        Assert.Null(vm.WaterPointsError);
+    }
+
+    [Fact]
+    public async Task An_address_picked_from_the_search_marks_the_Einsatzort_there_with_one_ETB_entry()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        var (session, _, _) = Open();
+        var changes = 0;
+        using var vm = new LagekarteViewModel(session, () => changes++, library);
+        var entries = session.Incident.Journal.Count;
+        vm.AddressQuery = "Hauptstr 12";
+
+        await vm.SearchAddressCommand.ExecuteAsync(null);
+        var hit = Assert.Single(vm.AddressHits);
+        Assert.Equal("Hauptstraße 12", hit.Title);
+        Assert.Equal("82256 Fürstenfeldbruck", hit.Detail);
+        Assert.Equal("Hauptstraße 12, 82256 Fürstenfeldbruck", hit.AutomationName);
+        Assert.True(vm.HasAddressHits);
+        Assert.Equal("Treffer antippen: setzt den Einsatzort.", vm.AddressHint);
+        vm.ChooseAddressCommand.Execute(hit);
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+        Assert.Equal(entries + 1, session.Incident.Journal.Count);
+        Assert.StartsWith("Einsatzort auf der Lagekarte gesetzt", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+        Assert.Equal(1, changes);
+        Assert.Empty(vm.AddressHits);
+        Assert.False(vm.HasAddressHits);
+        Assert.Equal(Marktplatz, vm.Map.Center);
+        Assert.Equal(LagekarteViewModel.EinsatzortZoom, vm.Map.Zoom);
+    }
+
+    [Fact]
+    public async Task On_a_closed_Einsatz_an_address_hit_is_only_shown()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        var (session, _, _) = Open();
+        session.Close();
+        using var vm = new LagekarteViewModel(session, () => { }, library) { AddressQuery = "Hauptstr" };
+
+        await vm.SearchAddressCommand.ExecuteAsync(null);
+        Assert.Equal("Treffer antippen: zeigt die Adresse.", vm.AddressHint);
+        vm.ChooseAddressCommand.Execute(vm.AddressHits.Single());
+
+        Assert.Null(session.Incident.Location);
+        Assert.Equal(Marktplatz, vm.Map.Center);
+    }
+
+    [Fact]
+    public async Task A_search_that_finds_nothing_says_so()
+    {
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, FfbLibrary()) { AddressQuery = "Nirgendwo 1" };
+
+        await vm.SearchAddressCommand.ExecuteAsync(null);
+
+        Assert.Empty(vm.AddressHits);
+        Assert.Equal("Keine Adresse gefunden. Straße und Hausnummer prüfen.", vm.AddressStatus);
+    }
+
+    [Fact]
+    public async Task With_several_packs_the_shown_one_is_searched_first_and_each_hit_names_its_pack()
+    {
+        var library = FfbLibrary();
+        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg") with { South = 47.8, North = 48.0 });
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        library.Addresses["sta"] = [Hauptstrasse12 with { Postcode = "82319", City = "Starnberg" }];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library) { AddressQuery = "Hauptstraße 12" };
+
+        await vm.SearchAddressCommand.ExecuteAsync(null);
+
+        Assert.Equal(["ffb:Hauptstraße 12", "sta:Hauptstraße 12"], library.Searches);
+        Assert.Equal(
+            ["82256 Fürstenfeldbruck · Landkreis Fürstenfeldbruck", "82319 Starnberg · Landkreis Starnberg"],
+            vm.AddressHits.Select(h => h.Detail));
+    }
+
+    [Fact]
+    public async Task No_more_hits_are_listed_than_the_cap()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = Enumerable.Range(1, 30).Select(n => Hauptstrasse12 with { HouseNumber = n.ToString(System.Globalization.CultureInfo.InvariantCulture) }).ToList();
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library) { AddressQuery = "Hauptstraße" };
+
+        await vm.SearchAddressCommand.ExecuteAsync(null);
+
+        Assert.Equal(LagekarteViewModel.MaxAddressHits, vm.AddressHits.Count);
+    }
+
+    [Fact]
+    public async Task An_empty_query_searches_nothing()
+    {
+        var library = FfbLibrary();
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library) { AddressQuery = "   " };
+
+        await vm.SearchAddressCommand.ExecuteAsync(null);
+
+        Assert.Empty(library.Searches);
+        Assert.Null(vm.AddressStatus);
+    }
+
+    [Fact]
+    public void The_search_starts_from_the_recorded_address_while_no_Einsatzort_is_marked()
+    {
+        var (session, _, _) = Open();
+        session.SetAddress("Hauptstraße", "Buchenau", "12", "82256", "Fürstenfeldbruck");
+
+        using var vm = new LagekarteViewModel(session, () => { }, FfbLibrary());
+
+        Assert.True(vm.CanSearchAddresses);
+        Assert.Equal("Hauptstraße 12 Fürstenfeldbruck", vm.AddressQuery);
+    }
+
+    [Fact]
+    public void A_recorded_street_without_a_house_number_starts_the_search_with_the_street_alone()
+    {
+        var (session, _, _) = Open();
+        session.SetAddress("Hauptstraße", null, null, "82256", "Fürstenfeldbruck");
+
+        using var vm = new LagekarteViewModel(session, () => { }, FfbLibrary());
+
+        Assert.Equal("Hauptstraße", vm.AddressQuery);
+    }
+
+    [Fact]
+    public void Once_the_Einsatzort_is_marked_the_search_starts_empty_and_without_a_pack_there_is_none()
+    {
+        var (session, vm, _) = Open();
+        session.SetAddress("Hauptstraße", null, "12");
+        session.SetIncidentLocation(Marktplatz);
+
+        using var marked = new LagekarteViewModel(session, () => { }, FfbLibrary());
+
+        Assert.Equal(string.Empty, marked.AddressQuery);
+        Assert.False(vm.CanSearchAddresses);
+    }
+
+    private static FakeRegionPackLibrary FfbLibrary()
+    {
+        var library = new FakeRegionPackLibrary();
+        library.Preinstall(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"));
+        return library;
     }
 
     private static (LocalIncidentSession Session, LagekarteViewModel Vm, Func<int> Changes) Open(string[]? units = null)

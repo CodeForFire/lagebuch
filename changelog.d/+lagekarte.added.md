@@ -1,0 +1,1 @@
+Führung gains a KARTE tab: the Lagebuchführer downloads an offline Kartenpaket per Landkreis from Stammdaten → Karten, marks the Einsatzort by tapping the map or by searching an address offline, places and drags units on it, sees Hydranten and Saugstellen from OpenStreetMap close up, and every joined device sees the same Lagekarte.

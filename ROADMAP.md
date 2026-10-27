@@ -188,9 +188,10 @@ Issues: #282, #297, #298, #299, #302, #304, #350, #400, #402, #403, #404, #462
 Wasserförderung über lange Wegstrecken, restarted in slices rather than as one
 large change: the FI 5.008 planner engine first, then the tab with persistence,
 sync and the PDF, the Einsatzauftrag per pump, the map mode salvaged from #164,
-and finally the execution mode in the field. The maps and elevation packs are
-already published in
-[lagebuch-regions](https://github.com/CodeForFire/lagebuch-regions).
+and finally the execution mode in the field. The maps and DGM5 elevation packs
+are already published in
+[lagebuch-geodata](https://github.com/CodeForFire/lagebuch-geodata), and the
+Lagekarte installs them; the planner reads `elevation.tif` from the same pack.
 
 It used to sit beyond 1.0. It moved forward because it adds tables to the
 `.lagebuch` file, and like the modules above that is cheap before the freeze

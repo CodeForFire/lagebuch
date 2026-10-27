@@ -40,6 +40,23 @@
       <Setter Property="Height" Value="28" />
       <Setter Property="Cursor" Value="SizeAll" />
     </Style>
+    <!-- The icon-btn look for the one toggle; Button.icon-btn does not reach a ToggleButton. -->
+    <Style Selector="ToggleButton#WaterPointsToggle">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ToggleButton#WaterPointsToggle PathIcon">
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+    </Style>
+    <Style Selector="Border#AddressSearch">
+      <Setter Property="Width" Value="320" />
+    </Style>
+    <!-- Narrow enough to leave the zoom buttons free on a phone. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#AddressSearch">
+      <Setter Property="Width" Value="250" />
+    </Style>
     <Style Selector="Border.map-banner">
       <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
@@ -124,6 +141,7 @@
         <c:MapCanvasControl x:Name="Map"
                             AutomationProperties.Name="Lagekarte"
                             TileSource="{Binding Map.TileSource}"
+                            WaterPoints="{Binding VisibleWaterPoints}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
                             ViewChangedCommand="{Binding Map.ChangeViewCommand}"
@@ -161,6 +179,49 @@
         </ItemsControl>
 
         <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top">
+          <!-- Offline address search from the pack's address list; a hit marks the Einsatzort. -->
+          <Border Classes="map-banner" x:Name="AddressSearch" IsVisible="{Binding CanSearchAddresses}">
+            <StackPanel Spacing="6">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox x:Name="AddressQueryBox" Text="{Binding AddressQuery}"
+                         PlaceholderText="Adresse suchen, z. B. Hauptstr 12"
+                         AutomationProperties.Name="Adresse suchen">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding SearchAddressCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="1" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Adresse suchen"
+                        AutomationProperties.Name="Adresse suchen starten" Command="{Binding SearchAddressCommand}">
+                  <PathIcon Data="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                </Button>
+              </Grid>
+              <TextBlock x:Name="AddressStatusText" Text="{Binding AddressStatus}" TextWrapping="Wrap" FontSize="12"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         IsVisible="{Binding AddressStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Text="{Binding AddressHint}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                         IsVisible="{Binding HasAddressHits}" />
+              <ScrollViewer MaxHeight="240" IsVisible="{Binding HasAddressHits}">
+                <ItemsControl x:Name="AddressHitList" ItemsSource="{Binding AddressHits}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LagekarteAddressRow">
+                      <!-- ReflectionBinding: the command lives on the ItemsControl's DataContext,
+                           object-typed under compiled bindings. -->
+                      <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                              AutomationProperties.Name="{Binding AutomationName}"
+                              Command="{ReflectionBinding $parent[ItemsControl].DataContext.ChooseAddressCommand}"
+                              CommandParameter="{Binding}">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Detail}" FontSize="11" TextWrapping="Wrap"
+                                     Foreground="{StaticResource TextSecondaryBrush}" />
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </StackPanel>
+          </Border>
           <!-- What the next tap places; the way out without placing anything. -->
           <Border Classes="map-banner" x:Name="PlacingBanner" IsVisible="{Binding IsPlacing}"
                   BorderBrush="{StaticResource SignalBrush}">
@@ -173,6 +234,10 @@
           <Border Classes="map-banner" x:Name="NoMapBanner" IsVisible="{Binding HasNoMap}">
             <TextBlock TextWrapping="Wrap" MaxWidth="420"
                        Text="Kein Kartenpaket auf diesem Gerät. Unter Stammdaten → Karten herunterladen." />
+          </Border>
+          <Border Classes="map-banner" x:Name="WaterPointsErrorBanner" BorderBrush="{StaticResource ErrorBrush}"
+                  IsVisible="{Binding WaterPointsError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding WaterPointsError}" TextWrapping="Wrap" MaxWidth="420" />
           </Border>
           <Border Classes="map-banner" x:Name="MapErrorBanner" BorderBrush="{StaticResource ErrorBrush}"
                   IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -191,12 +256,21 @@
                   Command="{Binding Map.ZoomOutCommand}">
             <PathIcon Data="M19 13H5v-2h14v2z" />
           </Button>
+          <ToggleButton x:Name="WaterPointsToggle" Classes="icon-btn" ToolTip.Tip="Hydranten zeigen"
+                        AutomationProperties.Name="Hydranten zeigen"
+                        IsVisible="{Binding HasWaterPoints}" IsChecked="{Binding ShowWaterPoints}">
+            <PathIcon Data="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+          </ToggleButton>
         </StackPanel>
 
         <!-- ODbL: every map drawn from OSM data names its source. -->
         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#CCFFFFFF" Padding="4,1"
                 IsVisible="{Binding Map.Attribution, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <TextBlock Text="{Binding Map.Attribution}" FontSize="10" Foreground="#FF333333" TextWrapping="Wrap" />
+          <StackPanel>
+            <TextBlock Text="{Binding Map.Attribution}" FontSize="10" Foreground="#FF333333" TextWrapping="Wrap" />
+            <TextBlock x:Name="WaterPointsNote" Text="{Binding WaterPointsNote}" FontSize="10" Foreground="#FF333333"
+                       IsVisible="{Binding WaterPointsNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
         </Border>
       </Grid>
     </Border>

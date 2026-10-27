@@ -1,5 +1,7 @@
+using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain.ValueObjects;
 
@@ -57,6 +59,70 @@ public static class MapDrawing
                 {
                     context.DrawImage(coarse, ancestor.SourceRect, target);
                 }
+            }
+        }
+    }
+
+    /// <summary>Further out, a Landkreis' thousands of hydrants are a red carpet, not information.</summary>
+    public const int WaterPointsMinZoom = 15;
+
+    /// <summary>Close enough that "UH 100" beside each hydrant still leaves room for the street.</summary>
+    public const int WaterLabelsMinZoom = 17;
+
+    // DIN 14090 colours: hydrants red, open water and tanks blue.
+    private static readonly IBrush HydrantBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F));
+    private static readonly IBrush OpenWaterBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+    private static readonly IPen WaterOutline = new ImmutablePen(Brushes.White, 1.5);
+    private static readonly IBrush LabelBackground = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF));
+    private static readonly IBrush LabelText = new ImmutableSolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21));
+    private static readonly CultureInfo LabelCulture = CultureInfo.GetCultureInfo("de-DE");
+
+    /// <summary>
+    /// The water points inside the visible map: a red dot for a hydrant, a blue square for a
+    /// Saugstelle, Löschwasserbehälter or Löschteich, and from <see cref="WaterLabelsMinZoom"/>
+    /// their label. Nothing below <see cref="WaterPointsMinZoom"/>.
+    /// </summary>
+    public static void DrawWaterPoints(DrawingContext context, IReadOnlyList<WaterPoint> points, GeoPoint center, int zoom, Size size)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(points);
+        ArgumentNullException.ThrowIfNull(center);
+        if (zoom < WaterPointsMinZoom || size.Width <= 0 || size.Height <= 0)
+        {
+            return;
+        }
+
+        // Compared in degrees first: thousands of points, a few dozen of them on screen.
+        const double margin = 40;
+        var topLeft = ToGeo(center, zoom, size, new Point(-margin, -margin));
+        var bottomRight = ToGeo(center, zoom, size, new Point(size.Width + margin, size.Height + margin));
+        var radius = zoom >= WaterLabelsMinZoom ? 7 : 5;
+        var typeface = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
+        foreach (var point in points)
+        {
+            var p = point.Position;
+            if (p.Latitude > topLeft.Latitude || p.Latitude < bottomRight.Latitude
+                || p.Longitude < topLeft.Longitude || p.Longitude > bottomRight.Longitude)
+            {
+                continue;
+            }
+
+            var at = ToScreen(center, zoom, size, p);
+            if (point.Kind == WaterPointKind.Hydrant)
+            {
+                context.DrawEllipse(HydrantBrush, WaterOutline, at, radius, radius);
+            }
+            else
+            {
+                context.DrawRectangle(OpenWaterBrush, WaterOutline, new Rect(at.X - radius, at.Y - radius, 2 * radius, 2 * radius));
+            }
+
+            if (zoom >= WaterLabelsMinZoom && point.Label.Length > 0)
+            {
+                var text = new FormattedText(point.Label, LabelCulture, FlowDirection.LeftToRight, typeface, 11, LabelText);
+                var origin = new Point(at.X + radius + 3, at.Y - (text.Height / 2));
+                context.FillRectangle(LabelBackground, new Rect(origin.X - 2, origin.Y, text.Width + 4, text.Height), 2);
+                context.DrawText(text, origin);
             }
         }
     }

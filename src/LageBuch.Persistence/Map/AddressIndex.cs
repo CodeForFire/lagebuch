@@ -1,0 +1,168 @@
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
+using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Sqlite;
+using Microsoft.Data.Sqlite;
+
+namespace LageBuch.Persistence.Map;
+
+/// <summary>
+/// Finds addresses in a Kartenpaket's <c>addresses.sqlite</c> (FORMAT.md: one <c>addresses</c>
+/// table, indexed on street and house number), offline. A query reads the way it is said:
+/// "Hauptstr 12a Maisach" -- a street, a house number, and words that narrow the place.
+/// "Str.", "Strasse" and "Straße" are one word, in the query and in the data.
+/// </summary>
+/// <remarks>
+/// The file came from the network: it is opened read-only, every value is bound as a parameter,
+/// a row with a position off the globe is skipped, and a file that is no address table reads as
+/// nothing found rather than as a failure of the map.
+/// </remarks>
+public sealed partial class AddressIndex
+{
+    /// <summary>A query longer than this is no address.</summary>
+    public const int MaxQueryLength = 100;
+
+    // Candidates read before the street and place are compared word by word; the SQL prefix only
+    // narrows by the street's first letters, so it reads more than it returns.
+    private const int CandidateLimit = 2000;
+
+    private readonly string _path;
+
+    public AddressIndex(string addressesFilePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(addressesFilePath);
+        _path = addressesFilePath;
+    }
+
+    /// <summary>
+    /// The addresses matching <paramref name="query"/>, best first, at most <paramref name="limit"/>:
+    /// the exact house number before "12a" for "12", an address in the named place before one OSM
+    /// gives no place at all, and otherwise by street and number.
+    /// Empty when nothing matches, the query names no street, or the file is no address table.
+    /// </summary>
+    public IReadOnlyList<AddressHit> Search(string query, int limit = 20)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+        if (query.Length > MaxQueryLength || !TryParse(query, out var street, out var houseNumber, out var place))
+        {
+            return [];
+        }
+
+        // The SQL prefix is the street before its "-straße" ending, so "Allinger Straße" still finds
+        // "Allinger Str."; the full comparison follows in Matches.
+        var stem = StreetEnding().Replace(street, string.Empty);
+        if (stem.Length < 2)
+        {
+            stem = street;
+        }
+
+        var wantedStreet = Normalize(street);
+        var hits = new List<(AddressHit Hit, int Rank)>();
+        try
+        {
+            using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText =
+                "SELECT street, housenumber, postcode, city, suburb, lat, lon FROM addresses " +
+                "WHERE street LIKE $street ESCAPE '\\' AND housenumber LIKE $number ESCAPE '\\' " +
+                "ORDER BY street, length(housenumber), housenumber LIMIT $limit;";
+            cmd.Parameters.AddWithValue("$street", EscapeLike(stem) + "%");
+            cmd.Parameters.AddWithValue("$number", EscapeLike(houseNumber ?? string.Empty) + "%");
+            cmd.Parameters.AddWithValue("$limit", CandidateLimit);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (Row(reader) is { } hit && Matches(hit, wantedStreet, place))
+                {
+                    var exactNumber = houseNumber is null || string.Equals(hit.HouseNumber, houseNumber, StringComparison.OrdinalIgnoreCase);
+                    var placeUnknown = place.Count > 0 && hit is { City: "", Suburb: "", Postcode: "" };
+                    hits.Add((hit, (exactNumber ? 0 : 2) + (placeUnknown ? 1 : 0)));
+                }
+            }
+        }
+        catch (SqliteException)
+        {
+            // Missing, damaged or not an address table: nothing is found, the map works on.
+            return [];
+        }
+
+        // OrderBy is stable, so within a rank the SQL's street-and-number order stays.
+        return hits.OrderBy(h => h.Rank).Take(limit).Select(h => h.Hit).ToList();
+    }
+
+    /// <summary>Lower case, and every way of writing "Straße" as one: "Hauptstraße" and "Hauptstr." both read "hauptstr".</summary>
+    public static string Normalize(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return text.ToLower(CultureInfo.GetCultureInfo("de-DE"))
+            .Replace("straße", "str", StringComparison.Ordinal)
+            .Replace("strasse", "str", StringComparison.Ordinal)
+            .Replace("str.", "str", StringComparison.Ordinal)
+            .Trim();
+    }
+
+    // The words before the first one that starts with a digit are the street; that word is the
+    // house number; the words after it narrow the place by postcode, Ort or Ortsteil.
+    private static bool TryParse(string query, out string street, out string? houseNumber, out IReadOnlyList<string> place)
+    {
+        var words = query.Split([' ', ',', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0 || char.IsAsciiDigit(words[0][0]))
+        {
+            street = string.Empty;
+            houseNumber = null;
+            place = [];
+            return false;
+        }
+
+        var number = Array.FindIndex(words, 1, w => char.IsAsciiDigit(w[0]));
+
+        street = string.Join(' ', number < 0 ? words : words[..number]);
+        houseNumber = number < 0 ? null : words[number];
+        place = number < 0 ? [] : words[(number + 1)..].Select(Normalize).ToList();
+        return true;
+    }
+
+    // An address OSM tags with no place at all is not ruled out by the place words: unknown is no
+    // mismatch, and its hit shows no Ort, so the Lagebuchführer sees what was matched.
+    private static bool Matches(AddressHit hit, string street, IReadOnlyList<string> place) =>
+        Normalize(hit.Street).StartsWith(street, StringComparison.Ordinal)
+        && (hit is { City: "", Suburb: "", Postcode: "" } || place.All(word =>
+            Normalize(hit.City).StartsWith(word, StringComparison.Ordinal)
+            || Normalize(hit.Suburb).StartsWith(word, StringComparison.Ordinal)
+            || hit.Postcode.StartsWith(word, StringComparison.Ordinal)));
+
+    // The columns are declared, but a hostile file can hold anything in them: a cell of the wrong
+    // type costs that row.
+    private static AddressHit? Row(SqliteDataReader reader)
+    {
+        if (reader.GetValue(0) is not string street || reader.GetValue(1) is not string houseNumber
+            || reader.GetValue(5) is not double lat || reader.GetValue(6) is not double lon
+            || GeoPoint.TryCreate(lat, lon) is not { } position)
+        {
+            return null;
+        }
+
+        return new AddressHit(street, houseNumber, reader.GetValue(2) as string ?? string.Empty, reader.GetValue(3) as string ?? string.Empty, reader.GetValue(4) as string ?? string.Empty, position);
+    }
+
+    private static string EscapeLike(string value)
+    {
+        var escaped = new StringBuilder(value.Length);
+        foreach (var c in value)
+        {
+            if (c is '%' or '_' or '\\')
+            {
+                escaped.Append('\\');
+            }
+
+            escaped.Append(c);
+        }
+
+        return escaped.ToString();
+    }
+
+    [GeneratedRegex(@"(?:stra(?:ß|ss)e|str\.?)\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex StreetEnding();
+}
