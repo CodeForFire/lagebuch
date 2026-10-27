@@ -33,10 +33,6 @@ public static class AttachmentTempPaths
     /// </summary>
     public const string RootFolderName = IncidentFileStore.TempFolderName;
 
-    // Owner-only on Unix: the copies are decrypted attachment bytes, and the system temp directory
-    // is shared with every other local user.
-    private const UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-
     /// <summary>The one directory attachment copies may live in.</summary>
     public static string Root { get; } = Path.Join(Path.GetTempPath(), RootFolderName);
 
@@ -48,42 +44,18 @@ public static class AttachmentTempPaths
 
     /// <summary>
     /// Creates and returns a fresh, empty directory under <see cref="Root"/> for a single "Öffnen".
-    /// On Unix the root and the new directory are owner-only (0700), and a root found wider than
-    /// that is tightened. A root that is a symbolic link is refused with an
-    /// <see cref="IOException"/>, because the copies would land wherever it points.
+    /// The root passes <see cref="PrivateTempFolder.Ensure"/>, which it shares with the upload spool:
+    /// owner-only (0700) on Unix, a wider root is tightened, and a root that is a symbolic link is
+    /// refused with an <see cref="IOException"/>. The new directory is owner-only too.
     /// </summary>
     public static string CreateOpenDirectory() => CreateOpenDirectory(Root);
 
     internal static string CreateOpenDirectory(string root)
     {
-        CreatePrivateDirectory(root);
-
-        if (new DirectoryInfo(root).LinkTarget is not null)
-        {
-            throw new IOException("Der Ordner für geöffnete Anhänge ist eine Verknüpfung und wird nicht verwendet.");
-        }
-
-        if (!OperatingSystem.IsWindows() && File.GetUnixFileMode(root) != OwnerOnly)
-        {
-            File.SetUnixFileMode(root, OwnerOnly);
-        }
-
+        PrivateTempFolder.Ensure(root);
         var directory = Path.Join(root, Guid.NewGuid().ToString("N"));
-        CreatePrivateDirectory(directory);
+        PrivateTempFolder.Create(directory);
         return directory;
-    }
-
-    // On Windows the per-user temp directory's ACL already keeps other users out.
-    private static void CreatePrivateDirectory(string path)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            Directory.CreateDirectory(path);
-        }
-        else
-        {
-            Directory.CreateDirectory(path, OwnerOnly);
-        }
     }
 
     /// <summary>
