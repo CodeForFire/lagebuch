@@ -157,6 +157,81 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
     desktop-file-validate "$ROOT/usr/share/applications/$PKG.desktop"
 fi
 
+# --- AppStream metainfo ----------------------------------------------------------------------
+# What GNOME Software and KDE Discover show on the installed app's page: licence, description,
+# screenshots, age rating. Without it they listed Lagebuch as "Unknown License — may be
+# proprietary" (#799). The id is the macOS bundle identifier; the launchable ties it to the entry
+# above. The screenshots are the README's, fetched from GitHub at this release's tag: the release
+# workflow only ever builds from a v-tag, so the URL always exists.
+# A .deb opened in a software centre before installing still shows an unknown licence: PackageKit's
+# apt backend reports "unknown" for every package, whatever the package carries.
+SCREENSHOTS="https://raw.githubusercontent.com/CodeForFire/lagebuch/v${VERSION}/docs/screenshots"
+install -d "$ROOT/usr/share/metainfo"
+cat > "$ROOT/usr/share/metainfo/de.codeforfire.$PKG.metainfo.xml" <<METAINFO
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.codeforfire.$PKG</id>
+  <name>Lagebuch</name>
+  <summary>Einsatztagebuch, Atemschutzüberwachung und Einsatzberichte für den ELW</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="de.codeforfire">
+    <name>CodeForFire</name>
+  </developer>
+  <description>
+    <p>
+      Lagebuch ist das digitale Einsatztagebuch für den Einsatzleitwagen. Ein Einsatz ist eine
+      Datei auf dem ELW-Laptop – mit Einsatztagebuch, Kräften, Atemschutzüberwachung, Aufgaben,
+      CO-Messprotokoll und PDF-Bericht.
+    </p>
+    <p>
+      Lagebuch läuft offline: kein Internet, kein Konto, kein Server, keine Telemetrie. Die
+      optionale Mehrgeräte-Verbindung bleibt im LAN, TLS-gesichert mit PIN.
+    </p>
+  </description>
+  <launchable type="desktop-id">$PKG.desktop</launchable>
+  <url type="homepage">https://codeforfire.github.io/</url>
+  <url type="bugtracker">https://github.com/CodeForFire/lagebuch/issues</url>
+  <url type="vcs-browser">https://github.com/CodeForFire/lagebuch</url>
+  <provides>
+    <mediatype>application/x-lagebuch</mediatype>
+  </provides>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Startseite</caption>
+      <image>${SCREENSHOTS}/home.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Einsatztagebuch</caption>
+      <image>${SCREENSHOTS}/etb.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Kräfte</caption>
+      <image>${SCREENSHOTS}/kraefte.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Atemschutzüberwachung</caption>
+      <image>${SCREENSHOTS}/atemschutz.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>PDF-Bericht</caption>
+      <image>${SCREENSHOTS}/pdf-export.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="$VERSION" date="$(date -u +%Y-%m-%d)"/>
+  </releases>
+</component>
+METAINFO
+chmod 644 "$ROOT/usr/share/metainfo/de.codeforfire.$PKG.metainfo.xml"
+
+# Optional for the same reason as desktop-file-validate above. --no-net keeps the build from
+# depending on GitHub being reachable; it skips only the check that the screenshot URLs load.
+if command -v appstreamcli >/dev/null 2>&1; then
+    appstreamcli validate --no-net "$ROOT/usr/share/metainfo/de.codeforfire.$PKG.metainfo.xml"
+fi
+
 # --- control metadata ------------------------------------------------------------------------
 # Installed-Size is in KiB, what apt shows before installing.
 #
