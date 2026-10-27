@@ -9,7 +9,7 @@ public class CombinedMapTileSourceTests
     {
         var ffb = new Tiles(maxZoom: 17, bounds: (11, 1086, 1090, 709, 712), (14, 1, 1, [0x01]), (14, 2, 2, [0x02]));
         var sta = new Tiles(maxZoom: 17, bounds: (11, 1086, 1090, 711, 715), (14, 2, 2, [0x22]), (14, 3, 3, [0x33]));
-        var map = new CombinedMapTileSource([ffb, sta]);
+        var map = new CombinedMapTileSource([new(ffb, null), new(sta, null)]);
 
         Assert.Equal(new byte[] { 0x01 }, map.GetTile(14, 1, 1));
         Assert.Equal(new byte[] { 0x02 }, map.GetTile(14, 2, 2));
@@ -22,9 +22,9 @@ public class CombinedMapTileSourceTests
     {
         // At zoom 12 the second pack's tiles 2180..2190 are zoom-11 tiles 1090..1095.
         var map = new CombinedMapTileSource([
-            new Tiles(maxZoom: 17, bounds: (11, 1086, 1090, 709, 712)),
-            new Tiles(maxZoom: 16, bounds: (12, 2180, 2190, 1430, 1431)),
-            new Tiles(maxZoom: null, bounds: null),
+            new(new Tiles(maxZoom: 17, bounds: (11, 1086, 1090, 709, 712)), null),
+            new(new Tiles(maxZoom: 16, bounds: (12, 2180, 2190, 1430, 1431)), null),
+            new(new Tiles(maxZoom: null, bounds: null), null),
         ]);
 
         Assert.Equal((11, 1086, 1095, 709, 715), map.GetTileBounds());
@@ -34,7 +34,7 @@ public class CombinedMapTileSourceTests
     [Fact]
     public void Packs_without_tiles_make_a_map_without_tiles()
     {
-        var map = new CombinedMapTileSource([new Tiles(maxZoom: null, bounds: null)]);
+        var map = new CombinedMapTileSource([new(new Tiles(maxZoom: null, bounds: null), null)]);
 
         Assert.Null(map.GetTileBounds());
         Assert.Null(map.GetMaxZoom());

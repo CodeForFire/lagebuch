@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Map;
 using LageBuch.Persistence.Sqlite;
 
 namespace LageBuch.AppLogic.Tests;
@@ -93,6 +94,36 @@ public class MapViewportTests
         finally
         {
             Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Several_packs_become_layers_each_with_its_area_and_those_without_one_underneath()
+    {
+        var root = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
+        try
+        {
+            var ffb = Directory.CreateDirectory(Path.Join(root, "ffb")).FullName;
+            var sta = Directory.CreateDirectory(Path.Join(root, "sta")).FullName;
+            File.WriteAllText(
+                Path.Join(ffb, InstalledRegionPack.BoundaryFileName),
+                """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.4, 48.0], [11.4, 48.3], [11.0, 48.0]]]}}""");
+            var viewport = new MapViewport();
+
+            viewport.ShowAll(
+                [
+                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"), ffb),
+                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"), sta),
+                ],
+                centerOnPacks: false);
+
+            var layers = Assert.IsType<CombinedMapTileSource>(viewport.TileSource).Layers;
+            Assert.Null(layers[0].Boundary);
+            Assert.Equal(4, Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyList<GeoPoint>>>(layers[1].Boundary)).Count);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 

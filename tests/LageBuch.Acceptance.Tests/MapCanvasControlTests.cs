@@ -134,6 +134,34 @@ public class MapCanvasControlTests
     public void A_pinch_to_twice_the_size_is_one_zoom_level(double scale, int delta) =>
         Assert.Equal(delta, MapCanvasControl.PinchScaleToZoomDelta(scale));
 
+    // Two neighbouring packs whose tiles are opaque everywhere, as real edge tiles are: empty land
+    // outside the pack's area. Each must show only within its own area, or the first (or last)
+    // pack's empty margin covers the other's streets.
+    [AvaloniaFact]
+    public void Each_pack_is_drawn_only_within_its_own_area()
+    {
+        GeoPoint[] Box(double west, double east) => [new(47, west), new(47, east), new(49, east), new(49, west)];
+        var west = new MapTileLayer(new SolidTiles(Colors.IndianRed), [Box(10, Fuerstenfeldbruck.Longitude)]);
+        var east = new MapTileLayer(new SolidTiles(Colors.SteelBlue), [Box(Fuerstenfeldbruck.Longitude, 12)]);
+        var (window, _, _) = Show(new CombinedMapTileSource([west, east]));
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(Colors.IndianRed, PixelAt(frame, 100, 150));
+        Assert.Equal(Colors.SteelBlue, PixelAt(frame, 300, 150));
+    }
+
+    [AvaloniaFact]
+    public void Outside_every_area_the_map_is_plain_land_colour()
+    {
+        GeoPoint[] box = [new(48.17, 11.25), new(48.17, 11.26), new(48.18, 11.26), new(48.18, 11.25)];
+        var (window, _, _) = Show(new CombinedMapTileSource([new MapTileLayer(new SolidTiles(Colors.SteelBlue), [box])]));
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(Color.FromRgb(0xE5, 0xE3, 0xDF), PixelAt(frame, 5, 5));
+    }
+
     [AvaloniaFact]
     public void A_hydrant_is_a_red_dot_from_zoom_15_and_an_open_water_point_a_blue_square()
     {

@@ -8,6 +8,8 @@ namespace LageBuch.AppLogic.Tests;
 
 public sealed class RegionPackLibraryTests : IDisposable
 {
+    private const string Area = """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.4, 48.0], [11.4, 48.3], [11.0, 48.0]]]}}""";
+
     private readonly string _dir = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
     private readonly FakeHandler _handler = new();
     private readonly HttpClient _http;
@@ -408,6 +410,90 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Fact]
+    public async Task A_packs_area_is_fetched_from_its_boundary_address_and_kept_with_it()
+    {
+        var zip = PackZip();
+        var requested = new List<string>();
+        _handler.Respond(r =>
+        {
+            requested.Add(r.RequestUri!.AbsoluteUri);
+            return Ok(r.RequestUri.AbsolutePath.EndsWith(".geojson", StringComparison.Ordinal) ? Encoding.UTF8.GetBytes(Area) : zip);
+        });
+
+        var installed = await Library().InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/boundaries/ffb.geojson" });
+
+        Assert.Equal(["https://example.org/ffb-v1.zip", "https://example.org/boundaries/ffb.geojson"], requested);
+        Assert.Equal(Area, await File.ReadAllTextAsync(installed.BoundaryPath));
+    }
+
+    [Fact]
+    public async Task An_area_inside_the_zip_is_checked_like_a_data_file_and_nothing_more_is_fetched()
+    {
+        var zip = Zip([.. Files("tiles", boundary: Area)]);
+        _handler.Respond(r => r.RequestUri!.AbsolutePath.EndsWith(".zip", StringComparison.Ordinal) ? Ok(zip) : throw new InvalidOperationException("Fetched the area anyway."));
+
+        var installed = await Library().InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/boundaries/ffb.geojson" });
+
+        Assert.Equal(Area, await File.ReadAllTextAsync(installed.BoundaryPath));
+        Assert.Equal(1, _handler.Requests);
+    }
+
+    [Fact]
+    public async Task An_area_inside_the_zip_that_pack_json_does_not_declare_refuses_the_pack()
+    {
+        var zip = Zip([.. Files("tiles"), ("boundary.geojson", Area)]);
+        _handler.Respond(_ => Ok(zip));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
+    }
+
+    [Theory]
+    [InlineData("http://example.org/ffb.geojson", "Die Gebietsgrenze des Kartenpakets hat keine gültige https-Adresse.")]
+    [InlineData("file:///etc/passwd", "Die Gebietsgrenze des Kartenpakets hat keine gültige https-Adresse.")]
+    public async Task An_area_address_that_is_not_https_is_never_requested_and_installs_nothing(string address, string message)
+    {
+        var zip = PackZip();
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip) with { BoundaryUrl = address }));
+
+        Assert.Equal(message, e.Message);
+        Assert.Equal(1, _handler.Requests);
+        Assert.Empty(library.GetInstalled());
+    }
+
+    [Theory]
+    [InlineData("<html>")]
+    [InlineData("""{"type": "Point", "coordinates": [11, 48]}""")]
+    public async Task An_area_that_is_no_polygon_installs_nothing(string body)
+    {
+        var zip = PackZip();
+        _handler.Respond(r => Ok(r.RequestUri!.AbsolutePath.EndsWith(".geojson", StringComparison.Ordinal) ? Encoding.UTF8.GetBytes(body) : zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/ffb.geojson" }));
+
+        Assert.Equal("Die Gebietsgrenze des Kartenpakets ist beschädigt.", e.Message);
+        Assert.Empty(library.GetInstalled());
+    }
+
+    [Fact]
+    public async Task An_area_larger_than_its_cap_is_cut_off()
+    {
+        var zip = PackZip();
+        _handler.Respond(r => r.RequestUri!.AbsolutePath.EndsWith(".geojson", StringComparison.Ordinal)
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new DeclaredLengthContent(new byte[BoundaryGeoJson.MaxFileBytes + 1], declaredLength: null) }
+            : Ok(zip));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/ffb.geojson" }));
+
+        Assert.Equal("Die Gebietsgrenze des Kartenpakets ist größer als angekündigt. Download abgebrochen.", e.Message);
+    }
+
+    [Fact]
     public async Task An_installed_packs_water_points_are_read_from_its_file()
     {
         var pack = WithWater("""{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2, 48.1]}, "properties": {"emergency": "fire_hydrant"}}]}""");
@@ -541,11 +627,11 @@ public sealed class RegionPackLibraryTests : IDisposable
 
     private static byte[] PackZip(string tiles = "tiles") => Zip([.. Files(tiles)]);
 
-    // The six files of a well-formed pack, its pack.json declaring the four data files truly.
+    // The files of a well-formed pack, its pack.json declaring each data file truly, the area too when given.
     // shapeManifest bends that pack.json into one that lies.
-    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null)
+    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null, string? boundary = null)
     {
-        (string Name, string Content)[] data = [("map.mbtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses")];
+        (string Name, string Content)[] data = [("map.mbtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses"), .. boundary is null ? Array.Empty<(string, string)>() : [("boundary.geojson", boundary)]];
         var files = string.Join(", ", data.Select(d => $$"""
             "{{d.Name}}": {"bytes": {{Encoding.UTF8.GetByteCount(d.Content)}}, "sha256": "{{Sha(d.Content)}}"}
             """));

@@ -181,8 +181,8 @@ dem Bediener ausgelöst:
    dort gewählte App. Er enthält keine Fehlertexte und keine Einsatzdaten.
 5. **Kartenpakete.** Unter Stammdaten → Karten lädt LISTE LADEN das
    Verzeichnis der Kartenpakete aus `CodeForFire/lagebuch-geodata` und
-   HERUNTERLADEN ein Paket von GitHub (`raw.githubusercontent.com`,
-   `github.com` und dessen Download-Server). Dabei sieht GitHub die
+   HERUNTERLADEN ein Paket samt seiner Gebietsgrenze von GitHub
+   (`raw.githubusercontent.com`, `github.com` und dessen Download-Server). Dabei sieht GitHub die
    IP-Adresse des Geräts und welches Paket geladen wird – keine Einsatzdaten.
    Lagebuch prüft jedes Paket vor dem Entpacken gegen die Prüfsumme im
    Verzeichnis. Danach zeichnet Lagebuch Karte und Hydranten ausschließlich aus

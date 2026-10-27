@@ -28,7 +28,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     /// <summary>The most a pack may unpack to, all files together.</summary>
     public const long MaxUnpackedBytes = 2L * 1024 * 1024 * 1024;
 
-    /// <summary>A pack's own <c>pack.json</c> larger than this is not a description of six files.</summary>
+    /// <summary>A pack's own <c>pack.json</c> larger than this is not a description of its files.</summary>
     public const long MaxManifestBytes = 64 * 1024;
 
     // The app's record of the catalogue entry; pack.json is the publisher's and is kept as it came.
@@ -50,6 +50,10 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     // Everything a zip holds, at its root: FORMAT.md says exactly these, and a zip with any other
     // entry is refused. Each is written under this fixed name, so no entry name reaches a path.
     private static readonly string[] PackFiles = [ManifestFileName, "ATTRIBUTION.md", .. DataFiles];
+
+    // A zip may also carry its area. Then pack.json declares it like a data file, and the
+    // catalogue's boundaryUrl is not fetched.
+    private static readonly string[] OptionalFiles = [InstalledRegionPack.BoundaryFileName];
 
     private readonly HttpClient _http;
     private readonly string _root;
@@ -148,6 +152,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
 
             var unpacked = Unpack(zipPath, staging);
             CheckManifest(Path.Join(staging, ManifestFileName), pack, unpacked);
+            await FetchBoundaryAsync(pack, Path.Join(staging, InstalledRegionPack.BoundaryFileName), cancellationToken);
 
             new JsonFileStore<RegionPackInfo>(Path.Join(staging, InfoFileName)).Write(pack);
 
@@ -307,7 +312,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         }
     }
 
-    // Unpacks the six files under their fixed names and returns each one's size and SHA-256.
+    // Unpacks the pack's files under their fixed names and returns each one's size and SHA-256.
     private static Dictionary<string, (long Bytes, string Sha256)> Unpack(string zipPath, string staging)
     {
         Directory.CreateDirectory(staging);
@@ -316,13 +321,15 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         try
         {
             using var zip = ZipFile.OpenRead(zipPath);
-            if (zip.Entries.Count != PackFiles.Length
-                || !zip.Entries.Select(e => e.FullName).Order(StringComparer.Ordinal).SequenceEqual(PackFiles.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            var names = zip.Entries.Select(e => e.FullName).ToList();
+            var optional = OptionalFiles.Where(names.Contains).ToList();
+            if (names.Count != PackFiles.Length + optional.Count
+                || !names.Order(StringComparer.Ordinal).SequenceEqual(PackFiles.Concat(optional).Order(StringComparer.Ordinal), StringComparer.Ordinal))
             {
                 throw new RegionPackException("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.");
             }
 
-            foreach (var name in PackFiles)
+            foreach (var name in PackFiles.Concat(optional))
             {
                 var entry = zip.GetEntry(name) ?? throw new RegionPackException("Das Kartenpaket ist beschädigt.");
                 using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -387,7 +394,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
                 throw damaged;
             }
 
-            foreach (var name in DataFiles)
+            foreach (var name in DataFiles.Concat(OptionalFiles.Where(unpacked.ContainsKey)))
             {
                 var (bytes, sha256) = unpacked[name];
                 if (!files.TryGetProperty(name, out var file) || file.ValueKind != JsonValueKind.Object
@@ -403,6 +410,32 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         catch (JsonException e)
         {
             throw new RegionPackException(damaged.Message, e);
+        }
+    }
+
+    // The pack's area, when the zip did not bring it: from the catalogue's boundaryUrl, over https
+    // and capped like the catalogue. Either way it has to be an area, or the pack is not installed.
+    private async Task FetchBoundaryAsync(RegionPackInfo pack, string path, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+        {
+            if (pack.BoundaryUrl is null)
+            {
+                return;
+            }
+
+            if (!Uri.TryCreate(pack.BoundaryUrl, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps)
+            {
+                throw new RegionPackException("Die Gebietsgrenze des Kartenpakets hat keine gültige https-Adresse.");
+            }
+
+            await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            await DownloadAsync(url, file, BoundaryGeoJson.MaxFileBytes, null, null, "Die Gebietsgrenze des Kartenpakets", cancellationToken);
+        }
+
+        if (new FileInfo(path).Length > BoundaryGeoJson.MaxFileBytes || BoundaryGeoJson.Parse(await File.ReadAllBytesAsync(path, cancellationToken)) is null)
+        {
+            throw new RegionPackException("Die Gebietsgrenze des Kartenpakets ist beschädigt.");
         }
     }
 

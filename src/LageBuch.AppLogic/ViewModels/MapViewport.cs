@@ -57,7 +57,8 @@ public sealed partial class MapViewport : ObservableObject
     }
 
     /// <summary>
-    /// Shows every pack in <paramref name="packs"/> as one map, with each distinct licence line;
+    /// Shows every pack in <paramref name="packs"/> as one map, each within its own area, with each
+    /// distinct licence line;
     /// an empty list shows no map. With <paramref name="centerOnPacks"/> the view opens on the
     /// middle of all of them, otherwise it stays where it looks.
     /// </summary>
@@ -71,7 +72,13 @@ public sealed partial class MapViewport : ObservableObject
             return;
         }
 
-        var source = new CombinedMapTileSource([.. packs.Select(p => new MbTilesFileSource(p.TilesPath))]);
+        // A pack without a known area is drawn first and whole, so that a pack that has one is laid
+        // over its empty margin rather than under it.
+        var layers = packs
+            .Select(p => new MapTileLayer(new MbTilesFileSource(p.TilesPath), BoundaryGeoJson.Read(p.BoundaryPath)))
+            .OrderBy(l => l.Boundary is null ? 0 : 1)
+            .ToList();
+        var source = new CombinedMapTileSource(layers);
         TileSource = source;
         Attribution = string.Join(" ", packs.Select(p => p.Info.Attribution).Distinct(StringComparer.Ordinal));
         if (centerOnPacks && source.GetTileBounds() is { } bounds)

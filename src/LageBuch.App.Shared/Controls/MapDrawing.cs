@@ -4,6 +4,7 @@ using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Map;
 
 namespace LageBuch.App.Shared.Controls;
 
@@ -32,12 +33,32 @@ public static class MapDrawing
             return;
         }
 
+        // Several packs are drawn one over the other, each only within its own area: outside it a
+        // pack's tiles are empty land that would cover its neighbour's streets.
+        IReadOnlyList<MapTileLayer> layers = source is CombinedMapTileSource combined ? combined.Layers : [new MapTileLayer(source, null)];
+        foreach (var layer in layers)
+        {
+            if (layer.Boundary is null)
+            {
+                DrawLayer(context, tiles, layer.Tiles, center, zoom, size);
+                continue;
+            }
+
+            using (context.PushGeometryClip(Area(layer.Boundary, center, zoom, size)))
+            {
+                DrawLayer(context, tiles, layer.Tiles, center, zoom, size);
+            }
+        }
+    }
+
+    private static void DrawLayer(DrawingContext context, MapTileCache tiles, IMapTileSource layer, GeoPoint center, int zoom, Size size)
+    {
         var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
         var left = centerX - (size.Width / 2);
         var top = centerY - (size.Height / 2);
         var (firstX, firstY) = WebMercator.ToTileIndex(left, top);
         var (lastX, lastY) = WebMercator.ToTileIndex(left + size.Width, top + size.Height);
-        var maxZoom = source.GetMaxZoom();
+        var maxZoom = layer.GetMaxZoom();
         var tilesPerSide = 1 << zoom;
 
         for (var tx = Math.Max(firstX, 0); tx <= Math.Min(lastX, tilesPerSide - 1); tx++)
@@ -50,17 +71,39 @@ public static class MapDrawing
                     WebMercator.TileSizePixels,
                     WebMercator.TileSizePixels);
 
-                if (tiles.Get(zoom, tx, ty) is { } bitmap)
+                if (tiles.Get(layer, zoom, tx, ty) is { } bitmap)
                 {
                     context.DrawImage(bitmap, target);
                 }
                 else if (Overzoom(zoom, tx, ty, maxZoom) is { } ancestor
-                    && tiles.Get(ancestor.Zoom, ancestor.X, ancestor.Y) is { } coarse)
+                    && tiles.Get(layer, ancestor.Zoom, ancestor.X, ancestor.Y) is { } coarse)
                 {
                     context.DrawImage(coarse, ancestor.SourceRect, target);
                 }
             }
         }
+    }
+
+    // The area in screen coordinates. Filled even-odd, so a hole in it stays a hole.
+    private static StreamGeometry Area(IReadOnlyList<IReadOnlyList<GeoPoint>> rings, GeoPoint center, int zoom, Size size)
+    {
+        var geometry = new StreamGeometry();
+        using (var area = geometry.Open())
+        {
+            area.SetFillRule(FillRule.EvenOdd);
+            foreach (var ring in rings)
+            {
+                area.BeginFigure(ToScreen(center, zoom, size, ring[0]), isFilled: true);
+                for (var i = 1; i < ring.Count; i++)
+                {
+                    area.LineTo(ToScreen(center, zoom, size, ring[i]));
+                }
+
+                area.EndFigure(isClosed: true);
+            }
+        }
+
+        return geometry;
     }
 
     /// <summary>Further out, a Landkreis' thousands of hydrants are a red carpet, not information.</summary>

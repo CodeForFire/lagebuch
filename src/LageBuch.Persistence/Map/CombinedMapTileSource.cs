@@ -1,19 +1,28 @@
 namespace LageBuch.Persistence.Map;
 
 /// <summary>
-/// Several Kartenpakete drawn as one map, so that a Landkreis border is a seam, not an edge. A tile
-/// comes from the first pack that has it; where two packs overlap, as neighbouring Landkreise with
-/// their 3 km margin do, the earlier one wins.
+/// Several Kartenpakete drawn as one map, so that a Landkreis border is a seam, not an edge.
 /// </summary>
+/// <remarks>
+/// A pack's tiles along its edge are only partly map: the rest is empty land, because the OSM data
+/// was cut to the pack's area before rendering. So a whole tile cannot simply come from the first
+/// pack that has one -- the map draws each of <see cref="Layers"/> clipped to its own area. Where
+/// two areas overlap, as neighbouring Landkreise do by their buffer, both show the same streets.
+/// <see cref="GetTile"/> answers for a caller that draws one tile per address: the first pack's.
+/// </remarks>
 public sealed class CombinedMapTileSource : IMapTileSource
 {
     private readonly IReadOnlyList<IMapTileSource> _sources;
 
-    public CombinedMapTileSource(IReadOnlyList<IMapTileSource> sources)
+    public CombinedMapTileSource(IReadOnlyList<MapTileLayer> layers)
     {
-        ArgumentNullException.ThrowIfNull(sources);
-        _sources = sources;
+        ArgumentNullException.ThrowIfNull(layers);
+        Layers = layers;
+        _sources = [.. layers.Select(l => l.Tiles)];
     }
+
+    /// <summary>The packs, each with its area, in the order the map draws them.</summary>
+    public IReadOnlyList<MapTileLayer> Layers { get; }
 
     public byte[]? GetTile(int zoom, int x, int y)
     {
