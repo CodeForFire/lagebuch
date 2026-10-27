@@ -49,9 +49,11 @@ address the issue before any public disclosure.
   [`docs/datenschutz-und-sicherheit.md`](docs/datenschutz-und-sicherheit.md),
   written for the Kreisbrandinspektionen and Datenschutzbeauftragte who have
   to approve a deployment.
-- **Multi-device sync** runs over LAN/Tailscale via SignalR and requires a
-  share PIN to join an incident. Issues affecting that transport, the PIN gate,
-  or the PDF export pipeline are very much in scope.
+- **Multi-device sync** runs over the LAN via SignalR (in theory over any
+  network that reaches the host, e.g. a VPN such as Tailscale, which is
+  untested) and requires a share PIN to join an incident. Issues affecting
+  that transport, the PIN gate, or the PDF export pipeline are very much in
+  scope.
 
 ## Known limitations
 
@@ -127,7 +129,7 @@ one note on why the trust model around the middle two is where it is.
   blocks new devices but not the ones already joined
   ([#288](../../issues/288)).
 - **The PIN plus network reachability is the entire access-control
-  boundary.** A device that can reach the host over the LAN/Tailscale link
+  boundary.** A device that can reach the host over the LAN
   and knows the (guess-budgeted, TLS-protected) PIN is already fully trusted
   to make arbitrary changes to the incident, regardless of what operator
   name it claims. A compromised or careless device can misattribute its own

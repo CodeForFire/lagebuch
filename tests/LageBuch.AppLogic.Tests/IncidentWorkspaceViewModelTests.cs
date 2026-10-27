@@ -90,7 +90,7 @@ public class IncidentWorkspaceViewModelTests
             alarmMute: mute);
     }
 
-    // --- Network sharing (no Tailscale required) --------------------------------------------
+    // --- Network sharing --------------------------------------------------------------------
     [Fact]
     public async Task Toggling_sharing_on_starts_the_host_and_offers_its_address_without_a_status_line()
     {

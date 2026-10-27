@@ -7,7 +7,7 @@ public sealed record IncidentFile
     // before sending it (FilesViewModel.AddFileAsync) and fully buffers a downloaded file too
     // (RemoteIncidentSession.GetFileBytesAsync) — so this cap bounds that client-side allocation,
     // not wire-transfer size. 25 MB keeps that a one-shot, few-second transfer on the app's
-    // Tailscale-LAN sync path while comfortably covering a phone photo or a scanned PDF.
+    // LAN sync path while comfortably covering a phone photo or a scanned PDF.
     public const long MaxSizeMegabytes = 25;
 
     public const long MaxSizeBytes = MaxSizeMegabytes * 1024 * 1024;

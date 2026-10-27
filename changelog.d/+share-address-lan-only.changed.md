@@ -1,0 +1,1 @@
+The address a sharing device shows to join it is now always its LAN address rather than a Tailscale address when one is up, since the command vehicle's own network is the tested setup and a VPN such as Tailscale is documented only as an untested option.

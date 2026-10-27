@@ -206,7 +206,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable — including
     /// when the Stammdaten fetch itself fails, which surfaces the same way.
     /// </summary>
-    /// <param name="host">The host's Tailscale/LAN address to dial.</param>
+    /// <param name="host">The host's LAN address to dial.</param>
     /// <param name="op">This device's operator, attributed on every command it sends.</param>
     /// <param name="localVersion">
     /// This device's app version. Display only — it names this device in a refusal message and is

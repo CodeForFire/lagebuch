@@ -1669,7 +1669,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         try
         {
-            // Binds every interface (loopback + LAN + tailnet). Can still fail — most likely the
+            // Binds every interface (loopback + LAN). Can still fail — most likely the
             // port is already taken by another instance sharing on this machine — so surface that
             // in the status line rather than letting it escape the command.
             // _masterData, not a fresh provider read: joined clients must get the set this

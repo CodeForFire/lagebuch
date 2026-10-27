@@ -48,7 +48,7 @@ Markdown.
   archivieren, kopieren oder weitergeben könnt.
 - **Keine Daten verlassen den ELW.** Stammdaten, Namen und Handynummern
   liegen nur auf euren Geräten. Die optionale Mehrgeräte-Verbindung läuft im
-  LAN oder über Tailscale, TLS-gesichert mit PIN – ohne Cloud, ohne Telemetrie.
+  LAN, TLS-gesichert mit PIN – ohne Cloud, ohne Telemetrie.
   Was genau wo gespeichert wird, steht in
   [Datenschutz und Sicherheit](docs/datenschutz-und-sicherheit.md) – die Seite
   für die Kreisbrandinspektion und den Datenschutzbeauftragten.
@@ -74,7 +74,7 @@ Markdown.
 | **Checklisten** | Beliebig viele eigene Checklisten aus den Stammdaten – benannt, in frei wählbarer Reihenfolge in der Seitenleiste, Pflichtpunkte markiert, Abschluss im ETB protokolliert |
 | **Dateien & Links** | Fotos und PDFs an den Einsatz hängen (landen im Bericht); Schnellzugriff auf Wetter, Karten, Hydrantenplan |
 | **PDF-Bericht** | Ein Klick, Abschnitte wählbar, Anhänge eingebettet – fertig für Akte und Kreisbrandinspektion |
-| **Mehrere Geräte** | Einsatz auf dem ELW-Laptop hosten, mit Tablet oder zweitem Laptop im LAN/Tailscale mitschreiben; Android-App als Begleitgerät |
+| **Mehrere Geräte** | Einsatz auf dem ELW-Laptop hosten, mit Tablet oder zweitem Laptop im LAN mitschreiben; Android-App als Begleitgerät |
 
 ## Mit der Tastatur
 
@@ -101,7 +101,7 @@ Alle Angaben laut Herstellerseiten, Stand September 2026. Fehler oder
 |---|---|---|---|---|---|
 | Ohne Internet voll nutzbar | ja | ja | Desktop-Suite ja; Stammdaten und Ticker über das Cloud-Portal ([Quelle](https://fireboard.net/)) | ja, Abgleich sobald wieder online ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | ja, als Browser-App ([Quelle](https://www.fireplan.de/elw)) |
 | Daten bleiben im ELW, kein Cloud-Konto | ja, eine Datei pro Einsatz | ja | nein, „cloudbasierte Lösung“ mit Portal-Benutzerkonto ([Quelle](https://fireboard.net/)) | nein, Cloud mit Servern in Deutschland ([Quelle](https://www.missionbuddies.de/faq/)) | k. A. |
-| Mehrere Geräte im Einsatz | ja, LAN/Tailscale, TLS-gepinnt, ohne Server | nein | ja, über Portal ([Quelle](https://fireboard.net/produkte/module/grundsystem/)) | ja; gratis auf 2 Geräten, Premium unbegrenzt ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | ja, live nur mit Internet ([Quelle](https://www.fireplan.de/elw)) |
+| Mehrere Geräte im Einsatz | ja, im LAN, TLS-gepinnt, ohne Server | nein | ja, über Portal ([Quelle](https://fireboard.net/produkte/module/grundsystem/)) | ja; gratis auf 2 Geräten, Premium unbegrenzt ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | ja, live nur mit Internet ([Quelle](https://www.fireplan.de/elw)) |
 | Atemschutzüberwachung | ja, mit Sprachansage, Rückzugsalarm und Sicherheitstrupp | Überwachungstafel | ja, laut Produktseite ([Quelle](https://fireboard.net/)) | ja, Gratis-Stufe ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | k. A. |
 | CO-Messprotokoll | ja, Messreihe je Wohnung | Zettel | k. A. | k. A. | k. A. |
 | PDF-Einsatzbericht | ja, Abschnitte wählbar | nein | ja ([Quelle](https://fireboard.net/produkte/module/grundsystem/)) | ja, modulweise Export ([Quelle](https://www.missionbuddies.de/faq/)) | k. A. |
