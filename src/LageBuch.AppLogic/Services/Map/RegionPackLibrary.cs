@@ -300,27 +300,27 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         }
     }
 
-    [SuppressMessage("Design", "CA1031", Justification = "Best-effort cleanup of a temporary file; the next install deletes it before it starts.")]
     private static void TryDelete(string path)
     {
         try
         {
             File.Delete(path);
         }
-        catch (Exception)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
+            // Best-effort: a leftover temporary file is deleted by the next install before it starts.
         }
     }
 
-    [SuppressMessage("Design", "CA1031", Justification = "Best-effort cleanup of a staging folder; the next install deletes it before it starts.")]
     private static void TryDeleteDirectory(string path)
     {
         try
         {
             DeleteDirectory(path);
         }
-        catch (Exception)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
+            // Best-effort: a leftover staging folder is deleted by the next install before it starts.
         }
     }
 }

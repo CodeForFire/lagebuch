@@ -55,4 +55,13 @@ public class WebMercatorTests
         Assert.Equal(0, center.Latitude, precision: 6);
         Assert.Equal(0, center.Longitude, precision: 6);
     }
+
+    [Fact]
+    public void A_tile_range_past_the_world_edge_centres_on_that_edge_not_somewhere_else()
+    {
+        // A tampered pack can name columns far beyond 2^zoom; the sum must not wrap an int.
+        var center = WebMercator.CenterOfTiles(22, 10_000_000, 10_000_000, 0, 0);
+
+        Assert.Equal(180, center.Longitude, precision: 6);
+    }
 }
