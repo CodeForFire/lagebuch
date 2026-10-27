@@ -163,22 +163,52 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
-    public void A_hydrant_is_a_red_dot_from_zoom_15_and_an_open_water_point_a_blue_square()
+    public void Each_kind_of_water_point_has_its_own_symbol_from_zoom_15()
     {
         var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
-        var east = WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).X + 60, WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).Y, 15);
+        GeoPoint East(double pixels) => WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).X + pixels, WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).Y, 15);
         control.WaterPoints =
         [
             new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100"),
-            new WaterPoint(east, WaterPointKind.Saugstelle, string.Empty),
+            new WaterPoint(East(60), WaterPointKind.Loeschwasserbehaelter, string.Empty),
+            new WaterPoint(East(-60), WaterPointKind.Saugstelle, string.Empty),
+            new WaterPoint(East(120), WaterPointKind.Loeschteich, string.Empty),
         ];
-        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, MapDrawing.WaterPointsMinZoom));
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MinZoom));
         Dispatcher.UIThread.RunJobs();
 
         using var frame = window.CaptureRenderedFrame()!;
 
         Assert.Equal(Color.FromRgb(0xD3, 0x2F, 0x2F), PixelAt(frame, 200, 150));
         Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 260, 150));
+
+        // A Saugstelle is a ring: white in the middle, blue on its rim.
+        Assert.Equal(Colors.White, PixelAt(frame, 140, 150));
+        Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 144, 150));
+
+        // A Löschteich is a diamond: blue in the middle, but not in the corners a square would fill.
+        Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 320, 150));
+        Assert.Equal(Colors.SteelBlue, PixelAt(frame, 325, 145));
+    }
+
+    [AvaloniaFact]
+    public void The_water_point_whose_card_is_open_is_ringed()
+    {
+        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var hydrant = new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100");
+        control.WaterPoints = [hydrant];
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MinZoom));
+        Dispatcher.UIThread.RunJobs();
+        using (var before = window.CaptureRenderedFrame()!)
+        {
+            Assert.Equal(Colors.SteelBlue, PixelAt(before, 210, 150));
+        }
+
+        control.SelectedWaterPoint = hydrant;
+        Dispatcher.UIThread.RunJobs();
+
+        using var after = window.CaptureRenderedFrame()!;
+        Assert.Equal(Color.FromRgb(0x21, 0x21, 0x21), PixelAt(after, 210, 150));
     }
 
     [AvaloniaFact]
@@ -186,7 +216,7 @@ public class MapCanvasControlTests
     {
         var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
         control.WaterPoints = [new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100")];
-        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, MapDrawing.WaterPointsMinZoom - 1));
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MinZoom - 1));
         Dispatcher.UIThread.RunJobs();
 
         using var frame = window.CaptureRenderedFrame()!;

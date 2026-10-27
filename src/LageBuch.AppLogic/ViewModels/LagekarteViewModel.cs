@@ -50,6 +50,13 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
 
         _session.Changed += Refresh;
+        Map.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MapViewport.Zoom))
+            {
+                OnPropertyChanged(nameof(ShowsWaterLegend));
+            }
+        };
     }
 
     public void Dispose() => _session.Changed -= Refresh;
@@ -96,13 +103,38 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     [NotifyPropertyChangedFor(nameof(VisibleWaterPoints))]
     [NotifyPropertyChangedFor(nameof(HasWaterPoints))]
     [NotifyPropertyChangedFor(nameof(WaterPointsNote))]
+    [NotifyPropertyChangedFor(nameof(ShowsWaterLegend))]
     private IReadOnlyList<WaterPoint>? _waterPoints;
 
     /// <summary>The HYDRANTEN switch. Belongs to this screen, not to the Einsatz: nothing is stored.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(VisibleWaterPoints))]
     [NotifyPropertyChangedFor(nameof(WaterPointsNote))]
+    [NotifyPropertyChangedFor(nameof(ShowsWaterLegend))]
     private bool _showWaterPoints = true;
+
+    /// <summary>The water point whose card is open: tapped on the map while nothing was picked to place.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedWaterPoint))]
+    private WaterPoint? _selectedWaterPoint;
+
+    public bool HasSelectedWaterPoint => SelectedWaterPoint is not null;
+
+    /// <summary>The symbols' key, whenever symbols are on the map.</summary>
+    public bool ShowsWaterLegend => VisibleWaterPoints is { Count: > 0 } && Map.Zoom >= WaterPointLayer.MinZoom;
+
+    partial void OnShowWaterPointsChanged(bool value)
+    {
+        if (!value)
+        {
+            SelectedWaterPoint = null;
+        }
+    }
+
+    partial void OnWaterPointsChanged(IReadOnlyList<WaterPoint>? value) => SelectedWaterPoint = null;
+
+    [RelayCommand]
+    private void CloseWaterPoint() => SelectedWaterPoint = null;
 
     /// <summary>Said under the map whenever hydrants are drawn: OSM is not the Wasserversorger's register.</summary>
     public string? WaterPointsNote => ShowWaterPoints && HasWaterPoints ? "Hydranten aus OpenStreetMap – nicht amtlich." : null;
@@ -163,12 +195,21 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     [RelayCommand]
     private void CancelPlacing() => Placing = null;
 
-    /// <summary>A tap on the map: places what was picked there. Without a pick a tap does nothing.</summary>
+    /// <summary>
+    /// A tap on the map: places what was picked there. Without a pick it opens the card of the
+    /// water point under the finger, or closes the card when there is none.
+    /// </summary>
     [RelayCommand]
     private void MapTapped(GeoPoint? point)
     {
-        if (point is null || Placing is not { } target)
+        if (point is null)
         {
+            return;
+        }
+
+        if (Placing is not { } target)
+        {
+            SelectedWaterPoint = VisibleWaterPoints is { } water ? WaterPointLayer.At(water, point, Map.Zoom) : null;
             return;
         }
 

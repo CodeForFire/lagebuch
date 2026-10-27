@@ -286,6 +286,76 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
+    public void A_tap_on_a_water_point_opens_its_card_and_a_tap_beside_it_closes_the_card()
+    {
+        var library = FfbLibrary();
+        var hydrant = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100");
+        library.WaterPoints["ffb"] = [hydrant];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+
+        vm.MapTappedCommand.Execute(Marktplatz);
+        Assert.Same(hydrant, vm.SelectedWaterPoint);
+        Assert.True(vm.HasSelectedWaterPoint);
+
+        vm.MapTappedCommand.Execute(Amperbruecke);
+        Assert.Null(vm.SelectedWaterPoint);
+        Assert.Null(session.Incident.Location);
+    }
+
+    [Fact]
+    public void A_tap_while_placing_places_and_opens_no_card()
+    {
+        var library = FfbLibrary();
+        library.WaterPoints["ffb"] = [new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100")];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+
+        vm.PlaceEinsatzortCommand.Execute(null);
+        vm.MapTappedCommand.Execute(Marktplatz);
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+        Assert.Null(vm.SelectedWaterPoint);
+    }
+
+    [Fact]
+    public void Turning_the_water_points_off_closes_the_card_and_the_legend()
+    {
+        var library = FfbLibrary();
+        library.WaterPoints["ffb"] = [new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100")];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        vm.MapTappedCommand.Execute(Marktplatz);
+        Assert.True(vm.ShowsWaterLegend);
+
+        vm.ShowWaterPoints = false;
+
+        Assert.Null(vm.SelectedWaterPoint);
+        Assert.False(vm.ShowsWaterLegend);
+    }
+
+    [Fact]
+    public void The_legend_shows_only_where_the_symbols_are_drawn()
+    {
+        var library = FfbLibrary();
+        library.WaterPoints["ffb"] = [new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100")];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, WaterPointLayer.MinZoom - 1));
+        Assert.False(vm.ShowsWaterLegend);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, WaterPointLayer.MinZoom));
+
+        Assert.True(vm.ShowsWaterLegend);
+        Assert.Contains(nameof(LagekarteViewModel.ShowsWaterLegend), changes);
+    }
+
+    [Fact]
     public void Water_points_that_cannot_be_read_are_reported_and_the_map_stays()
     {
         var library = FfbLibrary();

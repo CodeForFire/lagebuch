@@ -106,31 +106,28 @@ public static class MapDrawing
         return geometry;
     }
 
-    /// <summary>Further out, a Landkreis' thousands of hydrants are a red carpet, not information.</summary>
-    public const int WaterPointsMinZoom = 15;
-
-    /// <summary>Close enough that "UH 100" beside each hydrant still leaves room for the street.</summary>
-    public const int WaterLabelsMinZoom = 17;
-
     // DIN 14090 colours: hydrants red, open water and tanks blue.
     private static readonly IBrush HydrantBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F));
     private static readonly IBrush OpenWaterBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
     private static readonly IPen WaterOutline = new ImmutablePen(Brushes.White, 1.5);
+    private static readonly IPen SaugstelleRing = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)), 3);
+    private static readonly IPen SelectedRing = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21)), 2.5);
     private static readonly IBrush LabelBackground = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF));
     private static readonly IBrush LabelText = new ImmutableSolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21));
     private static readonly CultureInfo LabelCulture = CultureInfo.GetCultureInfo("de-DE");
 
     /// <summary>
-    /// The water points inside the visible map: a red dot for a hydrant, a blue square for a
-    /// Saugstelle, Löschwasserbehälter or Löschteich, and from <see cref="WaterLabelsMinZoom"/>
-    /// their label. Nothing below <see cref="WaterPointsMinZoom"/>.
+    /// The water points inside the visible map, one symbol per kind -- a red dot for a hydrant, a
+    /// blue ring for a Saugstelle, a blue square for a Löschwasserbehälter, a blue diamond for a
+    /// Löschteich -- and from <see cref="WaterPointLayer.LabelsMinZoom"/> their label. A ring marks
+    /// <paramref name="selected"/>. Nothing below <see cref="WaterPointLayer.MinZoom"/>.
     /// </summary>
-    public static void DrawWaterPoints(DrawingContext context, IReadOnlyList<WaterPoint> points, GeoPoint center, int zoom, Size size)
+    public static void DrawWaterPoints(DrawingContext context, IReadOnlyList<WaterPoint> points, GeoPoint center, int zoom, Size size, WaterPoint? selected = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(points);
         ArgumentNullException.ThrowIfNull(center);
-        if (zoom < WaterPointsMinZoom || size.Width <= 0 || size.Height <= 0)
+        if (zoom < WaterPointLayer.MinZoom || size.Width <= 0 || size.Height <= 0)
         {
             return;
         }
@@ -139,7 +136,7 @@ public static class MapDrawing
         const double margin = 40;
         var topLeft = ToGeo(center, zoom, size, new Point(-margin, -margin));
         var bottomRight = ToGeo(center, zoom, size, new Point(size.Width + margin, size.Height + margin));
-        var radius = zoom >= WaterLabelsMinZoom ? 7.0 : 5.0;
+        var radius = zoom >= WaterPointLayer.LabelsMinZoom ? 7.0 : 5.0;
         var typeface = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
         foreach (var point in points)
         {
@@ -151,22 +148,50 @@ public static class MapDrawing
             }
 
             var at = ToScreen(center, zoom, size, p);
-            if (point.Kind == WaterPointKind.Hydrant)
+            DrawSymbol(context, point.Kind, at, radius);
+            var isSelected = ReferenceEquals(point, selected);
+            if (isSelected)
             {
-                context.DrawEllipse(HydrantBrush, WaterOutline, at, radius, radius);
-            }
-            else
-            {
-                context.DrawRectangle(OpenWaterBrush, WaterOutline, new Rect(at.X - radius, at.Y - radius, 2 * radius, 2 * radius));
+                context.DrawEllipse(null, SelectedRing, at, radius + 5, radius + 5);
             }
 
-            if (zoom >= WaterLabelsMinZoom && point.Label.Length > 0)
+            if (zoom >= WaterPointLayer.LabelsMinZoom && point.Label.Length > 0)
             {
                 var text = new FormattedText(point.Label, LabelCulture, FlowDirection.LeftToRight, typeface, 11, LabelText);
-                var origin = new Point(at.X + radius + 3, at.Y - (text.Height / 2));
+                var origin = new Point(at.X + radius + (isSelected ? 9 : 3), at.Y - (text.Height / 2)); // clear of the selection ring
                 context.FillRectangle(LabelBackground, new Rect(origin.X - 2, origin.Y, text.Width + 4, text.Height), 2);
                 context.DrawText(text, origin);
             }
+        }
+    }
+
+    private static void DrawSymbol(DrawingContext context, WaterPointKind kind, Point at, double radius)
+    {
+        switch (kind)
+        {
+            case WaterPointKind.Hydrant:
+                context.DrawEllipse(HydrantBrush, WaterOutline, at, radius, radius);
+                break;
+            case WaterPointKind.Saugstelle:
+                // White underneath, so the ring reads on a blue river as well as on land.
+                context.DrawEllipse(Brushes.White, SaugstelleRing, at, radius - 1, radius - 1);
+                break;
+            case WaterPointKind.Loeschwasserbehaelter:
+                context.DrawRectangle(OpenWaterBrush, WaterOutline, new Rect(at.X - radius, at.Y - radius, 2 * radius, 2 * radius));
+                break;
+            default:
+                var diamond = new StreamGeometry();
+                using (var path = diamond.Open())
+                {
+                    path.BeginFigure(new Point(at.X, at.Y - radius - 1), isFilled: true);
+                    path.LineTo(new Point(at.X + radius + 1, at.Y));
+                    path.LineTo(new Point(at.X, at.Y + radius + 1));
+                    path.LineTo(new Point(at.X - radius - 1, at.Y));
+                    path.EndFigure(isClosed: true);
+                }
+
+                context.DrawGeometry(OpenWaterBrush, WaterOutline, diamond);
+                break;
         }
     }
 

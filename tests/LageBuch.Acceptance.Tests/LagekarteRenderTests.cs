@@ -73,6 +73,35 @@ public sealed class LagekarteRenderTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Clicking_a_hydrant_opens_its_card_and_the_legend_explains_the_symbols()
+    {
+        var (window, view, vm, session) = Show();
+        WaitForWaterPoints(vm);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var water = vm.WaterPoints;
+        Assert.NotNull(water);
+        var hydrant = water.First(w => w.Label == "ÜH 150");
+        var at = map.TranslatePoint(MapDrawing.ToScreen(vm.Map.Center, vm.Map.Zoom, map.Bounds.Size, hydrant.Position), window)
+            ?? throw new InvalidOperationException("Not in the window.");
+
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(hydrant, vm.SelectedWaterPoint);
+        Assert.Same(hydrant, map.SelectedWaterPoint);
+        Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WaterPointCard").IsVisible);
+        Assert.Equal(2, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "WaterPointDetails").ItemCount);
+        Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WaterLegend").IsVisible);
+        Assert.Null(session.Incident.Location);
+
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-hydrant-karte.png"));
+    }
+
+    [AvaloniaFact]
     public async Task Searching_an_address_and_clicking_the_hit_marks_the_Einsatzort_there()
     {
         var (window, view, vm, session) = Show();

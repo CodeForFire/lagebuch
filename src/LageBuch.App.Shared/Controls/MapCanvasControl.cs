@@ -40,6 +40,10 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<IReadOnlyList<WaterPoint>?> WaterPointsProperty =
         AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<WaterPoint>?>(nameof(WaterPoints));
 
+    /// <summary>The water point whose card is open, drawn with a ring; null marks none.</summary>
+    public static readonly StyledProperty<WaterPoint?> SelectedWaterPointProperty =
+        AvaloniaProperty.Register<MapCanvasControl, WaterPoint?>(nameof(SelectedWaterPoint));
+
     public static readonly StyledProperty<ICommand?> TappedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(TappedCommand));
 
@@ -61,7 +65,7 @@ public sealed class MapCanvasControl : Control
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, WaterPointsProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, WaterPointsProperty, SelectedWaterPointProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
@@ -95,6 +99,12 @@ public sealed class MapCanvasControl : Control
     {
         get => GetValue(WaterPointsProperty);
         set => SetValue(WaterPointsProperty, value);
+    }
+
+    public WaterPoint? SelectedWaterPoint
+    {
+        get => GetValue(SelectedWaterPointProperty);
+        set => SetValue(SelectedWaterPointProperty, value);
     }
 
     public bool WheelZoomNeedsControl
@@ -139,7 +149,7 @@ public sealed class MapCanvasControl : Control
         MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size);
         if (WaterPoints is { } water)
         {
-            MapDrawing.DrawWaterPoints(context, water, center, Zoom, Bounds.Size);
+            MapDrawing.DrawWaterPoints(context, water, center, Zoom, Bounds.Size, SelectedWaterPoint);
         }
     }
 

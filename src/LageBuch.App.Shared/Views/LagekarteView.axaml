@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:c="clr-namespace:LageBuch.App.Shared.Controls"
+             xmlns:map="clr-namespace:LageBuch.AppLogic.Services.Map;assembly=LageBuch.AppLogic"
              x:Class="LageBuch.App.Shared.Views.LagekarteView"
              x:DataType="vm:LagekarteViewModel">
   <UserControl.KeyBindings>
@@ -56,6 +57,10 @@
     <!-- Narrow enough to leave the zoom buttons free on a phone. -->
     <Style Selector="Panel#WorkspaceRoot.narrow Border#AddressSearch">
       <Setter Property="Width" Value="250" />
+    </Style>
+    <!-- On a phone the key wraps, leaving the attribution its corner. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#WaterLegend">
+      <Setter Property="MaxWidth" Value="180" />
     </Style>
     <Style Selector="Border.map-banner">
       <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
@@ -142,6 +147,7 @@
                             AutomationProperties.Name="Lagekarte"
                             TileSource="{Binding Map.TileSource}"
                             WaterPoints="{Binding VisibleWaterPoints}"
+                            SelectedWaterPoint="{Binding SelectedWaterPoint}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
                             ViewChangedCommand="{Binding Map.ChangeViewCommand}"
@@ -235,6 +241,37 @@
             <TextBlock TextWrapping="Wrap" MaxWidth="420"
                        Text="Kein Kartenpaket auf diesem Gerät. Unter Stammdaten → Karten herunterladen." />
           </Border>
+          <!-- A tapped water point, with what OSM says about it. -->
+          <Border Classes="map-banner" x:Name="WaterPointCard" Width="280" IsVisible="{Binding HasSelectedWaterPoint}">
+            <DockPanel>
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                <TextBlock Text="{Binding SelectedWaterPoint.Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="icon-btn" ToolTip.Tip="Schließen"
+                        AutomationProperties.Name="Wasserentnahmestelle schließen"
+                        Command="{Binding CloseWaterPointCommand}">
+                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
+              </Grid>
+              <TextBlock DockPanel.Dock="Bottom" Margin="0,6,0,0" FontSize="11" TextWrapping="Wrap"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         Text="Aus OpenStreetMap, nicht vom Wasserversorger. Vor Ort prüfen." />
+              <ItemsControl x:Name="WaterPointDetails" ItemsSource="{Binding SelectedWaterPoint.Details}" Grid.IsSharedSizeScope="True">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="map:WaterPointDetail">
+                    <Grid Margin="0,1">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="WaterDetailLabel" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding Label}" FontSize="12" Margin="0,0,10,0"
+                                 Foreground="{StaticResource TextSecondaryBrush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DockPanel>
+          </Border>
           <Border Classes="map-banner" x:Name="WaterPointsErrorBanner" BorderBrush="{StaticResource ErrorBrush}"
                   IsVisible="{Binding WaterPointsError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding WaterPointsError}" TextWrapping="Wrap" MaxWidth="420" />
@@ -262,6 +299,30 @@
             <PathIcon Data="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
           </ToggleButton>
         </StackPanel>
+
+        <!-- What the water symbols mean, whenever they are on the map. Drawn like MapDrawing draws them. -->
+        <Border x:Name="WaterLegend" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8"
+                Background="#E6FFFFFF" CornerRadius="{StaticResource RadiusSm}" Padding="8,4"
+                IsVisible="{Binding ShowsWaterLegend}">
+          <WrapPanel>
+            <WrapPanel.Styles>
+              <Style Selector="TextBlock">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Foreground" Value="#FF212121" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="4,0,10,0" />
+              </Style>
+            </WrapPanel.Styles>
+            <Ellipse Width="11" Height="11" Fill="#FFD32F2F" Stroke="White" StrokeThickness="1.5" />
+            <TextBlock Text="Hydrant" />
+            <Ellipse Width="11" Height="11" Fill="White" Stroke="#FF1565C0" StrokeThickness="3" />
+            <TextBlock Text="Saugstelle" />
+            <Rectangle Width="11" Height="11" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" />
+            <TextBlock Text="Löschwasserbehälter" />
+            <Path Data="M 6,0 L 12,6 L 6,12 L 0,6 Z" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" VerticalAlignment="Center" />
+            <TextBlock Text="Löschteich" />
+          </WrapPanel>
+        </Border>
 
         <!-- ODbL: every map drawn from OSM data names its source. -->
         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#CCFFFFFF" Padding="4,1"

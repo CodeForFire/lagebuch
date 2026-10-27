@@ -41,6 +41,57 @@ public class WaterPointsGeoJsonTests
     }
 
     [Fact]
+    public void A_hydrants_card_says_in_german_what_OSM_holds_and_keeps_what_it_does_not_know()
+    {
+        var point = Assert.Single(Points("""
+            {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2, 48.1]},
+             "properties": {"emergency": "fire_hydrant", "fire_hydrant:type": "pillar", "fire_hydrant:diameter": "150",
+               "fire_hydrant:pressure": "4", "fire_hydrant:position": "sidewalk", "couplings": "2", "couplings:type": "Storz",
+               "water_source": "main", "ref": "H 17", "operator": "Stadtwerke Musterstadt", "flow_rate": "1600 l/min", "osm": "node/10027951693"}}
+            """));
+
+        Assert.Equal("Überflurhydrant", point.Title);
+        Assert.Equal(
+            [
+                ("Bauart", "Überflur"), ("Durchmesser", "DN 150"), ("Druck", "4 bar"), ("Förderleistung", "1600 l/min"),
+                ("Kupplungen", "2"), ("Kupplungsart", "Storz"), ("Lage", "Gehweg"), ("Wasser aus", "Trinkwassernetz"),
+                ("Nummer", "H 17"), ("Betreiber", "Stadtwerke Musterstadt"), ("OSM", "node/10027951693"),
+            ],
+            point.Details.Select(d => (d.Label, d.Value)));
+    }
+
+    [Theory]
+    [InlineData("\"fire_hydrant:diameter\": \"100 mm\"", "Durchmesser", "100 mm")]
+    [InlineData("\"fire_hydrant:pressure\": \"suction\"", "Druck", "suction")]
+    [InlineData("\"fire_hydrant:position\": \"kerb\"", "Lage", "kerb")]
+    [InlineData("\"water_source\": \"cistern\"", "Wasser aus", "cistern")]
+    public void A_value_OSM_spells_its_own_way_is_shown_as_it_is(string tag, string label, string value)
+    {
+        var point = Assert.Single(Points($$$"""{"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2, 48.1]}, "properties": {"emergency": "fire_hydrant", {{{tag}}}}}"""));
+
+        Assert.Contains(new WaterPointDetail(label, value), point.Details);
+    }
+
+    [Theory]
+    [InlineData("node/1; DROP")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("../node/1")]
+    public void An_OSM_reference_that_is_no_object_id_is_left_off_the_card(string osm)
+    {
+        var point = Assert.Single(Points(Hydrant.Replace("node/1", osm, StringComparison.Ordinal)));
+
+        Assert.DoesNotContain(point.Details, d => d.Label == "OSM");
+    }
+
+    [Theory]
+    [InlineData("suction_point", "Saugstelle")]
+    [InlineData("water_tank", "Löschwasserbehälter")]
+    [InlineData("fire_water_pond", "Löschteich")]
+    [InlineData("fire_hydrant", "Hydrant")]
+    public void Each_kind_has_its_card_title(string emergency, string title) =>
+        Assert.Equal(title, Assert.Single(Points(Hydrant.Replace("fire_hydrant\", \"fire_hydrant:type\": \"underground\"", emergency + "\"", StringComparison.Ordinal))).Title);
+
+    [Fact]
     public void A_label_part_longer_than_its_cap_is_cut()
     {
         var point = Assert.Single(Points(Hydrant.Replace("\"100\"", $"\"{new string('9', 200)}\"", StringComparison.Ordinal)));
