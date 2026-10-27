@@ -12,6 +12,12 @@ namespace LageBuch.Persistence;
 /// </summary>
 public interface IIncidentFileStore
 {
+    /// <summary>
+    /// Stores bytes for an attachment whose <c>incident_files</c> row is already saved. Throws
+    /// <see cref="KeyNotFoundException"/> and stores nothing when no attachment names
+    /// <paramref name="storageFileName"/>, for instance because it was removed meanwhile (#761).
+    /// The same holds for <see cref="SaveStreamAsync"/>.
+    /// </summary>
     Task SaveBytesAsync(string incidentPath, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default);
 
     /// <summary>

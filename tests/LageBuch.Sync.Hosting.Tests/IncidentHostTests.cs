@@ -596,6 +596,39 @@ public class IncidentHostTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    // #761: the attachment is removed while its body is still arriving, and the store refuses the
+    // bytes. The client is told the file is gone, the same as for an id the host never knew.
+    [Fact]
+    public async Task UploadFile_returns_404_when_the_attachment_is_removed_while_its_body_arrives()
+    {
+        var clock = new FixedClock();
+        var store = new InMemoryStore();
+        var session = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = await TestHost.StartOnFreePortAsync(host);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        var fileId = Guid.NewGuid();
+        var addCommand = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", 3);
+        var addContent = new StringContent(SyncJson.Serialize<SyncCommand>(addCommand), Encoding.UTF8, "application/json");
+        (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), addContent)).EnsureSuccessStatusCode();
+        store.SaveFailure = new KeyNotFoundException("Der Anhang wurde inzwischen entfernt.");
+
+        using var uploadContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
+        var response = await http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), uploadContent);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     [Fact]
     public async Task UploadFile_rejects_a_body_over_the_cap()
     {

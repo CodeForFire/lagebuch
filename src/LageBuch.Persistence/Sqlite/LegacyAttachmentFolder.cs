@@ -43,17 +43,9 @@ internal static class LegacyAttachmentFolder
         IncidentFileBlobs.EnsureTable(cn, null);
         using (var tx = cn.BeginTransaction())
         {
-            foreach (var (id, fileName) in ReadRows(cn, tx))
+            // Keyed exactly as every reader -- and an older build writing this folder -- keys them.
+            foreach (var storage in IncidentFileBlobs.AttachedNames(cn, tx))
             {
-                if (!Guid.TryParse(id, out var guid))
-                {
-                    continue;
-                }
-
-                // Keyed on the name Rehydrate makes of the row, which is what every reader -- and an
-                // older build writing this folder -- passes to StorageFileName. The raw name can
-                // carry anything a crafted file puts there, a NUL or an extension the sanitiser drops.
-                var storage = IncidentFile.StorageFileName(guid, IncidentFile.RehydratedFileName(guid, fileName));
                 if (ResolveInside(folder, root, storage) is not { } candidate)
                 {
                     continue;
@@ -197,21 +189,6 @@ internal static class LegacyAttachmentFolder
         cmd.CommandText = BlobDeleteSql;
         cmd.Parameters.AddWithValue("$name", storage);
         cmd.ExecuteNonQuery();
-    }
-
-    private static List<(string Id, string FileName)> ReadRows(SqliteConnection cn, SqliteTransaction tx)
-    {
-        var rows = new List<(string, string)>();
-        using var cmd = cn.CreateCommand();
-        cmd.Transaction = tx;
-        cmd.CommandText = "SELECT id, file_name FROM incident_files;";
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            rows.Add((reader.GetString(0), reader.GetString(1)));
-        }
-
-        return rows;
     }
 
     private static string FolderFor(string incidentPath)

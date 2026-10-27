@@ -22,6 +22,12 @@ internal static class IncidentFileBlobs
     private const string RowIdSql =
         "SELECT rowid FROM " + Table + " WHERE storage_name = $name;";
 
+    private const string StoredNamesSql =
+        "SELECT storage_name FROM " + Table + ";";
+
+    private const string DeleteSql =
+        "DELETE FROM " + Table + " WHERE storage_name = $name;";
+
     private const int BufferSize = 81920;
 
     /// <summary>
@@ -66,10 +72,76 @@ internal static class IncidentFileBlobs
     }
 
     /// <summary>
+    /// The storage names the incident's attachments key their bytes under, one per
+    /// <c>incident_files</c> row. Keyed on the name <c>Rehydrate</c> makes of the row, which is what
+    /// every reader passes to <see cref="IncidentFile.StorageFileName"/>: the raw name can carry
+    /// anything a crafted file puts there, a NUL or an extension the sanitiser drops. A row whose id
+    /// is no Guid names nothing, since no reader could ever ask for its bytes.
+    /// </summary>
+    public static HashSet<string> AttachedNames(SqliteConnection cn, SqliteTransaction? tx)
+    {
+        ArgumentNullException.ThrowIfNull(cn);
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "SELECT id, file_name FROM incident_files;";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (Guid.TryParse(reader.GetString(0), out var id))
+            {
+                names.Add(IncidentFile.StorageFileName(id, IncidentFile.RehydratedFileName(id, reader.GetString(1))));
+            }
+        }
+
+        return names;
+    }
+
+    /// <summary>
+    /// Wipes, with <c>secure_delete</c>, every row of bytes no attachment names (#761): what a
+    /// crash or a failed wipe between a removal's two deletes left behind, or an upload that raced
+    /// the removal of its attachment. Run on open, when no write of this incident is queued, so it
+    /// cannot take bytes whose metadata is still on its way. A file with nothing to wipe is only
+    /// read, never written.
+    /// </summary>
+    public static void DeleteDetached(SqliteConnection cn)
+    {
+        ArgumentNullException.ThrowIfNull(cn);
+        if (Detached(cn, null).Count == 0)
+        {
+            // Stryker disable once Statement : without the return an empty transaction commits, which changes nothing in the file.
+            return;
+        }
+
+        using (var pragma = cn.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA secure_delete = ON;";
+            pragma.ExecuteNonQuery();
+        }
+
+        using var tx = cn.BeginTransaction();
+        foreach (var name in Detached(cn, tx))
+        {
+            using var delete = cn.CreateCommand();
+            delete.Transaction = tx;
+            delete.CommandText = DeleteSql;
+            delete.Parameters.AddWithValue("$name", name);
+            delete.ExecuteNonQuery();
+        }
+
+        tx.Commit();
+    }
+
+    /// <summary>
     /// Stores <paramref name="length"/> bytes from <paramref name="source"/> under
     /// <paramref name="storageName"/>, replacing any earlier row. A <c>zeroblob</c> reserves the
     /// row and the bytes are then streamed into it, so the attachment is never held in memory whole.
     /// The caller owns the transaction, so a failed copy leaves the previous row untouched.
+    /// Throws <see cref="KeyNotFoundException"/> when no attachment names
+    /// <paramref name="storageName"/> (#761). Every caller saves the metadata first, so a missing
+    /// row means the attachment was removed while its bytes were on their way; storing them would
+    /// leave bytes in the Einsatzdatei that no removal will ever wipe. The check runs inside the
+    /// write transaction, so a removal cannot slip in between it and the insert.
     /// </summary>
     public static void Write(SqliteConnection cn, SqliteTransaction tx, string storageName, Stream source, long length)
     {
@@ -80,6 +152,12 @@ internal static class IncidentFileBlobs
         if (length is < 0 or > IncidentFile.MaxSizeBytes)
         {
             throw new InvalidDataException(IncidentFile.TooLargeMessage);
+        }
+
+        if (!AttachedNames(cn, tx).Contains(storageName))
+        {
+            // Stryker disable once String : callers act on the exception type; the text is only for a reader of a trace.
+            throw new KeyNotFoundException("Der Anhang wurde inzwischen entfernt.");
         }
 
         using (var insert = cn.CreateCommand())
@@ -114,5 +192,25 @@ internal static class IncidentFileBlobs
             blob.Write(buffer, 0, read);
             remaining -= read;
         }
+    }
+
+    private static List<string> Detached(SqliteConnection cn, SqliteTransaction? tx)
+    {
+        var attached = AttachedNames(cn, tx);
+        var detached = new List<string>();
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = StoredNamesSql;
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var name = reader.GetString(0);
+            if (!attached.Contains(name))
+            {
+                detached.Add(name);
+            }
+        }
+
+        return detached;
     }
 }

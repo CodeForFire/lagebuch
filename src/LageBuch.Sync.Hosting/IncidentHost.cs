@@ -412,7 +412,17 @@ public sealed class IncidentHost : IAsyncDisposable
             maxBodySizeFeature.MaxRequestBodySize = IncidentFile.MaxSizeBytes;
         }
 
-        await _session.SaveFileStreamAsync(IncidentFile.StorageFileName(file.Id, file.FileName), request.Body, cancellationToken);
+        try
+        {
+            await _session.SaveFileStreamAsync(IncidentFile.StorageFileName(file.Id, file.FileName), request.Body, cancellationToken);
+        }
+        catch (KeyNotFoundException)
+        {
+            // The attachment was removed while its body was still arriving (#761). The store kept
+            // none of it, so the answer is the one a request for an unknown id gets.
+            return Results.NotFound();
+        }
+
         return Results.NoContent();
     }
 
