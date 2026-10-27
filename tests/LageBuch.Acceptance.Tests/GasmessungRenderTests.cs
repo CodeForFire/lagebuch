@@ -100,7 +100,7 @@ public class GasmessungRenderTests
     [AvaloniaFact]
     public void The_sidebar_holds_eight_inputs_and_FERTIG_stays_reachable()
     {
-        var (window, view, vm) = Workspace(1280, 800);
+        var (window, view, vm) = Workspace(1920, 1080);
         vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Capture(window, "gasmessung-sidebar.png");
