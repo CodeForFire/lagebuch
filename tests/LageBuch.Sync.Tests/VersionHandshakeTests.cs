@@ -240,7 +240,15 @@ public class VersionHandshakeTests
     {
         // 25 adds incidentNumberFormat to the Stammdaten payload's settings (#462). A peer at 24
         // skips the key and pre-fills no Einsatznummer, so it stays joinable.
-        Assert.Equal(25, SyncProtocol.ProtocolVersion);
-        Assert.Equal(24, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 25, int.MaxValue);
+    }
+
+    [Fact]
+    public void Several_gases_raise_the_protocol_and_the_floor_to_twenty_six()
+    {
+        // 26 replaces recordCoValue with recordGasValues and the snapshot's coValue with per-gas
+        // values (#410). A peer at 25 can neither send nor read a value, so the floor rises with it.
+        Assert.InRange(SyncProtocol.ProtocolVersion, 26, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 26, SyncProtocol.ProtocolVersion);
     }
 }

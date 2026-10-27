@@ -96,8 +96,8 @@ public static class SnapshotMapper
                 d.ResidentName,
                 d.Status,
                 d.KeyAvailable.ToNullableBool(),
-                d.CoValue,
-                d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList(),
+                d.Values.ToDictionary(kv => kv.Key, kv => kv.Value),
+                d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.GasId, r.Value, r.RecordedBy)).ToList(),
                 d.KeyNumber)).ToList(),
             incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel, p.Whereabouts, p.WhereaboutsAt)).ToList(),
             HouseNumber: incident.HouseNumber,
@@ -134,7 +134,8 @@ public static class SnapshotMapper
             ElStandort: incident.LeadershipPost.Standort,
             ElRufname: incident.LeadershipPost.Rufname,
             ElTelefon: incident.LeadershipPost.Telefon,
-            ElFunkgruppe: incident.LeadershipPost.Funkgruppe);
+            ElFunkgruppe: incident.LeadershipPost.Funkgruppe,
+            Gases: incident.Gases.Select(g => new IncidentGasDto(g.Id, GasDefinitionDto.From(g.Definition))).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -211,8 +212,8 @@ public static class SnapshotMapper
                 d.ResidentName,
                 d.Status,
                 KeyAvailabilityEncoding.FromNullableBool(d.KeyAvailable),
-                d.CoValue,
-                d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)),
+                d.Values,
+                d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.GasId, r.Value, r.RecordedBy)),
                 d.KeyNumber)),
             (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel, p.Whereabouts, p.WhereaboutsAt)),
             snapshot.HouseNumber,
@@ -246,7 +247,8 @@ public static class SnapshotMapper
             (snapshot.CommandNodes ?? []).Select(n => CommandNode.Rehydrate(
                 n.Id, n.Kind, n.Name, n.ParentId, n.Auftrag, n.Standort, n.Funkgruppe, n.Rufname, n.Telefon, n.DissolvedAt)),
             snapshot.Fuehrungsstufe,
-            new LeadershipPost(snapshot.ElStandort, snapshot.ElRufname, snapshot.ElTelefon, snapshot.ElFunkgruppe));
+            new LeadershipPost(snapshot.ElStandort, snapshot.ElRufname, snapshot.ElTelefon, snapshot.ElFunkgruppe),
+            snapshot.Gases?.Where(g => g?.Definition is not null).Select(g => new IncidentGas(g.Id, g.Definition.ToDefinition())));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

@@ -73,7 +73,7 @@ public class CoMessprotokollEditorCancelTests
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         var co = vm.CoMessprotokoll;
         var buildingId = session.Incident.Buildings[0].Id;
@@ -90,7 +90,7 @@ public class CoMessprotokollEditorCancelTests
         ppm.Value = 120;
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(120, co.Editor!.CoValue);
+        Assert.Equal(120, co.Editor!.GasInputs[0].Value);
         Assert.Equal(DwellingStatus.Affected, co.Editor.Status);
 
         // The pending state is previewed on the tile, but nothing is written yet.
@@ -98,7 +98,7 @@ public class CoMessprotokollEditorCancelTests
         var dwelling = session.Incident.Dwellings.Single(d =>
             d.BuildingId == buildingId && d.FloorOrdinal == 2 && d.ApartmentNumber == 1);
         Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
-        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.CoValue());
         Capture(window, "co-messung-cancel-pending.png");
 
         SidebarButton(window, "ABBRECHEN").Command!.Execute(null);
@@ -111,7 +111,7 @@ public class CoMessprotokollEditorCancelTests
         var after = session.Incident.Dwellings.Single(d =>
             d.BuildingId == buildingId && d.FloorOrdinal == 2 && d.ApartmentNumber == 1);
         Assert.Equal(DwellingStatus.NotSearched, after.Status);
-        Assert.Null(after.CoValue);
+        Assert.Null(after.CoValue());
         Assert.Equal(journalBefore, session.Incident.Journal.Count);
         Assert.False(co.IsEditorOpen);
         Assert.Equal(DwellingStatus.NotSearched, co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].Status);
@@ -127,7 +127,7 @@ public class CoMessprotokollEditorCancelTests
         var (window, vm, session) = ShowWorkspace();
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
         var co = vm.CoMessprotokoll;
         co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -149,7 +149,7 @@ public class CoMessprotokollEditorCancelTests
 
         Assert.False(co.IsDiscardEditorConfirmOpen);
         Assert.True(co.IsEditorOpen);
-        Assert.Equal(120, co.Editor!.CoValue);
+        Assert.Equal(120, co.Editor!.GasInputs[0].Value);
     }
 
     [AvaloniaFact]
@@ -158,7 +158,7 @@ public class CoMessprotokollEditorCancelTests
         var (window, vm, session) = ShowWorkspace();
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
         var co = vm.CoMessprotokoll;
         co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -179,7 +179,7 @@ public class CoMessprotokollEditorCancelTests
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         var co = vm.CoMessprotokoll;
         var buildingId = session.Incident.Buildings[0].Id;
@@ -197,7 +197,7 @@ public class CoMessprotokollEditorCancelTests
         var dwelling = session.Incident.Dwellings.Single(d =>
             d.BuildingId == buildingId && d.FloorOrdinal == 2 && d.ApartmentNumber == 1);
         Assert.Equal(DwellingStatus.Affected, dwelling.Status);
-        Assert.Equal(120, dwelling.CoValue);
+        Assert.Equal(120, dwelling.CoValue());
         Assert.False(co.IsEditorOpen);
     }
 }

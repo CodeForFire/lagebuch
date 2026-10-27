@@ -202,6 +202,14 @@
             <TextBlock Text="{Binding PersonnelConflicts}" FontSize="11" FontWeight="SemiBold"
                        Foreground="#F87171" TextWrapping="Wrap" MaxWidth="520" />
           </Border>
+          <!-- Messgase (#410): thresholds out of order would colour a Wohnung wrongly at the next
+               Einsatz. Same shape as the notices beside it: it names the gas and blocks saving. -->
+          <Border x:Name="GasConflictsBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding GasConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding GasConflicts}" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#F87171" TextWrapping="Wrap" MaxWidth="520" />
+          </Border>
         </WrapPanel>
         <WrapPanel x:Name="EditorActions" Orientation="Horizontal" ItemSpacing="8" LineSpacing="6">
           <Button x:Name="ImportButton" Content="IMPORTIEREN" Command="{Binding ImportCommand}" />
@@ -911,6 +919,96 @@
                                        AutomationProperties.Name="Notiz zur Funkgruppe" />
                             </StackPanel>
                             <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
+              <!-- Messgase editor (#410): NAME / EINHEIT / RICHTUNG / three bands / PLAUSIBEL BIS. The
+                   Rollen layout: the fields wrap under the name on a phone. Thresholds are decimals
+                   (20,9 Vol-%), so they take NumericUpDown.decimal; an empty one is "no band". -->
+              <DataTemplate x:DataType="vm:GasesSection">
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}"
+                          ToolTip.Tip="Höchstens acht Messgase" />
+                  <Grid DockPanel.Dock="Top" Classes="pick-header" ColumnDefinitions="*,Auto,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="GAS" Classes="overline" FontSize="10" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                      <TextBlock Width="96" Text="EINHEIT" Classes="overline" FontSize="10" />
+                      <TextBlock Width="124" Text="RICHTUNG" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="steigend: höher ist schlimmer. fallend: niedriger ist schlimmer (O₂)." />
+                      <TextBlock Width="92" Text="ERHÖHT" Classes="overline" FontSize="10" ToolTip.Tip="Erhöht ab" />
+                      <TextBlock Width="92" Text="GEFÄHRLICH" Classes="overline" FontSize="10" ToolTip.Tip="Gefährlich ab" />
+                      <TextBlock Width="92" Text="LEBENSGEF." Classes="overline" FontSize="10" ToolTip.Tip="Lebensgefährlich ab" />
+                      <TextBlock Width="92" Text="PLAUSIBEL BIS" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Darüber fragt die Gasmessung nach einem Tippfehler" />
+                    </StackPanel>
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:GasRow">
+                          <Grid Classes="pick-row" ColumnDefinitions="*,Auto,32" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,6">
+                            <Border Grid.Row="2" Grid.ColumnSpan="3" Classes="row-rule" />
+                            <TextBox Grid.Column="0" Classes="row-name" Margin="0,0,6,0" Text="{Binding Name}"
+                                     PlaceholderText="CO" MaxLength="{x:Static vm:GasRow.MaxNameLength}"
+                                     AutomationProperties.Name="Name des Messgases" />
+                            <WrapPanel Classes="row-extras">
+                              <StackPanel Width="96">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="EINHEIT" />
+                                <AutoCompleteBox Margin="0,0,6,0" Text="{Binding Unit}" ItemsSource="{Binding UnitSuggestions}"
+                                                 MaxLength="{x:Static vm:GasRow.MaxUnitLength}"
+                                                 AutomationProperties.Name="Einheit des Messgases" />
+                              </StackPanel>
+                              <StackPanel Width="124">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="RICHTUNG" />
+                                <ComboBox Margin="0,0,6,0" HorizontalAlignment="Stretch" ItemsSource="{Binding DirectionOptions}"
+                                          SelectedValue="{Binding Direction}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          AutomationProperties.Name="Richtung des Messgases">
+                                  <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:GasDirectionOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                                  </ComboBox.ItemTemplate>
+                                </ComboBox>
+                              </StackPanel>
+                              <StackPanel Width="92">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="ERHÖHT" />
+                                <NumericUpDown Classes="decimal" Margin="0,0,6,0" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                               ClipValueToMinMax="True" Value="{Binding Elevated}"
+                                               AutomationProperties.Name="Erhöht ab" />
+                              </StackPanel>
+                              <StackPanel Width="92">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="GEFÄHRLICH" />
+                                <NumericUpDown Classes="decimal" Margin="0,0,6,0" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                               ClipValueToMinMax="True" Value="{Binding Dangerous}"
+                                               AutomationProperties.Name="Gefährlich ab" />
+                              </StackPanel>
+                              <StackPanel Width="92">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="LEBENSGEF." />
+                                <NumericUpDown Classes="decimal" Margin="0,0,6,0" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                               ClipValueToMinMax="True" Value="{Binding Lethal}"
+                                               AutomationProperties.Name="Lebensgefährlich ab" />
+                              </StackPanel>
+                              <StackPanel Width="92">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="PLAUSIBEL BIS" />
+                                <NumericUpDown Classes="decimal" Margin="0,0,6,0" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                               ClipValueToMinMax="True" Value="{Binding PlausibleUpTo}"
+                                               AutomationProperties.Name="Plausibel bis" />
+                              </StackPanel>
+                            </WrapPanel>
+                            <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
+                                 $parent path cannot resolve here. Disabled on the last row: the list
+                                 is never empty (GasesSection). -->
+                            <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">

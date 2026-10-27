@@ -106,7 +106,7 @@ public class CoMessprotokollMessreiheTests
         session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 45);
         OpenEg(vm);
 
-        vm.Editor!.CoValue = 999;
+        vm.Editor!.GasInputs[0].Value = 999;
         Dispatcher.UIThread.RunJobs();
         vm.CloseEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();

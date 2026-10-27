@@ -44,6 +44,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private VehiclesSection _vehicles = null!;
     private StreetsSection _streets = null!;
     private TalkGroupsSection _talkGroups = null!;
+    private GasesSection _gases = null!;
     private SettingsSection _settings = null!;
 
     public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
@@ -166,9 +167,20 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string? _personnelConflicts;
 
+    /// <summary>
+    /// Messgase the import would refuse or the save would drop (#410): a nameless row, a name used
+    /// twice, thresholds out of order. A wrong order would colour a Wohnung wrongly at the next
+    /// Einsatz, so it blocks saving rather than being guessed at.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string? _gasConflicts;
+
     public bool HasVehicleConflicts => VehicleConflicts is not null;
 
     public bool HasPersonnelConflicts => PersonnelConflicts is not null;
+
+    public bool HasGasConflicts => GasConflicts is not null;
 
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
@@ -239,6 +251,9 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             // The derived lists still serve as typing suggestions for further rows.
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged, RequestConfirm),
             _talkGroups = new TalkGroupsSection("Funkgruppen", set.TalkGroups, MarkDirty, RequestConfirm),
+
+            // The gases the Gasmessung records (#410), copied into an Einsatz by its first Haus.
+            _gases = new GasesSection("Messgase", set.Gases, OnGasesChanged, RequestConfirm),
         };
 
         foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
@@ -265,6 +280,19 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         // answer has to be on screen before anything is touched.
         RefreshVehicleConflicts();
         RefreshPersonnelConflicts();
+        RefreshGasConflicts();
+    }
+
+    private void OnGasesChanged()
+    {
+        IsDirty = true;
+        RefreshGasConflicts();
+    }
+
+    private void RefreshGasConflicts()
+    {
+        var problems = _gases.Conflicts();
+        GasConflicts = problems.Count == 0 ? null : string.Join("\n", problems);
     }
 
     private void OnVehiclesChanged()
@@ -365,6 +393,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
         TalkGroups = _talkGroups.ToValues(),
+        Gases = _gases.ToValues(),
         Settings = _settings.ToSettings(),
     };
 
@@ -438,7 +467,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     // Dirty alone is not enough: a duplicate Funkrufname must be resolved before the set can be
     // written (#76 follow-up).
-    private bool CanSave => IsDirty && !HasVehicleConflicts && !HasPersonnelConflicts;
+    private bool CanSave => IsDirty && !HasVehicleConflicts && !HasPersonnelConflicts && !HasGasConflicts;
 
     [RelayCommand(CanExecute = nameof(IsDirty))]
     private void Discard() => Load();

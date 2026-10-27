@@ -150,15 +150,23 @@ public static class SyncProtocol
     /// at 24 skips the key and pre-fills no Einsatznummer, and a payload without it reads as no
     /// format, so the floor stays at 24.
     /// </para>
+    /// <para>
+    /// 26: the Gasmessung measures up to eight gases (#410). <c>recordCoValue</c> is replaced by
+    /// <c>recordGasValues</c>, which carries decimal values keyed by the Einsatz's own gas ids; the
+    /// snapshot's Wohnungen carry those values instead of <c>coValue</c>, its readings a gas id,
+    /// and the snapshot the Einsatz's gas list. <c>addCoBuilding</c> carries the sender's Messgase
+    /// for the first Haus. A peer at 25 can neither send a value a host at 26 understands nor read
+    /// one, so the floor rises to 26.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 25;
+    public const int ProtocolVersion = 26;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 24;
+    public const int MinimumProtocolVersion = 26;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

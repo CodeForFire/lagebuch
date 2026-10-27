@@ -873,7 +873,7 @@
           </TabControl.Styles>
           <TabControl.ItemTemplate>
             <!-- The module's shortcut sits at the tab's right edge (#544); a Checkliste has none.
-                 It reaches 12px into the tab's right padding: ATEMSCHUTZ and CO-MESSUNG leave the
+                 It reaches 12px into the tab's right padding: ATEMSCHUTZ and GASMESSUNG leave the
                  172px tab no room for it otherwise. -->
             <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
               <Grid ColumnDefinitions="*,Auto">

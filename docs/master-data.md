@@ -65,7 +65,7 @@ is plain text in the entry: changing a Textbaustein later changes no entry.
 Ausrückebereich whose structure is known long before the call, such as a
 recurring Wohnanlage. Each Objekt has a `name`, an optional address (`street`,
 `houseNumber`, `postalCode`, `place`) and the structure a Haus in the
-CO-Messprotokoll starts with:
+Gasmessprotokoll starts with:
 
 | Field | JSON | Range | Missing reads as |
 |---|---|---|---|
@@ -81,17 +81,47 @@ gives it (`Links`/`Mitte`/`Rechts` on a floor of three, `Whg. N` otherwise). A
 label is cut to 60 characters, and a key that names no floor or Wohnung of the
 Objekt is dropped.
 
-Typing in **BEZEICHNUNG** in the CO-Messprotokoll's **HAUS HINZUFÜGEN** dialog
+Typing in **BEZEICHNUNG** in the Gasmessprotokoll's **HAUS HINZUFÜGEN** dialog
 suggests the Objekte. Picking one fills Geschosse, Wohnungen/Geschoss and
 Untergeschosse, unless one of them was already changed by hand, and the Haus is
 created with the Objekt's Wohnungsbezeichnungen. These values are **copied**
 into the Einsatz. Editing or deleting the Objekt later changes no Haus already
 in an Einsatzdatei. A name that matches no Objekt adds a Haus exactly as before.
 
-The address is not copied, because a Haus in the CO-Messprotokoll has none. It
+The address is not copied, because a Haus in the Gasmessprotokoll has none. It
 tells two Objekte apart in the list. Out-of-range numbers are clamped, rows
 without a name are skipped, a second Objekt of the same name (ignoring case) is
 dropped, and a list holds at most 500 Objekte.
+
+## Messgase
+
+`gases` is the list **Messgase**: the gases a crew reads off its multi-gas meter
+in the **Gasmessung**, at most eight, in the order every Einsatz shows them.
+
+| Field | JSON | Meaning |
+|---|---|---|
+| Gas | `name` | the label on the tile, in the editor, the ETB and the PDF; at most 12 characters |
+| Einheit | `unit` | free text, e.g. `ppm`, `%UEG`, `Vol-%`, `mg/m³`; at most 10 characters |
+| Richtung | `direction` | `"steigend"` (higher is worse) or `"fallend"` (lower is worse, for O₂); anything else reads as steigend |
+| Erhöht / Gefährlich / Lebensgefährlich | `elevated` / `dangerous` / `lethal` | the bands, each optional, ordered in the gas's direction |
+| Plausibel bis | `plausibleUpTo` | optional; a reading above it gets the "bitte auf Tippfehler prüfen" hint and is still recorded |
+
+Numbers may carry decimals (`20.9` in the file, `20,9` on screen). A gas without
+any band is recorded and shown without colour. A Stammdaten file without `gases`,
+or with an empty list, measures exactly what the app always did: `CO` in `ppm`,
+steigend, 30 / 200 / 800, plausible up to 2000.
+
+The import rejects a file whose bands are out of order for their gas, because
+guessing which of them was meant would colour a Wohnung wrongly; a band that is
+not a number, negative or above 100 000 rejects it too. More than eight gases are
+cut at eight, an overlong name or unit is cut, and a second gas of the same name
+(ignoring case) is dropped. The editor names the same problems and does not save
+until they are fixed.
+
+The list is **copied** into an Einsatz when the Gasmessung opens its first Haus.
+From then on the Einsatz keeps its own copy: editing the Messgase later changes
+no Einsatzdatei, and a joined device shows the host's list.
+
 ## Funkgruppen and the Führungstafel slot of a Funktion
 
 `talkGroups` lists the Funkgruppen a Führungsstelle works on: each has a `name`, an

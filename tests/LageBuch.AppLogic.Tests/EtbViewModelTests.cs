@@ -149,7 +149,7 @@ public class EtbViewModelTests
 
         // ... while the bookkeeping around it stays hidden, which is what #223 asked for.
         Assert.DoesNotContain(texts, t => t.Contains("Einsatz begonnen", StringComparison.Ordinal));
-        Assert.DoesNotContain(texts, t => t.Contains("CO-Messprotokoll eröffnet", StringComparison.Ordinal));
+        Assert.DoesNotContain(texts, t => t.Contains("Gasmessprotokoll eröffnet", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -122,13 +122,44 @@ public static class CoMeasurementLabels
         return $"{building.Name}, {FloorLabel(floorOrdinal)}, {ApartmentLabel(building, floorOrdinal, apartmentNumber)}";
     }
 
+    /// <summary>One gas value as "120 ppm", or "H2S 3 ppm" once the Einsatz measures more than one
+    /// gas (#410) -- a CO-only Einsatz reads exactly as it did before.</summary>
+    public static string GasValueLabel(IncidentGas gas, decimal value, bool withName)
+    {
+        ArgumentNullException.ThrowIfNull(gas);
+        var measurement = Formatting.Measurement(value, gas.Unit);
+        return withName ? $"{gas.Name} {measurement}" : measurement;
+    }
+
+    /// <summary>Every measured gas of a Wohnung in list order, each with its band, for the tooltip,
+    /// the sidebar and the report. Empty when nothing was measured.</summary>
+    public static IReadOnlyList<GasValue> ValuesInOrder(IReadOnlyList<IncidentGas> gases, IReadOnlyDictionary<Guid, decimal> values)
+    {
+        ArgumentNullException.ThrowIfNull(gases);
+        ArgumentNullException.ThrowIfNull(values);
+        return gases
+            .Where(g => values.ContainsKey(g.Id))
+            .Select(g => new GasValue(g, values[g.Id], GasSeverityClassifier.SeverityOf(g.Definition, values[g.Id])))
+            .ToList();
+    }
+
     /// <summary>One reading of a Messreihe as "08:41 40 ppm", or "09:02 gelöscht" where the value
-    /// was cleared. Lives here rather than in either renderer so the CO tab and the report cannot
-    /// word the same series differently.</summary>
-    public static string ReadingLabel(CoReading reading)
+    /// was cleared; with more than one gas the gas is named, "08:41 H2S 3 ppm". Lives here rather
+    /// than in either renderer so the CO tab and the report cannot word the same series
+    /// differently.</summary>
+    public static string ReadingLabel(CoReading reading, IReadOnlyList<IncidentGas> gases)
     {
         ArgumentNullException.ThrowIfNull(reading);
-        var value = reading.Value is { } v ? $"{v} ppm" : "gelöscht";
+        ArgumentNullException.ThrowIfNull(gases);
+        var gas = gases.FirstOrDefault(g => g.Id == reading.GasId);
+        var withName = gases.Count > 1 && gas is not null;
+        var value = (reading.Value, gas) switch
+        {
+            ({ } v, { } g) => GasValueLabel(g, v, withName),
+            ({ } v, null) => Formatting.Measurement(v, string.Empty),
+            (null, { } g) when withName => $"{g.Name} gelöscht",
+            _ => "gelöscht",
+        };
         return $"{Formatting.TimeOfDay(reading.MeasuredAt)} {value}";
     }
 

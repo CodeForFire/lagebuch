@@ -242,7 +242,7 @@ public class CoMessprotokollViewModelTests
         session.RecordCoValue(haus, 0, cell.ApartmentNumber, 120);
 
         vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
-        vm.Editor!.CoValue = 999;
+        vm.Editor!.GasInputs[0].Value = 999;
 
         Assert.Single(vm.Editor.Readings);
         Assert.Equal("120 ppm", vm.Editor.Readings[0].Value);
@@ -261,7 +261,7 @@ public class CoMessprotokollViewModelTests
         var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0];
 
         cell.OpenEditorCommand.Execute(null);
-        vm.Editor!.CoValue = 120;
+        vm.Editor!.GasInputs[0].Value = 120;
         vm.ConfirmEditorCommand.Execute(null);
 
         var dwelling = session.Incident.Dwellings.Single(
@@ -417,11 +417,11 @@ public class CoMessprotokollViewModelTests
         var building = Building.Create("Haus A", 2, 3, 0);
         var dwelling = Dwelling.Create(building.Id, 0, 1);
 
-        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _) => { });
+        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _) => { }, [IncidentGas.LegacyCo]);
 
         Assert.Equal("Kein Messwert", cell.CoDisplay);
 
-        cell.CoValue = 45;
+        cell.Values = new Dictionary<Guid, decimal> { [IncidentGas.LegacyCoId] = 45 };
         Assert.Equal("45 ppm", cell.CoDisplay);
     }
 
@@ -430,21 +430,21 @@ public class CoMessprotokollViewModelTests
     {
         var building = Building.Create("Haus A", 2, 3, 0);
         var dwelling = Dwelling.Create(building.Id, 0, 1);
-        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _) => { });
+        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _) => { }, [IncidentGas.LegacyCo]);
 
         AssertNoSeverityFlag(cell);
 
-        cell.CoValue = 30;
+        cell.Values = new Dictionary<Guid, decimal> { [IncidentGas.LegacyCoId] = 30 };
         Assert.True(cell.IsCoElevated);
         Assert.False(cell.IsCoDangerous);
         Assert.False(cell.IsCoLethal);
 
-        cell.CoValue = 200;
+        cell.Values = new Dictionary<Guid, decimal> { [IncidentGas.LegacyCoId] = 200 };
         Assert.False(cell.IsCoElevated);
         Assert.True(cell.IsCoDangerous);
         Assert.False(cell.IsCoLethal);
 
-        cell.CoValue = 800;
+        cell.Values = new Dictionary<Guid, decimal> { [IncidentGas.LegacyCoId] = 800 };
         Assert.False(cell.IsCoElevated);
         Assert.False(cell.IsCoDangerous);
         Assert.True(cell.IsCoLethal);
@@ -463,10 +463,10 @@ public class CoMessprotokollViewModelTests
         var (_, vm) = CreateVm();
         var editor = OpenEditor(vm, 0, 1);
 
-        editor.CoValue = 2000;
+        editor.GasInputs[0].Value = 2000;
         Assert.False(editor.IsCoImplausible);
 
-        editor.CoValue = 2001;
+        editor.GasInputs[0].Value = 2001;
         Assert.True(editor.IsCoImplausible);
     }
 
@@ -476,11 +476,11 @@ public class CoMessprotokollViewModelTests
         var (_, vm) = CreateVm();
         var editor = OpenEditor(vm, 0, 1);
 
-        editor.CoValue = 799;
-        Assert.False(editor.IsCoLethal);
+        editor.GasInputs[0].Value = 799;
+        Assert.False(editor.GasInputs[0].IsCoLethal);
 
-        editor.CoValue = 800;
-        Assert.True(editor.IsCoLethal);
+        editor.GasInputs[0].Value = 800;
+        Assert.True(editor.GasInputs[0].IsCoLethal);
     }
 
     // Every other Add/Confirm command in the app (AddForce, AddRole, ConfirmTransfer, AddTrupp,
@@ -544,7 +544,7 @@ public class CoMessprotokollViewModelTests
         // #242: a ppm value now reaches the session only via the sidebar's FERTIG.
         var cell = vm.MatrixRows.SelectMany(r => r.Cells).First(c => c.BuildingId == houseB.Id);
         cell.OpenEditorCommand.Execute(null);
-        vm.Editor!.CoValue = 45;
+        vm.Editor!.GasInputs[0].Value = 45;
         vm.ConfirmEditorCommand.Execute(null); // triggers a RecordCoValue round trip
 
         Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
@@ -588,7 +588,7 @@ public class CoMessprotokollViewModelTests
 
         var cell = vm.MatrixRows.SelectMany(r => r.Cells).First(c => c.BuildingId == houseB.Id);
         cell.OpenEditorCommand.Execute(null);
-        vm.Editor!.CoValue = 45;
+        vm.Editor!.GasInputs[0].Value = 45;
         vm.ConfirmEditorCommand.Execute(null);
 
         Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
@@ -684,14 +684,14 @@ public class CoMessprotokollViewModelTests
         AttachComboBoxStandIn(vm);
 
         var editor = OpenEditor(vm, 1, 2);
-        editor.CoValue = 45;
+        editor.GasInputs[0].Value = 45;
 
         local.AddJournalEntry(EtbDirection.Internal, "Lage unverändert");
 
         Assert.Same(editor, vm.Editor);
-        Assert.Equal(45, vm.Editor!.CoValue);
+        Assert.Equal(45, vm.Editor!.GasInputs[0].Value);
         Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
-        Assert.Equal(45, Cell(vm, 1, 2).CoValue);
+        Assert.Equal(45, Cell(vm, 1, 2).Values.Values.Single());
     }
 
     [Fact]
@@ -769,7 +769,7 @@ public class CoMessprotokollViewModelTests
         var editor = OpenEditor(vm, 0, 1);
 
         vm.SetEditorStatusAffectedCommand.Execute(null);
-        editor.CoValue = 120;
+        editor.GasInputs[0].Value = 120;
         editor.ResidentName = "Musterfrau";
         editor.KeyAvailable = KeyAvailability.Available;
         editor.KeyNumber = "14";
@@ -780,7 +780,7 @@ public class CoMessprotokollViewModelTests
 
         var dwelling = DwellingOf(session, buildingId, 0, 1);
         Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
-        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.CoValue());
         Assert.Null(dwelling.ResidentName);
         Assert.Equal(KeyAvailability.Unknown, dwelling.KeyAvailable);
         Assert.Null(dwelling.KeyNumber);
@@ -797,7 +797,7 @@ public class CoMessprotokollViewModelTests
         var editor = OpenEditor(vm, 0, 1);
 
         vm.SetEditorStatusAffectedCommand.Execute(null);
-        editor.CoValue = 120;
+        editor.GasInputs[0].Value = 120;
         vm.CloseEditorCommand.Execute(null);
         vm.ConfirmDiscardEditorCommand.Execute(null);
 
@@ -812,14 +812,14 @@ public class CoMessprotokollViewModelTests
         var (session, vm) = CreateVm();
         var buildingId = session.Incident.Buildings[0].Id;
         var editor = OpenEditor(vm, 0, 1);
-        editor.CoValue = 120;
+        editor.GasInputs[0].Value = 120;
 
         vm.CloseEditorCommand.Execute(null);
 
         Assert.True(vm.IsDiscardEditorConfirmOpen);
         Assert.True(vm.IsEditorOpen);
         Assert.Same(editor, vm.Editor);
-        Assert.Null(DwellingOf(session, buildingId, 0, 1).CoValue);
+        Assert.Null(DwellingOf(session, buildingId, 0, 1).CoValue());
     }
 
     [Fact]
@@ -827,14 +827,14 @@ public class CoMessprotokollViewModelTests
     {
         var (_, vm) = CreateVm();
         var editor = OpenEditor(vm, 0, 1);
-        editor.CoValue = 120;
+        editor.GasInputs[0].Value = 120;
         vm.CloseEditorCommand.Execute(null);
 
         vm.CancelDiscardEditorCommand.Execute(null);
 
         Assert.False(vm.IsDiscardEditorConfirmOpen);
         Assert.True(vm.IsEditorOpen);
-        Assert.Equal(120, vm.Editor!.CoValue);
+        Assert.Equal(120, vm.Editor!.GasInputs[0].Value);
     }
 
     [Fact]
@@ -865,7 +865,7 @@ public class CoMessprotokollViewModelTests
         switch (field)
         {
             case "status": vm.SetEditorStatusAffectedCommand.Execute(null); break;
-            case "co": editor.CoValue = 35; break;
+            case "co": editor.GasInputs[0].Value = 35; break;
             case "detail": editor.KeyAvailable = KeyAvailability.Available; break;
             default: editor.Label = "Hinterhaus"; break;
         }
@@ -896,14 +896,14 @@ public class CoMessprotokollViewModelTests
         var (session, vm) = CreateVm();
         var buildingId = session.Incident.Buildings[0].Id;
         var editor = OpenEditor(vm, 0, 1);
-        editor.CoValue = 120;
+        editor.GasInputs[0].Value = 120;
         vm.CloseEditorCommand.Execute(null);
 
         vm.ConfirmEditorCommand.Execute(null);
 
         Assert.False(vm.IsDiscardEditorConfirmOpen);
         Assert.False(vm.IsEditorOpen);
-        Assert.Equal(120, DwellingOf(session, buildingId, 0, 1).CoValue);
+        Assert.Equal(120, DwellingOf(session, buildingId, 0, 1).CoValue());
     }
 
     [Fact]
@@ -914,7 +914,7 @@ public class CoMessprotokollViewModelTests
         var editor = OpenEditor(vm, 0, 1);
 
         vm.SetEditorStatusAffectedCommand.Execute(null);
-        editor.CoValue = 120;
+        editor.GasInputs[0].Value = 120;
         editor.ResidentName = "Musterfrau";
         editor.KeyAvailable = KeyAvailability.Available;
         editor.KeyNumber = " 14 ";
@@ -924,7 +924,7 @@ public class CoMessprotokollViewModelTests
 
         var dwelling = DwellingOf(session, buildingId, 0, 1);
         Assert.Equal(DwellingStatus.Affected, dwelling.Status);
-        Assert.Equal(120, dwelling.CoValue);
+        Assert.Equal(120, dwelling.CoValue());
         Assert.Equal("Musterfrau", dwelling.ResidentName);
         Assert.Equal(KeyAvailability.Available, dwelling.KeyAvailable);
         Assert.Equal("14", dwelling.KeyNumber);
@@ -1038,9 +1038,9 @@ public class CoMessprotokollViewModelTests
         var editor = OpenEditor(vm, 0, 1);
 
         vm.SetEditorStatusSearchedCommand.Execute(null);
-        editor.CoValue = 8;
-        editor.CoValue = 80; // typo, corrected before FERTIG
-        editor.CoValue = 45;
+        editor.GasInputs[0].Value = 8;
+        editor.GasInputs[0].Value = 80; // typo, corrected before FERTIG
+        editor.GasInputs[0].Value = 45;
         editor.ResidentName = "Musterfrau"; // details are silent -- no journal entry
 
         vm.ConfirmEditorCommand.Execute(null);
@@ -1079,7 +1079,7 @@ public class CoMessprotokollViewModelTests
 
         Assert.True(vm.IsEditorOpen);
         Assert.Equal(DwellingStatus.Affected, editor.Status);
-        Assert.Equal(300, editor.CoValue);
+        Assert.Equal(300, editor.GasInputs[0].Value);
         Assert.Equal("Mitte", editor.Label); // 3 units per floor => Links/Mitte/Rechts
     }
 
@@ -1091,7 +1091,7 @@ public class CoMessprotokollViewModelTests
         var editor = OpenEditor(vm, 0, 1);
 
         vm.SetEditorStatusAffectedCommand.Execute(null);
-        editor.CoValue = 120;
+        editor.GasInputs[0].Value = 120;
 
         var pending = Cell(vm, 0, 1);
         Assert.Equal(DwellingStatus.Affected, pending.Status);
@@ -1159,12 +1159,12 @@ public class CoMessprotokollViewModelTests
         var buildingId = session.Incident.Buildings[0].Id;
 
         var editor = OpenEditor(vm, 0, 1);
-        editor.CoValue = 45;
+        editor.GasInputs[0].Value = 45;
         editor.Status = DwellingStatus.Affected;
         vm.ConfirmEditorCommand.Execute(null);
 
         var dwelling = DwellingOf(session, buildingId, 0, 1);
-        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.CoValue());
         Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
     }
 }
@@ -1396,16 +1396,17 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         int floorCount,
         int apartmentsPerFloor,
         int undergroundFloorCount = 0,
-        IReadOnlyDictionary<string, string?>? apartmentLabels = null) =>
-        _inner.AddCoBuilding(name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels);
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null,
+        IReadOnlyList<GasDefinition>? gases = null) =>
+        _inner.AddCoBuilding(name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels, gases);
 
     public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         _inner.UpdateCoBuildingStructure(buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount);
 
     public void RemoveCoBuilding(Guid buildingId) => _inner.RemoveCoBuilding(buildingId);
 
-    public void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue) =>
-        _inner.RecordCoValue(buildingId, floorOrdinal, apartmentNumber, coValue);
+    public void RecordCoValues(Guid buildingId, int floorOrdinal, int apartmentNumber, IReadOnlyDictionary<Guid, decimal?> values) =>
+        _inner.RecordCoValues(buildingId, floorOrdinal, apartmentNumber, values);
 
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
         _inner.SetDwellingStatus(buildingId, floorOrdinal, apartmentNumber, status);

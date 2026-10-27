@@ -54,7 +54,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AddCoBuildingCommand), "addCoBuilding")]
 [JsonDerivedType(typeof(UpdateCoBuildingStructureCommand), "updateCoBuildingStructure")]
 [JsonDerivedType(typeof(RemoveCoBuildingCommand), "removeCoBuilding")]
-[JsonDerivedType(typeof(RecordCoValueCommand), "recordCoValue")]
+[JsonDerivedType(typeof(RecordCoValuesCommand), "recordGasValues")]
 [JsonDerivedType(typeof(SetDwellingStatusCommand), "setDwellingStatus")]
 [JsonDerivedType(typeof(UpdateDwellingDetailsCommand), "updateDwellingDetails")]
 [JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
@@ -300,14 +300,17 @@ public sealed record ExtendTaskTimerCommand(Guid TaskId, int Minutes) : SyncComm
 // UndergroundFloorCount defaults to 0 so a pre-#218 payload deserializes as "keine
 // Untergeschosse" instead of failing the contract (same convention as #76's OfficerCount).
 // ApartmentLabels are an Objekt's Wohnungsbezeichnungen (#420), optional for the same reason; the
-// host keeps only those that fit the Haus (Building.Create).
+// host keeps only those that fit the Haus (Building.Create). Gases are the sender's Stammdaten
+// Messgase (#410): the host copies them only when this is the Einsatz's first Haus, sanitised and
+// capped at eight, and ignores them otherwise.
 public sealed record AddCoBuildingCommand(
     OperatorDto Operator,
     string Name,
     int FloorCount,
     int ApartmentsPerFloor,
     int UndergroundFloorCount = 0,
-    IReadOnlyDictionary<string, string?>? ApartmentLabels = null) : SyncCommand;
+    IReadOnlyDictionary<string, string?>? ApartmentLabels = null,
+    IReadOnlyList<GasDefinitionDto>? Gases = null) : SyncCommand;
 
 public sealed record UpdateCoBuildingStructureCommand(
     OperatorDto Operator, Guid BuildingId, int FloorCount, int ApartmentsPerFloor, int UndergroundFloorCount = 0) : SyncCommand;
@@ -315,8 +318,12 @@ public sealed record UpdateCoBuildingStructureCommand(
 public sealed record RemoveCoBuildingCommand(
     OperatorDto Operator, Guid BuildingId) : SyncCommand;
 
-public sealed record RecordCoValueCommand(
-    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int ApartmentNumber, int? CoValue) : SyncCommand;
+// Protocol 26 (#410): one FERTIG's values, one per changed gas, keyed by the Einsatz's own gas id.
+// Replaced recordCoValue, which carried a single integer ppm. A null value clears that gas.
+public sealed record RecordCoValuesCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int ApartmentNumber, IReadOnlyList<GasValueDto> Values) : SyncCommand;
+
+public sealed record GasValueDto(Guid GasId, decimal? Value);
 
 public sealed record SetDwellingStatusCommand(
     OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int ApartmentNumber, DwellingStatus Status) : SyncCommand;

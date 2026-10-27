@@ -177,7 +177,7 @@ public class DemoIncidentTests : IDisposable
         // #424: the sample has to carry a real Messreihe, not just a current value, or the CO
         // section of the Probefahrt's PDF demonstrates nothing.
         var messreihe = loaded.Dwellings.Single(d => d.FloorOrdinal == 2 && d.ApartmentNumber == 1).Readings;
-        Assert.Equal(new int?[] { 120, 40, 5 }, messreihe.Select(r => r.Value));
+        Assert.Equal(new decimal?[] { 120, 40, 5 }, messreihe.Select(r => r.Value));
         Assert.Equal(5, loaded.Checklists[0].Items.Count);
         Assert.Equal(3, loaded.Checklists[0].Items.Count(i => i.IsDone));
 
@@ -270,6 +270,10 @@ public class DemoIncidentTests : IDisposable
         // Two TMO and two DMO groups, so the reference shows both kinds.
         Assert.Equal(2, set.TalkGroups.Count(g => g.Kind == TalkGroupKind.Tmo));
         Assert.Equal(2, set.TalkGroups.Count(g => g.Kind == TalkGroupKind.Dmo));
+
+        // #410: every gas a multi-gas meter shows, and O2 as the one that falls.
+        Assert.Equal(new[] { "CO", "CO2", "H2S", "CH4", "O2" }, set.Gases.Select(g => g.Name));
+        Assert.Contains(set.Gases, g => g.Direction == Domain.CoMeasurement.GasDirection.Falling);
     }
 
     private static void WriteSampleIfRequested(Incident incident)

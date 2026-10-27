@@ -430,7 +430,7 @@ public class AutomationPropertiesTests
     {
         var (window, _, session) = Workspace(1920, 1032);
         session.AddCoBuilding("Mehrfamilienhaus A", 2, 2);
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
         Dispatcher.UIThread.RunJobs();
 
         List<Button> Tiles() => window.GetVisualDescendants().OfType<Button>()

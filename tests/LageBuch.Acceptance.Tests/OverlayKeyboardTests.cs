@@ -171,7 +171,7 @@ public class OverlayKeyboardTests
     public void Enter_on_the_CO_remove_house_panel_removes_nothing()
     {
         var (window, vm) = ShowWorkspace(s => s.AddCoBuilding("Mehrfamilienhaus A", 2, 2));
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
         var remove = Named<Button>(window, "RemoveBuildingButton");
         remove.Focus(NavigationMethod.Tab);
         Dispatcher.UIThread.RunJobs();
@@ -191,13 +191,13 @@ public class OverlayKeyboardTests
     public void Returning_to_a_module_with_an_open_panel_does_not_pull_focus_into_it()
     {
         var (window, vm) = ShowWorkspace();
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
         vm.CoMessprotokoll.AddBuildingCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Assert.True(vm.CoMessprotokoll.IsAddBuildingDialogOpen);
 
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         Assert.True(vm.CoMessprotokoll.IsAddBuildingDialogOpen);
         Assert.False(window.IsFocusWithin(Named<Border>(window, "AddBuildingPanel")), $"focus is on {window.DescribeFocus()}");

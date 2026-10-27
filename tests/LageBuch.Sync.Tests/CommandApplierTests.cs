@@ -508,12 +508,12 @@ public class CommandApplierTests
         incident.AddCoBuilding(clock, new SessionOperator("Test", null), "Haus A", 2, 3);
         var buildingId = incident.Buildings[0].Id;
 
-        var cmd = new RecordCoValueCommand(new OperatorDto("Test", null), buildingId, 0, 1, 45);
+        var cmd = new RecordCoValuesCommand(new OperatorDto("Test", null), buildingId, 0, 1, [new GasValueDto(incident.Gases[0].Id, 45)]);
         ApplyOverWire(cmd, incident, clock);
 
         var dwelling = incident.Dwellings.First(d =>
             d.BuildingId == buildingId && d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(45, dwelling.CoValue);
+        Assert.Equal(45, dwelling.CoValue());
     }
 
     // #424: the command carries only the new value. The reading's time comes from the HOST clock
@@ -527,12 +527,12 @@ public class CommandApplierTests
         ApplyOverWire(new AddCoBuildingCommand(new OperatorDto("Test", null), "Haus A", 2, 3), incident, clock);
         var buildingId = incident.Buildings[0].Id;
 
-        ApplyOverWire(new RecordCoValueCommand(new OperatorDto("Huber", "FFB 12/1"), buildingId, 0, 1, 120), incident, clock);
+        ApplyOverWire(new RecordCoValuesCommand(new OperatorDto("Huber", "FFB 12/1"), buildingId, 0, 1, [new GasValueDto(incident.Gases[0].Id, 120)]), incident, clock);
         clock.Now = clock.Now.AddMinutes(27);
-        ApplyOverWire(new RecordCoValueCommand(new OperatorDto("Huber", "FFB 12/1"), buildingId, 0, 1, 40), incident, clock);
+        ApplyOverWire(new RecordCoValuesCommand(new OperatorDto("Huber", "FFB 12/1"), buildingId, 0, 1, [new GasValueDto(incident.Gases[0].Id, 40)]), incident, clock);
 
         var dwelling = incident.Dwellings.First(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(new int?[] { 120, 40 }, dwelling.Readings.Select(r => r.Value));
+        Assert.Equal(new decimal?[] { 120, 40 }, dwelling.Readings.Select(r => r.Value));
         Assert.All(dwelling.Readings, r => Assert.Equal("Huber (FFB 12/1)", r.RecordedBy));
         Assert.Equal(27, (dwelling.Readings[1].MeasuredAt - dwelling.Readings[0].MeasuredAt).TotalMinutes);
     }
@@ -545,7 +545,7 @@ public class CommandApplierTests
         var incident = NewIncident(clock);
         ApplyOverWire(new AddCoBuildingCommand(new OperatorDto("Test", null), "Haus A", 2, 3), incident, clock);
         var buildingId = incident.Buildings[0].Id;
-        var cmd = new RecordCoValueCommand(new OperatorDto("Huber", null), buildingId, 0, 1, 45);
+        var cmd = new RecordCoValuesCommand(new OperatorDto("Huber", null), buildingId, 0, 1, [new GasValueDto(incident.Gases[0].Id, 45)]);
 
         ApplyOverWire(cmd, incident, clock);
         ApplyOverWire(cmd, incident, clock);

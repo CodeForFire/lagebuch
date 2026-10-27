@@ -376,7 +376,7 @@ public class SnapshotRoundTripTests
         Assert.Equal(9, restored.Dwellings.Count);
         var dwelling = restored.Dwellings.First(d =>
             d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(45, dwelling.CoValue);
+        Assert.Equal(45, dwelling.CoValue());
     }
 
     // #424: a joined device has to see the Verlauf, not just the current number -- the series is
@@ -399,7 +399,7 @@ public class SnapshotRoundTripTests
             SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(original))));
 
         var dwelling = restored.Dwellings.First(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(new int?[] { 120, 40, null }, dwelling.Readings.Select(r => r.Value));
+        Assert.Equal(new decimal?[] { 120, 40, null }, dwelling.Readings.Select(r => r.Value));
         Assert.All(dwelling.Readings, r => Assert.Equal("Huber (FFB 12/1)", r.RecordedBy));
         Assert.Equal(27, (dwelling.Readings[1].MeasuredAt - dwelling.Readings[0].MeasuredAt).TotalMinutes);
     }
@@ -427,7 +427,7 @@ public class SnapshotRoundTripTests
 
         var dwelling = restored.Dwellings.First(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
         Assert.Empty(dwelling.Readings);
-        Assert.Equal(45, dwelling.CoValue);
+        Assert.Equal(45, dwelling.CoValue());
     }
 
     [Fact]

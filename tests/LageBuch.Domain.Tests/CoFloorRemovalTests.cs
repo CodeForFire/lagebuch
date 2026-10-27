@@ -30,7 +30,7 @@ public class CoFloorRemovalTests
         Assert.Equal(2, incident.Buildings[0].FloorCount);
         Assert.DoesNotContain(incident.Dwellings, d => d.FloorOrdinal == 3);
         Assert.Equal(12, incident.Dwellings.Count);
-        Assert.Equal(40, incident.Dwellings.Single(d => d.FloorOrdinal == 2 && d.ApartmentNumber == 1).CoValue);
+        Assert.Equal(40, incident.Dwellings.Single(d => d.FloorOrdinal == 2 && d.ApartmentNumber == 1).CoValue());
     }
 
     [Fact]

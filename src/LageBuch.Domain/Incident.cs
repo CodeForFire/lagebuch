@@ -25,6 +25,7 @@ public sealed class Incident
     private readonly List<IncidentTask> _tasks = new();
     private readonly List<Building> _buildings = new();
     private readonly List<Dwelling> _dwellings = new();
+    private readonly List<IncidentGas> _gases = new();
     private readonly List<InvolvedParty> _involvedParties = new();
     private readonly List<SituationReport> _situationReports = new();
     private readonly List<IssuedItem> _issuedItems = new();
@@ -86,6 +87,11 @@ public sealed class Incident
     public IReadOnlyList<Building> Buildings => _buildings;
 
     public IReadOnlyList<Dwelling> Dwellings => _dwellings;
+
+    /// <summary>The gases this Einsatz measures, in display order (#410): a copy of the Stammdaten
+    /// list taken when the first Haus was opened, never a reference into them. Empty until then.
+    /// </summary>
+    public IReadOnlyList<IncidentGas> Gases => _gases;
 
     /// <summary>The Beteiligte — people involved who are not forces — in creation order.</summary>
     public IReadOnlyList<InvolvedParty> InvolvedParties => _involvedParties;
@@ -183,7 +189,8 @@ public sealed class Incident
         IEnumerable<IssuedItem>? issuedItems = null,
         IEnumerable<CommandNode>? commandNodes = null,
         Fuehrungsstufe? fuehrungsstufe = null,
-        LeadershipPost? leadershipPost = null)
+        LeadershipPost? leadershipPost = null,
+        IEnumerable<IncidentGas>? gases = null)
     {
         var incident = new Incident
         {
@@ -213,7 +220,9 @@ public sealed class Incident
         incident._files.AddRange(files);
         incident._tasks.AddRange(tasks);
         incident._buildings.AddRange(buildings);
-        incident._dwellings.AddRange(dwellings);
+        incident._gases.AddRange(RehydrateGases(gases, incident._buildings.Count > 0));
+        var gasIds = incident._gases.Select(g => g.Id).ToHashSet();
+        incident._dwellings.AddRange(dwellings.Select(d => d.KeepingGases(gasIds)));
         incident._involvedParties.AddRange(involvedParties);
         incident._situationReports.AddRange(situationReports ?? []);
         incident._issuedItems.AddRange(issuedItems ?? []);
@@ -1885,7 +1894,8 @@ public sealed class Incident
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId);
 
     // apartmentLabels are copied from an Objekt in the Stammdaten (#420): the Haus keeps them as
-    // its own, and nothing points back at the Objekt.
+    // its own, and nothing points back at the Objekt. gases are the Stammdaten Messgase (#410),
+    // copied the same way -- but only by the first Haus; after that the Einsatz keeps its list.
     public void AddCoBuilding(
         IClock clock,
         SessionOperator op,
@@ -1893,11 +1903,18 @@ public sealed class Incident
         int floorCount,
         int apartmentsPerFloor,
         int undergroundFloorCount = 0,
-        IReadOnlyDictionary<string, string?>? apartmentLabels = null)
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null,
+        IEnumerable<GasDefinition>? gases = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
+
+        if (_gases.Count == 0)
+        {
+            var copied = GasDefinition.SanitizeList(gases);
+            _gases.AddRange((copied.Count > 0 ? copied : [GasDefinition.DefaultCo]).Select(g => new IncidentGas(Guid.NewGuid(), g)));
+        }
 
         var ordinal = _buildings.Count;
         var building = Building.Create(name, floorCount, apartmentsPerFloor, ordinal, undergroundFloorCount, apartmentLabels);
@@ -1914,7 +1931,7 @@ public sealed class Incident
         AppendSystemEntry(
             clock,
             op,
-            $"CO-Messprotokoll eröffnet: {building.Name} ({FloorRangeLabel(undergroundFloorCount, floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss)");
+            $"Gasmessprotokoll eröffnet: {building.Name} ({FloorRangeLabel(undergroundFloorCount, floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss)");
     }
 
     // Underground floor count defaults to 0 so a pre-#218 sync payload (no such property on the
@@ -1935,7 +1952,7 @@ public sealed class Incident
             .Where(d => d.BuildingId == buildingId && (d.FloorOrdinal > floorCount || d.FloorOrdinal < -undergroundFloorCount))
             .GroupBy(d => d.FloorOrdinal)
             .OrderByDescending(g => g.Key)
-            .Select(g => (Count: g.Count(), Text: RemovedFloorDescription(building, g.Key, g.OrderBy(d => d.ApartmentNumber).ToList())))
+            .Select(g => (Count: g.Count(), Text: RemovedFloorDescription(building, g.Key, g.OrderBy(d => d.ApartmentNumber).ToList(), _gases)))
             .ToList();
 
         var index = _buildings.IndexOf(building);
@@ -1996,11 +2013,11 @@ public sealed class Incident
     /// Wohnung that carried something a crew put there, by the label they had on screen (#443).
     /// Same notion of "carried" as the #419 picker: a Bezeichnung counts, since it lives on the
     /// Building and Dwelling.HasData can't see it.</summary>
-    private static string RemovedFloorDescription(Building building, int floorOrdinal, List<Dwelling> onFloor)
+    private static string RemovedFloorDescription(Building building, int floorOrdinal, List<Dwelling> onFloor, List<IncidentGas> gases)
     {
         var carrying = onFloor
             .Where(d => d.HasData || building.HasApartmentLabel(floorOrdinal, d.ApartmentNumber))
-            .Select(d => $"{CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber)}{DwellingContentSuffix(d)}")
+            .Select(d => $"{CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber)}{DwellingContentSuffix(d, gases)}")
             .ToList();
 
         var contents = carrying.Count > 0 ? $": {string.Join(", ", carrying)}" : ", leer";
@@ -2017,40 +2034,73 @@ public sealed class Incident
         _buildings.Remove(building);
         _dwellings.RemoveAll(d => d.BuildingId == buildingId);
 
-        AppendSystemEntry(clock, op, $"CO-Messprotokoll entfernt: {building.Name}");
+        AppendSystemEntry(clock, op, $"Gasmessprotokoll entfernt: {building.Name}");
     }
 
-    public void RecordCoValue(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue)
+    /// <summary>
+    /// Records what a crew measured in one Wohnung at one FERTIG (#410): one reading per gas that
+    /// changed, all with the same time, and one ETB entry naming them all --
+    /// "Gasmessung Haus A, 2. OG, Whg. 1: CO 120 ppm, H2S 3 ppm". A null value clears that gas.
+    /// </summary>
+    public void RecordCoValues(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int apartmentNumber, IReadOnlyDictionary<Guid, decimal?> values)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
+        ArgumentNullException.ThrowIfNull(values);
 
-        if (coValue is < 0)
+        if (values.Count > GasDefinition.MaxCount)
         {
-            throw new ArgumentOutOfRangeException(nameof(coValue), "CO-Messwert darf nicht negativ sein.");
+            throw new ArgumentOutOfRangeException(nameof(values), $"Höchstens {GasDefinition.MaxCount} Messgase.");
+        }
+
+        if (values.Keys.Any(id => !_gases.Exists(g => g.Id == id)))
+        {
+            throw new ArgumentException("Unbekanntes Messgas.", nameof(values));
         }
 
         var building = FindBuilding(buildingId);
         var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
 
-        // No-op writes return before anything is recorded. This is what keeps a retried or
-        // duplicated RecordCoValueCommand from inflating the series, and it is deliberately the
-        // same guard that already suppresses a duplicate ETB line. Consequence worth knowing: a
-        // genuine re-measurement that returns the identical value is not captured.
-        if (dwelling.CoValue == coValue)
+        var changes = new List<KeyValuePair<Guid, decimal?>>();
+        var parts = new List<string>();
+        foreach (var gas in _gases)
+        {
+            if (!values.TryGetValue(gas.Id, out var raw))
+            {
+                continue;
+            }
+
+            decimal? value = null;
+            if (raw is { } r)
+            {
+                value = GasDefinition.NormalizeValue(r)
+                    ?? throw new ArgumentOutOfRangeException(nameof(values), $"Messwert {gas.Name} liegt außerhalb von 0 bis {Formatting.Measurement(GasDefinition.MaxValue, gas.Unit)}.");
+            }
+
+            // No-op writes are skipped before anything is recorded. This is what keeps a retried or
+            // duplicated command from inflating the series, and it is deliberately the same guard
+            // that already suppresses a duplicate ETB line. Consequence worth knowing: a genuine
+            // re-measurement that returns the identical value is not captured.
+            if (dwelling.ValueOf(gas.Id) == value)
+            {
+                continue;
+            }
+
+            changes.Add(new(gas.Id, value));
+            parts.Add(value is { } v ? CoMeasurementLabels.GasValueLabel(gas, v, withName: true) : $"{gas.Name} gelöscht");
+        }
+
+        if (changes.Count == 0)
         {
             return;
         }
 
         var index = _dwellings.IndexOf(dwelling);
-        _dwellings[index] = dwelling.WithCoReading(coValue, clock.Now, op.Display);
+        _dwellings[index] = dwelling.WithCoReadings(changes, clock.Now, op.Display);
 
         var location = CoMeasurementLabels.DwellingLocation(building, floorOrdinal, apartmentNumber);
-        var text = coValue is { } v
-            ? $"CO-Messung {location}: {v} ppm"
-            : $"CO-Messung {location}: Messwert gelöscht";
-        AppendMeasurementEntry(clock, op, text);
+        AppendMeasurementEntry(clock, op, $"Gasmessung {location}: {string.Join(", ", parts)}");
     }
 
     public void SetDwellingStatus(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status)
@@ -2216,7 +2266,7 @@ public sealed class Incident
         // effective label back would freeze "Rechts" onto a survivor as if a crew had typed it.
         var removedLabels = onFloor
             .Where(d => doomed.Contains(d.ApartmentNumber))
-            .Select(d => $"{CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber)}{DwellingContentSuffix(d)}")
+            .Select(d => $"{CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber)}{DwellingContentSuffix(d, _gases)}")
             .ToList();
 
         var carriedLabels = new Dictionary<int, string?>();
@@ -2249,7 +2299,34 @@ public sealed class Incident
 
     /// <summary>What a Wohnung was carrying, for the ETB line that records its removal (#419) --
     /// the point being that the log says what was lost, not just how many.</summary>
-    private static string DwellingContentSuffix(Dwelling dwelling)
+    // A file or snapshot hands its gas list over as stored, so it is sanitised and capped like any
+    // other outside input. A file with Häuser but no gases is one whose gas table went missing:
+    // its readings carry the legacy CO id, so that gas is what it gets back.
+    private static List<IncidentGas> RehydrateGases(IEnumerable<IncidentGas>? gases, bool hasBuildings)
+    {
+        var result = new List<IncidentGas>();
+        foreach (var gas in gases ?? [])
+        {
+            if (gas.Definition.Sanitized() is { } clean
+                && !result.Exists(g => g.Id == gas.Id || string.Equals(g.Name, clean.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                result.Add(gas with { Definition = clean });
+                if (result.Count == GasDefinition.MaxCount)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (result.Count == 0 && hasBuildings)
+        {
+            result.Add(IncidentGas.LegacyCo);
+        }
+
+        return result;
+    }
+
+    private static string DwellingContentSuffix(Dwelling dwelling, List<IncidentGas> gases)
     {
         var carried = new List<string>();
         if (dwelling.ResidentName is not null)
@@ -2262,9 +2339,10 @@ public sealed class Incident
             carried.Add(dwelling.Status == DwellingStatus.Searched ? "durchsucht" : "betroffen");
         }
 
-        if (dwelling.CoValue is { } ppm)
+        var measured = CoMeasurementLabels.ValuesInOrder(gases, dwelling.Values);
+        if (measured.Count > 0)
         {
-            carried.Add($"{ppm} ppm");
+            carried.AddRange(measured.Select(m => CoMeasurementLabels.GasValueLabel(m.Gas, m.Value, gases.Count > 1)));
         }
         else if (dwelling.Readings.Count > 0)
         {
