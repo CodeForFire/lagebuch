@@ -43,8 +43,8 @@ public static class MapDrawing
             for (var ty = Math.Max(firstY, 0); ty <= Math.Min(lastY, tilesPerSide - 1); ty++)
             {
                 var target = new Rect(
-                    (tx * WebMercator.TileSizePixels) - left,
-                    (ty * WebMercator.TileSizePixels) - top,
+                    (tx * (double)WebMercator.TileSizePixels) - left,
+                    (ty * (double)WebMercator.TileSizePixels) - top,
                     WebMercator.TileSizePixels,
                     WebMercator.TileSizePixels);
 

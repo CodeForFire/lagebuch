@@ -46,7 +46,7 @@ public static class WebMercator
 
     /// <summary>The middle of an inclusive tile range, as <see cref="Persistence.Map.IMapTileSource.GetTileBounds"/> reports it.</summary>
     public static GeoPoint CenterOfTiles(int zoom, int minX, int maxX, int minY, int maxY) =>
-        ToGeo((minX + maxX + 1) * TileSizePixels / 2.0, (minY + maxY + 1) * TileSizePixels / 2.0, zoom);
+        ToGeo((minX + maxX + 1.0) * TileSizePixels / 2.0, (minY + maxY + 1.0) * TileSizePixels / 2.0, zoom);
 
     private static double WorldSize(int zoom) => TileSizePixels * Math.Pow(2, zoom);
 }
