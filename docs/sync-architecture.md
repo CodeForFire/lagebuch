@@ -132,7 +132,7 @@ that pulls in ASP.NET Core, which is why only the desktop head references it.
 
 ```mermaid
 flowchart LR
-    subgraph elw["Command vehicle LAN / tailnet"]
+    subgraph elw["Command vehicle LAN"]
         HostDev["Host (desktop)<br/>Kestrel, HTTPS<br/>dual-stack *:5859"]
         C1["Client (desktop)"]
         C2["Client (Android)"]
@@ -140,7 +140,7 @@ flowchart LR
     end
 
     C1 -- "https://192.168.x.y:5859" --> HostDev
-    C2 -- "https://100.x.y.z:5859 (Tailscale)" --> HostDev
+    C2 -- "https://192.168.x.z:5859" --> HostDev
     C3 -- "https://localhost:5859" --> HostDev
 ```
 
@@ -151,10 +151,8 @@ flowchart LR
   fixed at `SyncProtocol.Port` = **5859**. Port 0 (tests) lets the OS choose,
   and `BoundPort` reports the result.
 - **Which address to show.** `LocalNetwork.DisplayAddress()` is cosmetic: it
-  picks the nicest IPv4 to put on screen, preferring Tailscale (an interface
-  named `tailscale*`/`ts*` or an address in 100.64.0.0/10), then RFC 1918 LAN
-  addresses, then loopback. The host listens on every interface whatever this
-  shows.
+  picks one IPv4 address to put on screen, falling back to loopback. The host
+  listens on every interface whatever this shows.
 - **What the Lagebuchführer reads out.** The address, a fresh four-digit
   **PIN** (`RandomNumberGenerator.GetInt32(0, 10_000)`, new per share and per
   renewal) and the host's **Kennung**, e.g. `7K2Q-M9XD-4HPA`, for comparing on
