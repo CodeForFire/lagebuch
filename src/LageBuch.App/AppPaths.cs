@@ -19,6 +19,8 @@ internal static class AppPaths
 
     public static string AttachmentCacheDir => Path.Join(Root, "attachment-cache");
 
+    public static string RegionPacksDir => Path.Join(Root, "regions");
+
     public static string TrustJsonPath => Path.Join(Root, "trust.json");
 
     public static string HostKeyPath => Path.Join(Root, "host-key.pem");
