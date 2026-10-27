@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.AppLogic.Services.Map;
 
@@ -25,4 +26,13 @@ public sealed record RegionPackInfo(
     double MaxLatitude,
     double MaxLongitude,
     string BuiltAt,
-    string Attribution);
+    string Attribution)
+{
+    /// <summary>Whether <paramref name="point"/> lies inside the pack's bounding box, edges included.</summary>
+    public bool Covers(GeoPoint point)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        return point.Latitude >= MinLatitude && point.Latitude <= MaxLatitude
+            && point.Longitude >= MinLongitude && point.Longitude <= MaxLongitude;
+    }
+}
