@@ -1,0 +1,1 @@
+Linux: software centres such as GNOME Software now show the installed `.deb` as MIT-licensed, with a description, screenshots and an age rating, instead of an unknown and possibly proprietary licence (#799).

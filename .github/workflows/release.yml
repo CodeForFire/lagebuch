@@ -169,11 +169,12 @@ jobs:
           if-no-files-found: error
       # build-deb.sh renders the hicolor icon sizes with ImageMagick and refuses to build
       # without it; ubuntu-24.04 runners carry no ImageMagick, rsvg or Inkscape. desktop-file-utils
-      # is only needed so the script's optional entry validation actually runs in CI.
+      # and appstream are only needed so the script's optional entry and metainfo validation
+      # actually runs in CI.
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends imagemagick desktop-file-utils
+          sudo apt-get install -y --no-install-recommends imagemagick desktop-file-utils appstream
       - name: Build .deb
         env:
           VERSION: ${{ needs.version.outputs.version }}
