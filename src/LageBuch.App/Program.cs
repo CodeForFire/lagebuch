@@ -4,6 +4,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using LageBuch.App.Services;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
@@ -53,6 +54,9 @@ internal static class Program
         // than a using block — same shape as SerialAudioQueue's own CA1001 suppression.
 #pragma warning disable CA2000
         var alarms = new SystemAlarmService();
+
+        // Only the Kartenpakete download through it, on the Lagebuchführer's request.
+        var http = new HttpClient();
 #pragma warning restore CA2000
 
         // Best-effort: drain IncidentStore's background writer (issue #167 P0 #1) before the process
@@ -63,6 +67,7 @@ internal static class Program
         {
             desktopLifetime.Exit += (_, _) => store.FlushAsync().GetAwaiter().GetResult();
             desktopLifetime.Exit += (_, _) => alarms.Dispose();
+            desktopLifetime.Exit += (_, _) => http.Dispose();
         }
 
         var mainViewModel = LageBuch.App.Shared.CompositionRoot.CreateMainWindowViewModel(
@@ -85,7 +90,8 @@ internal static class Program
             lastConnection: new JsonLastConnectionStore(AppPaths.LastConnectionJsonPath),
             mailComposer: new OsMailComposer(),
             lastCrashReport: CrashReports.TakePending(AppPaths.Root),
-            alarmMute: new AlarmMute(AppPaths.AlarmMuteJsonPath));
+            alarmMute: new AlarmMute(AppPaths.AlarmMuteJsonPath),
+            mapPacks: new RegionPackLibrary(http, AppPaths.RegionPacksDir));
         OpenLaunchedFile(mainViewModel);
         return mainViewModel;
     }

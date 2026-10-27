@@ -4,6 +4,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
 
@@ -20,6 +21,9 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private readonly IMasterDataProvider _provider;
     private readonly IFileDialogService _dialogs;
     private readonly IMasterDataFileService _files;
+
+    // Built once, not per reload: it holds no Stammdaten, and rebuilding it would drop a running download.
+    private readonly MapPacksSection? _mapPacks;
 
     private MasterDataSet _original = MasterDataSet.Empty;
     private bool _originalIsEmpty = true;
@@ -46,11 +50,13 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private TalkGroupsSection _talkGroups = null!;
     private SettingsSection _settings = null!;
 
-    public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
+    /// <summary>Without <paramref name="mapPacks"/>, the device's Kartenpakete, the editor shows no Karten section.</summary>
+    public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files, IRegionPackLibrary? mapPacks = null)
     {
         _provider = provider;
         _dialogs = dialogs;
         _files = files;
+        _mapPacks = mapPacks is null ? null : new MapPacksSection("Karten", mapPacks, RequestConfirm);
         Load();
     }
 
@@ -241,7 +247,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             _talkGroups = new TalkGroupsSection("Funkgruppen", set.TalkGroups, MarkDirty, RequestConfirm),
         };
 
-        foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
+        EditorSection[] deviceSections = _mapPacks is null ? [] : [_mapPacks];
+        foreach (var section in categories.Concat(deviceSections).OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
         {
             Sections.Add(section);
         }

@@ -1251,4 +1251,24 @@ public class MasterDataEditorViewModelTests
         Assert.Equal("1001", values[1].Number);
         Assert.Equal(TalkGroupKind.Dmo, values[2].Kind);
     }
+
+    [Fact]
+    public void Without_a_map_library_the_editor_has_no_Karten_section() =>
+        Assert.Empty(Vm(new InMemoryProvider()).Sections.OfType<MapPacksSection>());
+
+    [Fact]
+    public void The_Karten_section_survives_a_reload_and_never_makes_the_editor_dirty()
+    {
+        var library = new FakeRegionPackLibrary();
+        library.Preinstall(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"));
+        var vm = new MasterDataEditorViewModel(new InMemoryProvider(), new FakeDialogs(), new FakeFileService(), library);
+        var karten = vm.Sections.OfType<MapPacksSection>().Single();
+
+        karten.SelectedPack = null;
+        Roles(vm).AddCommand.Execute(null);
+        vm.DiscardCommand.Execute(null);
+
+        Assert.Same(karten, vm.Sections.OfType<MapPacksSection>().Single());
+        Assert.False(vm.IsDirty);
+    }
 }

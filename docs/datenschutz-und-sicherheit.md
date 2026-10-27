@@ -147,6 +147,7 @@ Anwendungsdaten.
 | `trust.json` | die gespeicherten Schlüssel-Fingerabdrücke der Gegenstellen |
 | `host-key.pem` | der private Schlüssel, mit dem dieses Gerät sich beim Freigeben ausweist; entsteht bei der ersten Freigabe, unter Linux und macOS nur für den eigenen Benutzer lesbar |
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
+| `regions/` | die heruntergeladenen Kartenpakete (Kartenkacheln eines Landkreises aus OpenStreetMap); keine Einsatzdaten |
 | `crashes/` | Absturzberichte, höchstens fünf, ohne Fehlertexte und ohne Einsatzdaten (siehe unten) |
 
 Beim Öffnen eines Anhangs legt Lagebuch zusätzlich eine Arbeitskopie im
@@ -163,8 +164,8 @@ Deinstallieren der App entfernt Android all diese Daten.**
 
 ## Was das Gerät verlässt
 
-Von selbst: nichts. Es gibt im gesamten Programm genau vier Wege, auf denen
-Daten das Gerät verlassen können, und alle vier werden von der Bedienerin oder
+Von selbst: nichts. Es gibt im gesamten Programm genau fünf Wege, auf denen
+Daten das Gerät verlassen können, und alle fünf werden von der Bedienerin oder
 dem Bediener ausgelöst:
 
 1. **Die Mehrgeräte-Verbindung.** Sie richtet sich an genau die Adresse, die im
@@ -178,10 +179,16 @@ dem Bediener ausgelöst:
 4. **Der Absturzbericht unter Android.** Erst wenn auf der Startseite TEILEN
    angetippt wird, geht er an das Teilen-Menü von Android; wohin, bestimmt die
    dort gewählte App. Er enthält keine Fehlertexte und keine Einsatzdaten.
+5. **Kartenpakete.** Unter Stammdaten → Karten lädt LISTE LADEN das
+   Verzeichnis der Kartenpakete und HERUNTERLADEN ein Paket von GitHub
+   (`raw.githubusercontent.com` und `github.com`). Dabei sieht GitHub die
+   IP-Adresse des Geräts und welches Paket geladen wird – keine Einsatzdaten.
+   Danach zeichnet Lagebuch die Karte ausschließlich aus dem Paket auf dem
+   Gerät; kein Kartenserver erfährt, wo ein Einsatz liegt.
 
 Nicht vorhanden sind: Nutzungsstatistiken, automatisch versandte Absturzberichte, Updateprüfungen,
-Werbe- oder Analysebibliotheken sowie Schriftarten oder Karten von fremden
-Servern.
+Werbe- oder Analysebibliotheken sowie Schriftarten oder Kartenkacheln, die während
+der Arbeit von fremden Servern nachgeladen werden.
 
 **Lagebuch schreibt keine Protokolldateien.** Das ist für den Datenschutz von
 Vorteil – es entsteht kein zweiter Ort mit personenbezogenen Daten.

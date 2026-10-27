@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:c="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.MasterDataEditorView"
              x:DataType="vm:MasterDataEditorViewModel">
   <!-- Its own breakpoint rather than the shell's: this view is hosted directly by the render
@@ -582,6 +583,101 @@
               </DataTemplate>
 
               <!-- Links editor: name + URL + group (#518), reorderable -->
+              <!-- Kartenpakete: device-local, act at once, never part of SPEICHERN. -->
+              <DataTemplate x:DataType="vm:MapPacksSection">
+                <DockPanel x:Name="MapPacksPanel">
+                  <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                             Margin="0,0,0,12"
+                             Text="Kartenpakete liegen auf diesem Gerät, nicht in den Stammdaten. Jedes Gerät lädt seine eigenen; die Karte braucht danach kein Internet." />
+
+                  <TextBlock DockPanel.Dock="Top" Text="AUF DIESEM GERÄT" Classes="overline" FontSize="10" Margin="0,0,0,6" />
+                  <TextBlock DockPanel.Dock="Top" x:Name="NoMapPacksHint" Text="Noch kein Kartenpaket installiert."
+                             Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,12"
+                             IsVisible="{Binding !HasInstalled}" />
+                  <ListBox DockPanel.Dock="Top" x:Name="InstalledMapPacks" Margin="0,0,0,12"
+                           AutomationProperties.Name="Installierte Kartenpakete"
+                           ItemsSource="{Binding Installed}" SelectedItem="{Binding SelectedPack}"
+                           IsVisible="{Binding HasInstalled}">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:InstalledMapPackRow">
+                        <Grid ColumnDefinitions="*,32">
+                          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                          </StackPanel>
+                          <!-- ReflectionBinding: the section command lives on the ListBox's DataContext,
+                               object-typed under compiled bindings. -->
+                          <Button Grid.Column="1" Classes="icon-btn" ToolTip.Tip="Kartenpaket löschen"
+                                  AutomationProperties.Name="Kartenpaket löschen"
+                                  Command="{ReflectionBinding $parent[ListBox].DataContext.RemoveCommand}"
+                                  CommandParameter="{Binding}">
+                            <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                          </Button>
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="VERFÜGBAR" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" x:Name="LoadMapCatalogButton" Classes="ghost" Content="LISTE LADEN"
+                            Command="{Binding LoadCatalogCommand}" />
+                  </Grid>
+                  <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Available}" Margin="0,0,0,6">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:AvailableMapPackRow">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" />
+                            <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="signal" Content="{Binding ActionLabel}"
+                                  Command="{ReflectionBinding $parent[ItemsControl].DataContext.InstallCommand}"
+                                  CommandParameter="{Binding}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ProgressBar DockPanel.Dock="Top" Minimum="0" Maximum="1" Value="{Binding Progress}"
+                               Margin="0,0,0,6" IsVisible="{Binding IsBusy}"
+                               AutomationProperties.Name="Fortschritt" />
+                  <TextBlock DockPanel.Dock="Top" x:Name="MapPacksStatus" Text="{Binding Status}" TextWrapping="Wrap"
+                             Margin="0,0,0,12" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                  <!-- A look at the selected pack. Ctrl+wheel zooms, so a plain wheel still scrolls the page. -->
+                  <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                          CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" MinHeight="240"
+                          IsVisible="{Binding HasInstalled}">
+                    <Grid>
+                      <c:MapCanvasControl x:Name="MapPackPreview"
+                                          AutomationProperties.Name="Kartenvorschau"
+                                          TileSource="{Binding Preview.TileSource}"
+                                          Center="{Binding Preview.Center}"
+                                          Zoom="{Binding Preview.Zoom}"
+                                          WheelZoomNeedsControl="True"
+                                          ViewChangedCommand="{Binding Preview.ChangeViewCommand}" />
+                      <!-- On the app's dark surface, so the buttons stand out against a light map. -->
+                      <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Spacing="4"
+                                  Background="{StaticResource SurfaceRaisedBrush}">
+                        <Button Classes="icon-btn" ToolTip.Tip="Vergrößern" AutomationProperties.Name="Vergrößern"
+                                Command="{Binding Preview.ZoomInCommand}">
+                          <PathIcon Data="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </Button>
+                        <Button Classes="icon-btn" ToolTip.Tip="Verkleinern" AutomationProperties.Name="Verkleinern"
+                                Command="{Binding Preview.ZoomOutCommand}">
+                          <PathIcon Data="M19 13H5v-2h14v2z" />
+                        </Button>
+                      </StackPanel>
+                      <!-- ODbL: every map drawn from OSM data names its source. -->
+                      <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#CCFFFFFF" Padding="4,1">
+                        <TextBlock x:Name="MapAttribution" Text="{Binding Preview.Attribution}" FontSize="10"
+                                   Foreground="#FF333333" TextWrapping="Wrap" />
+                      </Border>
+                    </Grid>
+                  </Border>
+                </DockPanel>
+              </DataTemplate>
+
               <DataTemplate x:DataType="vm:LinksSection">
                 <DockPanel Classes="add-below">
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
