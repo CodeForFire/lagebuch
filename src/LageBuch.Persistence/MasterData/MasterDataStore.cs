@@ -228,16 +228,25 @@ public sealed class MasterDataStore
                     p("$v", value);
                 });
 
-        // Text settings get their own table: md_settings is typed INTEGER and read as such.
-        Run(
-            cn,
-            tx,
-            "INSERT INTO md_text_settings (key, value) VALUES ($k,$v) ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
-            p =>
-            {
-                p("$k", DispatchCentreNameKey);
-                p("$v", set.Settings.DispatchCentreName);
-            });
+        // Text settings get their own table: md_settings is typed INTEGER and read as such. No
+        // Einsatznummer format is written as "", which IncidentSettings reads back as none, so
+        // clearing it overwrites the old row instead of leaving it behind.
+        foreach (var (key, value) in new[]
+        {
+            (DispatchCentreNameKey, set.Settings.DispatchCentreName),
+            (IncidentNumberFormatKey, set.Settings.IncidentNumberFormat ?? string.Empty),
+        })
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_text_settings (key, value) VALUES ($k,$v) ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
+                p =>
+                {
+                    p("$k", key);
+                    p("$v", value);
+                });
+        }
 
         tx.Commit();
     }
@@ -307,6 +316,8 @@ public sealed class MasterDataStore
     }
 
     private const string DispatchCentreNameKey = "dispatch_centre_name";
+
+    private const string IncidentNumberFormatKey = "incident_number_format";
 
     private static (string Key, int Value)[] SettingsRows(IncidentSettings s) => new[]
     {
@@ -745,7 +756,8 @@ public sealed class MasterDataStore
             Get("ils_reminder_interval_minutes", d.IlsReminderIntervalMinutes),
             Get("ils_reminder_follow_up_interval_minutes", d.IlsReminderFollowUpIntervalMinutes),
             Get("return_pressure_bar", d.ReturnPressureBar),
-            ReadTextSetting(cn, DispatchCentreNameKey) ?? d.DispatchCentreName);
+            ReadTextSetting(cn, DispatchCentreNameKey) ?? d.DispatchCentreName,
+            ReadTextSetting(cn, IncidentNumberFormatKey));
     }
 
     /// <summary>One md_text_settings value, or null when the key has no row.</summary>

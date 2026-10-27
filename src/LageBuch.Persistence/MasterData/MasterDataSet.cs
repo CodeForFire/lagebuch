@@ -282,9 +282,40 @@ public sealed record IncidentSettings(
 
     // The Leitstelle the Rückmeldung goes to (#400). "ILS" is the Bavarian name; elsewhere it is a
     // Kreisleitstelle, a Rettungsleitstelle or plain Leitstelle.
-    string DispatchCentreName = IncidentSettings.DefaultDispatchCentreName)
+    string DispatchCentreName = IncidentSettings.DefaultDispatchCentreName,
+
+    // The Einsatznummer's template (#462), e.g. "{A} 1.2 {JJMMTT} {NNNN}"; null when the brigade has
+    // none. Kept as typed: LageBuch.Domain's IncidentNumberFormat reads it, and a template it cannot
+    // read simply pre-fills nothing.
+    string? IncidentNumberFormat = null)
 {
     public const string DefaultDispatchCentreName = "ILS";
+
+    /// <summary>
+    /// Room for a prefix, a date and a gap with some to spare; like the Leitstelle's name it arrives
+    /// from a Stammdaten import and from a sync host.
+    /// </summary>
+    public const int MaxIncidentNumberFormatLength = 60;
+
+    private readonly string? _incidentNumberFormat = NormalizeIncidentNumberFormat(IncidentNumberFormat);
+
+    /// <summary>Trimmed, null when blank, and at most <see cref="MaxIncidentNumberFormatLength"/> long.</summary>
+    public string? IncidentNumberFormat
+    {
+        get => _incidentNumberFormat;
+        init => _incidentNumberFormat = NormalizeIncidentNumberFormat(value);
+    }
+
+    private static string? NormalizeIncidentNumberFormat(string? template)
+    {
+        var trimmed = template?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length > MaxIncidentNumberFormatLength ? trimmed[..MaxIncidentNumberFormatLength].TrimEnd() : trimmed;
+    }
 
     /// <summary>
     /// Long enough for "Integrierte Leitstelle Fürstenfeldbruck"; the name sits in the header row, and
@@ -1326,7 +1357,8 @@ public static class MasterDataJson
             Int(s, "ilsReminderIntervalMinutes", d.IlsReminderIntervalMinutes),
             Int(s, "ilsReminderFollowUpIntervalMinutes", d.IlsReminderFollowUpIntervalMinutes),
             Int(s, "returnPressureBar", d.ReturnPressureBar),
-            Str(s, "dispatchCentreName") ?? d.DispatchCentreName);
+            Str(s, "dispatchCentreName") ?? d.DispatchCentreName,
+            Str(s, "incidentNumberFormat"));
     }
 
     // A street list is typically generated from OpenStreetMap and runs to hundreds of rows, so one
@@ -1533,6 +1565,7 @@ public static class MasterDataJson
                 ilsReminderFollowUpIntervalMinutes = set.Settings.IlsReminderFollowUpIntervalMinutes,
                 returnPressureBar = set.Settings.ReturnPressureBar,
                 dispatchCentreName = set.Settings.DispatchCentreName,
+                incidentNumberFormat = set.Settings.IncidentNumberFormat,
             },
         };
 

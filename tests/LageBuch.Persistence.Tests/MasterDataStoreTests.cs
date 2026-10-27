@@ -556,6 +556,26 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(12, settings.IlsReminderIntervalMinutes);
     }
 
+    [Fact]
+    public void Save_then_GetOrCreate_round_trips_the_incident_number_format()
+    {
+        var withFormat = IncidentSettings.Defaults with { IncidentNumberFormat = "B 1.2 {JJMMTT} {NNN}" };
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = withFormat });
+
+        Assert.Equal("B 1.2 {JJMMTT} {NNN}", MasterDataStore.GetOrCreate(_path).Settings.IncidentNumberFormat);
+    }
+
+    [Fact]
+    public void A_cleared_incident_number_format_stays_cleared()
+    {
+        var withFormat = IncidentSettings.Defaults with { IncidentNumberFormat = "B {NNN}" };
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = withFormat });
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty);
+
+        Assert.Null(MasterDataStore.GetOrCreate(_path).Settings.IncidentNumberFormat);
+    }
+
     // A masterdata.db written before #400 has no text-settings table at all.
     [Fact]
     public void A_store_without_the_text_settings_table_reads_ils()

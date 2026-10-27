@@ -145,8 +145,13 @@ public static class SyncProtocol
     /// as "cleared" -- wiping what another device entered, the <c>setAddress</c> case of 8. The
     /// floor rises to 24.
     /// </para>
+    /// <para>
+    /// 25: the Stammdaten payload's <c>settings</c> carry <c>incidentNumberFormat</c> (#462). A peer
+    /// at 24 skips the key and pre-fills no Einsatznummer, and a payload without it reads as no
+    /// format, so the floor stays at 24.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 24;
+    public const int ProtocolVersion = 25;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

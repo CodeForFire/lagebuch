@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
+using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
@@ -355,8 +356,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [RelayCommand(CanExecute = nameof(CanEditIncidentData))]
     private void EditIncidentData()
     {
+        // A template the format cannot read pre-fills nothing; the dialog then behaves as it did before #462.
+        _ = IncidentNumberFormat.TryParse(_masterData.Settings.IncidentNumberFormat, out var numberFormat);
         var dialog = new IncidentDataDialogViewModel(
-            _session, OnChanged, _masterData.Keywords, _masterData.Districts, _masterData.Streets);
+            _session, OnChanged, _masterData.Keywords, _masterData.Districts, _masterData.Streets, numberFormat);
 
         // Clear the overlay on either outcome; Save has already applied the edits on confirm, and
         // the header projections refresh through the session's Changed event.

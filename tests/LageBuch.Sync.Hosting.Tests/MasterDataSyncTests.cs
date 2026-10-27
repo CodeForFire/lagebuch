@@ -107,6 +107,23 @@ public class MasterDataSyncTests
         Assert.Equal("Kreisleitstelle", set.Settings.DispatchCentreName);
     }
 
+    // #462: a joined client pre-fills the Einsatznummer the way the host's brigade numbers.
+    [Fact]
+    public async Task Host_serves_its_incident_number_format()
+    {
+        var clock = new FixedClock();
+        var hostSet = SetWith("Löschzug Fürstenfeldbruck", 60);
+        hostSet = hostSet with { Settings = hostSet.Settings with { IncidentNumberFormat = "B 1.2 {JJMMTT} {NNN}" } };
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
+        await using var _ = host;
+
+        using var http = Client(port, TestHost.DefaultPin);
+        var set = MasterDataJson.Parse(
+            await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
+
+        Assert.Equal("B 1.2 {JJMMTT} {NNN}", set.Settings.IncidentNumberFormat);
+    }
+
     [Fact]
     public async Task Host_serves_its_talk_groups_and_role_slots()
     {

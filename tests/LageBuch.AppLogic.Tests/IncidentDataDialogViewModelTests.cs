@@ -454,4 +454,187 @@ public class IncidentDataDialogViewModelTests
         Assert.Null(vm.PostalCode);
         Assert.Equal("Feldweg am Weiher", store.Load("/x.lagebuch").Street);
     }
+
+    // #462: the brigade's Einsatznummer format types the known parts and leaves the Leitstelle's
+    // running number as a gap.
+    private static IncidentDataDialogViewModel WithFormat(LocalIncidentSession session, string template = "B 1.2 {JJMMTT} {NNN}")
+    {
+        Assert.True(IncidentNumberFormat.TryParse(template, out var format));
+        return new IncidentDataDialogViewModel(session, () => { }, incidentNumberFormat: format);
+    }
+
+    [Fact]
+    public void An_incident_without_a_number_opens_with_the_format_pre_filled_and_the_caret_on_the_gap()
+    {
+        var vm = WithFormat(NewSession(new FakeStore()));
+
+        Assert.Equal("B 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal("B 1.2 260622 ", vm.IncidentNumberPrefill);
+        Assert.Equal(13, vm.IncidentNumberCaretIndex);
+    }
+
+    [Fact]
+    public void An_incident_that_has_a_number_keeps_it_and_is_not_pre_filled()
+    {
+        var vm = WithFormat(NewSession(new FakeStore(), number: new IncidentNumber("B 1.2 260621 77")));
+
+        Assert.Equal("B 1.2 260621 77", vm.IncidentNumber);
+        Assert.Null(vm.IncidentNumberPrefill);
+    }
+
+    [Fact]
+    public void Without_a_format_nothing_is_pre_filled()
+    {
+        var vm = new IncidentDataDialogViewModel(NewSession(new FakeStore()), () => { });
+
+        Assert.Null(vm.IncidentNumber);
+        Assert.Null(vm.IncidentNumberPrefill);
+    }
+
+    [Fact]
+    public void Cancel_on_an_untouched_pre_fill_closes_without_asking()
+    {
+        var vm = WithFormat(NewSession(new FakeStore()));
+        var closed = false;
+        vm.Closed += (_, _) => closed = true;
+
+        Assert.False(vm.HasChanges);
+        vm.CancelCommand.Execute(null);
+
+        Assert.True(closed);
+        Assert.False(vm.IsDiscardConfirmOpen);
+    }
+
+    [Fact]
+    public void Saving_only_the_stichwort_never_stores_the_half_number()
+    {
+        var store = new FakeStore();
+        var vm = WithFormat(NewSession(store));
+
+        vm.Keyword = "B3P";
+        vm.SaveCommand.Execute(null);
+
+        var saved = store.Load("/x.lagebuch");
+        Assert.Equal("B3P", saved.Keyword);
+        Assert.Null(saved.IncidentNumber);
+    }
+
+    [Fact]
+    public void A_completed_number_is_saved()
+    {
+        var store = new FakeStore();
+        var vm = WithFormat(NewSession(store));
+
+        vm.IncidentNumber += "123";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("B 1.2 260622 123", store.Load("/x.lagebuch").IncidentNumber!.Value);
+    }
+
+    [Fact]
+    public void A_number_of_another_shape_shows_the_hint_and_is_still_saved()
+    {
+        var store = new FakeStore();
+        var vm = WithFormat(NewSession(store));
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.IncidentNumber = "4711";
+
+        Assert.True(vm.ShowIncidentNumberFormatHint);
+        Assert.Equal("Entspricht nicht dem Format B 1.2 {JJMMTT} {NNN}", vm.IncidentNumberFormatHint);
+        Assert.Contains(nameof(vm.ShowIncidentNumberFormatHint), raised);
+        vm.SaveCommand.Execute(null);
+        Assert.Equal("4711", store.Load("/x.lagebuch").IncidentNumber!.Value);
+    }
+
+    [Theory]
+    [InlineData("B 1.2 260622 123")]
+    [InlineData("B 1.2 260622 ")]
+    [InlineData("")]
+    public void No_hint_for_a_matching_an_untouched_or_an_empty_number(string number)
+    {
+        var vm = WithFormat(NewSession(new FakeStore()));
+
+        vm.IncidentNumber = number;
+
+        Assert.False(vm.ShowIncidentNumberFormatHint);
+    }
+
+    [Fact]
+    public void An_existing_number_of_another_shape_shows_the_hint()
+    {
+        var vm = WithFormat(NewSession(new FakeStore(), number: new IncidentNumber("4711")));
+
+        Assert.True(vm.ShowIncidentNumberFormatHint);
+    }
+
+    // The Einsatzart letter comes from the Stichwort (#462): B3P is a Brand, THL 1 a THL.
+    [Fact]
+    public void The_einsatzart_letter_is_pre_filled_from_the_stichwort_the_incident_has()
+    {
+        var vm = WithFormat(NewSession(new FakeStore(), keyword: "THL 1"), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        Assert.Equal("T 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal(13, vm.IncidentNumberCaretIndex);
+    }
+
+    [Fact]
+    public void Without_a_stichwort_the_caret_waits_on_the_einsatzart()
+    {
+        var vm = WithFormat(NewSession(new FakeStore()), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        Assert.Equal(" 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal(0, vm.IncidentNumberCaretIndex);
+    }
+
+    [Fact]
+    public void Typing_the_stichwort_fills_in_the_einsatzart_of_an_untouched_pre_fill()
+    {
+        var vm = WithFormat(NewSession(new FakeStore()), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        vm.Keyword = "B3P";
+        Assert.Equal("B 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal("B 1.2 260622 ", vm.IncidentNumberPrefill);
+        Assert.Equal(13, vm.IncidentNumberCaretIndex);
+
+        vm.Keyword = "THL 2";
+        Assert.Equal("T 1.2 260622 ", vm.IncidentNumber);
+        Assert.Equal("T 1.2 260622 ", vm.IncidentNumberPrefill);
+    }
+
+    [Fact]
+    public void Changing_the_stichwort_never_touches_a_number_already_typed_into()
+    {
+        var vm = WithFormat(NewSession(new FakeStore(), keyword: "B3P"), "{A} 1.2 {JJMMTT} {NNNN}");
+        vm.IncidentNumber += "4711";
+
+        vm.Keyword = "THL 1";
+
+        Assert.Equal("B 1.2 260622 4711", vm.IncidentNumber);
+    }
+
+    [Fact]
+    public void An_untouched_pre_fill_that_followed_the_stichwort_is_still_not_stored()
+    {
+        var store = new FakeStore();
+        var vm = WithFormat(NewSession(store), "{A} 1.2 {JJMMTT} {NNNN}");
+
+        vm.Keyword = "B3P";
+        vm.SaveCommand.Execute(null);
+
+        var saved = store.Load("/x.lagebuch");
+        Assert.Equal("B3P", saved.Keyword);
+        Assert.Null(saved.IncidentNumber);
+    }
+
+    [Fact]
+    public void Without_a_format_there_is_never_a_hint()
+    {
+        var vm = new IncidentDataDialogViewModel(NewSession(new FakeStore()), () => { });
+
+        vm.IncidentNumber = "4711";
+
+        Assert.False(vm.ShowIncidentNumberFormatHint);
+    }
 }
