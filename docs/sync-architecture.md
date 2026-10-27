@@ -153,6 +153,10 @@ flowchart LR
 - **Which address to show.** `LocalNetwork.DisplayAddress()` is cosmetic: it
   picks one IPv4 address to put on screen, falling back to loopback. The host
   listens on every interface whatever this shows.
+- **Other networks.** The command vehicle's own LAN is the tested setup. In
+  theory any network that routes to the host works, e.g. a VPN such as
+  Tailscale, because the host binds every interface and trust does not depend
+  on the address. That setup is untested.
 - **What the Lagebuchführer reads out.** The address, a fresh four-digit
   **PIN** (`RandomNumberGenerator.GetInt32(0, 10_000)`, new per share and per
   renewal) and the host's **Kennung**, e.g. `7K2Q-M9XD-4HPA`, for comparing on
