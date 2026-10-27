@@ -40,10 +40,54 @@ public sealed class MapPacksRenderTests : IDisposable
         Assert.Equal("© OpenStreetMap contributors (ODbL).", view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "MapAttribution").Text);
 
         // The PR screenshot.
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "stammdaten-karten.png"));
+    }
+
+    private static string Shots()
+    {
         var shots = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(shots);
+        return shots;
+    }
+
+    // Serves one catalogue and nothing else; no test reaches the network.
+    private sealed class CatalogueHandler(string catalogue) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(catalogue) });
+    }
+
+    [AvaloniaFact]
+    public async Task An_update_with_the_same_version_says_why_it_is_offered()
+    {
+        var root = Path.Join(_dir, "regions");
+        FictionalRegionPack.Install(root);
+        using var handler = new CatalogueHandler($$"""
+            {"formatVersion": 2, "packs": [{"slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1,
+              "downloadUrl": "https://example.org/ffb-v1.zip", "sizeBytes": 264978779, "sha256": "{{new string('a', 64)}}",
+              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 11, "maxZoom": 17,
+              "builtAt": "2026-10-27T20:15:49Z", "attribution": "{{FictionalRegionPack.Attribution}}",
+              "boundaryUrl": "https://example.org/boundaries/ffb.geojson"}]}
+            """);
+        using var http = new HttpClient(handler);
+        var vm = new MasterDataEditorViewModel(new EmptyProvider(), new FakeDialogs(), new NoFiles(), new RegionPackLibrary(http, root));
+        var section = vm.Sections.OfType<MapPacksSection>().Single();
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 760 };
+        window.Show();
+
+        await section.LoadCatalogCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(section.Available);
+        Assert.Equal("AKTUALISIEREN", row.ActionLabel);
+        var reason = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == row.UpdateReason);
+        Assert.True(reason.IsVisible);
+
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Join(shots, "stammdaten-karten.png"));
+        frame.SavePng(Path.Join(Shots(), "stammdaten-karten-grund.png"));
     }
 
     [AvaloniaFact]

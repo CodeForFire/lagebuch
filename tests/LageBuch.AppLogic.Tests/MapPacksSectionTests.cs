@@ -297,6 +297,25 @@ public class MapPacksSectionTests
 
         Assert.False(row.IsCurrent);
         Assert.Equal("AKTUALISIEREN", row.ActionLabel);
+        Assert.Equal("Lädt die Gebietsgrenze nach, damit angrenzende Karten nahtlos aneinander passen.", row.UpdateReason);
+    }
+
+    [Fact]
+    public void An_update_names_the_new_version_or_the_new_build_day()
+    {
+        Assert.Equal(
+            "Neue Version 2 – installiert ist Version 1.",
+            new AvailableMapPackRow(Ffb with { Version = 2 }, Ffb).UpdateReason);
+        Assert.Equal(
+            "Neu gebaut am 28.01.2027 – installiert ist der Stand vom 27.10.2026.",
+            new AvailableMapPackRow(Ffb with { Sha256 = new string('b', 64), BuiltAt = "2027-01-28T03:00:00Z" }, Ffb).UpdateReason);
+    }
+
+    [Fact]
+    public void A_pack_not_yet_installed_or_already_current_gives_no_reason()
+    {
+        Assert.Null(new AvailableMapPackRow(Ffb, null).UpdateReason);
+        Assert.Null(new AvailableMapPackRow(Ffb, Ffb).UpdateReason);
     }
 
     [Fact]

@@ -630,6 +630,9 @@
                           <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Name}" />
                             <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                            <TextBlock Text="{Binding UpdateReason}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                       TextWrapping="Wrap"
+                                       IsVisible="{Binding UpdateReason, Converter={x:Static ObjectConverters.IsNotNull}}" />
                           </StackPanel>
                           <Button Grid.Column="1" Classes="signal" Content="{Binding ActionLabel}"
                                   Command="{ReflectionBinding $parent[ItemsControl].DataContext.InstallCommand}"

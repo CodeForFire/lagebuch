@@ -191,13 +191,13 @@ public sealed partial class MapPacksSection : EditorSection
     }
 
     // "Stand 27.10.2026 · Version 1 · 253 MB". A build time that is no ISO timestamp is shown as it came.
-    internal static string Detail(RegionPackInfo info)
-    {
-        var built = DateTimeOffset.TryParse(info.BuiltAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
+    internal static string Detail(RegionPackInfo info) =>
+        $"Stand {BuiltDay(info)} · Version {Formatting.Number(info.Version)} · {Size(info.SizeBytes)}";
+
+    internal static string BuiltDay(RegionPackInfo info) =>
+        DateTimeOffset.TryParse(info.BuiltAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
             ? Formatting.Date(t)
             : info.BuiltAt;
-        return $"Stand {built} · Version {Formatting.Number(info.Version)} · {Size(info.SizeBytes)}";
-    }
 
     internal static string Size(long bytes) => $"{Formatting.Number((int)Math.Max(1, Math.Ceiling(bytes / (1024.0 * 1024.0))))} MB";
 }
@@ -233,4 +233,10 @@ public sealed class AvailableMapPackRow(RegionPackInfo info, RegionPackInfo? ins
         && string.Equals(installed.BoundaryUrl, Info.BoundaryUrl, StringComparison.Ordinal);
 
     public string ActionLabel => installed is null ? "HERUNTERLADEN" : IsCurrent ? "INSTALLIERT" : "AKTUALISIEREN";
+
+    /// <summary>Why AKTUALISIEREN is offered, so an update with the same version number is not a riddle; null otherwise.</summary>
+    public string? UpdateReason => installed is null || IsCurrent ? null
+        : installed.Version != Info.Version ? $"Neue Version {Formatting.Number(Info.Version)} – installiert ist Version {Formatting.Number(installed.Version)}."
+        : !string.Equals(installed.Sha256, Info.Sha256, StringComparison.Ordinal) ? $"Neu gebaut am {MapPacksSection.BuiltDay(Info)} – installiert ist der Stand vom {MapPacksSection.BuiltDay(installed)}."
+        : "Lädt die Gebietsgrenze nach, damit angrenzende Karten nahtlos aneinander passen.";
 }
