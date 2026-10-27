@@ -19,6 +19,16 @@ public class GasesSectionTests
         public void Save(MasterDataSet set) => Saved = set;
     }
 
+    private static readonly Dictionary<string, Action<GasRow>> Fill = new(StringComparer.Ordinal)
+    {
+        ["name"] = r => r.Name = "H2S",
+        ["unit"] = r => r.Unit = "ppm",
+        ["elevated"] = r => r.Elevated = 5,
+        ["dangerous"] = r => r.Dangerous = 10,
+        ["lethal"] = r => r.Lethal = 100,
+        ["plausible"] = r => r.PlausibleUpTo = 500,
+    };
+
     private static GasesSection Section(params GasDefinition[] gases) => new("Messgase", gases, () => { });
 
     [Fact]
@@ -111,5 +121,102 @@ public class GasesSectionTests
         Assert.True(vm.SaveCommand.CanExecute(null));
         vm.SaveCommand.Execute(null);
         Assert.Equal(900m, Assert.Single(provider.Saved.Gases).Lethal);
+    }
+
+    [Fact]
+    public void Adding_a_row_rechecks_both_buttons_marks_the_editor_changed_and_hands_the_row_to_the_view()
+    {
+        var changes = 0;
+        var section = new GasesSection("Messgase", [GasDefinition.DefaultCo], () => changes++);
+        var (addChecks, removeChecks) = (0, 0);
+        section.AddCommand.CanExecuteChanged += (_, _) => addChecks++;
+        section.RemoveCommand.CanExecuteChanged += (_, _) => removeChecks++;
+        object? handedOver = null;
+        section.RowAdded += (_, e) => handedOver = e.Row;
+
+        section.AddCommand.Execute(null);
+
+        Assert.True(addChecks > 0);
+        Assert.True(removeChecks > 0);
+        Assert.Equal(1, changes);
+        Assert.Same(section.Rows[1], handedOver);
+    }
+
+    [Fact]
+    public void Removing_no_row_or_a_row_from_elsewhere_does_nothing()
+    {
+        var asked = 0;
+        var section = new GasesSection("Messgase", [GasDefinition.DefaultCo, H2S], () => { }, (_, _) => asked++);
+        var stranger = Section(H2S).Rows[0];
+
+        section.RemoveCommand.Execute(null);
+        section.RemoveCommand.Execute(stranger);
+
+        Assert.Equal(2, section.Rows.Count);
+        Assert.Equal(0, asked);
+    }
+
+    [Fact]
+    public void A_row_added_and_left_blank_goes_at_once()
+    {
+        var (changes, asked) = (0, 0);
+        var section = new GasesSection("Messgase", [GasDefinition.DefaultCo], () => changes++, (_, _) => asked++);
+        section.AddCommand.Execute(null);
+
+        section.RemoveCommand.Execute(section.Rows[1]);
+
+        Assert.Single(section.Rows);
+        Assert.Equal(0, asked);
+        Assert.Equal(2, changes);
+    }
+
+    [Theory]
+    [InlineData("name")]
+    [InlineData("unit")]
+    [InlineData("elevated")]
+    [InlineData("dangerous")]
+    [InlineData("lethal")]
+    [InlineData("plausible")]
+    public void A_row_added_with_any_field_filled_asks_before_it_goes(string field)
+    {
+        var asked = 0;
+        var section = new GasesSection("Messgase", [GasDefinition.DefaultCo], () => { }, (_, _) => asked++);
+        section.AddCommand.Execute(null);
+        var row = section.Rows[1];
+        Fill[field](row);
+
+        section.RemoveCommand.Execute(row);
+
+        Assert.Equal(1, asked);
+        Assert.Equal(2, section.Rows.Count);
+    }
+
+    [Fact]
+    public void Several_nameless_rows_are_named_together_and_not_as_duplicates()
+    {
+        var section = Section(GasDefinition.DefaultCo);
+        section.AddCommand.Execute(null);
+        section.AddCommand.Execute(null);
+
+        Assert.Equal("Messgas ohne Namen: Zeilen 2, 3", Assert.Single(section.Conflicts()));
+    }
+
+    [Fact]
+    public void A_list_of_nameless_rows_saves_as_CO_alone()
+    {
+        var section = Section(GasDefinition.DefaultCo);
+        section.Rows[0].Name = "  ";
+
+        Assert.Equal(new[] { GasDefinition.DefaultCo }, section.ToValues());
+    }
+
+    [Fact]
+    public void A_stored_list_with_a_conflict_is_flagged_as_soon_as_the_editor_opens()
+    {
+        var provider = new Provider(MasterDataSet.Empty with { Gases = [GasDefinition.DefaultCo with { Lethal = 100 }] });
+
+        var vm = new MasterDataEditorViewModel(provider, new FakeDialogs(), new NoFiles());
+
+        Assert.True(vm.HasGasConflicts);
     }
 }

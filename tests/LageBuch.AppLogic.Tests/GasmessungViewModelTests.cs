@@ -202,4 +202,113 @@ public class GasmessungViewModelTests
         Assert.Equal("H2S", row.Gas);
         Assert.Equal("3 ppm", row.Value);
     }
+
+    [Fact]
+    public void A_tile_announces_what_each_change_redraws()
+    {
+        var (session, vm) = CreateVm(GasDefinition.DefaultCo, H2S);
+        var cell = Cell(vm, 0, 1);
+        var changed = new List<string?>();
+        cell.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        string[] tooltip = [nameof(cell.TooltipHead), nameof(cell.TooltipTail), nameof(cell.TileTooltip)];
+
+        cell.Status = DwellingStatus.Affected;
+        Assert.Superset(new HashSet<string?>([nameof(cell.StatusGlyph), .. tooltip]), changed.ToHashSet());
+
+        changed.Clear();
+        cell.Values = new Dictionary<Guid, decimal> { [session.Incident.Gases[0].Id] = 1 };
+        Assert.Superset(
+            new HashSet<string?>([
+                nameof(cell.Worst), nameof(cell.GasValueRows), nameof(cell.CoDisplay), nameof(cell.CoCompact),
+                nameof(cell.IsCoElevated), nameof(cell.IsCoDangerous), nameof(cell.IsCoLethal), .. tooltip]),
+            changed.ToHashSet());
+
+        changed.Clear();
+        cell.KeyAvailable = KeyAvailability.Available;
+        Assert.Superset(new HashSet<string?>([nameof(cell.KeyDisplay), .. tooltip]), changed.ToHashSet());
+
+        changed.Clear();
+        cell.KeyNumber = "12";
+        Assert.Superset(new HashSet<string?>([nameof(cell.KeyDisplay), .. tooltip]), changed.ToHashSet());
+    }
+
+    [Fact]
+    public void A_tile_and_a_sidebar_built_without_gases_show_none()
+    {
+        var building = Building.Create("Haus A", 1, 1, 0);
+        var dwelling = Dwelling.Rehydrate(Guid.NewGuid(), building.Id, 0, 1, null, DwellingStatus.NotSearched, KeyAvailability.Unknown, null);
+
+        var cell = new DwellingCellViewModel(dwelling, building, isReadOnly: false, (_, _, _) => { });
+        var editor = new DwellingEditorViewModel(dwelling, building);
+
+        Assert.Empty(cell.GasValueRows);
+        Assert.Empty(editor.GasInputs);
+    }
+
+    [Fact]
+    public void A_Messreihe_row_of_a_gas_the_Einsatz_lacks_shows_the_bare_number_uncoloured()
+    {
+        List<IncidentGas> gases = [new(Guid.NewGuid(), GasDefinition.DefaultCo), new(Guid.NewGuid(), H2S)];
+
+        var row = CoReadingRow.From(new CoReading(Clock.Now, Guid.NewGuid(), 7, "x"), gases);
+
+        Assert.Equal("7", row.Value);
+        Assert.Equal(string.Empty, row.Gas);
+        Assert.False(row.IsCoElevated || row.IsCoDangerous || row.IsCoLethal);
+    }
+
+    [Fact]
+    public void A_Messreihe_row_of_a_CO_only_Einsatz_names_no_gas_and_flags_a_lethal_value()
+    {
+        List<IncidentGas> gases = [new(Guid.NewGuid(), GasDefinition.DefaultCo)];
+
+        var row = CoReadingRow.From(new CoReading(Clock.Now, gases[0].Id, 2500, "x"), gases);
+
+        Assert.Equal(string.Empty, row.Gas);
+        Assert.True(row.IsCoLethal);
+        Assert.False(row.IsCoDangerous);
+    }
+
+    [Fact]
+    public void An_input_rounds_what_FERTIG_would_record_and_colours_its_band()
+    {
+        var input = new GasInputRow(new IncidentGas(Guid.NewGuid(), GasDefinition.DefaultCo), null, () => { });
+
+        input.Value = 40.555m;
+        Assert.Equal(40.56m, input.Committed);
+        Assert.True(input.IsCoElevated);
+        Assert.False(input.IsCoDangerous);
+
+        input.Value = 250;
+        Assert.True(input.IsCoDangerous);
+        Assert.False(input.IsCoElevated);
+    }
+
+    [Fact]
+    public void A_tile_whose_Haus_is_gone_opens_no_sidebar()
+    {
+        var (session, vm) = CreateVm();
+        var cell = Cell(vm, 0, 1);
+        session.RemoveCoBuilding(session.Incident.Buildings[0].Id);
+
+        cell.OpenEditorCommand.Execute(null);
+
+        Assert.Null(vm.Editor);
+    }
+
+    [Fact]
+    public void Shrinking_past_a_Wohnung_whose_value_was_cleared_names_its_Messreihe()
+    {
+        var (session, vm) = CreateVm();
+        var haus = session.Incident.Buildings[0].Id;
+        var co = session.Incident.Gases[0].Id;
+        session.RecordCoValues(haus, 0, 3, new Dictionary<Guid, decimal?> { [co] = 40 });
+        session.RecordCoValues(haus, 0, 3, new Dictionary<Guid, decimal?> { [co] = null });
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).ApartmentCount = 2;
+
+        var pending = vm.PendingApartmentRemoval;
+        Assert.NotNull(pending);
+        Assert.Contains("Messreihe", pending.Rows.Single(r => r.ApartmentNumber == 3).Contents, StringComparison.Ordinal);
+    }
 }
