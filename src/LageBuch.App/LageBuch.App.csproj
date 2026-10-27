@@ -26,6 +26,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The licences travel with the .msi, .deb and .dmg, which all ship the publish directory: the
+         OFL requires its text next to the bundled fonts. Kept out of the single-file bundle so
+         they sit beside the executable, readable. -->
+    <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\LageBuch.App.Shared\Assets\Fonts\OFL.txt" Link="OFL.txt" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="LageBuch.App.Tests" />
   </ItemGroup>
 

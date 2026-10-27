@@ -5,6 +5,11 @@ All fonts below are licensed under the **SIL Open Font License, Version 1.1**
 within an application. Each family retains its own copyright and Reserved Font
 Name as stated in its upstream `OFL.txt`.
 
+[`OFL.txt`](OFL.txt) holds the licence text with every copyright line, including
+Inter's (the default UI font, from the `Avalonia.Fonts.Inter` package). The
+desktop app copies it next to the executable on publish, so the `.msi`, `.deb`
+and `.dmg` carry it as the OFL requires.
+
 | File(s)                                      | Family         | Copyright                                                                 |
 | -------------------------------------------- | -------------- | ------------------------------------------------------------------------- |
 | `Oswald-Medium.ttf`, `Oswald-SemiBold.ttf`   | Oswald         | Copyright 2016 The Oswald Project Authors (github.com/googlefonts/OswaldFont) |
