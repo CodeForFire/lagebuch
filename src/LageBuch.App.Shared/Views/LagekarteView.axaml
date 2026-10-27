@@ -1,0 +1,204 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:c="clr-namespace:LageBuch.App.Shared.Controls"
+             x:Class="LageBuch.App.Shared.Views.LagekarteView"
+             x:DataType="vm:LagekarteViewModel">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding CancelPlacingCommand}" />
+  </UserControl.KeyBindings>
+  <!-- Keyed off the "narrow" class on IncidentWorkspaceView's root Panel (#685). The list sits
+       beside the map on a desk and under it on a phone; both as Style setters, because a local
+       DockPanel.Dock= or Width= would outrank them. -->
+  <UserControl.Styles>
+    <Style Selector="Border#UnitPanel">
+      <Setter Property="DockPanel.Dock" Value="Right" />
+      <Setter Property="Width" Value="300" />
+      <Setter Property="Margin" Value="12,0,0,0" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#UnitPanel">
+      <Setter Property="DockPanel.Dock" Value="Bottom" />
+      <Setter Property="Width" Value="NaN" />
+      <Setter Property="MaxHeight" Value="260" />
+      <Setter Property="Margin" Value="0,12,0,0" />
+    </Style>
+    <!-- Marks sit on a light map, so they carry their own dark plate rather than the page's colours. -->
+    <Style Selector="Border.unit-mark">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="Cursor" Value="SizeAll" />
+    </Style>
+    <Style Selector="Border.einsatzort-mark">
+      <Setter Property="Background" Value="{StaticResource SignalBrush}" />
+      <Setter Property="BorderBrush" Value="White" />
+      <Setter Property="BorderThickness" Value="3" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Cursor" Value="SizeAll" />
+    </Style>
+    <Style Selector="Border.map-banner">
+      <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="Margin" Value="8" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Einsatzort and units: what can be put on the map, and what already is. -->
+    <Border x:Name="UnitPanel" Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="12">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="EINSATZORT" Classes="overline" FontSize="10" Margin="0,0,0,6" />
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,14">
+          <Button Grid.Column="0" x:Name="PlaceEinsatzortButton" Classes="signal" HorizontalAlignment="Left"
+                  Content="{Binding EinsatzortLabel}"
+                  IsEnabled="{Binding CanEdit}" Command="{Binding PlaceEinsatzortCommand}" />
+          <Button Grid.Column="1" Classes="icon-btn" ToolTip.Tip="Zum Einsatzort"
+                  AutomationProperties.Name="Zum Einsatzort" IsVisible="{Binding HasEinsatzort}"
+                  Command="{Binding CenterOnEinsatzortCommand}">
+            <PathIcon Data="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />
+          </Button>
+          <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Einsatzort von der Karte nehmen"
+                  AutomationProperties.Name="Einsatzort von der Karte nehmen"
+                  IsVisible="{Binding HasEinsatzort}" IsEnabled="{Binding CanEdit}"
+                  Command="{Binding RemoveEinsatzortCommand}">
+            <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+          </Button>
+        </Grid>
+
+        <TextBlock DockPanel.Dock="Top" Text="EINHEITEN" Classes="overline" FontSize="10" Margin="0,0,0,6" />
+        <TextBlock DockPanel.Dock="Top" x:Name="NoUnitsHint" TextWrapping="Wrap"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="Noch keine Einheiten. Unter KRÄFTE erfassen."
+                   IsVisible="{Binding HasNoUnits}" />
+        <ScrollViewer>
+          <ItemsControl x:Name="UnitList" ItemsSource="{Binding Units}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:LagekarteUnitRow">
+                <!-- The name gets the whole width: a Funkrufname cut to "Florian Musterst…" names no one. -->
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                  <TextBlock Grid.ColumnSpan="4" Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Detail}" FontSize="12" VerticalAlignment="Center"
+                             Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                  <!-- ReflectionBinding: the commands live on the ItemsControl's DataContext,
+                       object-typed under compiled bindings. -->
+                  <Button Grid.Row="1" Grid.Column="1" Classes="ghost" Content="{Binding PlaceLabel}" Margin="6,0,0,0"
+                          IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.PlaceUnitCommand}"
+                          CommandParameter="{Binding}" />
+                  <Button Grid.Row="1" Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Auf der Karte zeigen"
+                          AutomationProperties.Name="Auf der Karte zeigen" IsVisible="{Binding IsPlaced}"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.CenterOnUnitCommand}"
+                          CommandParameter="{Binding}">
+                    <PathIcon Data="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />
+                  </Button>
+                  <Button Grid.Row="1" Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Von der Karte nehmen"
+                          AutomationProperties.Name="Von der Karte nehmen" IsVisible="{Binding IsPlaced}"
+                          IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveUnitCommand}"
+                          CommandParameter="{Binding}">
+                    <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <!-- The map, its marks, and what floats over it. -->
+    <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <Grid x:Name="MapArea">
+        <c:MapCanvasControl x:Name="Map"
+                            AutomationProperties.Name="Lagekarte"
+                            TileSource="{Binding Map.TileSource}"
+                            Center="{Binding Map.Center}"
+                            Zoom="{Binding Map.Zoom}"
+                            ViewChangedCommand="{Binding Map.ChangeViewCommand}"
+                            TappedCommand="{Binding MapTappedCommand}" />
+
+        <ItemsControl x:Name="Marks" ItemsSource="{Binding Markers}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate x:DataType="vm:LagekarteViewModel">
+              <c:MapMarkerPanel Center="{Binding Map.Center}" Zoom="{Binding Map.Zoom}" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.Styles>
+            <Style Selector="ItemsControl#Marks > ContentPresenter" x:DataType="vm:LagekarteMarker">
+              <Setter Property="c:MapMarkerPanel.Position" Value="{Binding Position}" />
+            </Style>
+          </ItemsControl.Styles>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LagekarteMarker">
+              <Panel AutomationProperties.Name="{Binding AutomationName}" ToolTip.Tip="{Binding Title}"
+                     PointerPressed="OnMarkerPressed" PointerMoved="OnMarkerMoved"
+                     PointerReleased="OnMarkerReleased" PointerCaptureLost="OnMarkerCaptureLost">
+                <Border Classes="einsatzort-mark" IsVisible="{Binding IsEinsatzort}">
+                  <TextBlock Text="E" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Border Classes="unit-mark" IsVisible="{Binding !IsEinsatzort}">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
+                               IsVisible="{Binding Subtitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </StackPanel>
+                </Border>
+              </Panel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top">
+          <!-- What the next tap places; the way out without placing anything. -->
+          <Border Classes="map-banner" x:Name="PlacingBanner" IsVisible="{Binding IsPlacing}"
+                  BorderBrush="{StaticResource SignalBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="{Binding PlacingHint}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
+              <Button Classes="ghost" Content="IN KARTENMITTE" Command="{Binding PlaceAtCenterCommand}" />
+              <Button Classes="ghost" Content="ABBRECHEN" Command="{Binding CancelPlacingCommand}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="map-banner" x:Name="NoMapBanner" IsVisible="{Binding HasNoMap}">
+            <TextBlock TextWrapping="Wrap" MaxWidth="420"
+                       Text="Kein Kartenpaket auf diesem Gerät. Unter Stammdaten → Karten herunterladen." />
+          </Border>
+          <Border Classes="map-banner" x:Name="MapErrorBanner" BorderBrush="{StaticResource ErrorBrush}"
+                  IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding ActionError}" TextWrapping="Wrap" MaxWidth="420" />
+          </Border>
+        </StackPanel>
+
+        <!-- On the app's dark surface, so the buttons stand out against a light map. -->
+        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Spacing="4"
+                    Background="{StaticResource SurfaceRaisedBrush}">
+          <Button Classes="icon-btn" ToolTip.Tip="Vergrößern" AutomationProperties.Name="Vergrößern"
+                  Command="{Binding Map.ZoomInCommand}">
+            <PathIcon Data="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+          </Button>
+          <Button Classes="icon-btn" ToolTip.Tip="Verkleinern" AutomationProperties.Name="Verkleinern"
+                  Command="{Binding Map.ZoomOutCommand}">
+            <PathIcon Data="M19 13H5v-2h14v2z" />
+          </Button>
+        </StackPanel>
+
+        <!-- ODbL: every map drawn from OSM data names its source. -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#CCFFFFFF" Padding="4,1"
+                IsVisible="{Binding Map.Attribution, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Text="{Binding Map.Attribution}" FontSize="10" Foreground="#FF333333" TextWrapping="Wrap" />
+        </Border>
+      </Grid>
+    </Border>
+  </DockPanel>
+</UserControl>

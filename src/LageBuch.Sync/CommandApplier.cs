@@ -85,6 +85,12 @@ public static class CommandApplier
             case MoveForceUnitCommand c:
                 incident.MoveForceUnit(clock, Operator(c.Operator), c.UnitId, c.NodeId);
                 break;
+            case SetIncidentLocationCommand c:
+                incident.SetLocation(clock, Operator(c.Operator), Position(c.Latitude, c.Longitude));
+                break;
+            case PlaceForceUnitCommand c:
+                incident.PlaceForceUnit(clock, Operator(c.Operator), c.UnitId, Position(c.Latitude, c.Longitude));
+                break;
             case SetFuehrungsstufeCommand c:
                 incident.SetFuehrungsstufe(clock, Operator(c.Operator), c.Stufe);
                 break;
@@ -273,4 +279,12 @@ public static class CommandApplier
     }
 
     private static SessionOperator Operator(OperatorDto dto) => new(dto.Name, dto.CallSign);
+
+    // Both null takes a mark off the Lagekarte. Anything else has to be a position on the globe: a
+    // half-given or impossible coordinate is refused like any other bad command, never read as "off".
+    private static GeoPoint? Position(double? latitude, double? longitude) =>
+        latitude is null && longitude is null
+            ? null
+            : GeoPoint.TryCreate(latitude, longitude)
+                ?? throw new ArgumentException("Ungültige Koordinaten.", nameof(latitude));
 }

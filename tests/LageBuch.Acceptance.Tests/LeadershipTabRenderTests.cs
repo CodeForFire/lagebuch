@@ -35,7 +35,7 @@ public class LeadershipTabRenderTests
     }
 
     [AvaloniaFact]
-    public void Fuehrung_opens_on_organisation_beside_funktionen_and_kraefte()
+    public void Fuehrung_opens_on_organisation_beside_funktionen_kraefte_and_karte()
     {
         var window = ShowWorkspace();
 
@@ -43,7 +43,7 @@ public class LeadershipTabRenderTests
         var strip = WorkspaceRenderHelper.LeadershipTabStrip(window);
 
         Assert.Equal(
-            new[] { "ORGANISATION", "FUNKTIONEN", "KRÄFTE" },
+            new[] { "ORGANISATION", "FUNKTIONEN", "KRÄFTE", "KARTE" },
             strip.Items.OfType<TabItem>().Select(t => t.Header as string));
         Assert.Equal("ORGANISATION", ((TabItem)strip.SelectedItem!).Header);
         Assert.All(strip.Items.OfType<TabItem>(), t => Assert.True(t.IsEffectivelyVisible));

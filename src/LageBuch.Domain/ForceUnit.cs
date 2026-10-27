@@ -1,3 +1,5 @@
+using LageBuch.Domain.ValueObjects;
+
 namespace LageBuch.Domain;
 
 public sealed record ForceUnit(
@@ -21,7 +23,10 @@ public sealed record ForceUnit(
 
     // The Abschnitt, Unterabschnitt or Bereitstellung the unit is placed in; null is "nicht
     // zugeordnet". Appended last so every older row and payload reads as unplaced.
-    Guid? NodeId = null)
+    Guid? NodeId = null,
+
+    // Where the unit stands on the Lagekarte; null is "nicht auf der Karte". Same convention.
+    GeoPoint? Position = null)
 {
     /// <summary>Mannschaft = Gesamtstärke abzüglich Zugführer und Führungskräfte.</summary>
     public int MannschaftCount => PersonnelCount - OfficerCount - ZugfuehrerCount;
@@ -99,6 +104,9 @@ public sealed record ForceUnit(
     /// <summary>Returns a copy placed in <paramref name="nodeId"/>, or unplaced when null.</summary>
     public ForceUnit WithNode(Guid? nodeId) => this with { NodeId = nodeId };
 
+    /// <summary>Returns a copy standing at <paramref name="position"/> on the Lagekarte, or off it when null.</summary>
+    public ForceUnit WithPosition(GeoPoint? position) => this with { Position = position };
+
     public IReadOnlyList<ForceUnitStrengthEdit> Edits { get; private init; } =
         Array.Empty<ForceUnitStrengthEdit>();
 
@@ -113,8 +121,9 @@ public sealed record ForceUnit(
         int officerCount,
         IEnumerable<ForceUnitStrengthEdit>? edits = null,
         int zugfuehrerCount = 0,
-        Guid? nodeId = null)
-        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount, zugfuehrerCount, nodeId)
+        Guid? nodeId = null,
+        GeoPoint? position = null)
+        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount, zugfuehrerCount, nodeId, position)
         {
             Edits = (edits ?? Enumerable.Empty<ForceUnitStrengthEdit>()).ToList(),
         };

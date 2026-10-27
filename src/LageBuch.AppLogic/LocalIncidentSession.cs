@@ -178,6 +178,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void MoveForceUnit(Guid unitId, Guid? nodeId) =>
         Mutate(() => Incident.MoveForceUnit(_clock, RequireOperator(), unitId, nodeId));
 
+    public void SetIncidentLocation(GeoPoint? location) =>
+        Mutate(() => Incident.SetLocation(_clock, RequireOperator(), location));
+
+    public void PlaceForceUnit(Guid unitId, GeoPoint? position) =>
+        Mutate(() => Incident.PlaceForceUnit(_clock, RequireOperator(), unitId, position));
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Mutate(() => Incident.PlaceRoleAssignment(_clock, RequireOperator(), assignmentId, nodeId, slot));
 

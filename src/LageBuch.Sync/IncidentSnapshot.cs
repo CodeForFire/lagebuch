@@ -70,7 +70,12 @@ public sealed record IncidentSnapshot(
     string? ElStandort = null,
     string? ElRufname = null,
     string? ElTelefon = null,
-    string? ElFunkgruppe = null);
+    string? ElFunkgruppe = null,
+
+    // The Einsatzort on the Lagekarte, as plain numbers: a peer's values are checked on arrival
+    // (GeoPoint.TryCreate), never trusted into a constructor that would throw mid-sync.
+    double? LocationLatitude = null,
+    double? LocationLongitude = null);
 
 public sealed record TimerDto(
     string Key,
@@ -124,7 +129,9 @@ public sealed record ForceUnitDto(
     int OfficerCount,
     IReadOnlyList<ForceUnitStrengthEditDto> Edits,
     int ZugfuehrerCount = 0,
-    Guid? NodeId = null);
+    Guid? NodeId = null,
+    double? PositionLatitude = null,
+    double? PositionLongitude = null);
 
 // Mirrors Domain.ForceUnitStrengthEdit: one prior Stärke retained on correction (#76), the
 // force-row sibling of EtbEntryEditDto.

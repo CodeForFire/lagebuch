@@ -41,7 +41,7 @@ public static class CompositionRoot
         // the switch still works for this run.
         alarmMute ??= new AlarmMute();
         alarm = new MutedAlarmService(alarm, alarmMute);
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport, alarmMute: alarmMute);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport, alarmMute: alarmMute, mapPacks: mapPacks);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService, mapPacks);
         return new MainWindowViewModel(home, editor, dialogs, appVersion, alarm, alarmMute, uiDispatcher);
     }

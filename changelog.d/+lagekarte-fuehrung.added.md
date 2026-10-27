@@ -1,0 +1,1 @@
+Führung gains a KARTE tab: the Lagebuchführer marks the Einsatzort and puts units on the offline map by picking them and tapping, drags them to move them, and every joined device sees the same Lagekarte.
