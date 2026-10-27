@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services.Map;
@@ -189,6 +190,15 @@ public sealed partial class MapPacksSection : EditorSection
         InstallCommand.NotifyCanExecuteChanged();
     }
 
+    // "Stand 27.10.2026 · Version 1 · 253 MB". A build time that is no ISO timestamp is shown as it came.
+    internal static string Detail(RegionPackInfo info)
+    {
+        var built = DateTimeOffset.TryParse(info.BuiltAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
+            ? Formatting.Date(t)
+            : info.BuiltAt;
+        return $"Stand {built} · Version {Formatting.Number(info.Version)} · {Size(info.SizeBytes)}";
+    }
+
     internal static string Size(long bytes) => $"{Formatting.Number((int)Math.Max(1, Math.Ceiling(bytes / (1024.0 * 1024.0))))} MB";
 }
 
@@ -199,7 +209,7 @@ public sealed class InstalledMapPackRow(InstalledRegionPack pack)
 
     public string Name => Pack.Info.Name;
 
-    public string Detail => $"Stand {Pack.Info.BuiltAt} · {MapPacksSection.Size(Pack.Info.SizeBytes)}";
+    public string Detail => MapPacksSection.Detail(Pack.Info);
 
     public string Attribution => Pack.Info.Attribution;
 }
@@ -211,10 +221,10 @@ public sealed class AvailableMapPackRow(RegionPackInfo info, RegionPackInfo? ins
 
     public string Name => Info.Name;
 
-    public string Detail => $"Stand {Info.BuiltAt} · {MapPacksSection.Size(Info.SizeBytes)}";
+    public string Detail => MapPacksSection.Detail(Info);
 
     /// <summary>The device holds exactly this edition; there is nothing to download.</summary>
-    public bool IsCurrent => installed is not null && installed.BuiltAt == Info.BuiltAt && installed.DownloadUrl == Info.DownloadUrl;
+    public bool IsCurrent => installed is not null && installed.Version == Info.Version && string.Equals(installed.Sha256, Info.Sha256, StringComparison.Ordinal);
 
     public string ActionLabel => installed is null ? "HERUNTERLADEN" : IsCurrent ? "INSTALLIERT" : "AKTUALISIEREN";
 }

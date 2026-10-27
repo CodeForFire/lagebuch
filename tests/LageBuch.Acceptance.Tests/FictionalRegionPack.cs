@@ -19,8 +19,8 @@ internal static class FictionalRegionPack
     public static void Install(string root)
     {
         var folder = Directory.CreateDirectory(Path.Join(root, "ffb")).FullName;
-        var info = new RegionPackInfo("Landkreis Fürstenfeldbruck", "ffb", "https://example.org/ffb.zip", 15_782_458, 48.0877, 10.9930, 48.2967, 11.4129, "2026-08-31", Attribution);
-        File.WriteAllText(Path.Join(folder, "pack.json"), JsonSerializer.Serialize(info));
+        var info = new RegionPackInfo("Landkreis Fürstenfeldbruck", "ffb", 1, "https://example.org/ffb-v1.zip", 264_978_779, new string('a', 64), 10.9527, 48.0607, 11.4532, 48.3237, 11, 17, "2026-10-27T20:15:49Z", Attribution);
+        File.WriteAllText(Path.Join(folder, "installed.json"), JsonSerializer.Serialize(info));
 
         using var cn = SqliteConnectionFactory.OpenReadWrite(Path.Join(folder, InstalledRegionPack.TilesFileName));
         using (var create = cn.CreateCommand())

@@ -4,27 +4,34 @@ using LageBuch.Domain.ValueObjects;
 namespace LageBuch.AppLogic.Services.Map;
 
 /// <summary>
-/// One Kartenpaket: a Landkreis' raster tiles, as the published catalogue lists it and as an
-/// installed pack remembers it in its <c>pack.json</c>.
+/// One Kartenpaket from <c>CodeForFire/lagebuch-geodata</c>: a Landkreis' base map, terrain
+/// heights, water points and addresses, as the published <c>packs.json</c> lists it and as an
+/// installed pack remembers it.
 /// </summary>
 /// <remarks>
 /// <see cref="Slug"/> is the folder the pack is installed under, and
 /// <see cref="RegionPackCatalogJson.IsSafeSlug"/> holds for it. Only an <c>https</c>
-/// <see cref="DownloadUrl"/> is ever fetched, and a download larger than <see cref="SizeBytes"/>
-/// is refused. <see cref="BuiltAt"/> is the render date as the catalogue writes it, shown as it
-/// is; <see cref="Attribution"/> is the licence line every map drawn from the pack has to show.
+/// <see cref="DownloadUrl"/> is ever fetched, a download larger than <see cref="SizeBytes"/> is
+/// refused, and one whose SHA-256 is not <see cref="Sha256"/> (lower-case hex) is never unpacked.
+/// <see cref="Version"/> rises with every rebuild. <see cref="BuiltAt"/> is the build time as the
+/// catalogue writes it; <see cref="Attribution"/> is the licence line every map drawn from the
+/// pack has to show.
 /// </remarks>
 [SuppressMessage("Design", "CA1054", Justification = "Catalogue data, kept as the string it arrived as; RegionPackLibrary parses and checks it before any request.")]
 [SuppressMessage("Design", "CA1056", Justification = "Catalogue data, kept as the string it arrived as; RegionPackLibrary parses and checks it before any request.")]
 public sealed record RegionPackInfo(
     string Name,
     string Slug,
+    int Version,
     string DownloadUrl,
     long SizeBytes,
-    double MinLatitude,
-    double MinLongitude,
-    double MaxLatitude,
-    double MaxLongitude,
+    string Sha256,
+    double West,
+    double South,
+    double East,
+    double North,
+    int MinZoom,
+    int MaxZoom,
     string BuiltAt,
     string Attribution)
 {
@@ -32,7 +39,7 @@ public sealed record RegionPackInfo(
     public bool Covers(GeoPoint point)
     {
         ArgumentNullException.ThrowIfNull(point);
-        return point.Latitude >= MinLatitude && point.Latitude <= MaxLatitude
-            && point.Longitude >= MinLongitude && point.Longitude <= MaxLongitude;
+        return point.Latitude >= South && point.Latitude <= North
+            && point.Longitude >= West && point.Longitude <= East;
     }
 }

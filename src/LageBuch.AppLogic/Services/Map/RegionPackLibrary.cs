@@ -1,12 +1,16 @@
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace LageBuch.AppLogic.Services.Map;
 
 /// <summary>
 /// Keeps the Kartenpakete under one folder, <c>&lt;root&gt;/&lt;slug&gt;/</c>, each with the
-/// <c>pack.json</c> it was installed from. The catalogue and every zip come from the network, so
-/// both are read against caps, and only the files a pack is known to hold are ever written.
+/// catalogue entry it was installed from in <c>installed.json</c>. The catalogue and every zip
+/// come from the network, so both are read against caps; a zip is unpacked only when its SHA-256
+/// is the catalogue's, it holds exactly the files FORMAT.md names, and each matches the size and
+/// SHA-256 its own <c>pack.json</c> declares.
 /// </summary>
 /// <remarks>
 /// The only network calls Lagebuch makes on its own account, and only when the Lagebuchführer asks
@@ -17,24 +21,34 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     /// <summary>A catalogue larger than this is not a list of Landkreise.</summary>
     public const long MaxCatalogBytes = 1024 * 1024;
 
-    /// <summary>The largest zip accepted, whatever the catalogue claims. A zoom-15 Landkreis is about 16 MB.</summary>
+    /// <summary>The largest zip accepted, whatever the catalogue claims. A Landkreis at zoom 17 with its DGM5 is about 270 MB.</summary>
     public const long MaxPackBytes = 1024L * 1024 * 1024;
 
     /// <summary>The most a pack may unpack to, all files together.</summary>
     public const long MaxUnpackedBytes = 2L * 1024 * 1024 * 1024;
 
-    private const string InfoFileName = "pack.json";
+    /// <summary>A pack's own <c>pack.json</c> larger than this is not a description of six files.</summary>
+    public const long MaxManifestBytes = 64 * 1024;
+
+    // The app's record of the catalogue entry; pack.json is the publisher's and is kept as it came.
+    private const string InfoFileName = "installed.json";
+
+    private const string ManifestFileName = "pack.json";
 
     // Downloading is the slow part; the last tenth of the bar is left for unpacking.
     private const double DownloadShare = 0.9;
 
-    /// <summary>The catalogue published from <c>CodeForFire/lagebuch-regions</c>.</summary>
-    public static readonly Uri DefaultCatalogUrl = new("https://raw.githubusercontent.com/CodeForFire/lagebuch-regions/main/regions.json");
+    /// <summary>The catalogue published from <c>CodeForFire/lagebuch-geodata</c>.</summary>
+    public static readonly Uri DefaultCatalogUrl = new("https://raw.githubusercontent.com/CodeForFire/lagebuch-geodata/main/packs.json");
 
-    // The files a pack is known to hold, each written under this fixed name. Nothing else in the
-    // zip is unpacked, so no entry name ever reaches a path. region.dem is the Wasserförderung's
-    // elevation grid (#587).
-    private static readonly string[] PackFiles = [InstalledRegionPack.TilesFileName, "region.dem"];
+    // The data files pack.json lists with size and SHA-256. elevation.tif is the Wasserförderung's
+    // terrain model (#587); it is installed and checked, not yet read.
+    private static readonly string[] DataFiles =
+        [InstalledRegionPack.TilesFileName, "elevation.tif", InstalledRegionPack.WaterFileName, InstalledRegionPack.AddressesFileName];
+
+    // Everything a zip holds, at its root: FORMAT.md says exactly these, and a zip with any other
+    // entry is refused. Each is written under this fixed name, so no entry name reaches a path.
+    private static readonly string[] PackFiles = [ManifestFileName, "ATTRIBUTION.md", .. DataFiles];
 
     private readonly HttpClient _http;
     private readonly string _root;
@@ -56,6 +70,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
             _catalogUrl,
             buffer,
             MaxCatalogBytes,
+            null,
             null,
             "Die Liste der Kartenpakete",
             cancellationToken);
@@ -117,16 +132,21 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
             DeleteDirectory(staging);
             DeleteDirectory(previous);
 
-            await using (var file = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
             {
-                await DownloadAsync(url, file, pack.SizeBytes, progress, "Das Kartenpaket", cancellationToken);
+                await using (var file = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await DownloadAsync(url, file, pack.SizeBytes, hash, progress, "Das Kartenpaket", cancellationToken);
+                }
+
+                if (!SameHash(hash.GetHashAndReset(), pack.Sha256))
+                {
+                    throw new RegionPackException("Das Kartenpaket ist beschädigt (Prüfsumme stimmt nicht). Erneut herunterladen.");
+                }
             }
 
-            Unpack(zipPath, staging);
-            if (!File.Exists(Path.Join(staging, InstalledRegionPack.TilesFileName)))
-            {
-                throw new RegionPackException("Das Kartenpaket enthält keine Karte (region.mbtiles fehlt).");
-            }
+            var unpacked = Unpack(zipPath, staging);
+            CheckManifest(Path.Join(staging, ManifestFileName), pack, unpacked);
 
             new JsonFileStore<RegionPackInfo>(Path.Join(staging, InfoFileName)).Write(pack);
 
@@ -211,8 +231,8 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     }
 
     // Reads the body into target, refusing it as soon as it outgrows maxBytes -- a missing or
-    // lying Content-Length must not let it grow without bound.
-    private async Task DownloadAsync(Uri url, Stream target, long maxBytes, IProgress<double>? progress, string what, CancellationToken cancellationToken)
+    // lying Content-Length must not let it grow without bound. Every byte also goes into hash.
+    private async Task DownloadAsync(Uri url, Stream target, long maxBytes, IncrementalHash? hash, IProgress<double>? progress, string what, CancellationToken cancellationToken)
     {
         try
         {
@@ -240,6 +260,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
                     throw new RegionPackException($"{what} ist größer als angekündigt. Download abgebrochen.");
                 }
 
+                hash?.AppendData(chunk, 0, n);
                 await target.WriteAsync(chunk.AsMemory(0, n), cancellationToken);
                 progress?.Report(Math.Min(DownloadShare, (double)read / total * DownloadShare));
             }
@@ -255,42 +276,108 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         }
     }
 
-    private static void Unpack(string zipPath, string staging)
+    // Unpacks the six files under their fixed names and returns each one's size and SHA-256.
+    private static Dictionary<string, (long Bytes, string Sha256)> Unpack(string zipPath, string staging)
     {
         Directory.CreateDirectory(staging);
-        long unpacked = 0;
+        var unpacked = new Dictionary<string, (long Bytes, string Sha256)>(StringComparer.Ordinal);
+        long total = 0;
         try
         {
             using var zip = ZipFile.OpenRead(zipPath);
+            if (zip.Entries.Count != PackFiles.Length
+                || !zip.Entries.Select(e => e.FullName).Order(StringComparer.Ordinal).SequenceEqual(PackFiles.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            {
+                throw new RegionPackException("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.");
+            }
+
             foreach (var name in PackFiles)
             {
-                var entry = zip.GetEntry(name);
-                if (entry is null)
-                {
-                    continue;
-                }
-
+                var entry = zip.GetEntry(name) ?? throw new RegionPackException("Das Kartenpaket ist beschädigt.");
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
                 using var source = entry.Open();
                 using var target = new FileStream(Path.Join(staging, name), FileMode.CreateNew, FileAccess.Write, FileShare.None);
                 var chunk = new byte[81920];
+                long bytes = 0;
                 int n;
                 while ((n = source.Read(chunk, 0, chunk.Length)) > 0)
                 {
-                    unpacked += n;
-                    if (unpacked > MaxUnpackedBytes)
+                    bytes += n;
+                    total += n;
+                    if (total > MaxUnpackedBytes)
                     {
                         throw new RegionPackException("Das Kartenpaket ist entpackt zu groß und wird nicht installiert.");
                     }
 
+                    hash.AppendData(chunk, 0, n);
                     target.Write(chunk, 0, n);
                 }
+
+                unpacked[name] = (bytes, Convert.ToHexStringLower(hash.GetHashAndReset()));
             }
+
+            return unpacked;
         }
         catch (InvalidDataException e)
         {
             throw new RegionPackException("Das Kartenpaket ist beschädigt.", e);
         }
     }
+
+    // The pack's own pack.json must describe the pack the catalogue offered, and every data file
+    // must be the one it declares: a zip swapped on the way, or built wrongly, is not installed.
+    private static void CheckManifest(string path, RegionPackInfo pack, Dictionary<string, (long Bytes, string Sha256)> unpacked)
+    {
+        var damaged = new RegionPackException("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).");
+        if (unpacked[ManifestFileName].Bytes > MaxManifestBytes)
+        {
+            throw damaged;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("formatVersion", out var format) || format.ValueKind != JsonValueKind.Number)
+            {
+                throw damaged;
+            }
+
+            if (!format.TryGetInt32(out var version) || version != RegionPackCatalogJson.FormatVersion)
+            {
+                throw new RegionPackException("Das Kartenpaket braucht eine neuere Lagebuch-Version. Lagebuch aktualisieren.");
+            }
+
+            if (!root.TryGetProperty("slug", out var slug) || slug.ValueKind != JsonValueKind.String
+                || !string.Equals(slug.GetString(), pack.Slug, StringComparison.Ordinal)
+                || !root.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Object)
+            {
+                throw damaged;
+            }
+
+            foreach (var name in DataFiles)
+            {
+                var (bytes, sha256) = unpacked[name];
+                if (!files.TryGetProperty(name, out var file) || file.ValueKind != JsonValueKind.Object
+                    || !file.TryGetProperty("bytes", out var declaredBytes) || declaredBytes.ValueKind != JsonValueKind.Number
+                    || !declaredBytes.TryGetInt64(out var b) || b != bytes
+                    || !file.TryGetProperty("sha256", out var declaredSha) || declaredSha.ValueKind != JsonValueKind.String
+                    || !SameHash(Convert.FromHexString(sha256), declaredSha.GetString()))
+                {
+                    throw damaged;
+                }
+            }
+        }
+        catch (JsonException e)
+        {
+            throw new RegionPackException(damaged.Message, e);
+        }
+    }
+
+    private static bool SameHash(byte[] actual, string? expectedHex) =>
+        RegionPackCatalogJson.IsSha256(expectedHex)
+        && CryptographicOperations.FixedTimeEquals(actual, Convert.FromHexString(expectedHex));
 
     private static void DeleteDirectory(string path)
     {

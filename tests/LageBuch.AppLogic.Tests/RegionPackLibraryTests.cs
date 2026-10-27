@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using LageBuch.AppLogic.Services.Map;
 
@@ -23,35 +24,41 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Fact]
-    public async Task An_installed_pack_holds_its_tiles_and_is_listed_with_what_the_catalogue_said()
+    public async Task An_installed_pack_holds_its_six_files_and_is_listed_with_what_the_catalogue_said()
     {
-        var zip = Zip(("region.mbtiles", "tiles-v1"), ("region.dem", "dem"));
+        var zip = PackZip("tiles-v1");
         _handler.Respond(_ => Ok(zip));
         var library = Library();
 
-        var installed = await library.InstallAsync(Pack(zip.Length));
+        var installed = await library.InstallAsync(Pack(zip));
 
         Assert.Equal(Path.Join(Root, "ffb"), installed.FolderPath);
         Assert.Equal("tiles-v1", await File.ReadAllTextAsync(installed.TilesPath));
+        Assert.Equal("water", await File.ReadAllTextAsync(installed.WaterPath));
+        Assert.Equal("addresses", await File.ReadAllTextAsync(installed.AddressesPath));
+        Assert.Equal(
+            ["ATTRIBUTION.md", "addresses.sqlite", "elevation.tif", "installed.json", "map.mbtiles", "pack.json", "water.geojson"],
+            Directory.GetFiles(installed.FolderPath).Select(Path.GetFileName).Order(StringComparer.Ordinal));
         var listed = Assert.Single(library.GetInstalled());
-        Assert.Equal(Pack(zip.Length), listed.Info);
+        Assert.Equal(Pack(zip), listed.Info);
     }
 
     [Fact]
     public async Task A_newer_edition_replaces_the_old_one_and_leaves_none_of_its_files()
     {
-        var v1 = Zip(("region.mbtiles", "tiles-v1"), ("region.dem", "dem"));
+        var v1 = PackZip("tiles-v1");
         _handler.Respond(_ => Ok(v1));
         var library = Library();
-        await library.InstallAsync(Pack(v1.Length));
+        var old = await library.InstallAsync(Pack(v1));
+        await File.WriteAllTextAsync(Path.Join(old.FolderPath, "stray.txt"), "left by hand");
 
-        var v2 = Zip(("region.mbtiles", "tiles-v2"));
+        var v2 = PackZip("tiles-v2");
         _handler.Respond(_ => Ok(v2));
-        var installed = await library.InstallAsync(Pack(v2.Length) with { BuiltAt = "2026-10-01" });
+        var installed = await library.InstallAsync(Pack(v2) with { Version = 2 });
 
         Assert.Equal("tiles-v2", await File.ReadAllTextAsync(installed.TilesPath));
-        Assert.False(File.Exists(Path.Join(installed.FolderPath, "region.dem")));
-        Assert.Equal("2026-10-01", Assert.Single(library.GetInstalled()).Info.BuiltAt);
+        Assert.False(File.Exists(Path.Join(installed.FolderPath, "stray.txt")));
+        Assert.Equal(2, Assert.Single(library.GetInstalled()).Info.Version);
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
     }
 
@@ -97,10 +104,10 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task A_body_larger_than_the_catalogue_announced_is_cut_off_and_the_older_copy_stays()
     {
-        var v1 = Zip(("region.mbtiles", "tiles-v1"));
+        var v1 = PackZip("tiles-v1");
         _handler.Respond(_ => Ok(v1));
         var library = Library();
-        await library.InstallAsync(Pack(v1.Length));
+        await library.InstallAsync(Pack(v1));
 
         // No Content-Length, so only counting the bytes as they arrive can catch it.
         _handler.Respond(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new DeclaredLengthContent(new byte[4096], declaredLength: null) });
@@ -114,19 +121,19 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task Leftovers_of_an_interrupted_install_do_not_block_the_next_one()
     {
-        var v1 = Zip(("region.mbtiles", "tiles-v1"));
+        var v1 = PackZip("tiles-v1");
         _handler.Respond(_ => Ok(v1));
         var library = Library();
-        await library.InstallAsync(Pack(v1.Length));
+        await library.InstallAsync(Pack(v1));
 
         // What an install killed halfway leaves behind.
         Directory.CreateDirectory(Path.Join(Root, ".ffb.staging"));
-        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.staging", "region.mbtiles"), "half");
+        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.staging", "map.mbtiles"), "half");
         Directory.CreateDirectory(Path.Join(Root, ".ffb.previous"));
-        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.previous", "region.mbtiles"), "old");
-        var v2 = Zip(("region.mbtiles", "tiles-v2"));
+        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.previous", "map.mbtiles"), "old");
+        var v2 = PackZip("tiles-v2");
         _handler.Respond(_ => Ok(v2));
-        var installed = await library.InstallAsync(Pack(v2.Length));
+        var installed = await library.InstallAsync(Pack(v2));
 
         Assert.Equal("tiles-v2", await File.ReadAllTextAsync(installed.TilesPath));
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
@@ -135,11 +142,11 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task An_install_reports_progress_from_nothing_to_done()
     {
-        var zip = Zip(("region.mbtiles", "tiles"));
+        var zip = PackZip();
         _handler.Respond(_ => Ok(zip));
         var progress = new RecordingProgress();
 
-        await Library().InstallAsync(Pack(zip.Length), progress);
+        await Library().InstallAsync(Pack(zip), progress);
 
         Assert.Equal(0, progress.Reports[0], precision: 6);
         Assert.Equal(1, progress.Reports[^1], precision: 6);
@@ -166,7 +173,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     public async Task A_pack_folder_that_cannot_be_created_is_reported_in_german()
     {
         await File.WriteAllTextAsync(Root, "a file where the folder belongs");
-        _handler.Respond(_ => Ok(Zip(("region.mbtiles", "tiles"))));
+        _handler.Respond(_ => Ok(PackZip()));
 
         var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(10)));
 
@@ -174,31 +181,110 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Fact]
-    public async Task A_zip_entry_named_to_escape_the_pack_folder_is_never_written()
+    public async Task A_download_whose_checksum_is_not_the_catalogues_is_never_unpacked_and_the_older_copy_stays()
     {
-        var zip = Zip(("../../evil.txt", "x"), ("sub/../../../evil2.txt", "x"), ("region.mbtiles", "tiles"), ("readme.txt", "x"));
-        _handler.Respond(_ => Ok(zip));
+        var v1 = PackZip("tiles-v1");
+        _handler.Respond(_ => Ok(v1));
+        var library = Library();
+        await library.InstallAsync(Pack(v1));
 
-        var installed = await Library().InstallAsync(Pack(zip.Length));
+        // The same size as announced, so only the hash can tell it was swapped on the way.
+        var swapped = PackZip("tiles-XX");
+        _handler.Respond(_ => Ok(swapped));
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(swapped) with { Sha256 = Sha(v1) }));
 
-        Assert.Empty(Directory.GetFiles(_dir, "evil*", SearchOption.AllDirectories));
-        Assert.Equal(
-            ["pack.json", "region.mbtiles"],
-            Directory.GetFiles(installed.FolderPath).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal("Das Kartenpaket ist beschädigt (Prüfsumme stimmt nicht). Erneut herunterladen.", e.Message);
+        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).TilesPath));
+        Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
     }
 
-    [Fact]
-    public async Task A_zip_without_tiles_is_refused_and_installs_nothing()
+    [Theory]
+    [InlineData("../../evil.txt")]
+    [InlineData("sub/../../../evil.txt")]
+    [InlineData("readme.txt")]
+    [InlineData("sub/map.mbtiles")]
+    public async Task A_zip_with_an_entry_format_md_does_not_name_is_refused_and_nothing_is_written(string extra)
     {
-        var zip = Zip(("region.dem", "dem"));
+        var zip = Zip([.. Files(), (extra, "x")]);
         _handler.Respond(_ => Ok(zip));
         var library = Library();
 
-        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip.Length)));
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
 
-        Assert.Contains("region.mbtiles", e.Message, StringComparison.Ordinal);
+        Assert.Equal("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.", e.Message);
+        Assert.Empty(Directory.GetFiles(_dir, "evil*", SearchOption.AllDirectories));
         Assert.Empty(library.GetInstalled());
         Assert.Empty(Directory.GetFileSystemEntries(Root));
+    }
+
+    [Theory]
+    [InlineData("map.mbtiles")]
+    [InlineData("pack.json")]
+    [InlineData("ATTRIBUTION.md")]
+    public async Task A_zip_missing_one_of_its_files_is_refused_and_installs_nothing(string missing)
+    {
+        var zip = Zip([.. Files().Where(f => f.Name != missing)]);
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.", e.Message);
+        Assert.Empty(library.GetInstalled());
+        Assert.Empty(Directory.GetFileSystemEntries(Root));
+    }
+
+    [Fact]
+    public async Task A_zip_holding_a_file_twice_is_refused()
+    {
+        var zip = Zip([.. Files(), ("map.mbtiles", "second")]);
+        _handler.Respond(_ => Ok(zip));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.", e.Message);
+    }
+
+    [Theory]
+    [InlineData("\"slug\": \"ffb\"", "\"slug\": \"sta\"")]
+    [InlineData("\"slug\": \"ffb\", ", "")]
+    [InlineData("\"map.mbtiles\": {\"bytes\": 5", "\"map.mbtiles\": {\"bytes\": 6")]
+    [InlineData("\"water.geojson\": {\"bytes\": 5, \"sha256\": \"", "\"water.geojson\": {\"bytes\": 5, \"sha256\": \"0")]
+    [InlineData("\"addresses.sqlite\"", "\"other.sqlite\"")]
+    [InlineData("{\"formatVersion\"", "[{\"formatVersion\"")]
+    public async Task A_pack_json_that_does_not_describe_what_was_unpacked_refuses_the_pack(string field, string replacement)
+    {
+        var zip = Zip([.. Files("tiles", manifest => manifest.Replace(field, replacement, StringComparison.Ordinal))]);
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
+        Assert.Empty(library.GetInstalled());
+        Assert.Empty(Directory.GetFileSystemEntries(Root));
+    }
+
+    [Fact]
+    public async Task A_pack_of_a_newer_format_asks_for_a_newer_app()
+    {
+        var zip = Zip([.. Files("tiles", manifest => manifest.Replace("\"formatVersion\": 2", "\"formatVersion\": 3", StringComparison.Ordinal))]);
+        _handler.Respond(_ => Ok(zip));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket braucht eine neuere Lagebuch-Version. Lagebuch aktualisieren.", e.Message);
+    }
+
+    [Fact]
+    public async Task A_pack_json_larger_than_its_cap_is_not_read()
+    {
+        var zip = Zip([.. Files("tiles", manifest => manifest.Replace("{\"formatVersion\"", "{\"pad\": \"" + new string('x', (int)RegionPackLibrary.MaxManifestBytes) + "\", \"formatVersion\"", StringComparison.Ordinal))]);
+        _handler.Respond(_ => Ok(zip));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
     }
 
     [Fact]
@@ -207,7 +293,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         var garbage = Encoding.UTF8.GetBytes("<html>not a zip</html>");
         _handler.Respond(_ => Ok(garbage));
 
-        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(garbage.Length)));
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(garbage)));
 
         Assert.Equal("Das Kartenpaket ist beschädigt.", e.Message);
     }
@@ -265,7 +351,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         _handler.Respond(r =>
         {
             requested = r.RequestUri;
-            return Ok(Encoding.UTF8.GetBytes("[]"));
+            return Ok(Encoding.UTF8.GetBytes("""{"formatVersion":2,"packs":[]}"""));
         });
 
         await new RegionPackLibrary(_http, Root, address).GetCatalogAsync();
@@ -292,7 +378,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         _handler.Respond(r =>
         {
             Assert.Equal(RegionPackLibrary.DefaultCatalogUrl, r.RequestUri);
-            return Ok(Encoding.UTF8.GetBytes("""[{"name":"Landkreis Starnberg","slug":"sta","downloadUrl":"https://example.org/sta.zip","sizeBytes":5,"boundingBox":{"minLat":47.8,"minLon":11.1,"maxLat":48.1,"maxLon":11.4},"builtAt":"2026-09-01","attribution":"OSM"}]"""));
+            return Ok(Encoding.UTF8.GetBytes($$"""{"formatVersion":2,"packs":[{"name":"Landkreis Starnberg","slug":"sta","version":1,"downloadUrl":"https://example.org/sta.zip","sizeBytes":5,"sha256":"{{new string('a', 64)}}","bounds":{"west":11.1,"south":47.8,"east":11.4,"north":48.1},"minZoom":11,"maxZoom":17,"builtAt":"2026-10-27T20:15:49Z","attribution":"OSM"}]}"""));
         });
 
         var pack = Assert.Single(await Library().GetCatalogAsync());
@@ -301,7 +387,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Fact]
-    public async Task A_catalogue_that_is_no_json_array_is_reported_as_damaged()
+    public async Task A_catalogue_that_is_no_json_is_reported_as_damaged()
     {
         _handler.Respond(_ => Ok(Encoding.UTF8.GetBytes("<html>")));
 
@@ -325,12 +411,12 @@ public sealed class RegionPackLibraryTests : IDisposable
     public void Without_a_pack_folder_nothing_is_installed() => Assert.Empty(Library().GetInstalled());
 
     [Fact]
-    public async Task A_folder_whose_pack_json_names_another_pack_is_not_listed()
+    public async Task A_folder_whose_record_names_another_pack_is_not_listed()
     {
-        var zip = Zip(("region.mbtiles", "tiles"));
+        var zip = PackZip();
         _handler.Respond(_ => Ok(zip));
         var library = Library();
-        var installed = await library.InstallAsync(Pack(zip.Length));
+        var installed = await library.InstallAsync(Pack(zip));
         Directory.Move(installed.FolderPath, Path.Join(Root, "sta"));
         Directory.CreateDirectory(Path.Join(Root, "empty"));
 
@@ -340,10 +426,10 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task Removing_a_pack_deletes_its_folder()
     {
-        var zip = Zip(("region.mbtiles", "tiles"));
+        var zip = PackZip();
         _handler.Respond(_ => Ok(zip));
         var library = Library();
-        var installed = await library.InstallAsync(Pack(zip.Length));
+        var installed = await library.InstallAsync(Pack(zip));
 
         library.Remove(installed);
 
@@ -354,10 +440,10 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task A_pack_that_cannot_be_deleted_is_reported_by_name()
     {
-        var zip = Zip(("region.mbtiles", "tiles"));
+        var zip = PackZip();
         _handler.Respond(_ => Ok(zip));
         var library = Library();
-        var installed = await library.InstallAsync(Pack(zip.Length));
+        var installed = await library.InstallAsync(Pack(zip));
 
         var e = WhileUndeletable(installed, () => Assert.Throws<RegionPackException>(() => library.Remove(installed)));
 
@@ -391,7 +477,28 @@ public sealed class RegionPackLibraryTests : IDisposable
     private RegionPackLibrary Library() => new(_http, Root);
 
     private static RegionPackInfo Pack(long size) =>
-        new("Landkreis Fürstenfeldbruck", "ffb", "https://example.org/ffb.zip", size, 48.08, 10.99, 48.29, 11.41, "2026-08-31", "© OpenStreetMap contributors");
+        new("Landkreis Fürstenfeldbruck", "ffb", 1, "https://example.org/ffb-v1.zip", size, new string('a', 64), 10.95, 48.06, 11.45, 48.32, 11, 17, "2026-10-27T20:15:49Z", "© OpenStreetMap-Mitwirkende (ODbL)");
+
+    // The catalogue entry for exactly this zip: its size and its SHA-256.
+    private static RegionPackInfo Pack(byte[] zip) => Pack(zip.Length) with { Sha256 = Sha(zip) };
+
+    private static string Sha(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+    private static string Sha(string text) => Sha(Encoding.UTF8.GetBytes(text));
+
+    private static byte[] PackZip(string tiles = "tiles") => Zip([.. Files(tiles)]);
+
+    // The six files of a well-formed pack, its pack.json declaring the four data files truly.
+    // shapeManifest bends that pack.json into one that lies.
+    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null)
+    {
+        (string Name, string Content)[] data = [("map.mbtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses")];
+        var files = string.Join(", ", data.Select(d => $$"""
+            "{{d.Name}}": {"bytes": {{Encoding.UTF8.GetByteCount(d.Content)}}, "sha256": "{{Sha(d.Content)}}"}
+            """));
+        var manifest = """{"formatVersion": 2, "slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1, "files": {""" + files + "}}";
+        return [("pack.json", shapeManifest?.Invoke(manifest) ?? manifest), ("ATTRIBUTION.md", "© OpenStreetMap-Mitwirkende"), .. data];
+    }
 
     // Windows refuses to delete a file someone holds open; Unix refuses to unlink from a folder
     // without write permission.

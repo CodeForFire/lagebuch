@@ -170,7 +170,7 @@ public class LagekarteViewModelTests
     public void The_map_shows_the_pack_that_covers_the_Einsatzort()
     {
         var library = new FakeRegionPackLibrary();
-        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg") with { MinLatitude = 47.8, MaxLatitude = 48.0 });
+        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg") with { South = 47.8, North = 48.0 });
         library.Preinstall(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"));
         var (session, _, _) = Open();
         session.SetIncidentLocation(Marktplatz);

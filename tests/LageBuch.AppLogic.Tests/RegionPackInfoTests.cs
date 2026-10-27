@@ -6,7 +6,7 @@ namespace LageBuch.AppLogic.Tests;
 public class RegionPackInfoTests
 {
     private static readonly RegionPackInfo Ffb =
-        new("Landkreis Fürstenfeldbruck", "ffb", "https://example.org/ffb.zip", 1, 48.0877067, 10.9930275, 48.2967233, 11.4128816, "2026-08-31", "OSM");
+        new("Landkreis Fürstenfeldbruck", "ffb", 1, "https://example.org/ffb.zip", 1, new string('a', 64), 10.9930275, 48.0877067, 11.4128816, 48.2967233, 11, 17, "2026-10-27T20:15:49Z", "OSM");
 
     [Theory]
     [InlineData(48.0877067, 10.9930275, true)]

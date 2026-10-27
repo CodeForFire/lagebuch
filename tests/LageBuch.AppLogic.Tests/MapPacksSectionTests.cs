@@ -37,7 +37,7 @@ public class MapPacksSectionTests
     {
         var library = new FakeRegionPackLibrary();
         library.Preinstall(Ffb);
-        library.Preinstall(Sta with { BuiltAt = "2026-01-01" });
+        library.Preinstall(Sta with { Version = 0 });
         library.Catalogue = [Ffb, Sta, FakeRegionPackLibrary.Pack("ll", "Landkreis Landsberg am Lech")];
         var section = new MapPacksSection("Karten", library);
 
@@ -98,7 +98,7 @@ public class MapPacksSectionTests
     [Fact]
     public async Task Reinstalling_the_shown_pack_lets_go_of_its_file_first()
     {
-        var library = new FakeRegionPackLibrary { Catalogue = [Ffb with { BuiltAt = "2026-10-01" }], InstallGate = new TaskCompletionSource() };
+        var library = new FakeRegionPackLibrary { Catalogue = [Ffb with { Version = 2 }], InstallGate = new TaskCompletionSource() };
         library.Preinstall(Ffb);
         var section = new MapPacksSection("Karten", library);
         await section.LoadCatalogCommand.ExecuteAsync(null);
@@ -275,10 +275,26 @@ public class MapPacksSectionTests
     }
 
     [Fact]
-    public void The_size_is_shown_in_whole_megabytes_rounded_up()
+    public void A_pack_shows_its_build_day_its_version_and_its_size_in_whole_megabytes_rounded_up()
     {
-        var row = new InstalledMapPackRow(new InstalledRegionPack(Ffb with { SizeBytes = 15_782_458 }, "x"));
+        var row = new InstalledMapPackRow(new InstalledRegionPack(Ffb with { SizeBytes = 264_978_779, Version = 3 }, "x"));
 
-        Assert.Equal("Stand 2026-08-31 · 16 MB", row.Detail);
+        Assert.Equal("Stand 27.10.2026 · Version 3 · 253 MB", row.Detail);
+    }
+
+    [Fact]
+    public void A_build_time_that_is_no_timestamp_is_shown_as_it_came()
+    {
+        var row = new InstalledMapPackRow(new InstalledRegionPack(Ffb with { BuiltAt = "Herbst" }, "x"));
+
+        Assert.Equal("Stand Herbst · Version 1 · 16 MB", row.Detail);
+    }
+
+    [Fact]
+    public void A_rebuild_with_the_same_version_but_another_checksum_is_offered_as_an_update()
+    {
+        var row = new AvailableMapPackRow(Ffb with { Sha256 = new string('b', 64) }, Ffb);
+
+        Assert.Equal("AKTUALISIEREN", row.ActionLabel);
     }
 }

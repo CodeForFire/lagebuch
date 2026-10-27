@@ -25,6 +25,9 @@ public static class Formatting
 
     public static string Timestamp(DateTimeOffset t) => t.ToString("dd.MM.yyyy HH:mm", De);
 
+    /// <summary>A calendar day alone, "27.10.2026", for something dated rather than timed.</summary>
+    public static string Date(DateTimeOffset t) => t.ToString("dd.MM.yyyy", De);
+
     /// <summary>Clock time alone, for series read within one Einsatz (a CO-Messreihe), where the
     /// date is the same on every line and only the minute carries information.</summary>
     public static string TimeOfDay(DateTimeOffset t) => t.ToString("HH:mm", De);

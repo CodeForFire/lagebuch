@@ -22,8 +22,8 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
 
     public int InstallCount { get; private set; }
 
-    public static RegionPackInfo Pack(string slug, string name, string builtAt = "2026-08-31") =>
-        new(name, slug, $"https://example.org/{slug}.zip", 16 * 1024 * 1024, 48.08, 10.99, 48.29, 11.41, builtAt, "© OpenStreetMap contributors");
+    public static RegionPackInfo Pack(string slug, string name, int version = 1) =>
+        new(name, slug, version, $"https://example.org/{slug}.zip", 16 * 1024 * 1024, new string('a', 64), 10.99, 48.08, 11.41, 48.29, 11, 17, "2026-10-27T20:15:49Z", "© OpenStreetMap contributors");
 
     public void Preinstall(RegionPackInfo info) => _installed.Add(new InstalledRegionPack(info, Path.Join("regions", info.Slug)));
 
