@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 
@@ -280,6 +281,189 @@ public class GasMeasurementTests
         Assert.Equal(known.Id, Assert.Single(loaded.Values).Key);
         Assert.Equal(known.Id, Assert.Single(loaded.Readings).GasId);
     }
+
+    [Fact]
+    public void The_editor_suggests_the_four_usual_units()
+    {
+        Assert.Equal(new[] { "ppm", "%UEG", "Vol-%", "mg/m³" }, GasDefinition.UnitSuggestions);
+    }
+
+    [Fact]
+    public void A_gas_whose_name_is_only_whitespace_sanitises_to_nothing()
+    {
+        Assert.Null((H2S with { Name = "   " }).Sanitized());
+    }
+
+    [Fact]
+    public void Sanitising_keeps_a_falling_direction_and_turns_an_unknown_one_rising()
+    {
+        var unknown = (O2 with { Direction = (GasDirection)7 }).Sanitized();
+
+        Assert.NotNull(unknown);
+        Assert.Equal(GasDirection.Rising, unknown.Direction);
+        Assert.Equal(GasDirection.Falling, O2.Sanitized()?.Direction);
+    }
+
+    [Fact]
+    public void Sanitising_a_gas_without_a_unit_leaves_the_unit_empty()
+    {
+        var fromFile = JsonSerializer.Deserialize<GasDefinition>("""{"Name":"H2S","Unit":null,"Direction":0}""");
+
+        Assert.NotNull(fromFile);
+        Assert.Equal(string.Empty, fromFile.Sanitized()?.Unit);
+    }
+
+    [Fact]
+    public void Zero_and_the_maximum_are_both_valid_readings()
+    {
+        Assert.Equal(0m, GasDefinition.NormalizeValue(0m));
+        Assert.Equal(GasDefinition.MaxValue, GasDefinition.NormalizeValue(GasDefinition.MaxValue));
+    }
+
+    [Fact]
+    public void A_measurement_drops_trailing_zeros_and_an_empty_unit_adds_no_space()
+    {
+        Assert.Equal("20,5 Vol-%", Formatting.Measurement(20.50m, "Vol-%"));
+        Assert.Equal("20,5", Formatting.Measurement(20.50m, string.Empty));
+    }
+
+    [Fact]
+    public void A_Wohnung_rehydrated_without_values_has_none()
+    {
+        var dwelling = Dwelling.Rehydrate(Guid.NewGuid(), Guid.NewGuid(), 0, 1, null, DwellingStatus.NotSearched, KeyAvailability.Unknown, values: null);
+
+        Assert.Empty(dwelling.Values);
+    }
+
+    [Fact]
+    public void A_Wohnung_measuring_only_known_gases_is_kept_as_it_is()
+    {
+        var known = Guid.NewGuid();
+        var dwelling = Wohnung(new Dictionary<Guid, decimal> { [known] = 40 }, [new(_clock.Now, known, 40, "x")]);
+
+        Assert.Same(dwelling, dwelling.KeepingGases(new HashSet<Guid> { known }));
+    }
+
+    [Fact]
+    public void A_reading_of_an_unknown_gas_is_dropped_even_when_every_value_is_known()
+    {
+        var known = Guid.NewGuid();
+        var dwelling = Wohnung(new Dictionary<Guid, decimal> { [known] = 40 }, [new(_clock.Now, known, 40, "x"), new(_clock.Now, Guid.NewGuid(), 7, "x")]);
+
+        var kept = dwelling.KeepingGases(new HashSet<Guid> { known });
+
+        Assert.Equal(known, Assert.Single(kept.Readings).GasId);
+    }
+
+    [Fact]
+    public void A_value_of_an_unknown_gas_is_dropped_even_when_every_reading_is_known()
+    {
+        var known = Guid.NewGuid();
+        var dwelling = Wohnung(new Dictionary<Guid, decimal> { [known] = 40, [Guid.NewGuid()] = 7 }, [new(_clock.Now, known, 40, "x")]);
+
+        var kept = dwelling.KeepingGases(new HashSet<Guid> { known });
+
+        Assert.Equal(known, Assert.Single(kept.Values).Key);
+    }
+
+    [Fact]
+    public void A_Messreihe_line_of_a_gas_the_list_lacks_shows_the_bare_number()
+    {
+        var gases = Gases(GasDefinition.DefaultCo);
+        var at = new DateTimeOffset(2026, 10, 27, 8, 41, 0, TimeSpan.Zero);
+
+        Assert.Equal("08:41 7", CoMeasurementLabels.ReadingLabel(new CoReading(at, Guid.NewGuid(), 7, "x"), gases));
+    }
+
+    [Fact]
+    public void Removing_a_Gasmessprotokoll_is_written_to_the_ETB()
+    {
+        var incident = Incident.Start(_clock, _op);
+        incident.AddCoBuilding(_clock, _op, "Haus A", 2, 3);
+
+        incident.RemoveCoBuilding(_clock, _op, incident.Buildings[0].Id);
+
+        Assert.Equal("Gasmessprotokoll entfernt: Haus A", incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void Eight_values_at_once_are_accepted()
+    {
+        var incident = Incident.Start(_clock, _op);
+        incident.AddCoBuilding(_clock, _op, "Haus A", 2, 3, gases: Enumerable.Range(1, 8).Select(i => H2S with { Name = $"G{i}" }));
+
+        incident.RecordCoValues(_clock, _op, incident.Buildings[0].Id, 0, 1, incident.Gases.ToDictionary(g => g.Id, _ => (decimal?)1));
+
+        Assert.Equal(8, incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1).Values.Count);
+    }
+
+    [Fact]
+    public void A_refused_set_of_values_says_why()
+    {
+        var incident = Incident.Start(_clock, _op);
+        incident.AddCoBuilding(_clock, _op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+        var co = incident.Gases[0].Id;
+
+        var tooMany = Assert.Throws<ArgumentOutOfRangeException>(() => incident.RecordCoValues(
+            _clock, _op, haus, 0, 1, Enumerable.Range(0, 9).ToDictionary(_ => Guid.NewGuid(), _ => (decimal?)1)));
+        var unknown = Assert.Throws<ArgumentException>(() => incident.RecordCoValues(
+            _clock, _op, haus, 0, 1, new Dictionary<Guid, decimal?> { [Guid.NewGuid()] = 1 }));
+        var outOfRange = Assert.Throws<ArgumentOutOfRangeException>(() => incident.RecordCoValues(
+            _clock, _op, haus, 0, 1, new Dictionary<Guid, decimal?> { [co] = -1 }));
+
+        Assert.StartsWith("Höchstens 8 Messgase.", tooMany.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Unbekanntes Messgas.", unknown.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Messwert CO liegt außerhalb von 0 bis 100000 ppm.", outOfRange.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_gas_left_out_of_a_FERTIG_keeps_its_value()
+    {
+        var incident = Incident.Start(_clock, _op);
+        incident.AddCoBuilding(_clock, _op, "Haus A", 2, 3, gases: [GasDefinition.DefaultCo, H2S]);
+        var (co, h2s) = (incident.Gases[0].Id, incident.Gases[1].Id);
+        var haus = incident.Buildings[0].Id;
+        incident.RecordCoValues(_clock, _op, haus, 0, 1, new Dictionary<Guid, decimal?> { [co] = 120, [h2s] = 3 });
+
+        incident.RecordCoValues(_clock, _op, haus, 0, 1, new Dictionary<Guid, decimal?> { [co] = 200 });
+
+        Assert.Equal(3m, incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1).ValueOf(h2s));
+    }
+
+    [Fact]
+    public void Rehydrate_keeps_only_the_first_of_two_gases_with_the_same_id()
+    {
+        var id = Guid.NewGuid();
+
+        var incident = Rehydrate([new IncidentGas(id, H2S), new IncidentGas(id, O2)], buildings: true);
+
+        Assert.Equal("H2S", Assert.Single(incident.Gases).Name);
+    }
+
+    [Fact]
+    public void Rehydrate_of_a_file_without_Haeuser_or_gases_measures_nothing_yet()
+    {
+        Assert.Empty(Rehydrate([], buildings: false).Gases);
+    }
+
+    [Fact]
+    public void Removing_a_Wohnung_whose_value_was_cleared_still_names_its_Messreihe()
+    {
+        var incident = Incident.Start(_clock, _op);
+        incident.AddCoBuilding(_clock, _op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+        var co = incident.Gases[0].Id;
+        incident.RecordCoValues(_clock, _op, haus, 0, 1, new Dictionary<Guid, decimal?> { [co] = 40 });
+        incident.RecordCoValues(_clock, _op, haus, 0, 1, new Dictionary<Guid, decimal?> { [co] = null });
+
+        incident.RemoveDwellings(_clock, _op, haus, 0, [1]);
+
+        Assert.EndsWith("entfernt: Links (Messreihe)", incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
+    private static Dwelling Wohnung(Dictionary<Guid, decimal> values, CoReading[] readings) =>
+        Dwelling.Rehydrate(Guid.NewGuid(), Guid.NewGuid(), 0, 1, null, DwellingStatus.NotSearched, KeyAvailability.Unknown, values, readings);
 
     private static List<IncidentGas> Gases(params GasDefinition[] definitions) =>
         definitions.Select(d => new IncidentGas(Guid.NewGuid(), d)).ToList();
