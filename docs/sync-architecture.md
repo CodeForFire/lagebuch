@@ -20,7 +20,7 @@ two disagree, the code wins and this page has a bug.
 - [10. Attachments](#10-attachments)
 - [11. Stammdaten over sync](#11-stammdaten-over-sync)
 - [12. Connection lifecycle and teardown](#12-connection-lifecycle-and-teardown)
-- [13. The SignalR transport and #781](#13-the-signalr-transport-and-781)
+- [13. The SignalR transport](#13-the-signalr-transport)
 - [14. Protocol versioning](#14-protocol-versioning)
 - [15. Limits and timeouts](#15-limits-and-timeouts)
 - [16. Threading model](#16-threading-model)
@@ -339,7 +339,7 @@ like SSH: **Trust-on-First-Use, pinned to the host's key**, plus a short
 
 **Client side.** `RemoteJoin.OpenAsync` installs one
 `ServerCertificateCustomValidationCallback` on the `HttpClientHandler` that
-serves the HTTP calls and the hub's HTTP requests (but see §13). The store is
+serves the HTTP calls and every request of the hub's SSE transport (§13). The store is
 `ITrustStore` (`JsonTrustStore` in both heads), keyed by the dialled address.
 
 ```mermaid
@@ -601,7 +601,7 @@ stateDiagram-v2
   stops Kestrel and disposes the certificate. Clients see the hub close, give
   up after the reconnect window and return Home.
 
-## 13. The SignalR transport and #781
+## 13. The SignalR transport
 
 The hub connection is built in `RemoteIncidentSession.StartAsync` with
 `HubConnectionBuilder().WithUrl(base + "/hub", options)`. The PIN and protocol
@@ -609,102 +609,69 @@ headers go on `options.Headers` (a separate header bag: sharing the handler
 does not share `HttpClient.DefaultRequestHeaders`), and
 `options.HttpMessageHandlerFactory` returns the borrowed, pinned handler.
 
-SignalR first POSTs `/hub/negotiate`, then tries transports in order:
-**WebSockets → Server-Sent Events → Long Polling**.
-
-**Why three transports.** Lagebuch never chose them. They are SignalR's
-built-in negotiation, and neither end configures it: the host calls
-`AddSignalR()` and `MapHub`, the client calls `WithUrl`, and nobody sets
-`HttpTransportType`, `Transports` or `SkipNegotiation`. The chain exists for
-the web, where proxies and middleboxes break WebSockets. SignalR was adopted
-in #57 as a ready-made push channel, and the fallbacks came with it.
-
-For this hub they matter less than usual:
-
-| Transport | Host → client | Client → host | Reached in practice |
-|---|---|---|---|
-| WebSockets | one socket | same socket | no, fails today (#781) |
-| Server-Sent Events | long-lived GET stream | one POST per message | **yes, on every connect** |
-| Long polling | held GETs, repeated | one POST per message | never seen; only if SSE also fails |
-
-- **The hub carries almost nothing.** `IncidentHub` has no methods. Its only
-  job is the `snapshot` push. Commands go over `POST /command`, catch-up over
-  `/revision` and `/snapshot`. Client → host on the hub is only SignalR's
-  pings and the close. The cheap client → host stream WebSockets offers buys
-  almost nothing here.
-- **SSE is exactly the shape that is used:** a server → client stream. That is
-  why the fallback has gone unnoticed.
-- **Long polling is effectively untested.** Even with no push channel at all,
-  the 10 s reconcile poll (§9) would keep a device converging.
-- **The cost sits at the edges.** Every connect and reconnect pays for the
-  failed WebSocket attempt and a second negotiate. Teardown also differs per
-  transport, which is why #778 needed `CloseGrace`.
+**The transport is Server-Sent Events, and only that** (#781).
+`options.Transports = HttpTransportType.ServerSentEvents`. The client POSTs
+`/hub/negotiate` once, then opens one long-lived GET stream for host → client.
+Its few messages the other way (SignalR's pings, the close) are POSTs. Every
+one of those requests goes through the pinned handler, so the TOFU check (§7)
+covers the push channel exactly as it covers `/command`.
 
 ```mermaid
 flowchart LR
     subgraph client["Client"]
         Handler["pinned HttpClientHandler<br/>(TOFU callback, §7)"]
-        WS["ClientWebSocket<br/>(own TLS stack)"]
     end
     H["IncidentHost :5859"]
 
     Http["HttpClient<br/>/version /masterdata /snapshot<br/>/revision /command /files"] --> Handler
-    Neg["SignalR negotiate"] --> Handler
+    Neg["SignalR negotiate (once)"] --> Handler
     SSE["SSE stream + POSTs"] --> Handler
-    LP["Long polling"] --> Handler
     Handler --> H
-    WSt["WebSockets transport"] --> WS
-    WS -. fails today .-> H
 ```
 
-**What happens today (#781).** Every connect tries WebSockets, fails with a
-`WebSocketException`, negotiates a second time and runs on SSE. Nobody notices,
-because the fallback works. The costs:
+**Why not SignalR's default chain.** Out of the box SignalR tries
+**WebSockets → Server-Sent Events → Long Polling**. That chain exists for the
+web, where proxies break WebSockets; Lagebuch inherited it when SignalR was
+adopted as a ready-made push channel in #57, and never configured it. For
+this hub it bought nothing:
 
-- Every connect and reconnect spends a failed handshake plus a second
-  negotiate round trip.
-- On SSE only host→client is a stream. Every client→host message is its own
-  HTTP POST. (Lagebuch sends no hub messages client→host apart from SignalR's
-  own pings and the close, because commands go over `POST /command`.)
-- SSE has none of the WebSocket transport's behaviour: `CloseTimeout` applies
-  to WebSockets only, which is why #778 had to add `CloseGrace`.
+| Transport | Host → client | Client → host | Status |
+|---|---|---|---|
+| WebSockets | one socket | same socket | not offered. It failed on every connect: see below |
+| Server-Sent Events | long-lived GET stream | one POST per message | **the transport** |
+| Long polling | held GETs, repeated | one POST per message | not offered. It was never exercised |
 
-**Likely cause (unverified, per the issue).**
-`HttpMessageHandlerFactory` covers negotiate, SSE and long polling. The
-WebSocket transport builds its own `ClientWebSocket`, which presumably checks
-the self-signed certificate against the system store and fails. The fix
-directions named in the issue:
+- **The hub carries almost nothing.** `IncidentHub` has no methods. Its only
+  job is the `snapshot` push. Commands go over `POST /command`, catch-up over
+  `/revision` and `/snapshot`. The cheap client → host stream WebSockets offers
+  has nothing to carry here.
+- **SSE is exactly the shape that is used:** a server → client stream.
+- **Without any push, a device still converges.** The 10 s reconcile poll (§9)
+  catches up, which is why long polling was dropped as a fallback rather than
+  kept as an untested path. A network that breaks SSE fails the join, where the
+  Lagebuchführer sees it.
 
-- `HttpConnectionOptions.WebSocketFactory` connecting the socket through the
-  pinned handler (`ClientWebSocket.ConnectAsync(uri, new HttpMessageInvoker(handler), ct)`); or
-- `HttpConnectionOptions.WebSocketConfiguration` setting the same pinning
-  callback on `ClientWebSocketOptions.RemoteCertificateValidationCallback`.
+**What the WebSocket attempt cost (#781).** SignalR's WebSocket transport
+builds its own `ClientWebSocket`, which does its own TLS and never sees the
+pinned handler. It checked the host's self-signed certificate against the
+system store and failed with
+`AuthenticationException: … certificate chain: UntrustedRoot`. The client then
+negotiated a second time and settled on SSE, on every connect and every
+reconnect. Nobody noticed, because the fallback worked. Connecting the socket
+through the pinned handler (`ClientWebSocket.ConnectAsync(uri, invoker, ct)`)
+was shown to work, and the host's gates accept the PIN and protocol headers on
+the upgrade. But it would have added a second TLS path to keep pinned, Android's
+native handler most likely cannot upgrade at all, and the hub has nothing to
+gain from it. Declaring SSE was the smaller change.
 
-Whichever is chosen must keep:
+**Teardown is SSE's.** `CloseTimeout` governs WebSockets only, so it does not
+apply. `CloseGrace` (§12) is the bound on leaving.
 
-- the socket pinned through `ITrustStore` exactly like the HTTP requests (never
-  an accept-any callback, §7);
-- `X-Lagebuch-Pin` and `X-Lagebuch-Protocol` on the upgrade request, with the
-  host's middleware accepting them there (both gates run before routing, so the
-  upgrade passes through them like any other request);
-- Android, whose `ClientWebSocket` runs on a different platform stack;
-- SSE as the fallback for networks that break WebSockets;
-- `CloseGrace` as the bound for whichever transport is in use.
-
-The first diagnostic step is to log the `WebSocketException`'s inner
-exception. The test target is a client connecting over WebSockets against the
-real host that still refuses a host whose certificate changed, with
-`LinkFailureTests` passing over WebSockets.
-
-**An alternative worth weighing first.** Given what the hub carries, the
-transport could instead be declared explicitly:
-`options.Transports = HttpTransportType.ServerSentEvents`. That is one line.
-It removes the failed handshake and the second negotiate, and it leaves no
-WebSocket TLS path to keep pinned. Whichever way #781 goes, dropping long
-polling from the allowed set keeps an untested path from being reached by
-accident. Once the inner exception has confirmed the cause, compare "pin
-WebSockets properly" with "declare SSE the transport" before writing the fix:
-the second puts far less code near the certificates.
+**If WebSockets are ever wanted** (say, a hub that starts carrying client →
+host traffic), route the socket through the same pinned handler via
+`HttpConnectionOptions.WebSocketFactory`, never through an accept-any or
+separately written certificate callback. `HubTransportTests` pins the current
+choice.
 
 ## 14. Protocol versioning
 
@@ -805,6 +772,7 @@ Under `ImmediateUiDispatcher` (tests), `Post` runs inline, which is why
 | | `SnapshotRevisionTests`, `SnapshotReconcileTests` | the revision guard and the poll (#295) |
 | | `CommandOrderTests`, `CommandRejectionTests` | order (#767) and refusal reporting |
 | | `LinkFailureTests` + `FaultyRelay` | a real TCP relay that resets or silences the link |
+| | `HubTransportTests` | SSE only: one negotiate, no WebSocket, no long-polling fallback (#781) |
 | | `MasterDataSyncTests` | Stammdaten from the host (#183) |
 | | `WorkspaceCollaborationTests` | two real workspaces over loopback |
 
@@ -815,7 +783,6 @@ exactly one pass.
 
 ## 18. Known gaps
 
-- **WebSockets never connect; every client runs on SSE** (#781, §13).
 - **A failed byte wipe after `removeFile`** answers 500 although the removal
   landed. The client's banner reads as a refusal, the bytes may remain in the
   incident file, and the host's own UI is not told (see `HandleCommand`).

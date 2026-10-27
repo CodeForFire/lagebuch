@@ -13,6 +13,7 @@ using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -326,6 +327,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     // SignalR asks for a handler when the hub starts and on each reconnect, both after
                     // the session exists, so its abort token is there to hand over.
                     o.HttpMessageHandlerFactory = _ => new BorrowedHandler(handler, created?._transportAbort.Token ?? CancellationToken.None);
+
+                    // Server-Sent Events and nothing else (#781). The hub only pushes snapshots,
+                    // which is exactly what an SSE stream carries, and SSE runs through the pinned
+                    // handler above. SignalR's default tried WebSockets first, whose ClientWebSocket
+                    // does its own TLS and refused the self-signed certificate (UntrustedRoot), and
+                    // then negotiated again on every connect and reconnect. Long polling is left out
+                    // too: it was never exercised, and the reconcile poll covers a device that
+                    // receives no push.
+                    o.Transports = HttpTransportType.ServerSentEvents;
                 })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))

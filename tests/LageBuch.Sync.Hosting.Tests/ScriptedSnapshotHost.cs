@@ -40,6 +40,7 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     private readonly SemaphoreSlim _revisionRequests = new(0);
     private readonly SemaphoreSlim _commandRequests = new(0);
     private readonly System.Collections.Concurrent.ConcurrentQueue<SyncCommand> _received = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<HubRequest> _hubRequests = new();
     private int _commandsReceived;
     private TaskCompletionSource? _revisionGate;
     private TaskCompletionSource? _commandGate;
@@ -83,6 +84,18 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     public IReadOnlyList<SyncCommand> ReceivedCommands => _received.ToArray();
 
     /// <summary>
+    /// Every request that reached the hub's path — negotiate, transport and close — in arrival order,
+    /// so a test can see which transport the client chose and how often it negotiated (#781).
+    /// </summary>
+    public IReadOnlyList<HubRequest> HubRequests => _hubRequests.ToArray();
+
+    /// <summary>
+    /// When set, the hub answers an SSE stream request with 404 — a network that breaks the one
+    /// transport the client speaks, which leaves it no other to fall back to.
+    /// </summary>
+    public bool RefuseServerSentEvents { get; set; }
+
+    /// <summary>
     /// When set, <c>GET /revision</c> answers with this status and no body — a reconcile pass that
     /// reaches the host but cannot learn its position.
     /// </summary>
@@ -118,6 +131,26 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
 
         var app = builder.Build();
         var host = new ScriptedSnapshotHost(app, app.Services.GetRequiredService<IHubContext<IncidentHub>>(), initial);
+
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path.StartsWithSegments(SyncProtocol.HubPath, StringComparison.Ordinal))
+            {
+                var request = new HubRequest(
+                    context.Request.Method,
+                    context.Request.Path.Value ?? string.Empty,
+                    context.Request.Headers.Accept.ToString(),
+                    context.WebSockets.IsWebSocketRequest);
+                host._hubRequests.Enqueue(request);
+                if (host.RefuseServerSentEvents && request.IsServerSentEvents)
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return;
+                }
+            }
+
+            await next();
+        });
 
         app.MapHub<IncidentHub>(SyncProtocol.HubPath);
         app.MapGet(
@@ -256,5 +289,14 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         {
             await body.WriteAsync(chunk.AsMemory(0, (int)Math.Min(chunk.Length, remaining)));
         }
+    }
+
+    /// <summary>One request to the hub's path, as <see cref="HubRequests"/> records it.</summary>
+    internal sealed record HubRequest(string Method, string Path, string Accept, bool IsWebSocket)
+    {
+        public bool IsNegotiate => Path.EndsWith("/negotiate", StringComparison.Ordinal);
+
+        public bool IsServerSentEvents =>
+            Method == "GET" && Accept.Contains("text/event-stream", StringComparison.Ordinal);
     }
 }

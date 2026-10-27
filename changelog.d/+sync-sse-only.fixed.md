@@ -1,0 +1,1 @@
+A joining device now opens its push channel over Server-Sent Events straight away, instead of first failing a WebSocket handshake on the host's certificate and negotiating a second time on every connect and reconnect (#781).
