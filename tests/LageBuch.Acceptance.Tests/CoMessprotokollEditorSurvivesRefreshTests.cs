@@ -52,7 +52,7 @@ public class CoMessprotokollEditorSurvivesRefreshTests
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         session.AddCoBuilding("Mehrfamilienhaus B", 2, 2);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         var co = vm.CoMessprotokoll;
         var buildingId = co.SelectedBuilding!.Id;
@@ -62,7 +62,7 @@ public class CoMessprotokollEditorSurvivesRefreshTests
         var ppm = Sidebar(window).GetVisualDescendants().OfType<NumericUpDown>().Single();
         ppm.Value = 120;
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(120, co.Editor!.CoValue);
+        Assert.Equal(120, co.Editor!.GasInputs[0].Value);
         return (co, buildingId);
     }
 
@@ -76,12 +76,12 @@ public class CoMessprotokollEditorSurvivesRefreshTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.NotNull(co.Editor);
-        Assert.Equal(120, co.Editor!.CoValue);
+        Assert.Equal(120, co.Editor!.GasInputs[0].Value);
         Assert.True(Sidebar(window).IsEffectivelyVisible);
         Assert.Equal(buildingId, co.SelectedBuilding?.Id);
 
         // The pending value is still previewed on its tile after the matrix rebuild.
-        Assert.Equal(120, co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].CoValue);
+        Assert.Equal(120, co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].Values.Values.Single());
     }
 
     [AvaloniaFact]
@@ -95,7 +95,7 @@ public class CoMessprotokollEditorSurvivesRefreshTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.NotNull(co.Editor);
-        Assert.Equal(120, co.Editor!.CoValue);
+        Assert.Equal(120, co.Editor!.GasInputs[0].Value);
         Assert.Equal(buildingId, co.SelectedBuilding?.Id);
         Assert.Equal(4, co.SelectedBuilding!.FloorCount);
         Assert.Contains(co.MatrixRows, r => r.Ordinal == 4);

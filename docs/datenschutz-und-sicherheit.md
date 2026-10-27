@@ -43,7 +43,7 @@ einzelne Datei gespeichert wird.
 | Einsatztagebuch (ETB) | Freitext bis 4000 Zeichen, Von/An, Richtung, „erfasst von“ | Einsatzdatei |
 | ETB-Korrekturen | **jede überschriebene Fassung bleibt erhalten**, mit Zeitpunkt und Bearbeiter | Einsatzdatei |
 | Einsatzdaten | Stichwort, Einsatznummer, **Straße und Ortsteil**, „abgeschlossen von“ | Einsatzdatei |
-| CO-Messprotokoll | **Name der Bewohnerin oder des Bewohners je Wohnung**, ppm-Wert, Status, Schlüssel vorhanden | Einsatzdatei |
+| Gasmessprotokoll | **Name der Bewohnerin oder des Bewohners je Wohnung**, Messwerte der Gase, Status, Schlüssel vorhanden | Einsatzdatei |
 | Kräfte | Wache, Funkrufname, Stärke als Zahlen (ZF/GF/Mann, AGT), Status, Bemerkung – **keine Namen** | Einsatzdatei |
 | Aufgaben | Auftrag, Zuständiger (Freitext), „angelegt von“, „erledigt von“, Zeiten | Einsatzdatei |
 | Beteiligte | **Name, Telefonnummer, Notiz und Aufenthaltsort** (z. B. „im RTW …“, mit Uhrzeit) von Personen außerhalb der Feuerwehr (z. B. Eigentümer, Fahrzeughalter, Polizei), die Wohnung, in der sie angetroffen wurden, „angelegt von“ | Einsatzdatei |
@@ -53,7 +53,7 @@ einzelne Datei gespeichert wird.
 
 Drei Punkte verdienen besondere Aufmerksamkeit:
 
-**Das CO-Messprotokoll enthält Daten Dritter.** Erfasst werden hier Namen von
+**Das Gasmessprotokoll enthält Daten Dritter.** Erfasst werden hier Namen von
 Personen, die nicht der Feuerwehr angehören und die der Erfassung nicht
 zugestimmt haben. Die Verarbeitung erfolgt zur Einsatzdurchführung, und genau
 dieser Teil der Einsatzdatei sollte bei der Festlegung von Löschfristen zuerst
@@ -66,7 +66,7 @@ oder die Ansprechperson der Polizei werden mit Name, Telefonnummer und Notiz
 erfasst. Diese Angaben stehen bewusst nur in dieser Liste und im PDF-Bericht –
 das ETB erhält beim Anlegen, Ändern oder Entfernen keinen Eintrag. Ein
 entfernter Eintrag ist damit aus der Einsatzdatei verschwunden; für
-Löschfristen gilt dasselbe wie für das CO-Messprotokoll. Für die Ausgabeliste
+Löschfristen gilt dasselbe wie für das Gasmessprotokoll. Für die Ausgabeliste
 gilt dasselbe: Wer ein Gerät erhalten hat – etwa die Presse oder eine
 Nachbarwehr –, steht mit Name und Telefonnummer nur dort und im PDF-Bericht,
 nicht im ETB.
@@ -247,7 +247,7 @@ vollständigen Stand des Einsatzes: Einsatzdaten, das gesamte ETB einschließlic
 der aufbewahrten Korrekturfassungen, Funktionen **mit Namen und
 Telefonnummern**, Kräfte, Atemschutztrupps mit den Namen der Truppmitglieder,
 Aufgaben, Beteiligte **mit Namen und Telefonnummern**, die Ausgabeliste
-**mit Namen und Telefonnummern**, CO-Messprotokoll, Änderungsprotokoll und die
+**mit Namen und Telefonnummern**, Gasmessprotokoll, Änderungsprotokoll und die
 Liste der Anhänge.
 Anhänge selbst werden nur auf Anforderung übertragen (höchstens 25 MB je Datei).
 

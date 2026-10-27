@@ -7,8 +7,22 @@ public static class Formatting
 {
     private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
 
+    /// <summary>The de-DE number format, for an input that takes a decimal the way the user types
+    /// it ("20,9"), whatever culture the device runs in (#410).</summary>
+    public static NumberFormatInfo NumberFormat => De.NumberFormat;
+
     /// <summary>A whole number the way the user reads it (de-DE grouping).</summary>
     public static string Number(int value) => value.ToString("N0", De);
+
+    /// <summary>A gas reading the way the meter shows it: "20,9 Vol-%", "120 ppm" (#410). At most
+    /// two decimals and no grouping, so a CO value reads exactly as it did when it was an integer.
+    /// </summary>
+    public static string Measurement(decimal value, string unit)
+    {
+        ArgumentNullException.ThrowIfNull(unit);
+        var number = value.ToString("0.##", De);
+        return unit.Length == 0 ? number : $"{number} {unit}";
+    }
 
     public static string Timestamp(DateTimeOffset t) => t.ToString("dd.MM.yyyy HH:mm", De);
 

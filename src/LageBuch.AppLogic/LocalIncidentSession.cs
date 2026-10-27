@@ -391,8 +391,9 @@ public sealed class LocalIncidentSession : IIncidentSession
         int floorCount,
         int apartmentsPerFloor,
         int undergroundFloorCount = 0,
-        IReadOnlyDictionary<string, string?>? apartmentLabels = null) =>
-        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels));
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null,
+        IReadOnlyList<GasDefinition>? gases = null) =>
+        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels, gases));
 
     public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         Mutate(() => Incident.UpdateCoBuildingStructure(_clock, RequireOperator(), buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount));
@@ -400,8 +401,8 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void RemoveCoBuilding(Guid buildingId) =>
         Mutate(() => Incident.RemoveCoBuilding(_clock, RequireOperator(), buildingId));
 
-    public void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue) =>
-        Mutate(() => Incident.RecordCoValue(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, coValue));
+    public void RecordCoValues(Guid buildingId, int floorOrdinal, int apartmentNumber, IReadOnlyDictionary<Guid, decimal?> values) =>
+        Mutate(() => Incident.RecordCoValues(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, values));
 
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
         Mutate(() => Incident.SetDwellingStatus(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, status));

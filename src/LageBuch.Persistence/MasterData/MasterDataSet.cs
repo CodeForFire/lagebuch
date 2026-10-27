@@ -59,6 +59,11 @@ public sealed record MasterDataSet(
     // lands in an incident, so renaming one here never changes a past Einsatz.
     IReadOnlyList<TalkGroup> TalkGroups,
 
+    // Messgase (#410): the gases a crew measures in the Gasmessung, at most eight, each with its
+    // unit and bands. Copied into an incident when it opens its first Haus (#337); nothing points
+    // back here. Like Settings, never empty -- a store without any yields CO alone.
+    IReadOnlyList<GasDefinition> Gases,
+
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
     IncidentSettings Settings)
@@ -84,6 +89,7 @@ public sealed record MasterDataSet(
         Array.Empty<Premises>(),
         Array.Empty<Device>(),
         Array.Empty<TalkGroup>(),
+        [GasDefinition.DefaultCo],
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -94,6 +100,7 @@ public sealed record MasterDataSet(
     /// mark the set non-empty would ask for confirmation on an otherwise fresh install.
     /// <see cref="Navigation"/> is excluded for exactly the same reason — a layout saved once would
     /// otherwise permanently turn the silent bootstrap into a confirm prompt.
+    /// <see cref="Gases"/> is excluded too: like Settings it always carries at least the default CO.
     /// </summary>
     public bool IsEmpty =>
         Roles.Count == 0
@@ -1109,6 +1116,7 @@ public static class MasterDataJson
             ParsePremises(root),
             ParseDevices(root),
             ParseTalkGroups(root),
+            GasDefinitionJson.Parse(root),
             ParseSettings(root));
     }
 
@@ -1546,6 +1554,16 @@ public static class MasterDataJson
                 category = t.Category,
                 etb = t.ForEtb,
                 tasks = t.ForTasks,
+            }),
+            gases = set.Gases.Select(g => new
+            {
+                name = g.Name,
+                unit = g.Unit,
+                direction = GasDefinitionJson.DirectionName(g.Direction),
+                elevated = g.Elevated,
+                dangerous = g.Dangerous,
+                lethal = g.Lethal,
+                plausibleUpTo = g.PlausibleUpTo,
             }),
             premises = set.Premises.Select(p => new
             {

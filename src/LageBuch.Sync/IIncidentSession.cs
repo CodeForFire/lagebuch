@@ -266,13 +266,16 @@ public interface IIncidentSession
         int floorCount,
         int apartmentsPerFloor,
         int undergroundFloorCount = 0,
-        IReadOnlyDictionary<string, string?>? apartmentLabels = null);
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null,
+        IReadOnlyList<GasDefinition>? gases = null);
 
     void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0);
 
     void RemoveCoBuilding(Guid buildingId);
 
-    void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue);
+    /// <summary>Records one FERTIG's gas values (#410), keyed by the Einsatz's own gas ids; a null
+    /// value clears that gas. See <see cref="Incident.RecordCoValues"/>.</summary>
+    void RecordCoValues(Guid buildingId, int floorOrdinal, int apartmentNumber, IReadOnlyDictionary<Guid, decimal?> values);
 
     void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status);
 

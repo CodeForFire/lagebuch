@@ -149,7 +149,7 @@ public class DemoFlowRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // The two rail groups: the app's own categories, then the brigade's own Checklisten.
-        Assert.Equal(15, vm.Sections.Count);
+        Assert.Equal(16, vm.Sections.Count);
         Assert.Equal(2, vm.Checklists.Count);
         Capture(window, "stammdaten-editor.png");
     }
@@ -309,7 +309,7 @@ public class DemoFlowRenderTests
         session.SetDwellingStatus(haus, 1, 1, DwellingStatus.Searched);
         session.SetDwellingStatus(haus, 1, 2, DwellingStatus.Searched);
         session.SetDwellingDetails(haus, 0, 1, "Mustermann", KeyAvailability.NotAvailable);
-        SelectTab(window, "CO-MESSUNG");
+        SelectTab(window, "GASMESSUNG");
         Assert.NotNull(vm.CoMessprotokoll.SelectedBuilding);
         Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);
         Capture(window, "co-messung.png");

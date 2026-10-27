@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.ViewModels;
@@ -50,13 +51,13 @@ public class CoMessprotokollCoValueInputTests
     public void Typing_an_implausible_value_shows_the_warning_live()
     {
         var (window, view, vm, _) = ShowEditor();
-        var input = view.GetControl<NumericUpDown>("CoValueInput");
+        var input = view.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Name == "GasValueInput");
 
         input.Focus();
         window.Type("2500");
 
         Assert.NotNull(vm.Editor);
-        Assert.Equal(2500, vm.Editor!.CoValue);
+        Assert.Equal(2500, vm.Editor!.GasInputs[0].Value);
         Assert.True(vm.Editor!.IsCoImplausible);
     }
 
@@ -68,7 +69,7 @@ public class CoMessprotokollCoValueInputTests
         // actually visible to a human typing-then-Enter in one motion. Enter must be a no-op here;
         // only FERTIG/ABBRECHEN may close the editor.
         var (window, view, vm, session) = ShowEditor();
-        var input = view.GetControl<NumericUpDown>("CoValueInput");
+        var input = view.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Name == "GasValueInput");
 
         input.Focus();
         window.Type("2500");
@@ -76,7 +77,7 @@ public class CoMessprotokollCoValueInputTests
 
         Assert.NotNull(vm.Editor);
         Assert.True(vm.Editor!.IsCoImplausible);
-        Assert.Null(EgDwelling(session).CoValue); // FERTIG was never clicked -- nothing committed
+        Assert.Null(EgDwelling(session).CoValue()); // FERTIG was never clicked -- nothing committed
     }
 
     [AvaloniaFact]
@@ -86,25 +87,52 @@ public class CoMessprotokollCoValueInputTests
         // plausibility warning exists to catch) did nothing at all. Root cause: NumericUpDown's
         // ClipValueToMinMax defaults to false, so a parsed value above Maximum throws inside the
         // control's own conversion, the exception is swallowed internally, and Value never updates.
-        // ClipValueToMinMax="True" on the control clips it to Maximum (9999) instead, which still
-        // lands well inside the Lethal/implausible bands -- silence replaced with a real reaction.
+        // ClipValueToMinMax="True" on the control clips it to Maximum (the domain's ceiling) instead,
+        // which still lands well inside the Lethal/implausible bands -- silence replaced with a real
+        // reaction.
         var (window, view, vm, _) = ShowEditor();
-        var input = view.GetControl<NumericUpDown>("CoValueInput");
+        var input = view.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Name == "GasValueInput");
 
         input.Focus();
         window.Type("111111111");
 
         Assert.NotNull(vm.Editor);
-        Assert.Equal(9999, vm.Editor!.CoValue);
-        Assert.True(vm.Editor!.IsCoLethal);
+        Assert.Equal(GasDefinition.MaxValue, vm.Editor!.GasInputs[0].Value);
+        Assert.True(vm.Editor!.GasInputs[0].IsCoLethal);
         Assert.True(vm.Editor!.IsCoImplausible);
+    }
+
+    // #410: a gas reading takes decimals the German way, whatever culture the device runs in.
+    [AvaloniaFact]
+    public void A_decimal_is_typed_with_a_comma()
+    {
+        var (window, view, vm, _) = ShowEditor();
+        var input = view.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Name == "GasValueInput");
+
+        input.Focus();
+        window.Type("20,9");
+
+        Assert.Equal(20.9m, vm.Editor!.GasInputs[0].Value);
+    }
+
+    // The German thousands dot must not turn a typed "20.9" into 209 Vol-%.
+    [AvaloniaFact]
+    public void A_decimal_point_is_not_read_as_a_thousands_separator()
+    {
+        var (window, view, vm, _) = ShowEditor();
+        var input = view.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Name == "GasValueInput");
+
+        input.Focus();
+        window.Type("20.9");
+
+        Assert.NotEqual(209m, vm.Editor!.GasInputs[0].Value);
     }
 
     [AvaloniaFact]
     public void Clicking_FERTIG_after_typing_commits_the_value()
     {
         var (window, view, vm, session) = ShowEditor();
-        var input = view.GetControl<NumericUpDown>("CoValueInput");
+        var input = view.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Name == "GasValueInput");
 
         input.Focus();
         window.Type("2500");
@@ -113,6 +141,6 @@ public class CoMessprotokollCoValueInputTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Null(vm.Editor);
-        Assert.Equal(2500, EgDwelling(session).CoValue);
+        Assert.Equal(2500, EgDwelling(session).CoValue());
     }
 }

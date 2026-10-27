@@ -171,7 +171,7 @@ public class HeaderSearchAndActionPlacementTests
         var (window, vm, session) = ShowWorkspace();
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -187,12 +187,12 @@ public class HeaderSearchAndActionPlacementTests
         var (window, vm, session) = ShowWorkspace();
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         var co = vm.CoMessprotokoll;
         co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
-        co.Editor!.CoValue = 120;
+        co.Editor!.GasInputs[0].Value = 120;
         co.CloseEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Assert.True(co.IsDiscardEditorConfirmOpen);

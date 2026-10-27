@@ -70,7 +70,12 @@ public sealed record IncidentSnapshot(
     string? ElStandort = null,
     string? ElRufname = null,
     string? ElTelefon = null,
-    string? ElFunkgruppe = null);
+    string? ElFunkgruppe = null,
+
+    // Protocol 26 (#410): the Einsatz's own gas list. A joined client shows exactly this, never
+    // its own Stammdaten. Null reads as no list, which Incident.Rehydrate turns into the legacy CO
+    // gas once a Haus exists.
+    IReadOnlyList<IncidentGasDto>? Gases = null);
 
 public sealed record TimerDto(
     string Key,
@@ -234,7 +239,11 @@ public sealed record BuildingDto(
 
 public sealed record DwellingDto(
     Guid Id, Guid BuildingId, int FloorOrdinal, int ApartmentNumber,
-    string? ResidentName, DwellingStatus Status, bool? KeyAvailable, int? CoValue,
+    string? ResidentName, DwellingStatus Status, bool? KeyAvailable,
+
+    // Protocol 26 (#410): the current value per gas, keyed by the Einsatz's own gas id. Replaced
+    // the single CoValue, which is why the floor rose with it.
+    IReadOnlyDictionary<Guid, decimal>? Values,
 
     // Appended with a default, the BuildingDto convention: a snapshot written before #424 has no
     // readings key, deserializes to null, and maps to an empty series. That default is this
@@ -244,6 +253,25 @@ public sealed record DwellingDto(
     // Protocol 24, appended the same way: a snapshot without it reads as no Schlüsselnummer.
     string? KeyNumber = null);
 
-/// <summary>One CO reading on the wire; the JSON-shaped sibling of
+/// <summary>One gas reading on the wire; the JSON-shaped sibling of
 /// <see cref="LageBuch.Domain.CoMeasurement.CoReading"/>.</summary>
-public sealed record CoReadingDto(DateTimeOffset MeasuredAt, int? Value, string RecordedBy);
+public sealed record CoReadingDto(DateTimeOffset MeasuredAt, Guid GasId, decimal? Value, string RecordedBy);
+
+/// <summary>A gas definition on the wire (#410): a Messgas from the Stammdaten in
+/// <see cref="AddCoBuildingCommand"/>, or the definition half of an <see cref="IncidentGasDto"/>.
+/// Hostile like everything a peer sends: <see cref="GasDefinition.Sanitized"/> runs on the way
+/// in.</summary>
+public sealed record GasDefinitionDto(
+    string Name, string Unit, GasDirection Direction, decimal? Elevated, decimal? Dangerous, decimal? Lethal, decimal? PlausibleUpTo)
+{
+    public static GasDefinitionDto From(GasDefinition gas)
+    {
+        ArgumentNullException.ThrowIfNull(gas);
+        return new(gas.Name, gas.Unit, gas.Direction, gas.Elevated, gas.Dangerous, gas.Lethal, gas.PlausibleUpTo);
+    }
+
+    public GasDefinition ToDefinition() => new(Name, Unit, Direction, Elevated, Dangerous, Lethal, PlausibleUpTo);
+}
+
+/// <summary>One of the Einsatz's own gases on the wire; mirrors <see cref="IncidentGas"/>.</summary>
+public sealed record IncidentGasDto(Guid Id, GasDefinitionDto Definition);

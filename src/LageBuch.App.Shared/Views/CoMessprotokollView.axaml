@@ -75,6 +75,17 @@
       <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="Bold" />
     </Style>
+    <!-- The same bands on a gas input in the sidebar (#410), so the danger shows before FERTIG. -->
+    <Style Selector="NumericUpDown.gasValue.elevated">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <Style Selector="NumericUpDown.gasValue.dangerous">
+      <Setter Property="Foreground" Value="{StaticResource SignalHotBrush}" />
+    </Style>
+    <Style Selector="NumericUpDown.gasValue.lethal">
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
   </UserControl.Styles>
 
   <!-- Tab follows the screen, top to bottom (#695). The DockPanel needs its bottom-docked
@@ -84,7 +95,7 @@
   <DockPanel KeyboardNavigation.TabNavigation="Local">
     <!-- Title: every other tab leads with one at this same position (DockPanel.Dock="Top",
          Margin bottom 14) — this view was missing it (#137). -->
-    <TextBlock DockPanel.Dock="Top" x:Name="CoTitle" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
+    <TextBlock DockPanel.Dock="Top" x:Name="CoTitle" Text="GASMESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
 
     <!-- Building management: which Haus, and add/remove a Haus (bottom gutter, matching every
          other tab's entry point, #221). HAUS auswählen/ENTFERNEN act on the selected Haus and sit
@@ -347,33 +358,56 @@
                       Command="{Binding SetEditorStatusAffectedCommand}" />
             </StackPanel>
 
-            <!-- CO Value -->
-            <StackPanel Spacing="2">
-              <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
-              <!-- No Enter-to-commit here on purpose: NumericUpDown already live-updates Editor.CoValue
-                   per keystroke (it syncs Text to Value on every TextBox.TextChanged), which is what
-                   drives the implausible-value warning below as the operator types. An Enter shortcut
-                   that also closes the sidebar (like FERTIG) would defeat that warning's whole point,
-                   since typing a value and hitting Enter is one fluid motion: the sidebar would vanish
-                   in the same instant the warning appeared, before anyone could actually read it. -->
-              <!-- ClipValueToMinMax="True" is load-bearing, not decorative: Avalonia's NumericUpDown
-                   defaults it to false, which means typing anything above Maximum (e.g. a fat-fingered
-                   "111111111") throws inside the control's own text-to-value conversion, that exception
-                   is swallowed internally, and Value silently never updates: no warning, no color, no
-                   feedback at all. Exactly the typo this field exists to catch, met with total silence.
-                   Clipping instead lands the value at 9999, which is comfortably inside both the Lethal
-                   and implausible-value bands below, so a wild typo still gets a visible reaction. -->
-              <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" ClipValueToMinMax="True"
-                             Value="{Binding Editor.CoValue}"
-                             FormatString="0" PlaceholderText="Kein Messwert" />
-              <!-- Caution about a likely typo (e.g. 9999 vs 999), not a severity warning; deliberately
-                   non-blocking: a real fire scene can genuinely produce extreme ppm values, so FERTIG
-                   still commits it. -->
-              <TextBlock Text="⚠ Ungewöhnlich hoher Wert – bitte auf Tippfehler prüfen"
-                         FontSize="10" TextWrapping="Wrap"
-                         Foreground="{StaticResource AmberBrush}"
-                         IsVisible="{Binding Editor.IsCoImplausible}" />
-            </StackPanel>
+            <!-- One input per gas of the Einsatz (#410), in its list order, headed by its name, its
+                 unit inside the field, and its value coloured by its own band while it is typed. A
+                 CO-only Einsatz shows the single CO input it always had. -->
+            <ItemsControl x:Name="GasInputs" ItemsSource="{Binding Editor.GasInputs}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:GasInputRow">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding Header}" Classes="overline" FontSize="10" />
+                    <!-- No Enter-to-commit here on purpose: NumericUpDown already live-updates the value
+                         per keystroke (it syncs Text to Value on every TextBox.TextChanged), which is what
+                         drives the implausible-value warning below as the operator types. An Enter shortcut
+                         that also closes the sidebar (like FERTIG) would defeat that warning's whole point,
+                         since typing a value and hitting Enter is one fluid motion: the sidebar would vanish
+                         in the same instant the warning appeared, before anyone could actually read it. -->
+                    <!-- ClipValueToMinMax="True" is load-bearing, not decorative: Avalonia's NumericUpDown
+                         defaults it to false, which means typing anything above Maximum (e.g. a fat-fingered
+                         "111111111") throws inside the control's own text-to-value conversion, that exception
+                         is swallowed internally, and Value silently never updates: no warning, no color, no
+                         feedback at all. Exactly the typo this field exists to catch, met with total silence.
+                         Clipping instead lands the value at the domain's ceiling, far above any gas's
+                         Plausibel-bis, so a wild typo still gets a visible reaction. -->
+                    <NumericUpDown x:Name="GasValueInput" Classes="decimal gasValue"
+                                   Classes.elevated="{Binding IsCoElevated}"
+                                   Classes.dangerous="{Binding IsCoDangerous}"
+                                   Classes.lethal="{Binding IsCoLethal}"
+                                   Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}" ClipValueToMinMax="True"
+                                   Value="{Binding Value}"
+                                   PlaceholderText="Kein Messwert"
+                                   AutomationProperties.Name="{Binding AccessibleName}">
+                      <NumericUpDown.InnerRightContent>
+                        <TextBlock Text="{Binding Unit}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                   FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                      </NumericUpDown.InnerRightContent>
+                    </NumericUpDown>
+                    <!-- Caution about a likely typo (e.g. 9999 vs 999), not a severity warning; deliberately
+                         non-blocking: a real fire scene can genuinely produce extreme values, so FERTIG
+                         still commits it. -->
+                    <TextBlock Text="⚠ Ungewöhnlich hoher Wert – bitte auf Tippfehler prüfen"
+                               FontSize="10" TextWrapping="Wrap"
+                               Foreground="{StaticResource AmberBrush}"
+                               IsVisible="{Binding IsImplausible}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
             <!-- MESSREIHE (#424): this Wohnung's committed readings, newest first. Only values
                  actually written by FERTIG appear here: the field above already shows the pending
@@ -394,20 +428,33 @@
               <ScrollViewer x:Name="MessreiheScroll" MaxHeight="108"
                             HorizontalScrollBarVisibility="Disabled"
                             VerticalScrollBarVisibility="Auto">
-              <ItemsControl x:Name="MessreiheList" ItemsSource="{Binding Editor.Readings}">
+              <ItemsControl x:Name="MessreiheList" ItemsSource="{Binding Editor.Readings}" Grid.IsSharedSizeScope="True">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:CoReadingRow">
-                    <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,2,0,0">
+                    <!-- The gas column (#410) is empty for a CO-only Einsatz, so its Auto width
+                         collapses and the row reads as before. Shared, so a long name does not
+                         stagger the values below it. -->
+                    <Grid Margin="0,2,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="MessreiheGas" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
                       <TextBlock Grid.Column="0" Text="{Binding Time}"
                                  FontFamily="{StaticResource MonoFont}" FontSize="11"
                                  Foreground="{StaticResource TextMutedBrush}" Margin="0,0,8,0" />
-                      <TextBlock Grid.Column="1" Text="{Binding Value}"
+                      <TextBlock Grid.Column="1" Text="{Binding Gas}"
+                                 FontFamily="{StaticResource MonoFont}" FontSize="11"
+                                 IsVisible="{Binding Gas, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                 Foreground="{StaticResource TextMutedBrush}" Margin="0,0,6,0" />
+                      <TextBlock Grid.Column="2" Text="{Binding Value}"
                                  FontFamily="{StaticResource MonoFont}" FontSize="11"
                                  Classes="coValue"
                                  Classes.elevated="{Binding IsCoElevated}"
                                  Classes.dangerous="{Binding IsCoDangerous}"
                                  Classes.lethal="{Binding IsCoLethal}" />
-                      <TextBlock Grid.Column="2" Text="{Binding RecordedBy}"
+                      <TextBlock Grid.Column="3" Text="{Binding RecordedBy}"
                                  FontSize="10" Margin="8,0,0,0"
                                  VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis"
@@ -661,9 +708,34 @@
                       <Button Classes="unit-tile" Background="Transparent" BorderThickness="0" Padding="0" Height="NaN"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                              ToolTip.Tip="{Binding TileTooltip}"
                               AutomationProperties.Name="{Binding TileTooltip}"
                               Command="{Binding OpenEditorCommand}">
+                        <!-- Every gas, each in its own colour (#410): the tile shows only the worst
+                             one. The sentence TileTooltip carries the same for a screen reader. -->
+                        <ToolTip.Tip>
+                          <StackPanel x:Name="TileTooltipPanel" Spacing="2" MaxWidth="320">
+                            <TextBlock Text="{Binding TooltipHead}" TextWrapping="Wrap" />
+                            <TextBlock Text="Kein Messwert"
+                                       IsVisible="{Binding !GasValueRows.Count}" />
+                            <ItemsControl ItemsSource="{Binding GasValueRows}">
+                              <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                  <WrapPanel ItemSpacing="8" />
+                                </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:GasValueRow">
+                                  <TextBlock Text="{Binding Text}" FontFamily="{StaticResource MonoFont}"
+                                             Classes="coValue"
+                                             Classes.elevated="{Binding IsCoElevated}"
+                                             Classes.dangerous="{Binding IsCoDangerous}"
+                                             Classes.lethal="{Binding IsCoLethal}" />
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding TooltipTail}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </ToolTip.Tip>
                         <!-- Door-mark tile: dark ground, colored accent stripe + a slash/X/circled-X
                              glyph mirror the spray-marked search convention crews already read on
                              scene, instead of a solid traffic-light fill. Sized down to 104x46 from

@@ -234,7 +234,7 @@ public static class CommandApplier
                 incident.ExtendTaskTimer(c.TaskId, c.Minutes, clock);
                 break;
             case AddCoBuildingCommand c:
-                incident.AddCoBuilding(clock, Operator(c.Operator), c.Name, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount, c.ApartmentLabels);
+                incident.AddCoBuilding(clock, Operator(c.Operator), c.Name, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount, c.ApartmentLabels, c.Gases?.OfType<GasDefinitionDto>().Select(g => g.ToDefinition()));
                 break;
             case UpdateCoBuildingStructureCommand c:
                 incident.UpdateCoBuildingStructure(clock, Operator(c.Operator), c.BuildingId, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount);
@@ -242,8 +242,8 @@ public static class CommandApplier
             case RemoveCoBuildingCommand c:
                 incident.RemoveCoBuilding(clock, Operator(c.Operator), c.BuildingId);
                 break;
-            case RecordCoValueCommand c:
-                incident.RecordCoValue(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.CoValue);
+            case RecordCoValuesCommand c:
+                incident.RecordCoValues(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, GasValues(c.Values));
                 break;
             case SetDwellingStatusCommand c:
                 incident.SetDwellingStatus(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.Status);
@@ -273,4 +273,26 @@ public static class CommandApplier
     }
 
     private static SessionOperator Operator(OperatorDto dto) => new(dto.Name, dto.CallSign);
+
+    // A peer's list, capped before anything is built from it: more than eight values, or one gas
+    // named twice, is a malformed command and is refused as one (ArgumentException, which the host
+    // turns into a 400). Incident.RecordCoValues checks the ids against the Einsatz's own list.
+    private static Dictionary<Guid, decimal?> GasValues(IReadOnlyList<GasValueDto>? values)
+    {
+        if (values is null || values.Count > GasDefinition.MaxCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(values), $"Höchstens {GasDefinition.MaxCount} Messgase.");
+        }
+
+        var result = new Dictionary<Guid, decimal?>();
+        foreach (var value in values)
+        {
+            if (value is null || !result.TryAdd(value.GasId, value.Value))
+            {
+                throw new ArgumentException("Messgas doppelt oder leer.", nameof(values));
+            }
+        }
+
+        return result;
+    }
 }

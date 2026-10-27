@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 35;
+    public const int CurrentVersion = 36;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -242,6 +242,11 @@ public static class Migrations
             ApplyV35(cn, tx);
 
             // Stryker restore all
+        }
+
+        if (version < 36)
+        {
+            ApplyV36(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1024,6 +1029,72 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_dwellings", "key_number", "TEXT");
 
         // Stryker restore all
+    }
+
+    // #410: up to eight gases instead of one CO value. The incident gets its own gas table -- a
+    // copy of the Stammdaten list, never a reference into it -- and the current values move into a
+    // per-gas JSON map on co_dwellings, the shape floor_descriptions already has. Readings gain the
+    // gas they belong to and a decimal value kept as invariant text (20.9 Vol-% O2 is not an
+    // INTEGER). Every file from before carries exactly one gas, CO, with the bands the app always
+    // used: this step writes that gas and moves co_value and the Messreihe onto it, so nothing is
+    // lost and nothing reads as an unnamed gas. co_value and co_readings.value stay where they are,
+    // unread: SchemaGuard never drops a column, and neither does a migration here.
+    private static void ApplyV36(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql36 = """
+            CREATE TABLE IF NOT EXISTS co_gases (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                unit TEXT NOT NULL DEFAULT '',
+                direction INTEGER NOT NULL DEFAULT 0,
+                elevated TEXT,
+                dangerous TEXT,
+                lethal TEXT,
+                plausible_up_to TEXT
+            );
+            """;
+        Exec(cn, tx, sql36);
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_dwellings", "gas_values", "TEXT NOT NULL DEFAULT '{}'");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_readings", "gas_id", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_readings", "measured_value", "TEXT");
+
+        // Each backfill only where its table exists, the way AddColumnIfMissing skips a missing
+        // table: a file need not carry every table an older step would have created.
+        const string legacyGas = """
+            INSERT INTO co_gases (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to)
+                SELECT $id, 0, 'CO', 'ppm', 0, '30', '200', '800', '2000'
+                WHERE EXISTS (SELECT 1 FROM co_buildings) AND NOT EXISTS (SELECT 1 FROM co_gases);
+            """;
+        const string legacyValues = "UPDATE co_dwellings SET gas_values = json_object($id, CAST(co_value AS TEXT)) WHERE co_value IS NOT NULL;";
+        const string legacyReadings = "UPDATE co_readings SET gas_id = $id, measured_value = CAST(value AS TEXT) WHERE gas_id IS NULL;";
+        if (SchemaHelpers.TableExists(cn, tx, "co_buildings"))
+        {
+            ExecWithLegacyCoId(cn, tx, legacyGas);
+        }
+
+        if (SchemaHelpers.TableExists(cn, tx, "co_dwellings"))
+        {
+            ExecWithLegacyCoId(cn, tx, legacyValues);
+        }
+
+        if (SchemaHelpers.TableExists(cn, tx, "co_readings"))
+        {
+            ExecWithLegacyCoId(cn, tx, legacyReadings);
+        }
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: SQL is migration data built from compile-time constants; the gas id is a bound parameter.")]
+    private static void ExecWithLegacyCoId(SqliteConnection cn, SqliteTransaction tx, string sql)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = sql;
+        cmd.Parameters.AddWithValue("$id", Domain.CoMeasurement.IncidentGas.LegacyCoId.ToString());
+        cmd.ExecuteNonQuery();
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

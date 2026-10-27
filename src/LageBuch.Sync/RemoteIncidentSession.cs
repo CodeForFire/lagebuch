@@ -831,8 +831,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         int floorCount,
         int apartmentsPerFloor,
         int undergroundFloorCount = 0,
-        IReadOnlyDictionary<string, string?>? apartmentLabels = null) =>
-        Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels));
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null,
+        IReadOnlyList<GasDefinition>? gases = null) =>
+        Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor, undergroundFloorCount, apartmentLabels, gases?.Select(GasDefinitionDto.From).ToList()));
 
     public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         Send(new UpdateCoBuildingStructureCommand(Op(), buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount));
@@ -840,8 +841,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void RemoveCoBuilding(Guid buildingId) =>
         Send(new RemoveCoBuildingCommand(Op(), buildingId));
 
-    public void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue) =>
-        Send(new RecordCoValueCommand(Op(), buildingId, floorOrdinal, apartmentNumber, coValue));
+    public void RecordCoValues(Guid buildingId, int floorOrdinal, int apartmentNumber, IReadOnlyDictionary<Guid, decimal?> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        Send(new RecordCoValuesCommand(Op(), buildingId, floorOrdinal, apartmentNumber, values.Select(kv => new GasValueDto(kv.Key, kv.Value)).ToList()));
+    }
 
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
         Send(new SetDwellingStatusCommand(Op(), buildingId, floorOrdinal, apartmentNumber, status));

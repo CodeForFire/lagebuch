@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using LageBuch.Domain;
 using LageBuch.Domain.Leadership;
+using LageBuch.Persistence.MasterData;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -64,7 +65,7 @@ public sealed class IncidentRepository
                     "role_assignments", "force_units", "force_unit_edits", "scba_trupps",
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
-                    "co_buildings", "co_dwellings", "co_readings", "involved_parties", "situation_reports",
+                    "co_buildings", "co_dwellings", "co_readings", "co_gases", "involved_parties", "situation_reports",
                     "issued_items", "command_nodes",
                  })
         {
@@ -113,6 +114,7 @@ public sealed class IncidentRepository
         WriteTimers(inserts, incident);
         WriteFiles(inserts, incident);
         WriteCoBuildings(inserts, incident);
+        WriteCoGases(inserts, incident);
         WriteCoDwellings(inserts, incident);
         WriteTasks(inserts, incident);
         WriteInvolvedParties(inserts, incident);
@@ -377,6 +379,30 @@ public sealed class IncidentRepository
         }
     }
 
+    // The incident's own copy of its gases (#410), in display order. Decimals as invariant text.
+    private static void WriteCoGases(InsertCommands inserts, Incident incident)
+    {
+        for (var i = 0; i < incident.Gases.Count; i++)
+        {
+            var g = incident.Gases[i];
+            Run(
+                inserts,
+                "INSERT INTO co_gases (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to) VALUES ($id,$o,$n,$u,$d,$e,$g,$l,$p);",
+                p =>
+                {
+                    p("$id", g.Id.ToString());
+                    p("$o", i);
+                    p("$n", g.Name);
+                    p("$u", g.Unit);
+                    p("$d", (int)g.Definition.Direction);
+                    p("$e", (object?)GasDefinitionJson.ToText(g.Definition.Elevated) ?? DBNull.Value);
+                    p("$g", (object?)GasDefinitionJson.ToText(g.Definition.Dangerous) ?? DBNull.Value);
+                    p("$l", (object?)GasDefinitionJson.ToText(g.Definition.Lethal) ?? DBNull.Value);
+                    p("$p", (object?)GasDefinitionJson.ToText(g.Definition.PlausibleUpTo) ?? DBNull.Value);
+                });
+        }
+    }
+
     private static void WriteCoDwellings(InsertCommands inserts, Incident incident)
     {
         for (var i = 0; i < incident.Dwellings.Count; i++)
@@ -384,7 +410,7 @@ public sealed class IncidentRepository
             var d = incident.Dwellings[i];
             Run(
                 inserts,
-                "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value, key_number) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$cv,$kn);",
+                "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, gas_values, key_number) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$gv,$kn);",
                 p =>
                 {
                     p("$id", d.Id.ToString());
@@ -394,7 +420,8 @@ public sealed class IncidentRepository
                     p("$rn", (object?)d.ResidentName ?? DBNull.Value);
                     p("$st", (int)d.Status);
                     p("$kv", Domain.CoMeasurement.KeyAvailabilityEncoding.ToNullableBool(d.KeyAvailable) is { } k ? (object)(k ? 1 : 0) : DBNull.Value);
-                    p("$cv", (object?)d.CoValue ?? DBNull.Value);
+                    p("$gv", System.Text.Json.JsonSerializer.Serialize(
+                        d.Values.ToDictionary(kv => kv.Key.ToString(), kv => GasDefinitionJson.ToText(kv.Value))));
                     p("$kn", (object?)d.KeyNumber ?? DBNull.Value);
                 });
 
@@ -403,14 +430,15 @@ public sealed class IncidentRepository
                 var reading = d.Readings[j];
                 Run(
                     inserts,
-                    "INSERT INTO co_readings (id, dwelling_id, ordinal, measured_at, value, recorded_by) " + "VALUES ($id,$did,$o,$at,$v,$by);",
+                    "INSERT INTO co_readings (id, dwelling_id, ordinal, measured_at, gas_id, measured_value, recorded_by) " + "VALUES ($id,$did,$o,$at,$g,$v,$by);",
                     p =>
                     {
                         p("$id", Guid.NewGuid().ToString());
                         p("$did", d.Id.ToString());
                         p("$o", j);
                         p("$at", reading.MeasuredAt.ToString(Iso));
-                        p("$v", (object?)reading.Value ?? DBNull.Value);
+                        p("$g", reading.GasId.ToString());
+                        p("$v", (object?)GasDefinitionJson.ToText(reading.Value) ?? DBNull.Value);
                         p("$by", reading.RecordedBy);
                     });
             }
@@ -853,17 +881,39 @@ public sealed class IncidentRepository
         // Grouped up front rather than queried per Wohnung, the same shape as strengthEditsByUnit
         // above. Ordered by dwelling_id as well as ordinal: grouping alone would survive a bare
         // "ORDER BY ordinal", but the series' order is the whole point of storing it.
+        // A reading whose gas id does not parse is dropped here; one naming a gas the list lacks is
+        // dropped by Incident.Rehydrate, which applies the same rule to a sync snapshot.
         var readingsByDwelling = ReadAll(
             cn,
-            "SELECT dwelling_id, measured_at, value, recorded_by FROM co_readings ORDER BY dwelling_id, ordinal;",
+            "SELECT dwelling_id, measured_at, gas_id, measured_value, recorded_by FROM co_readings ORDER BY dwelling_id, ordinal;",
             r => (DwellingId: Guid.Parse(r.GetString(0)),
-                  Reading: new Domain.CoMeasurement.CoReading(ParseDate(r.GetString(1)), NullableInt(r, 2), r.GetString(3))))
+                  GasId: NullableGuid(r, 2),
+                  MeasuredAt: ParseDate(r.GetString(1)),
+                  Value: GasDefinitionJson.FromText(Str(r, 3)),
+                  RecordedBy: r.GetString(4)))
+            .Where(x => x.GasId is not null)
             .GroupBy(x => x.DwellingId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.Reading).ToList());
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => new Domain.CoMeasurement.CoReading(x.MeasuredAt, x.GasId.GetValueOrDefault(), x.Value, x.RecordedBy)).ToList());
+
+        var gases = ReadAll(
+            cn,
+            "SELECT id, name, unit, direction, elevated, dangerous, lethal, plausible_up_to FROM co_gases ORDER BY ordinal;",
+            r => new Domain.CoMeasurement.IncidentGas(
+                Guid.Parse(r.GetString(0)),
+                new Domain.CoMeasurement.GasDefinition(
+                    r.GetString(1),
+                    r.GetString(2),
+                    (Domain.CoMeasurement.GasDirection)r.GetInt32(3),
+                    GasDefinitionJson.FromText(Str(r, 4)),
+                    GasDefinitionJson.FromText(Str(r, 5)),
+                    GasDefinitionJson.FromText(Str(r, 6)),
+                    GasDefinitionJson.FromText(Str(r, 7)))));
 
         var dwellings = ReadAll(
             cn,
-            "SELECT id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value, key_number FROM co_dwellings ORDER BY floor_ordinal, apartment_number;",
+            "SELECT id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, gas_values, key_number FROM co_dwellings ORDER BY floor_ordinal, apartment_number;",
             r =>
             {
                 var id = Guid.Parse(r.GetString(0));
@@ -875,7 +925,7 @@ public sealed class IncidentRepository
                     Str(r, 4),
                     (Domain.CoMeasurement.DwellingStatus)r.GetInt32(5),
                     Domain.CoMeasurement.KeyAvailabilityEncoding.FromNullableBool(r.IsDBNull(6) ? null : r.GetInt32(6) == 1),
-                    NullableInt(r, 7),
+                    GasValues(r.GetString(7)),
                     readingsByDwelling.TryGetValue(id, out var rs) ? rs : null,
                     Str(r, 8));
             });
@@ -997,7 +1047,8 @@ public sealed class IncidentRepository
             issuedItems,
             commandNodes,
             LeadershipKeys.StufeFrom(meta[14] as string),
-            new Domain.Leadership.LeadershipPost(meta[15] as string, meta[16] as string, meta[17] as string, meta[18] as string));
+            new Domain.Leadership.LeadershipPost(meta[15] as string, meta[16] as string, meta[17] as string, meta[18] as string),
+            gases);
     }
 
     private static DateTimeOffset ParseDate(string s) =>
@@ -1006,6 +1057,23 @@ public sealed class IncidentRepository
     private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
     private static int? NullableInt(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
+
+    // co_dwellings.gas_values (#410): gas id -> invariant decimal text. An entry whose key or value
+    // does not parse is dropped rather than failing the whole file.
+    private static Dictionary<Guid, decimal> GasValues(string json)
+    {
+        var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(json) ?? [];
+        var values = new Dictionary<Guid, decimal>();
+        foreach (var (key, text) in raw)
+        {
+            if (Guid.TryParse(key, out var gasId) && GasDefinitionJson.FromText(text) is { } value)
+            {
+                values[gasId] = value;
+            }
+        }
+
+        return values;
+    }
 
     // TryParse rather than Parse: an unreadable id degrades to "no Sicherheitstrupp recorded",
     // which is the same stance Rehydrate takes on a stored crew -- a file that opens imperfectly

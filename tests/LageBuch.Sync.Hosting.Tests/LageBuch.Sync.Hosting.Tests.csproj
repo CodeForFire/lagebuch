@@ -19,6 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\CoOnlyIncidentExtensions.cs" Link="Shared\CoOnlyIncidentExtensions.cs" />
+    <Compile Include="..\Shared\CoOnlySessionExtensions.cs" Link="Shared\CoOnlySessionExtensions.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\LageBuch.Sync.Hosting\LageBuch.Sync.Hosting.csproj" />
   </ItemGroup>
 

@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -192,6 +193,25 @@ public sealed class MasterDataStore
                 });
         }
 
+        Run(cn, tx, "DELETE FROM md_gases;", _ => { });
+        foreach (var g in set.Gases)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_gases (name, unit, direction, elevated, dangerous, lethal, plausible_up_to) VALUES ($n,$u,$d,$e,$g,$l,$p);",
+                p =>
+                {
+                    p("$n", g.Name);
+                    p("$u", g.Unit);
+                    p("$d", (int)g.Direction);
+                    p("$e", (object?)GasDefinitionJson.ToText(g.Elevated) ?? DBNull.Value);
+                    p("$g", (object?)GasDefinitionJson.ToText(g.Dangerous) ?? DBNull.Value);
+                    p("$l", (object?)GasDefinitionJson.ToText(g.Lethal) ?? DBNull.Value);
+                    p("$p", (object?)GasDefinitionJson.ToText(g.PlausibleUpTo) ?? DBNull.Value);
+                });
+        }
+
         WriteChecklists(cn, tx, set.ChecklistTemplates);
         WriteNavigation(cn, tx, set.Navigation);
 
@@ -344,6 +364,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT);
             CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT);
+            CREATE TABLE IF NOT EXISTS md_gases (name TEXT NOT NULL, unit TEXT NOT NULL DEFAULT '', direction INTEGER NOT NULL DEFAULT 0, elevated TEXT, dangerous TEXT, lethal TEXT, plausible_up_to TEXT);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -488,6 +509,15 @@ public sealed class MasterDataStore
         // every repairable column to the same rule.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_talk_groups", "number", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_talk_groups", "note", "TEXT");
+
+        // md_gases' optional columns (#410): the table is new, but #397's sweep holds every
+        // repairable column to the same rule.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "unit", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "direction", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "elevated", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "dangerous", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "lethal", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "plausible_up_to", "TEXT");
 
         // Wachen and Funkrufnamen used to be lists of their own; they are derived from md_vehicles
         // (and md_personnel) now. Drop the stale tables a pre-change store still carries -- their
@@ -655,6 +685,7 @@ public sealed class MasterDataStore
             ReadPremises(cn),
             ReadDevices(cn),
             ReadTalkGroups(cn),
+            ReadGases(cn),
             ReadSettings(cn));
     }
 
@@ -955,6 +986,30 @@ public sealed class MasterDataStore
         }
 
         return list;
+    }
+
+    // Rowid order is the list order. A store saved before #410 has no rows and reads as CO alone;
+    // the rows are sanitised on the way in, because the file may have been edited by hand.
+    private static IReadOnlyList<GasDefinition> ReadGases(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT name, unit, direction, elevated, dangerous, lethal, plausible_up_to FROM md_gases;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<GasDefinition>();
+        while (r.Read())
+        {
+            list.Add(new GasDefinition(
+                r.GetString(0),
+                r.GetString(1),
+                (GasDirection)r.GetInt32(2),
+                GasDefinitionJson.FromText(Str(r, 3)),
+                GasDefinitionJson.FromText(Str(r, 4)),
+                GasDefinitionJson.FromText(Str(r, 5)),
+                GasDefinitionJson.FromText(Str(r, 6))));
+        }
+
+        var gases = GasDefinition.SanitizeList(list);
+        return gases.Count > 0 ? gases : [GasDefinition.DefaultCo];
     }
 
     private static List<Person> ReadPersonnel(SqliteConnection cn)

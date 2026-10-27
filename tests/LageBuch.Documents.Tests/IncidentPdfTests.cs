@@ -236,7 +236,7 @@ public class IncidentPdfTests
     [InlineData(IncidentPdfSections.InvolvedParties, "Beteiligte")]
     [InlineData(IncidentPdfSections.Tasks, "Aufgaben")]
     [InlineData(IncidentPdfSections.Atemschutz, "Atemschutzüberwachung")]
-    [InlineData(IncidentPdfSections.CoMessprotokoll, "CO-Messprotokoll")]
+    [InlineData(IncidentPdfSections.CoMessprotokoll, "Gasmessprotokoll")]
     [InlineData(IncidentPdfSections.Files, "Angehängte Dateien")]
     public void Each_section_is_printed_exactly_when_it_is_selected(IncidentPdfSections section, string heading)
     {

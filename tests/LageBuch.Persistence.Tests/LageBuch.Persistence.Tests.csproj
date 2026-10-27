@@ -20,6 +20,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\CoOnlyIncidentExtensions.cs" Link="Shared\CoOnlyIncidentExtensions.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\LageBuch.Persistence\LageBuch.Persistence.csproj" />
   </ItemGroup>
 

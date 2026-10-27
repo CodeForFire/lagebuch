@@ -100,7 +100,7 @@ public class WorkspaceShortcutTests
 
         string[] expected =
         [
-            "AUFBAU", "ETB", "AUFGABEN", "FÜHRUNG", "BETEILIGTE", "ATEMSCHUTZ", "CO-MESSUNG",
+            "AUFBAU", "ETB", "AUFGABEN", "FÜHRUNG", "BETEILIGTE", "ATEMSCHUTZ", "GASMESSUNG",
             "DATEIEN", "LINKS",
         ];
         for (var i = 0; i < expected.Length; i++)

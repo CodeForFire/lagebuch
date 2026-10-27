@@ -57,7 +57,7 @@ public class CoMeasurementTests
         Assert.Equal(2, dwelling.FloorOrdinal);
         Assert.Equal(3, dwelling.ApartmentNumber);
         Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
-        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.CoValue());
         Assert.Null(dwelling.ResidentName);
         Assert.Equal(KeyAvailability.Unknown, dwelling.KeyAvailable);
     }
@@ -188,7 +188,7 @@ public class CoMeasurementTests
         incident.AddCoBuilding(clock, op, "Haus A", 8, 10);
 
         var entry = incident.Journal.Last();
-        Assert.Contains("CO-Messprotokoll eröffnet", entry.Text, StringComparison.Ordinal);
+        Assert.Contains("Gasmessprotokoll eröffnet", entry.Text, StringComparison.Ordinal);
         Assert.Contains("Haus A", entry.Text, StringComparison.Ordinal);
     }
 
@@ -225,7 +225,7 @@ public class CoMeasurementTests
         Assert.Equal(120, reading.Value);
         Assert.Equal(clock.Now, reading.MeasuredAt);
         Assert.Equal(op.Display, reading.RecordedBy);
-        Assert.Equal(120, dwelling.CoValue);
+        Assert.Equal(120, dwelling.CoValue());
     }
 
     [Fact]
@@ -244,13 +244,13 @@ public class CoMeasurementTests
         incident.RecordCoValue(clock, op, haus, 0, 1, 5);
 
         var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(new int?[] { 120, 40, 5 }, dwelling.Readings.Select(r => r.Value));
+        Assert.Equal(new decimal?[] { 120, 40, 5 }, dwelling.Readings.Select(r => r.Value));
         Assert.Equal(
             new[] { "08:14", "08:41", "09:02" },
             dwelling.Readings.Select(r => Formatting.TimeOfDay(r.MeasuredAt)));
 
         // The current value is always the last reading, never a fourth, separately-tracked number.
-        Assert.Equal(dwelling.Readings[^1].Value, dwelling.CoValue);
+        Assert.Equal(dwelling.Readings[^1].Value, dwelling.CoValue());
     }
 
     // The idempotence guard is what keeps a retried sync command from inflating the series.
@@ -287,7 +287,7 @@ public class CoMeasurementTests
         Assert.Equal(2, dwelling.Readings.Count);
         Assert.Equal(120, dwelling.Readings[0].Value);
         Assert.Null(dwelling.Readings[1].Value);
-        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.CoValue());
     }
 
     [Fact]
@@ -310,10 +310,10 @@ public class CoMeasurementTests
     public void Dwelling_Rehydrate_WithoutReadings_HasAnEmptySeries()
     {
         var dwelling = Dwelling.Rehydrate(
-            Guid.NewGuid(), Guid.NewGuid(), 0, 1, null, DwellingStatus.NotSearched, KeyAvailability.Unknown, 45);
+            Guid.NewGuid(), Guid.NewGuid(), 0, 1, null, DwellingStatus.NotSearched, KeyAvailability.Unknown, new Dictionary<Guid, decimal> { [IncidentGas.LegacyCoId] = 45 });
 
         Assert.Empty(dwelling.Readings);
-        Assert.Equal(45, dwelling.CoValue);
+        Assert.Equal(45, dwelling.CoValue());
     }
 
     // #424: the reading is a professional record, not bookkeeping. It must not land on
@@ -756,62 +756,62 @@ public class CoMeasurementTests
     }
 
     [Fact]
-    public void CoSeverityClassifier_SeverityOf_Null_IsNormal()
+    public void DefaultCo_SeverityOf_Null_IsNormal()
     {
-        Assert.Equal(CoSeverity.Normal, CoSeverityClassifier.SeverityOf(null));
+        Assert.Equal(CoSeverity.Normal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, null));
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(29)]
-    public void CoSeverityClassifier_SeverityOf_BelowElevatedThreshold_IsNormal(int ppm)
+    public void DefaultCo_SeverityOf_BelowElevatedThreshold_IsNormal(int ppm)
     {
-        Assert.Equal(CoSeverity.Normal, CoSeverityClassifier.SeverityOf(ppm));
+        Assert.Equal(CoSeverity.Normal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
     }
 
     [Theory]
     [InlineData(30)]
     [InlineData(199)]
-    public void CoSeverityClassifier_SeverityOf_InElevatedRange_IsElevated(int ppm)
+    public void DefaultCo_SeverityOf_InElevatedRange_IsElevated(int ppm)
     {
-        Assert.Equal(CoSeverity.Elevated, CoSeverityClassifier.SeverityOf(ppm));
+        Assert.Equal(CoSeverity.Elevated, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
     }
 
     [Theory]
     [InlineData(200)]
     [InlineData(799)]
-    public void CoSeverityClassifier_SeverityOf_InDangerousRange_IsDangerous(int ppm)
+    public void DefaultCo_SeverityOf_InDangerousRange_IsDangerous(int ppm)
     {
-        Assert.Equal(CoSeverity.Dangerous, CoSeverityClassifier.SeverityOf(ppm));
+        Assert.Equal(CoSeverity.Dangerous, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
     }
 
     [Theory]
     [InlineData(800)]
     [InlineData(9999)]
-    public void CoSeverityClassifier_SeverityOf_AtOrAboveLethalThreshold_IsLethal(int ppm)
+    public void DefaultCo_SeverityOf_AtOrAboveLethalThreshold_IsLethal(int ppm)
     {
-        Assert.Equal(CoSeverity.Lethal, CoSeverityClassifier.SeverityOf(ppm));
+        Assert.Equal(CoSeverity.Lethal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
     }
 
     [Fact]
-    public void CoSeverityClassifier_IsImplausible_Null_IsFalse()
+    public void DefaultCo_IsImplausible_Null_IsFalse()
     {
-        Assert.False(CoSeverityClassifier.IsImplausible(null));
+        Assert.False(GasSeverityClassifier.IsImplausible(GasDefinition.DefaultCo, null));
     }
 
     [Theory]
     [InlineData(2000)]
     [InlineData(800)]
-    public void CoSeverityClassifier_IsImplausible_AtOrBelowThreshold_IsFalse(int ppm)
+    public void DefaultCo_IsImplausible_AtOrBelowThreshold_IsFalse(int ppm)
     {
-        Assert.False(CoSeverityClassifier.IsImplausible(ppm));
+        Assert.False(GasSeverityClassifier.IsImplausible(GasDefinition.DefaultCo, ppm));
     }
 
     [Theory]
     [InlineData(2001)]
     [InlineData(9999)]
-    public void CoSeverityClassifier_IsImplausible_AboveThreshold_IsTrue(int ppm)
+    public void DefaultCo_IsImplausible_AboveThreshold_IsTrue(int ppm)
     {
-        Assert.True(CoSeverityClassifier.IsImplausible(ppm));
+        Assert.True(GasSeverityClassifier.IsImplausible(GasDefinition.DefaultCo, ppm));
     }
 }

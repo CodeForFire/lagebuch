@@ -69,7 +69,7 @@ public class MasterDataChecklistEditingTests
         var modules = Nav(Vm()).Rows.Where(r => r.ChecklistId is null).ToList();
 
         Assert.Equal(
-            ["ETB", "Aufgaben", "Führung", "Beteiligte", "Atemschutz", "CO-Messung", "Dateien", "Links", "Kontakte", "Ausgabe"],
+            ["ETB", "Aufgaben", "Führung", "Beteiligte", "Atemschutz", "Gasmessung", "Dateien", "Links", "Kontakte", "Ausgabe"],
             modules.Select(r => r.Label));
         Assert.All(modules, r => Assert.True(r.IsVisible));
     }

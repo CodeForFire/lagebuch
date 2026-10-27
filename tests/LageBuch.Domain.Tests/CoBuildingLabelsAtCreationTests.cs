@@ -66,7 +66,7 @@ public class CoBuildingLabelsAtCreationTests
         incident.AddCoBuilding(Clock, Op, "Haus A", 8, 10, 1, new Dictionary<string, string?> { ["0:1"] = "Kiosk" });
 
         Assert.Equal(
-            "CO-Messprotokoll eröffnet: Haus A (1. UG–8. OG, 10 Wohnungen je Geschoss)",
+            "Gasmessprotokoll eröffnet: Haus A (1. UG–8. OG, 10 Wohnungen je Geschoss)",
             incident.Journal.Last().Text);
     }
 }

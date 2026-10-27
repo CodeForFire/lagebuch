@@ -13,14 +13,16 @@ public static class CoMessprotokollSection
         container.Column(column =>
         {
             column.Spacing(4);
-            column.Item().Text("CO-Messprotokoll").FontSize(14).SemiBold().FontColor(Colors.Blue.Darken1);
+            column.Item().Text("Gasmessprotokoll").FontSize(14).SemiBold().FontColor(Colors.Blue.Darken1);
 
             if (incident.Buildings.Count == 0)
             {
-                column.Item().Text("— kein CO-Messprotokoll erfasst —").Italic().FontColor(Colors.Grey.Medium);
+                column.Item().Text("— kein Gasmessprotokoll erfasst —").Italic().FontColor(Colors.Grey.Medium);
                 return;
             }
 
+            var gases = incident.Gases;
+            var withName = gases.Count > 1;
             foreach (var building in incident.Buildings)
             {
                 column.Item().PaddingTop(8).Text(t =>
@@ -52,21 +54,35 @@ public static class CoMessprotokollSection
                     foreach (var unit in units)
                     {
                         var label = CoMeasurementLabels.ApartmentLabel(building, floor, unit.ApartmentNumber);
-                        var co = unit.CoValue is { } v ? $"{v} ppm" : "kein Messwert";
                         var key = KeyText(unit.KeyAvailable, unit.KeyNumber);
                         var resident = string.IsNullOrWhiteSpace(unit.ResidentName) ? null : $", {unit.ResidentName}";
+                        var measured = CoMeasurementLabels.ValuesInOrder(gases, unit.Values);
 
-                        // ppm severity is its own span, colored independently of Status (search
-                        // progress): a lethal reading must read as lethal in print too, matching
-                        // the app view's Classes.elevated/dangerous/lethal on the tile.
-                        var severityColor = GetSeverityColor(CoSeverityClassifier.SeverityOf(unit.CoValue));
+                        // The Messwerte (#410): every measured gas in list order, each its own
+                        // span coloured by its own band, independently of Status (search
+                        // progress) -- a lethal reading must read as lethal in print too, matching
+                        // the tile. One run per Wohnung, so eight gases still fit A4 portrait. A
+                        // single-gas Einsatz leaves the name out and reads as it always did.
                         column.Item().Text(t =>
                         {
                             t.Span($"• {label}{resident}: ").FontSize(8);
-                            var coSpan = t.Span(co).FontSize(8);
-                            if (severityColor is not null)
+                            if (measured.Count == 0)
                             {
-                                coSpan.FontColor(severityColor);
+                                t.Span("kein Messwert").FontSize(8);
+                            }
+
+                            for (var i = 0; i < measured.Count; i++)
+                            {
+                                if (i > 0)
+                                {
+                                    t.Span(" · ").FontSize(8);
+                                }
+
+                                var valueSpan = t.Span(CoMeasurementLabels.GasValueLabel(measured[i].Gas, measured[i].Value, withName)).FontSize(8);
+                                if (GetSeverityColor(measured[i].Severity) is { } severityColor)
+                                {
+                                    valueSpan.FontColor(severityColor);
+                                }
                             }
 
                             t.Span($", Schlüssel: {key}, {CoMeasurementLabels.StatusText(unit.Status)}")
@@ -75,13 +91,13 @@ public static class CoMessprotokollSection
 
                         // #424: the Verlauf the Einsatzleiter is actually looking for, indented
                         // under its unit. Only from two readings up -- with one it just repeats
-                        // the ppm on the line above. Deliberately grey rather than
+                        // the value on the line above. Deliberately grey rather than
                         // severity-coloured: this page is scanned as a whole for red, and a red
                         // historical value would announce a danger that has already passed. The
                         // current value one line up carries the coloured statement.
                         if (unit.Readings.Count >= 2)
                         {
-                            var series = string.Join(" · ", unit.Readings.Select(CoMeasurementLabels.ReadingLabel));
+                            var series = string.Join(" · ", unit.Readings.Select(r => CoMeasurementLabels.ReadingLabel(r, gases)));
                             column.Item().PaddingLeft(10).Text($"Messreihe: {series}")
                                 .FontSize(7).FontColor(Colors.Grey.Darken1);
                         }
@@ -104,12 +120,15 @@ public static class CoMessprotokollSection
                     var location = CoMeasurementLabels.DwellingLocation(building, d.FloorOrdinal, d.ApartmentNumber);
                     var resident = d.ResidentName ?? "—";
                     var key = KeyText(d.KeyAvailable, d.KeyNumber);
-                    var co = d.CoValue is { } v ? $"{v} ppm" : "—";
+                    var measured = CoMeasurementLabels.ValuesInOrder(gases, d.Values);
+                    var values = measured.Count > 0
+                        ? string.Join(" · ", measured.Select(m => CoMeasurementLabels.GasValueLabel(m.Gas, m.Value, withName: true)))
+                        : "—";
 
                     // #702: who the Beteiligte list records as found here, after what was measured.
                     var parties = incident.InvolvedPartiesIn(d.Id);
                     var found = parties.Count > 0 ? $", Beteiligte: {string.Join(", ", parties.Select(p => p.Name))}" : string.Empty;
-                    column.Item().Text($"• {location}, Bewohner: {resident}, Schlüssel: {key}, CO: {co}{found}");
+                    column.Item().Text($"• {location}, Bewohner: {resident}, Schlüssel: {key}, Messwerte: {values}{found}");
                 }
             }
 

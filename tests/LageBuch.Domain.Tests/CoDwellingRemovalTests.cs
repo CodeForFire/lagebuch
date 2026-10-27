@@ -61,7 +61,7 @@ public class CoDwellingRemovalTests
         incident.RecordCoValue(clock, op, buildingId, 0, 1, null);
 
         var unit = Unit(incident, buildingId, 0, 1);
-        Assert.Null(unit.CoValue);
+        Assert.Null(unit.CoValue());
         Assert.NotEmpty(unit.Readings);
         Assert.True(unit.HasData);
     }
@@ -85,7 +85,7 @@ public class CoDwellingRemovalTests
         // Whg. 3 became Whg. 2 -- same record, same Messreihe, not a fresh empty unit.
         var movedThird = Unit(incident, buildingId, 0, 2);
         Assert.Equal(thirdId, movedThird.Id);
-        Assert.Equal(120, movedThird.CoValue);
+        Assert.Equal(120, movedThird.CoValue());
         Assert.NotEmpty(movedThird.Readings);
 
         var movedFourth = Unit(incident, buildingId, 0, 3);
@@ -226,7 +226,7 @@ public class CoDwellingRemovalTests
 
         Assert.Equal(14, incident.Buildings[0].ApartmentsFor(0));
         Assert.Equal(14, incident.Dwellings.Count(d => d.FloorOrdinal == 0));
-        Assert.Equal(120, Unit(incident, buildingId, 0, 12).CoValue);
+        Assert.Equal(120, Unit(incident, buildingId, 0, 12).CoValue());
         Assert.Equal("Müller", Unit(incident, buildingId, 0, 14).ResidentName);
         Assert.Equal(3, incident.Dwellings.Count(d => d.FloorOrdinal == 3));
     }

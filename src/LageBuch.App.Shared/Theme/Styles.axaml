@@ -2,7 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
         xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
-        xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic">
+        xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+        xmlns:domain="clr-namespace:LageBuch.Domain;assembly=LageBuch.Domain">
 
   <Styles.Resources>
     <ResourceDictionary>
@@ -650,8 +651,8 @@
        Any, no FormatString) a typed "3.5" is kept as 3.5 by the control and displayed as such,
        while the int-typed view-model property rounds it to 4: the number on screen is not the
        number written into the Einsatz record. Integer parsing refuses the fraction outright, and
-       FormatString pins the display to whole numbers. A future input that genuinely needs decimals
-       can override both locally. -->
+       FormatString pins the display to whole numbers. An input that genuinely needs decimals takes
+       the decimal class below. -->
   <Style Selector="NumericUpDown">
     <Setter Property="ParsingNumberStyle" Value="Integer" />
     <Setter Property="FormatString" Value="0" />
@@ -665,6 +666,16 @@
     <!-- Spinner arrows are fiddly for counts up to a few hundred (Druck, Minuten); typing the
          value directly is the primary interaction everywhere in this app. -->
     <Setter Property="ShowButtonSpinner" Value="False" />
+  </Style>
+
+  <!-- A gas reading (#410) is the one input with a fractional meaning: 20,9 Vol-% O2. It parses in
+       de-DE whatever the device's culture, so the comma is the decimal separator. Float, not
+       Number: Number accepts the German thousands dot too, which would read a typed "20.9" as 209;
+       Float refuses it instead. Two decimals, like the domain keeps. -->
+  <Style Selector="NumericUpDown.decimal">
+    <Setter Property="ParsingNumberStyle" Value="Float" />
+    <Setter Property="FormatString" Value="0.##" />
+    <Setter Property="NumberFormat" Value="{x:Static domain:Formatting.NumberFormat}" />
   </Style>
 
   <!-- Labeled field wrapper (#137): caption above an arbitrary input control. Styling the
