@@ -538,7 +538,9 @@ sequenceDiagram
   the view.
 - `removeFile` removes the metadata through the normal apply and broadcast, and
   the host then deletes the bytes. If that wipe fails, the client gets a
-  **500** even though the removal landed; see §18.
+  **500** even though the removal landed; see §18. The host's Dateien tab says
+  so (`LocalIncidentSession.FileBytesNotWiped`, #762), and the bytes are wiped
+  when the Einsatz is next opened (#761).
 
 ## 11. Stammdaten over sync
 
@@ -784,8 +786,8 @@ exactly one pass.
 ## 18. Known gaps
 
 - **A failed byte wipe after `removeFile`** answers 500 although the removal
-  landed. The client's banner reads as a refusal, the bytes may remain in the
-  incident file, and the host's own UI is not told (see `HandleCommand`).
+  landed, so the client's banner reads as a refusal (see `HandleCommand`). The
+  host is told, and the bytes go at the next open (§10).
 - **A late snapshot from an older epoch** is accepted until the next poll
   corrects it (§9). This is accepted by design.
 - **`_revision` is in memory only.** A restarted share is a new epoch, and
