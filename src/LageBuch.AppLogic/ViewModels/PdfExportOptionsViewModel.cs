@@ -31,7 +31,7 @@ public sealed partial class PdfExportOptionsViewModel : ObservableObject
             new PdfSectionOptionViewModel(IncidentPdfSections.IssuedItems, "Ausgabeliste", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Tasks, "Aufgaben", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Atemschutz, "Atemschutzüberwachung", NotifyCanExecuteChanged),
-            new PdfSectionOptionViewModel(IncidentPdfSections.CoMessprotokoll, "CO-Messprotokoll", NotifyCanExecuteChanged),
+            new PdfSectionOptionViewModel(IncidentPdfSections.CoMessprotokoll, "Gasmessprotokoll", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Files, "Angehängte Dateien", NotifyCanExecuteChanged),
         };
     }

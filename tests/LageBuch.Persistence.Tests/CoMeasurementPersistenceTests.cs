@@ -56,12 +56,12 @@ public class CoMeasurementPersistenceTests : IDisposable
         var loaded = IncidentRepository.Load(_path);
 
         var dwelling = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(new int?[] { 120, 40, null }, dwelling.Readings.Select(r => r.Value));
+        Assert.Equal(new decimal?[] { 120, 40, null }, dwelling.Readings.Select(r => r.Value));
         Assert.All(dwelling.Readings, r => Assert.Equal("Huber (FFB 12/1)", r.RecordedBy));
         Assert.Equal(
             new[] { "10:00", "10:27", "10:48" },
             dwelling.Readings.Select(r => Formatting.TimeOfDay(r.MeasuredAt.ToUniversalTime())));
-        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.CoValue());
     }
 
     // The ApplyV21 lesson: force_unit_edits needed a cleanup migration because Save's DELETE list
@@ -84,7 +84,7 @@ public class CoMeasurementPersistenceTests : IDisposable
 
         var loaded = IncidentRepository.Load(_path);
         var dwelling = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(new int?[] { 120, 40 }, dwelling.Readings.Select(r => r.Value));
+        Assert.Equal(new decimal?[] { 120, 40 }, dwelling.Readings.Select(r => r.Value));
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public class CoMeasurementPersistenceTests : IDisposable
 
         // Whg. 4 is Whg. 3 now, with both readings and its Bezeichnung still attached.
         var moved = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 3);
-        Assert.Equal(40, moved.CoValue);
+        Assert.Equal(40, moved.CoValue());
         Assert.Equal(2, moved.Readings.Count);
         Assert.Equal("Kiosk", CoMeasurementLabels.ApartmentLabel(loaded.Buildings[0], 0, 3));
         Assert.Equal(3, loaded.Buildings[0].ApartmentsFor(0));
@@ -155,7 +155,7 @@ public class CoMeasurementPersistenceTests : IDisposable
 
         var dwelling = loaded.Dwellings.First(d =>
             d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
-        Assert.Equal(45, dwelling.CoValue);
+        Assert.Equal(45, dwelling.CoValue());
         Assert.Equal("Müller", dwelling.ResidentName);
         Assert.Equal(KeyAvailability.Available, dwelling.KeyAvailable);
 
@@ -179,7 +179,7 @@ public class CoMeasurementPersistenceTests : IDisposable
         var loaded = IncidentRepository.Load(_path);
 
         var dwelling = loaded.Dwellings[0];
-        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.CoValue());
         Assert.Null(dwelling.ResidentName);
         Assert.Equal(KeyAvailability.Unknown, dwelling.KeyAvailable);
     }
@@ -244,5 +244,80 @@ public class CoMeasurementPersistenceTests : IDisposable
 
         var numbers = loaded.Dwellings.Where(d => d.FloorOrdinal == 0).OrderBy(d => d.ApartmentNumber).Select(d => d.KeyNumber);
         Assert.Equal(new[] { "B-14", null, null }, numbers);
+    }
+
+    // --- Issue #410: up to eight gases ---
+    [Fact]
+    public void Several_gases_with_decimals_round_trip_with_their_list_and_their_series()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        var o2 = new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m);
+        var co2 = new GasDefinition("CO2", "Vol-%", GasDirection.Rising, null, null, null, null);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, gases: [GasDefinition.DefaultCo, o2, co2]);
+        var (co, oxygen) = (incident.Gases[0].Id, incident.Gases[1].Id);
+        incident.RecordCoValues(clock, op, incident.Buildings[0].Id, 0, 1, new Dictionary<Guid, decimal?> { [co] = 120, [oxygen] = 20.9m });
+        clock.Now = clock.Now.AddMinutes(10);
+        incident.RecordCoValues(clock, op, incident.Buildings[0].Id, 0, 1, new Dictionary<Guid, decimal?> { [oxygen] = 17.25m });
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(incident.Gases, loaded.Gases);
+        var dwelling = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(120m, dwelling.ValueOf(co));
+        Assert.Equal(17.25m, dwelling.ValueOf(oxygen));
+        Assert.Equal(
+            new (Guid, decimal?)[] { (co, 120m), (oxygen, 20.9m), (oxygen, 17.25m) },
+            dwelling.Readings.Select(r => (r.GasId, r.Value)));
+    }
+
+    // A file from before #410 has one CO value per Wohnung and a Messreihe of integers. It must
+    // come back with exactly one gas, CO in ppm with the old bands, and every value on it.
+    [Fact]
+    public void A_file_from_before_the_gas_list_comes_back_with_one_CO_gas_and_nothing_lost()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 120);
+        clock.Now = clock.Now.AddMinutes(27);
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 40);
+        IncidentRepository.Save(_path, incident);
+        RollBackToV35(incident.Gases[0].Id);
+
+        var loaded = IncidentRepository.Load(_path);
+
+        var gas = Assert.Single(loaded.Gases);
+        Assert.Equal(IncidentGas.LegacyCo, gas);
+        var dwelling = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(40m, dwelling.ValueOf(IncidentGas.LegacyCoId));
+        Assert.Equal(new decimal?[] { 120, 40 }, dwelling.Readings.Select(r => r.Value));
+        Assert.All(dwelling.Readings, r => Assert.Equal(IncidentGas.LegacyCoId, r.GasId));
+    }
+
+    // The V35 shape: no gas table, the integer co_value and reading value, no gas ids.
+    private void RollBackToV35(Guid gasId)
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                UPDATE co_dwellings SET co_value = CAST(json_extract(gas_values, '$."' || $gas || '"') AS INTEGER);
+                UPDATE co_readings SET value = CAST(measured_value AS INTEGER);
+                DROP TABLE co_gases;
+                ALTER TABLE co_dwellings DROP COLUMN gas_values;
+                ALTER TABLE co_readings DROP COLUMN gas_id;
+                ALTER TABLE co_readings DROP COLUMN measured_value;
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (35);
+                """;
+            cmd.Parameters.AddWithValue("$gas", gasId.ToString());
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
     }
 }

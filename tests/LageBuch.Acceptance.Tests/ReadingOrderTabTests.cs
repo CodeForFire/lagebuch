@@ -92,7 +92,7 @@ public class ReadingOrderTabTests
     [InlineData("KRÄFTE", "AddForceButton")]
     [InlineData("BETEILIGTE", "AddInvolvedPartyButton")]
     [InlineData("ATEMSCHUTZ", "AddTruppButton")]
-    [InlineData("CO-MESSUNG", "AddBuildingButton")]
+    [InlineData("GASMESSUNG", "AddBuildingButton")]
     [InlineData("DATEIEN", "AddFileButton")]
     public void Tab_from_the_entry_form_s_last_control_goes_on_to_the_footer(string module, string lastControl)
     {

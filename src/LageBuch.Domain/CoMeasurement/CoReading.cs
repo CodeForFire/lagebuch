@@ -1,7 +1,7 @@
 namespace LageBuch.Domain.CoMeasurement;
 
 /// <summary>
-/// One CO reading taken in a Wohnung (#424) — the CO sibling of
+/// One gas reading taken in a Wohnung (#424, per gas since #410) — the CO sibling of
 /// <see cref="LageBuch.Domain.ForceUnitStrengthEdit"/>: what was measured, when, by whom.
 /// </summary>
 /// <remarks>
@@ -14,14 +14,18 @@ namespace LageBuch.Domain.CoMeasurement;
 /// parent's value, at an unknown time".
 /// </para>
 /// <para>
+/// <see cref="GasId"/> points into the incident's own gas list (<see cref="IncidentGas"/>), never
+/// into the Stammdaten. <see cref="Value"/> is decimal because 20,9 Vol-% O₂ is not an integer.
+/// </para>
+/// <para>
 /// <see cref="Value"/> is nullable because clearing a reading is a correction worth keeping, not
 /// an absence: after a deletion the Wohnung shows "kein Messwert" and the series is the only
 /// remaining record that 120 ppm was ever there.
 /// </para>
 /// <para>
 /// No identity of its own. A reading is immutable and never addressed singly; its identity is
-/// (Wohnung, position in the series), exactly as with <c>force_unit_edits</c>. #410 extends this
-/// record with a gas slot and a unit as trailing defaults rather than reshaping it.
+/// (Wohnung, position in the series), exactly as with <c>force_unit_edits</c>. Readings of several
+/// gases taken at one FERTIG share their <see cref="MeasuredAt"/>.
 /// </para>
 /// </remarks>
-public sealed record CoReading(DateTimeOffset MeasuredAt, int? Value, string RecordedBy);
+public sealed record CoReading(DateTimeOffset MeasuredAt, Guid GasId, decimal? Value, string RecordedBy);
