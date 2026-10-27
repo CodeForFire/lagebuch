@@ -47,7 +47,8 @@ internal static class WorkspaceRenderHelper
     public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars(
         IIncidentHostController? host = null,
         bool withOverdueTask = false,
-        FixedClock? clock = null)
+        FixedClock? clock = null,
+        IReadOnlyList<Domain.CoMeasurement.GasDefinition>? gases = null)
     {
         // Passed in by a test that has to move time on after the bars are up (#539).
         clock ??= new FixedClock();
@@ -77,7 +78,7 @@ internal static class WorkspaceRenderHelper
             session,
             clock,
             ticker,
-            Md(),
+            gases is null ? Md() : Md() with { Gases = gases },
             new FakeDialogs(),
             new NoopAlarmService(),
             host ?? new NoopIncidentHostController());

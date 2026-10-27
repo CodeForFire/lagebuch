@@ -47,7 +47,7 @@ public class CoMessprotokollSectionTests
 
         PdfText.AssertInOrder(
             text,
-            "CO-Messprotokoll",
+            "Gasmessprotokoll",
             "Haus A: 1. UG–1. OG",
             "1. OG • Whg. 1: 8 ppm, Schlüssel: nein, abgesucht – keine Personen betroffen",
             "• Whg. 2, Erika: 40 ppm, Schlüssel: ja, Person(en) betroffen",
@@ -87,8 +87,8 @@ public class CoMessprotokollSectionTests
         PdfText.AssertInOrder(
             text,
             "Betroffene Wohnungen",
-            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja, CO: 40 ppm",
-            "• Haus B, EG, Whg. 1, Bewohner: —, Schlüssel: —, CO: —",
+            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja, Messwerte: CO 40 ppm",
+            "• Haus B, EG, Whg. 1, Bewohner: —, Schlüssel: —, Messwerte: —",
             "Legende: Nicht abgesucht Abgesucht Betroffen");
         Assert.Equal(2, PdfText.Count(text, "Bewohner:"));
     }
@@ -109,10 +109,10 @@ public class CoMessprotokollSectionTests
         var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
 
         Assert.Contains(
-            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja, CO: 40 ppm, Beteiligte: Erika Beispiel, Max Beispiel",
+            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja, Messwerte: CO 40 ppm, Beteiligte: Erika Beispiel, Max Beispiel",
             text,
             StringComparison.Ordinal);
-        Assert.Contains("• Haus B, EG, Whg. 1, Bewohner: —, Schlüssel: —, CO: —", text, StringComparison.Ordinal);
+        Assert.Contains("• Haus B, EG, Whg. 1, Bewohner: —, Schlüssel: —, Messwerte: —", text, StringComparison.Ordinal);
         Assert.Equal(1, PdfText.Count(text, "Beteiligte:"));
     }
 
@@ -126,7 +126,7 @@ public class CoMessprotokollSectionTests
 
         Assert.Contains("• Whg. 2, Erika: 40 ppm, Schlüssel: ja (Nr. B-14), Person(en) betroffen", text, StringComparison.Ordinal);
         Assert.Contains(
-            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja (Nr. B-14), CO: 40 ppm",
+            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja (Nr. B-14), Messwerte: CO 40 ppm",
             text,
             StringComparison.Ordinal);
     }
@@ -151,8 +151,8 @@ public class CoMessprotokollSectionTests
         var haus = Building.Create("Haus A", 1, 1, 0);
         Dwelling[] dwellings =
         [
-            Dwelling.Rehydrate(Guid.NewGuid(), haus.Id, 0, 1, "Erika", DwellingStatus.Affected, KeyAvailability.Available, 40),
-            Dwelling.Rehydrate(Guid.NewGuid(), Guid.NewGuid(), 0, 1, "Max", DwellingStatus.Affected, KeyAvailability.Available, 90),
+            Dwelling.Rehydrate(Guid.NewGuid(), haus.Id, 0, 1, "Erika", DwellingStatus.Affected, KeyAvailability.Available, new Dictionary<Guid, decimal> { [IncidentGas.LegacyCoId] = 40 }),
+            Dwelling.Rehydrate(Guid.NewGuid(), Guid.NewGuid(), 0, 1, "Max", DwellingStatus.Affected, KeyAvailability.Available, new Dictionary<Guid, decimal> { [IncidentGas.LegacyCoId] = 90 }),
         ];
         var incident = Incident.Rehydrate(
             Guid.NewGuid(), Started, IncidentState.Open, null, null, null, null, null, null, null, [], [], [], [], [], [], [], [], [], [haus], dwellings, []);
@@ -195,7 +195,7 @@ public class CoMessprotokollSectionTests
 
         var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
 
-        Assert.Contains("CO-Messprotokoll — kein CO-Messprotokoll erfasst —", text, StringComparison.Ordinal);
+        Assert.Contains("Gasmessprotokoll — kein Gasmessprotokoll erfasst —", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Legende", text, StringComparison.Ordinal);
     }
 

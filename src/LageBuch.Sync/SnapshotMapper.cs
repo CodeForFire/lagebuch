@@ -102,8 +102,8 @@ public static class SnapshotMapper
                 d.ResidentName,
                 d.Status,
                 d.KeyAvailable.ToNullableBool(),
-                d.CoValue,
-                d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList(),
+                d.Values.ToDictionary(kv => kv.Key, kv => kv.Value),
+                d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.GasId, r.Value, r.RecordedBy)).ToList(),
                 d.KeyNumber)).ToList(),
             incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel, p.Whereabouts, p.WhereaboutsAt)).ToList(),
             HouseNumber: incident.HouseNumber,
@@ -158,7 +158,8 @@ public static class SnapshotMapper
             NavOverrides: incident.NavOverrides.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
             ElFuehrungsfahrzeug: incident.LeadershipPost.Fuehrungsfahrzeug,
             MapOverlays: incident.MapOverlays.Select(o => new MapOverlayDto(
-                o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)).ToList());
+                o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)).ToList(),
+            Gases: incident.Gases.Select(g => new IncidentGasDto(g.Id, GasDefinitionDto.From(g.Definition))).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -238,8 +239,8 @@ public static class SnapshotMapper
                 d.ResidentName,
                 d.Status,
                 KeyAvailabilityEncoding.FromNullableBool(d.KeyAvailable),
-                d.CoValue,
-                d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)),
+                d.Values,
+                d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.GasId, r.Value, r.RecordedBy)),
                 d.KeyNumber)),
             (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel, p.Whereabouts, p.WhereaboutsAt)),
             snapshot.HouseNumber,
@@ -292,7 +293,8 @@ public static class SnapshotMapper
             GeoPoint.TryCreate(snapshot.LocationLatitude, snapshot.LocationLongitude),
             snapshot.NavOverrides,
             (snapshot.MapOverlays ?? []).Select(o => MapOverlay.Rehydrate(
-                o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)));
+                o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)),
+            snapshot.Gases?.Where(g => g?.Definition is not null).Select(g => new IncidentGas(g.Id, g.Definition.ToDefinition())));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

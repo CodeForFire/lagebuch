@@ -120,6 +120,13 @@
     },
     { "name": "Haus A", "street": "Hauptstraße", "houseNumber": "5", "postalCode": "12345", "place": "Musterstadt", "floors": 3, "apartmentsPerFloor": 2, "undergroundFloors": 0, "apartmentLabels": {} }
   ],
+  "gases": [
+    { "name": "CO", "unit": "ppm", "direction": "steigend", "elevated": 30, "dangerous": 200, "lethal": 800, "plausibleUpTo": 2000 },
+    { "name": "CO2", "unit": "Vol-%", "direction": "steigend", "elevated": 0.5, "dangerous": 4, "lethal": 8, "plausibleUpTo": 20 },
+    { "name": "H2S", "unit": "ppm", "direction": "steigend", "elevated": 5, "dangerous": 10, "lethal": 100, "plausibleUpTo": 500 },
+    { "name": "CH4", "unit": "%UEG", "direction": "steigend", "elevated": 10, "dangerous": 20, "lethal": 40, "plausibleUpTo": 100 },
+    { "name": "O2", "unit": "Vol-%", "direction": "fallend", "elevated": 19, "dangerous": 17, "lethal": 10, "plausibleUpTo": 25 }
+  ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,
     "ilsReminderFollowUpIntervalMinutes": 30,

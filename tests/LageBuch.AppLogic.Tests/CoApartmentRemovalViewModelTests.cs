@@ -155,7 +155,7 @@ public class CoApartmentRemovalViewModelTests
             .OrderBy(d => d.ApartmentNumber)
             .ToList();
         Assert.Equal("Müller", floor[0].ResidentName);
-        Assert.Equal(120, floor[2].CoValue); // Whg. 4 moved down to 3, value intact
+        Assert.Equal(120, floor[2].CoValue()); // Whg. 4 moved down to 3, value intact
     }
 
     [Fact]

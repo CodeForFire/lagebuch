@@ -23,7 +23,7 @@
 Lagebuch ist das digitale Einsatztagebuch für den Einsatzleitwagen: eine
 Desktop-Anwendung, die auch ohne Netz, ohne Cloud und ohne Abo funktioniert.
 Ein Einsatz ist eine Datei auf dem ELW-Laptop – mit Einsatztagebuch, Kräften,
-Atemschutzüberwachung, Aufgaben, CO-Messprotokoll und PDF-Bericht.
+Atemschutzüberwachung, Aufgaben, Gasmessprotokoll und PDF-Bericht.
 
 **Alles auf einer Seite:** [codeforfire.github.io](https://codeforfire.github.io/) –
 Übersicht, Probefahrt, Download und Datenschutz, ohne GitHub-Konto und ohne
@@ -70,7 +70,7 @@ Markdown.
 | **Ausgabeliste** | Ausgegebene Geräte (Mobilteil, Westen, AED …) aus den Stammdaten: an wen, Telefon, Organisation, mit Uhrzeit; Rückgabe mit einem Klick – was noch draußen ist, steht oben, und „Einsatz abschließen“ warnt davor; im PDF, ohne ETB-Eintrag |
 | **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene; Sicherheitstrupp je Trupp zugeordnet und im ETB protokolliert |
 | **Rückmeldung an ILS** | Erinnerung nach konfigurierbarer Zeit, danach im Intervall, mit ERLEDIGT-Quittierung; überlebt Neustart und Absturz |
-| **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), Messreihe je Wohnung mit Uhrzeit und ppm-Wert in Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort; der Verlauf steht im ETB und im PDF |
+| **Gasmessprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), bis zu acht Gase aus den Stammdaten (CO, CO₂, H₂S, CH₄, O₂ …) mit eigener Einheit und eigenen Grenzwerten, Messreihe je Wohnung mit Uhrzeit und Wert in Gefahrenfarbe – die Kachel zeigt das schlimmste Gas, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort; der Verlauf steht im ETB und im PDF |
 | **Checklisten** | Beliebig viele eigene Checklisten aus den Stammdaten – benannt, in frei wählbarer Reihenfolge in der Seitenleiste, Pflichtpunkte markiert, Abschluss im ETB protokolliert |
 | **Dateien & Links** | Fotos und PDFs an den Einsatz hängen (landen im Bericht); Schnellzugriff auf Wetter, Karten, Hydrantenplan |
 | **PDF-Bericht** | Ein Klick, Abschnitte wählbar, Anhänge eingebettet – fertig für Akte und Kreisbrandinspektion |
@@ -126,7 +126,7 @@ Alle Beispieldaten sind frei erfunden.
    ([Direktlink](https://github.com/CodeForFire/lagebuch/raw/main/docs/samples/uebung.lagebuch)),
    in Lagebuch **ÖFFNEN** wählen. Der Einsatz „B 3 – Zimmerbrand“ hat schon
    ETB-Einträge, vier Fahrzeuge, einen Angriffstrupp unter Atemschutz mit
-   zugeordnetem Sicherheitstrupp, Aufgaben und ein CO-Messprotokoll, in dem
+   zugeordnetem Sicherheitstrupp, Aufgaben und ein Gasmessprotokoll, in dem
    eine Wohnung schon dreimal gemessen wurde. Über **WEITER BEARBEITEN** könnt ihr selbst eingreifen.
 4. **Ausprobieren** – einen ETB-Eintrag schreiben, im Tab **ATEMSCHUTZ** einen
    Trupp bereitstellen, einen Sicherheitstrupp zuordnen und starten, eine

@@ -28,14 +28,18 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 {
     private readonly Action<Guid, int, int> _onOpenEditor;
 
+    private readonly IReadOnlyList<IncidentGas> _gases;
+
     public DwellingCellViewModel(
         Dwelling dwelling,
         Building building,
         bool isReadOnly,
-        Action<Guid, int, int> onOpenEditor)
+        Action<Guid, int, int> onOpenEditor,
+        IReadOnlyList<IncidentGas>? gases = null)
     {
         ArgumentNullException.ThrowIfNull(dwelling);
         ArgumentNullException.ThrowIfNull(building);
+        _gases = gases ?? [];
         Id = dwelling.Id;
         BuildingId = dwelling.BuildingId;
         FloorOrdinal = dwelling.FloorOrdinal;
@@ -43,7 +47,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         IsReadOnly = isReadOnly;
         _onOpenEditor = onOpenEditor;
         _status = dwelling.Status;
-        _coValue = dwelling.CoValue;
+        _values = dwelling.Values;
         _residentName = dwelling.ResidentName;
         _keyAvailable = dwelling.KeyAvailable;
         _keyNumber = dwelling.KeyNumber;
@@ -65,8 +69,9 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     [ObservableProperty]
     private DwellingStatus _status;
 
+    /// <summary>The current value of each gas (#410), keyed by the Einsatz's own gas id.</summary>
     [ObservableProperty]
-    private int? _coValue;
+    private IReadOnlyDictionary<Guid, decimal> _values;
 
     [ObservableProperty]
     private string? _residentName;
@@ -96,32 +101,54 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     /// carries a line above.</summary>
     public string CoSeriesText => Readings.Count < 2
         ? string.Empty
-        : "Messreihe: " + string.Join(" · ", Readings.Select(CoMeasurementLabels.ReadingLabel));
+        : "Messreihe: " + string.Join(" · ", Readings.Select(r => CoMeasurementLabels.ReadingLabel(r, _gases)));
 
-    public string CoDisplay => CoValue is { } v ? $"{v} ppm" : "Kein Messwert";
+    /// <summary>Every measured gas in list order, each with the band it falls in, for the tooltip
+    /// (#410). A CO-only Einsatz has one entry and no gas name.</summary>
+    public IReadOnlyList<GasValueRow> GasValueRows => CoMeasurementLabels.ValuesInOrder(_gases, Values)
+        .Select(v => GasValueRow.From(v, _gases.Count > 1))
+        .ToList();
 
-    /// <summary>The tile's ppm readout. Empty rather than "Kein Messwert" when nothing is measured:
-    /// unmeasured is the resting state of every unit in a fresh building, so spelling it out on each
-    /// tile prints the same non-information dozens of times and buries the values that do exist.
-    /// The status glyph already says the unit is unsearched.</summary>
-    public string CoCompact => CoValue is { } v ? $"{v} ppm" : string.Empty;
+    /// <summary>Every measured gas as one line, "CO 120 ppm · H2S 3 ppm", or "Kein Messwert".</summary>
+    public string CoDisplay => GasValueRows is { Count: > 0 } rows
+        ? string.Join(" · ", rows.Select(r => r.Text))
+        : "Kein Messwert";
 
-    // ppm severity is independent of Status (search progress): a lethal reading on an unsearched
-    // tile must still read as lethal. Drives Classes.elevated/dangerous/lethal on the tile's ppm
+    /// <summary>The reading that decides the tile's colour: the worst gas, a tie going to the gas
+    /// earlier in the list, the first measured gas while all are normal (#410).</summary>
+    public GasValue? Worst => GasSeverityClassifier.Worst(_gases, Values);
+
+    /// <summary>The tile's readout: the deciding gas, named once the Einsatz measures more than one
+    /// ("H2S 12 ppm"), so a CO-only Einsatz reads exactly as before. Empty rather than "Kein
+    /// Messwert" when nothing is measured: unmeasured is the resting state of every unit in a fresh
+    /// building, so spelling it out on each tile prints the same non-information dozens of times and
+    /// buries the values that do exist. The status glyph already says the unit is unsearched.</summary>
+    public string CoCompact => Worst is { } w ? CoMeasurementLabels.GasValueLabel(w.Gas, w.Value, _gases.Count > 1) : string.Empty;
+
+    // Severity is independent of Status (search progress): a lethal reading on an unsearched tile
+    // must still read as lethal. Drives Classes.elevated/dangerous/lethal on the tile's value
     // TextBlock in CoMessprotokollView.axaml, mirroring ScbaView's Classes.alarm pattern.
-    public bool IsCoElevated => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Elevated;
+    public bool IsCoElevated => Worst?.Severity == CoSeverity.Elevated;
 
-    public bool IsCoDangerous => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Dangerous;
+    public bool IsCoDangerous => Worst?.Severity == CoSeverity.Dangerous;
 
-    public bool IsCoLethal => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Lethal;
+    public bool IsCoLethal => Worst?.Severity == CoSeverity.Lethal;
 
     /// <summary>Detail the compact tile deliberately drops (resident, key, full status wording),
-    /// surfaced on hover so nothing is lost -- the tile carries identity + status + ppm only.</summary>
-    public string TileTooltip
+    /// surfaced on hover so nothing is lost -- the tile carries identity + status + the worst gas
+    /// only. One sentence, for a screen reader; the tooltip itself shows <see cref="TooltipHead"/>,
+    /// then <see cref="GasValueRows"/> each in its own colour (#410), then <see cref="TooltipTail"/>.</summary>
+    public string TileTooltip => string.Join(" · ", TooltipHead, CoDisplay, TooltipTail);
+
+    /// <summary>"Mitte · noch nicht abgesucht".</summary>
+    public string TooltipHead => $"{Label} · {CoMeasurementLabels.StatusText(Status)}";
+
+    /// <summary>Bewohner, Schlüssel and the Messreihe, after the gas values.</summary>
+    public string TooltipTail
     {
         get
         {
-            var parts = new List<string> { Label, CoMeasurementLabels.StatusText(Status), CoDisplay };
+            var parts = new List<string>();
             if (!string.IsNullOrWhiteSpace(ResidentName))
             {
                 parts.Add(ResidentName!);
@@ -177,14 +204,16 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     {
         StatusBrush = GetStatusBrush(value);
         OnPropertyChanged(nameof(StatusGlyph));
-        OnPropertyChanged(nameof(TileTooltip));
+        NotifyTooltip();
     }
 
-    partial void OnCoValueChanged(int? value)
+    partial void OnValuesChanged(IReadOnlyDictionary<Guid, decimal> value)
     {
+        OnPropertyChanged(nameof(Worst));
+        OnPropertyChanged(nameof(GasValueRows));
         OnPropertyChanged(nameof(CoDisplay));
         OnPropertyChanged(nameof(CoCompact));
-        OnPropertyChanged(nameof(TileTooltip));
+        NotifyTooltip();
         OnPropertyChanged(nameof(IsCoElevated));
         OnPropertyChanged(nameof(IsCoDangerous));
         OnPropertyChanged(nameof(IsCoLethal));
@@ -193,18 +222,25 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     partial void OnKeyAvailableChanged(KeyAvailability value)
     {
         OnPropertyChanged(nameof(KeyDisplay));
-        OnPropertyChanged(nameof(TileTooltip));
+        NotifyTooltip();
     }
 
     partial void OnKeyNumberChanged(string? value)
     {
         OnPropertyChanged(nameof(KeyDisplay));
-        OnPropertyChanged(nameof(TileTooltip));
+        NotifyTooltip();
     }
 
-    partial void OnResidentNameChanged(string? value) => OnPropertyChanged(nameof(TileTooltip));
+    partial void OnResidentNameChanged(string? value) => NotifyTooltip();
 
-    partial void OnLabelChanged(string value) => OnPropertyChanged(nameof(TileTooltip));
+    partial void OnLabelChanged(string value) => NotifyTooltip();
+
+    private void NotifyTooltip()
+    {
+        OnPropertyChanged(nameof(TooltipHead));
+        OnPropertyChanged(nameof(TooltipTail));
+        OnPropertyChanged(nameof(TileTooltip));
+    }
 
     [RelayCommand]
     private void OpenEditor() => _onOpenEditor(BuildingId, FloorOrdinal, ApartmentNumber);
@@ -226,35 +262,118 @@ public sealed record CoReadingRow(
     string RecordedBy,
     bool IsCoElevated,
     bool IsCoDangerous,
-    bool IsCoLethal)
+    bool IsCoLethal,
+    string Gas = "")
 {
-    public static CoReadingRow From(CoReading reading)
+    /// <summary>A row for one reading. <see cref="Gas"/> names the gas once the Einsatz measures
+    /// more than one (#410), and stays empty otherwise so a CO-only Messreihe reads as before.</summary>
+    public static CoReadingRow From(CoReading reading, IReadOnlyList<IncidentGas> gases)
     {
         ArgumentNullException.ThrowIfNull(reading);
-        var severity = CoSeverityClassifier.SeverityOf(reading.Value);
+        ArgumentNullException.ThrowIfNull(gases);
+        var gas = gases.FirstOrDefault(g => g.Id == reading.GasId);
+        var severity = gas is null ? CoSeverity.Normal : GasSeverityClassifier.SeverityOf(gas.Definition, reading.Value);
         return new(
             Formatting.TimeOfDay(reading.MeasuredAt),
-            reading.Value is { } v ? $"{v} ppm" : "gelöscht",
+            reading.Value is { } v ? Formatting.Measurement(v, gas?.Unit ?? string.Empty) : "gelöscht",
             reading.RecordedBy,
             severity == CoSeverity.Elevated,
             severity == CoSeverity.Dangerous,
-            severity == CoSeverity.Lethal);
+            severity == CoSeverity.Lethal,
+            gases.Count > 1 && gas is not null ? gas.Name : string.Empty);
     }
+}
+
+/// <summary>One gas's current value, pre-formatted for the tooltip and the sidebar (#410), with the
+/// band that colours it.</summary>
+public sealed record GasValueRow(string Text, bool IsCoElevated, bool IsCoDangerous, bool IsCoLethal)
+{
+    public static GasValueRow From(GasValue value, bool withName)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new(
+            CoMeasurementLabels.GasValueLabel(value.Gas, value.Value, withName),
+            value.Severity == CoSeverity.Elevated,
+            value.Severity == CoSeverity.Dangerous,
+            value.Severity == CoSeverity.Lethal);
+    }
+}
+
+/// <summary>
+/// One gas's input in the WOHNUNG BEARBEITEN sidebar (#410): the value as typed, against the value
+/// committed, with the band and the plausibility hint recomputed live so the danger colour shows
+/// before FERTIG. Like the rest of the sidebar it writes nothing; the editor reads it back on
+/// commit.
+/// </summary>
+public sealed partial class GasInputRow : ObservableObject
+{
+    private readonly Action _onChanged;
+
+    public GasInputRow(IncidentGas gas, decimal? original, Action onChanged)
+    {
+        ArgumentNullException.ThrowIfNull(gas);
+        Gas = gas;
+        Original = original;
+        _value = original;
+        _onChanged = onChanged ?? (() => { });
+    }
+
+    public IncidentGas Gas { get; }
+
+    public string Name => Gas.Name;
+
+    public string Unit => Gas.Unit;
+
+    /// <summary>The overline above the input: the gas's name, "CO". Its unit sits inside the field.</summary>
+    public string Header => Formatting.Upper(Gas.Name);
+
+    /// <summary>What a screen reader announces for the text-less input.</summary>
+    public string AccessibleName => $"{Gas.Name}-Wert";
+
+    public decimal? Original { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasChange))]
+    [NotifyPropertyChangedFor(nameof(IsCoElevated))]
+    [NotifyPropertyChangedFor(nameof(IsCoDangerous))]
+    [NotifyPropertyChangedFor(nameof(IsCoLethal))]
+    [NotifyPropertyChangedFor(nameof(IsImplausible))]
+    private decimal? _value;
+
+    /// <summary>The value FERTIG would record: rounded the way the domain stores it, so typing
+    /// 20,90 over 20,9 is not mistaken for a new reading.</summary>
+    public decimal? Committed => Value is { } v ? GasDefinition.NormalizeValue(v) ?? v : null;
+
+    public bool HasChange => Committed != Original;
+
+    public bool IsCoElevated => GasSeverityClassifier.SeverityOf(Gas.Definition, Value) == CoSeverity.Elevated;
+
+    public bool IsCoDangerous => GasSeverityClassifier.SeverityOf(Gas.Definition, Value) == CoSeverity.Dangerous;
+
+    public bool IsCoLethal => GasSeverityClassifier.SeverityOf(Gas.Definition, Value) == CoSeverity.Lethal;
+
+    /// <summary>A caution about a likely *typo* (e.g. 9999 vs 999), distinct from severity: a real
+    /// fire scene can genuinely produce extreme values, so this never blocks FERTIG -- it only
+    /// asks the Lagebuchführer to double-check what they typed.</summary>
+    public bool IsImplausible => GasSeverityClassifier.IsImplausible(Gas.Definition, Value);
+
+    partial void OnValueChanged(decimal? value) => _onChanged();
 }
 
 public sealed partial class DwellingEditorViewModel : ObservableObject
 {
-    public DwellingEditorViewModel(Dwelling dwelling, Building building, IReadOnlyList<string>? involvedPartyNames = null)
+    public DwellingEditorViewModel(
+        Dwelling dwelling, Building building, IReadOnlyList<string>? involvedPartyNames = null, IReadOnlyList<IncidentGas>? gases = null)
     {
         ArgumentNullException.ThrowIfNull(dwelling);
         ArgumentNullException.ThrowIfNull(building);
         InvolvedPartyNames = involvedPartyNames ?? [];
+        var incidentGases = gases ?? [];
         BuildingId = dwelling.BuildingId;
         FloorOrdinal = dwelling.FloorOrdinal;
         ApartmentNumber = dwelling.ApartmentNumber;
 
         OriginalStatus = dwelling.Status;
-        OriginalCoValue = dwelling.CoValue;
         OriginalResidentName = dwelling.ResidentName;
         OriginalKeyAvailable = dwelling.KeyAvailable;
         OriginalKeyNumber = dwelling.KeyNumber;
@@ -262,10 +381,12 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
         // Newest first: during an Einsatz the question is "what is it now, and was it worse?",
         // so the latest reading belongs at the top where the eye lands.
-        Readings = dwelling.Readings.Reverse().Select(CoReadingRow.From).ToList();
+        Readings = dwelling.Readings.Reverse().Select(r => CoReadingRow.From(r, incidentGases)).ToList();
+
+        // One input per gas of the Einsatz, in list order (#410).
+        GasInputs = incidentGases.Select(g => new GasInputRow(g, dwelling.ValueOf(g.Id), OnGasInputChanged)).ToList();
 
         _status = OriginalStatus;
-        _coValue = OriginalCoValue;
         _residentName = OriginalResidentName;
         _keyAvailable = OriginalKeyAvailable;
         _keyNumber = OriginalKeyNumber;
@@ -288,9 +409,6 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     [ObservableProperty]
     private DwellingStatus _status;
-
-    [ObservableProperty]
-    private int? _coValue;
 
     [ObservableProperty]
     private string? _residentName;
@@ -353,7 +471,8 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     public DwellingStatus OriginalStatus { get; }
 
-    public int? OriginalCoValue { get; }
+    /// <summary>One input per gas of the Einsatz, in list order (#410).</summary>
+    public IReadOnlyList<GasInputRow> GasInputs { get; }
 
     public string? OriginalResidentName { get; }
 
@@ -365,7 +484,7 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     /// <summary>
     /// The Wohnung's committed Messreihe, newest first. Read-only on purpose: a keystroke in the
-    /// ppm field is not a measurement, and ABBRECHEN has to be able to discard it — a previewed
+    /// value field is not a measurement, and ABBRECHEN has to be able to discard it — a previewed
     /// row would put a reading in the list that never happened, with a timestamp that does not
     /// exist yet (it is minted by the clock inside RecordCoValue when FERTIG commits).
     /// </summary>
@@ -375,7 +494,15 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     public bool HasStatusChange => Status != OriginalStatus;
 
-    public bool HasCoValueChange => CoValue != OriginalCoValue;
+    public bool HasCoValueChange => GasInputs.Any(g => g.HasChange);
+
+    /// <summary>What FERTIG records: every gas whose value changed, null where it was cleared.</summary>
+    public IReadOnlyDictionary<Guid, decimal?> ChangedValues =>
+        GasInputs.Where(g => g.HasChange).ToDictionary(g => g.Gas.Id, g => g.Committed);
+
+    /// <summary>The values as they stand in the sidebar, for the tile's pending preview.</summary>
+    public IReadOnlyDictionary<Guid, decimal> PendingValues =>
+        GasInputs.Where(g => g.Committed is not null).ToDictionary(g => g.Gas.Id, g => g.Committed.GetValueOrDefault());
 
     // Normalized the same way Dwelling.WithDetails does, so clearing an already-empty name is not
     // mistaken for an edit and does not cost a save (or, on a joined device, a command POST).
@@ -390,18 +517,8 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
     /// <summary>Whether ABBRECHEN would throw anything away, so it has to ask first (#652).</summary>
     public bool HasChanges => HasStatusChange || HasCoValueChange || HasDetailChange || HasLabelChange;
 
-    // Same severity signal as the tile (DwellingCellViewModel), shown live while typing so the
-    // operator sees danger coloring before committing, not only after FERTIG.
-    public bool IsCoElevated => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Elevated;
-
-    public bool IsCoDangerous => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Dangerous;
-
-    public bool IsCoLethal => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Lethal;
-
-    /// <summary>A caution about a likely *typo* (e.g. 9999 vs 999), distinct from severity: a real
-    /// fire scene can genuinely produce extreme ppm values, so this never blocks FERTIG -- it only
-    /// asks the operator to double-check what they typed.</summary>
-    public bool IsCoImplausible => CoSeverityClassifier.IsImplausible(CoValue);
+    /// <summary>Whether any gas's value looks like a typo; each input carries its own hint.</summary>
+    public bool IsCoImplausible => GasInputs.Any(g => g.IsImplausible);
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -409,12 +526,11 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
     private static string? StoredKeyNumber(KeyAvailability keyAvailable, string? keyNumber) =>
         keyAvailable == KeyAvailability.Available ? Normalize(keyNumber) : null;
 
-    partial void OnCoValueChanged(int? value)
+    // A typed value raises the editor's own change, so the tile preview (ApplyPendingEditToMatrix)
+    // follows the sidebar as it did for the single CO value.
+    private void OnGasInputChanged()
     {
         OnPropertyChanged(nameof(HasCoValueChange));
-        OnPropertyChanged(nameof(IsCoElevated));
-        OnPropertyChanged(nameof(IsCoDangerous));
-        OnPropertyChanged(nameof(IsCoLethal));
         OnPropertyChanged(nameof(IsCoImplausible));
     }
 }
@@ -620,14 +736,19 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
     private readonly Action _onChanged;
     private readonly IReadOnlyList<Premises> _premises;
 
-    // premises: the Objekte a new Haus may be picked from (#420); none when omitted.
-    public CoMessprotokollViewModel(IIncidentSession session, IClock clock, Action onChanged, IReadOnlyList<Premises>? premises = null)
+    private readonly IReadOnlyList<GasDefinition>? _gases;
+
+    // premises: the Objekte a new Haus may be picked from (#420); none when omitted. gases: the
+    // Stammdaten Messgase (#410), copied into the Einsatz by its first Haus; CO alone when omitted.
+    public CoMessprotokollViewModel(
+        IIncidentSession session, IClock clock, Action onChanged, IReadOnlyList<Premises>? premises = null, IReadOnlyList<GasDefinition>? gases = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
         _premises = premises ?? Array.Empty<Premises>();
+        _gases = gases;
         PremisesOptions = _premises.Select(p => p.Name).ToList();
         IsReadOnly = session.IsReadOnly;
         _session.Changed += Refresh;
@@ -924,7 +1045,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
                 {
                     var dwelling = dwellings.GetValueOrDefault((floor, apt));
                     return dwelling is not null
-                        ? new DwellingCellViewModel(dwelling, building, IsReadOnly, OnOpenEditor)
+                        ? new DwellingCellViewModel(dwelling, building, IsReadOnly, OnOpenEditor, _session.Incident.Gases)
                         : null;
                 })
                 .Where(c => c is not null)
@@ -1015,7 +1136,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         }
 
         cell.Status = editor.Status;
-        cell.CoValue = editor.CoValue;
+        cell.Values = editor.PendingValues;
         cell.ResidentName = editor.ResidentName;
         cell.KeyAvailable = editor.KeyAvailable;
         cell.KeyNumber = editor.IsKeyNumberEnabled ? editor.KeyNumber : null;
@@ -1096,7 +1217,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
     /// <summary>Seeds the picker: empty Wohnungen from the right first, then the rightmost units
     /// that do carry something, so the default selection is the least destructive one that still
     /// reaches the count the crew typed.</summary>
-    private static ApartmentRemovalViewModel BuildApartmentRemoval(
+    private ApartmentRemovalViewModel BuildApartmentRemoval(
         Building building,
         int floorOrdinal,
         int count,
@@ -1134,12 +1255,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         return built;
     }
 
-    private static string DescribeContents(Dwelling dwelling)
+    private string DescribeContents(Dwelling dwelling)
     {
         var parts = new List<string>();
-        if (dwelling.CoValue is { } ppm)
+        var gases = _session.Incident.Gases;
+        var measured = CoMeasurementLabels.ValuesInOrder(gases, dwelling.Values);
+        if (measured.Count > 0)
         {
-            parts.Add($"{ppm} ppm");
+            parts.AddRange(measured.Select(m => CoMeasurementLabels.GasValueLabel(m.Gas, m.Value, gases.Count > 1)));
         }
         else if (dwelling.Readings.Count > 0)
         {
@@ -1219,7 +1342,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
         Editor = building is not null && dwelling is not null
             ? new DwellingEditorViewModel(
-                dwelling, building, _session.Incident.InvolvedPartiesIn(dwelling.Id).Select(p => p.Name).ToList())
+                dwelling, building, _session.Incident.InvolvedPartiesIn(dwelling.Id).Select(p => p.Name).ToList(), _session.Incident.Gases)
             : null;
     }
 
@@ -1334,8 +1457,9 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         }
 
         // The labels are the Objekt's own copy (#337); Building.Create keeps only those that fit.
+        // The Messgase are copied the same way, by the first Haus only (#410).
         _session.AddCoBuilding(
-            NewBuildingName, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors, _pickedPremises?.ApartmentLabels);
+            NewBuildingName, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors, _pickedPremises?.ApartmentLabels, _gases);
         NewBuildingName = string.Empty;
         _filledFloors = _filledApartments = _filledUndergroundFloors = null;
         NewBuildingFloors = Premises.DefaultFloorCount;
@@ -1589,7 +1713,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
     }
 
     /// <summary>FERTIG. The single commit point for a unit: writes only the fields that actually
-    /// changed, so the Einsatztagebuch gets one entry for the status and one for the ppm reading
+    /// changed, so the Einsatztagebuch gets one entry for the status and one for the gas readings
     /// rather than one per keystroke, and a joined device does not POST no-op commands.</summary>
     [RelayCommand]
     private void ConfirmEditor()
@@ -1619,7 +1743,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
         if (editor.HasCoValueChange)
         {
-            _session.RecordCoValue(editor.BuildingId, editor.FloorOrdinal, editor.ApartmentNumber, editor.CoValue);
+            _session.RecordCoValues(editor.BuildingId, editor.FloorOrdinal, editor.ApartmentNumber, editor.ChangedValues);
             wrote = true;
         }
 
