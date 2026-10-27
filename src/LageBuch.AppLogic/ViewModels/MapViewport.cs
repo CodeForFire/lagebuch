@@ -56,6 +56,31 @@ public sealed partial class MapViewport : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Shows every pack in <paramref name="packs"/> as one map, with each distinct licence line;
+    /// an empty list shows no map. With <paramref name="centerOnPacks"/> the view opens on the
+    /// middle of all of them, otherwise it stays where it looks.
+    /// </summary>
+    public void ShowAll(IReadOnlyList<InstalledRegionPack> packs, bool centerOnPacks)
+    {
+        ArgumentNullException.ThrowIfNull(packs);
+        if (packs.Count == 0)
+        {
+            TileSource = null;
+            Attribution = null;
+            return;
+        }
+
+        var source = new CombinedMapTileSource([.. packs.Select(p => new MbTilesFileSource(p.TilesPath))]);
+        TileSource = source;
+        Attribution = string.Join(" ", packs.Select(p => p.Info.Attribution).Distinct(StringComparer.Ordinal));
+        if (centerOnPacks && source.GetTileBounds() is { } bounds)
+        {
+            Center = WebMercator.CenterOfTiles(bounds.Zoom, bounds.MinX, bounds.MaxX, bounds.MinY, bounds.MaxY);
+            Zoom = Math.Clamp(bounds.Zoom + 1, MinZoom, MaxZoom);
+        }
+    }
+
     [RelayCommand]
     private void ChangeView(MapViewChange? change)
     {

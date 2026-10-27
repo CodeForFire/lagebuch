@@ -26,8 +26,10 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
     /// <summary>Every pack's water points; a pack missing here has none.</summary>
     public Dictionary<string, IReadOnlyList<WaterPoint>> WaterPoints { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>When set, reading water points fails with it.</summary>
+    /// <summary>When set, reading water points fails with it: for every pack, or only for <see cref="WaterFailureSlug"/>.</summary>
     public RegionPackException? WaterFailure { get; set; }
+
+    public string? WaterFailureSlug { get; set; }
 
     /// <summary>Every pack's addresses; a search returns those whose street starts with the query's first word.</summary>
     public Dictionary<string, IReadOnlyList<AddressHit>> Addresses { get; } = new(StringComparer.Ordinal);
@@ -72,7 +74,7 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
     }
 
     public Task<IReadOnlyList<WaterPoint>> GetWaterPointsAsync(InstalledRegionPack pack, CancellationToken cancellationToken = default) =>
-        WaterFailure is { } failure
+        WaterFailure is { } failure && (WaterFailureSlug is null || WaterFailureSlug == pack.Info.Slug)
             ? Task.FromException<IReadOnlyList<WaterPoint>>(failure)
             : Task.FromResult(WaterPoints.GetValueOrDefault(pack.Info.Slug) ?? []);
 

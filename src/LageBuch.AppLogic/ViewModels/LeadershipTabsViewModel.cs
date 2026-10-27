@@ -54,6 +54,16 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
     [ObservableProperty]
     private bool _isNarrow;
 
+    // A Kartenpaket downloaded under Stammdaten while this Einsatz is open shows up the next time
+    // KARTE is opened, not only after the Einsatz is reopened.
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        if (value == MapTab)
+        {
+            Map.ReloadPacks();
+        }
+    }
+
     // Each tab lays out differently on a phone, and the workspace hands the flag only to the
     // modules in its rail -- this is the one it sees.
     partial void OnIsNarrowChanged(bool value)

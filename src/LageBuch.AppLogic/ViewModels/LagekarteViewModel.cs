@@ -13,7 +13,8 @@ namespace LageBuch.AppLogic.ViewModels;
 /// The KARTE tab in Führung: the Einsatzort and the units on an offline map. Placing works by
 /// picking what to place and then tapping the map, the same on a desk and on a tablet; a marker
 /// already on the map is dragged to move it. Positions live in the incident, so they sync and
-/// survive another device's Kartenpaket -- the pack is only the backdrop. The pack also brings
+/// survive another device's Kartenpaket -- the packs are only the backdrop, and every pack on
+/// the device is drawn as one map. The pack also brings
 /// the Hydranten drawn over the map and the addresses an Einsatzort can be found by, offline.
 /// </summary>
 public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware, IDisposable
@@ -27,8 +28,10 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly IRegionPackLibrary? _library;
-    private readonly IReadOnlyList<InstalledRegionPack> _packs;
-    private InstalledRegionPack? _shownPack;
+    private IReadOnlyList<InstalledRegionPack> _packs = [];
+
+    // Counts water point loads, so a slow read for an older set of packs cannot overwrite a newer one.
+    private int _waterLoad;
 
     public LagekarteViewModel(IIncidentSession session, Action onChanged, IRegionPackLibrary? mapPacks = null)
     {
@@ -38,10 +41,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
         _library = mapPacks;
-        _packs = InstalledPacks(mapPacks);
         _addressQuery = session.Incident.Location is null ? RecordedAddress(session.Incident) : string.Empty;
         Refresh();
-        ShowPackFor(FirstMark());
+        ShowPacks(InstalledPacks(mapPacks), centerOnPacks: true);
         if (session.Incident.Location is { } location)
         {
             Map.ChangeViewCommand.Execute(new MapViewChange(location, EinsatzortZoom));
@@ -66,6 +68,22 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
     /// <summary>No Kartenpaket on this device: the map still takes marks, it just has no streets under them.</summary>
     public bool HasNoMap => _packs.Count == 0;
+
+    /// <summary>
+    /// Reads which packs are on the device again, for a pack downloaded or deleted under
+    /// Stammdaten while this Einsatz is open. The view stays where it looks.
+    /// </summary>
+    public void ReloadPacks()
+    {
+        var packs = InstalledPacks(_library);
+        if (packs.Select(p => p.Info).SequenceEqual(_packs.Select(p => p.Info)))
+        {
+            return;
+        }
+
+        // A first pack on a map that had none, and nothing marked yet: open on the pack.
+        ShowPacks(packs, centerOnPacks: _packs.Count == 0 && FirstMark() is null);
+    }
 
     public bool HasEinsatzort => _session.Incident.Location is not null;
 
@@ -213,7 +231,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
 
         var hits = new List<LagekarteAddressRow>();
-        foreach (var pack in _packs.OrderBy(p => ReferenceEquals(p, _shownPack) ? 0 : 1))
+        foreach (var pack in _packs)
         {
             foreach (var hit in await _library.SearchAddressesAsync(pack, query))
             {
@@ -252,10 +270,6 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
                 return;
             }
         }
-        else
-        {
-            ShowPackFor(row.Position);
-        }
 
         Map.ChangeViewCommand.Execute(new MapViewChange(row.Position, Math.Max(Map.Zoom, EinsatzortZoom)));
     }
@@ -272,7 +286,6 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     {
         if (_session.Incident.Location is { } location)
         {
-            ShowPackFor(location);
             Map.ChangeViewCommand.Execute(new MapViewChange(location, Math.Max(Map.Zoom, EinsatzortZoom)));
         }
     }
@@ -282,7 +295,6 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     {
         if (row?.Position is { } position)
         {
-            ShowPackFor(position);
             Map.ChangeViewCommand.Execute(new MapViewChange(position, Map.Zoom));
         }
     }
@@ -298,15 +310,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
     private bool Place(Guid? unitId, GeoPoint position)
     {
-        var placed = unitId is { } id
+        return unitId is { } id
             ? Run(() => _session.PlaceForceUnit(id, position))
             : Run(() => _session.SetIncidentLocation(position));
-        if (placed)
-        {
-            ShowPackFor(position);
-        }
-
-        return placed;
     }
 
     private bool Run(Action command)
@@ -364,59 +370,50 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     private GeoPoint? FirstMark() =>
         _session.Incident.Location ?? _session.Incident.Forces.Select(u => u.Position).FirstOrDefault(p => p is not null);
 
-    // Keeps the pack on screen while it covers the point; otherwise the first pack that does, or
-    // the first pack at all when none does, so that the map never goes blank by choice.
-    private void ShowPackFor(GeoPoint? point)
+    // Every installed pack is one map: a Landkreis border is a seam, and an Einsatz across it, or
+    // a unit sent to the neighbours, stays on the map.
+    private void ShowPacks(IReadOnlyList<InstalledRegionPack> packs, bool centerOnPacks)
     {
-        if (_packs.Count == 0 || (_shownPack is not null && (point is null || _shownPack.Info.Covers(point))))
-        {
-            return;
-        }
-
-        var pack = (point is null ? null : _packs.FirstOrDefault(p => p.Info.Covers(point))) ?? _shownPack ?? _packs[0];
-        if (ReferenceEquals(pack, _shownPack))
-        {
-            return;
-        }
-
-        // Show() opens on the pack's middle. That is right for the first pack; a switch while the
-        // map already looks somewhere keeps looking there.
-        var first = _shownPack is null;
-        var view = new MapViewChange(Map.Center, Map.Zoom);
-        _shownPack = pack;
-        Map.Show(pack);
-        if (!first)
-        {
-            Map.ChangeViewCommand.Execute(view);
-        }
+        _packs = packs;
+        Map.ShowAll(packs, centerOnPacks);
+        OnPropertyChanged(nameof(HasNoMap));
+        OnPropertyChanged(nameof(CanSearchAddresses));
 
         // Fire-and-forget on purpose: a failure lands in WaterPointsError, never in the map.
-        _ = LoadWaterPointsAsync(pack);
+        _ = LoadWaterPointsAsync(packs);
     }
 
-    private async Task LoadWaterPointsAsync(InstalledRegionPack pack)
+    // The water points of every pack. A pack whose file cannot be read costs its own points, not
+    // the others'; neighbouring packs overlap by a few km, so a hydrant there is drawn twice, on
+    // the same spot.
+    private async Task LoadWaterPointsAsync(IReadOnlyList<InstalledRegionPack> packs)
     {
+        var load = ++_waterLoad;
         WaterPoints = null;
         WaterPointsError = null;
-        if (_library is null)
+        if (_library is null || packs.Count == 0)
         {
             return;
         }
 
-        try
+        var points = new List<WaterPoint>();
+        string? error = null;
+        foreach (var pack in packs)
         {
-            var points = await _library.GetWaterPointsAsync(pack);
-            if (ReferenceEquals(pack, _shownPack))
+            try
             {
-                WaterPoints = points;
+                points.AddRange(await _library.GetWaterPointsAsync(pack));
+            }
+            catch (RegionPackException e)
+            {
+                error ??= packs.Count > 1 ? $"{pack.Info.Name}: {e.Message}" : e.Message;
             }
         }
-        catch (RegionPackException e)
+
+        if (load == _waterLoad)
         {
-            if (ReferenceEquals(pack, _shownPack))
-            {
-                WaterPointsError = e.Message;
-            }
+            WaterPoints = points;
+            WaterPointsError = error;
         }
     }
 

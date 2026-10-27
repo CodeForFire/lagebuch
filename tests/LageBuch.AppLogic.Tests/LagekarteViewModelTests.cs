@@ -169,19 +169,88 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
-    public void The_map_shows_the_pack_that_covers_the_Einsatzort()
+    public void Every_installed_pack_is_one_map_with_each_licence_line_once()
     {
         var library = new FakeRegionPackLibrary();
-        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg") with { South = 47.8, North = 48.0 });
         library.Preinstall(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"));
+        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg") with { South = 47.8, North = 48.0 });
+        library.Preinstall(FakeRegionPackLibrary.Pack("ll", "Landkreis Landsberg am Lech") with { Attribution = "© OSM, DGM5 © LDBV" });
         var (session, _, _) = Open();
         session.SetIncidentLocation(Marktplatz);
 
         using var vm = new LagekarteViewModel(session, () => { }, library);
 
         Assert.False(vm.HasNoMap);
-        Assert.Equal("© OpenStreetMap contributors", vm.Map.Attribution);
+        Assert.IsType<CombinedMapTileSource>(vm.Map.TileSource);
+        Assert.Equal("© OpenStreetMap contributors © OSM, DGM5 © LDBV", vm.Map.Attribution);
         Assert.Equal(Marktplatz, vm.Map.Center);
+        Assert.Equal(LagekarteViewModel.EinsatzortZoom, vm.Map.Zoom);
+    }
+
+    [Fact]
+    public void The_water_points_of_every_pack_are_drawn_and_one_unreadable_pack_costs_only_its_own()
+    {
+        var library = FfbLibrary();
+        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"));
+        library.Preinstall(FakeRegionPackLibrary.Pack("ll", "Landkreis Landsberg am Lech"));
+        library.WaterPoints["ffb"] = [new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100")];
+        library.WaterPoints["sta"] = [new WaterPoint(Amperbruecke, WaterPointKind.Saugstelle, "Würm")];
+        library.WaterFailure = new RegionPackException("Die Wasserentnahmestellen des Kartenpakets sind beschädigt.");
+        library.WaterFailureSlug = "ll";
+        var (session, _, _) = Open();
+
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+
+        Assert.Equal(["UH 100", "Würm"], vm.WaterPoints?.Select(w => w.Label));
+        Assert.Equal("Landkreis Landsberg am Lech: Die Wasserentnahmestellen des Kartenpakets sind beschädigt.", vm.WaterPointsError);
+    }
+
+    [Fact]
+    public void A_pack_installed_while_the_Einsatz_is_open_joins_the_map_and_the_view_stays()
+    {
+        var library = FfbLibrary();
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Amperbruecke, 15));
+        var before = vm.Map.TileSource;
+
+        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"));
+        library.WaterPoints["sta"] = [new WaterPoint(Amperbruecke, WaterPointKind.Hydrant, "UH 80")];
+        library.Addresses["sta"] = [Hauptstrasse12];
+        vm.ReloadPacks();
+
+        Assert.NotSame(before, vm.Map.TileSource);
+        Assert.Equal(Amperbruecke, vm.Map.Center);
+        Assert.Equal(15, vm.Map.Zoom);
+        Assert.Equal(["UH 80"], vm.WaterPoints?.Select(w => w.Label));
+    }
+
+    [Fact]
+    public void Reloading_the_same_packs_changes_nothing()
+    {
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, FfbLibrary());
+        var before = vm.Map.TileSource;
+
+        vm.ReloadPacks();
+
+        Assert.Same(before, vm.Map.TileSource);
+    }
+
+    [Fact]
+    public void A_pack_deleted_while_the_Einsatz_is_open_leaves_the_map_saying_so()
+    {
+        var library = FfbLibrary();
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+
+        library.Remove(library.GetInstalled().Single());
+        vm.ReloadPacks();
+
+        Assert.True(vm.HasNoMap);
+        Assert.False(vm.CanSearchAddresses);
+        Assert.Null(vm.Map.TileSource);
+        Assert.Null(vm.WaterPoints);
     }
 
     [Fact]

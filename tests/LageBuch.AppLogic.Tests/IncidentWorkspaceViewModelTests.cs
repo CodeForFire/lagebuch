@@ -2276,6 +2276,21 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal(LeadershipTabsViewModel.OrganisationTab, vm.LeadershipTabs.SelectedTabIndex);
     }
 
+    [Fact]
+    public void Opening_the_KARTE_tab_picks_up_a_pack_downloaded_while_the_Einsatz_is_open()
+    {
+        var library = new FakeRegionPackLibrary();
+        var session = TestSession.StartNew(new FakeStore(), new FixedClock(T0), new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(T0), new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new FakeHostController(), mapPacks: library);
+        Assert.True(vm.Lagekarte.HasNoMap);
+
+        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"));
+        vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.MapTab;
+
+        Assert.False(vm.Lagekarte.HasNoMap);
+        Assert.True(vm.Lagekarte.CanSearchAddresses);
+    }
+
     // A read-only flip synced from another device rebuilds every module; the Lagebuchführer must
     // not be thrown back from Kräfte to the board by something done elsewhere.
     [Fact]
