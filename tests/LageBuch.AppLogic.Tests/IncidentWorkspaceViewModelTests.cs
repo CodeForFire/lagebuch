@@ -398,6 +398,46 @@ public class IncidentWorkspaceViewModelTests
             new TestPdfExporter());
     }
 
+    // #762: a joined client removes an attachment, the host applies it and then fails to wipe the
+    // bytes. The client gets a 500; the host's Lagebuchführer, who hands this file on, must see it too.
+    [Fact]
+    public async Task A_joined_clients_removal_whose_bytes_are_not_wiped_is_reported_on_the_host()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        using var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController(), new TestPdfExporter());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        var file = Assert.Single(session.Incident.Files);
+        store.DeleteFailure = new IOException("Datenträger voll");
+
+        // What IncidentHost does for a RemoveFileCommand: the domain removal, then the byte wipe.
+        session.Incident.RemoveFile(clock, new SessionOperator("Client"), file.Id);
+        await Assert.ThrowsAsync<IOException>(() => session.DeleteFileBytesAsync(Domain.Files.IncidentFile.StorageFileName(file.Id, file.FileName)));
+
+        Assert.Equal(
+            "Anhang von einem verbundenen Gerät entfernt, Daten konnten nicht aus der Einsatzdatei gelöscht werden: Datenträger voll",
+            vm.Files.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task A_disposed_workspace_no_longer_reports_a_failed_wipe()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController(), new TestPdfExporter());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        var file = Assert.Single(session.Incident.Files);
+        store.DeleteFailure = new IOException("Datenträger voll");
+        vm.Dispose();
+
+        session.Incident.RemoveFile(clock, new SessionOperator("Client"), file.Id);
+        await Assert.ThrowsAsync<IOException>(() => session.DeleteFileBytesAsync(Domain.Files.IncidentFile.StorageFileName(file.Id, file.FileName)));
+
+        Assert.Null(vm.Files.ErrorMessage);
+    }
+
     [Fact]
     public void The_etb_rail_entry_holds_the_journal_and_the_lagemeldung_as_tabs()
     {

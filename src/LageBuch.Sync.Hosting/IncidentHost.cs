@@ -342,8 +342,8 @@ public sealed class IncidentHost : IAsyncDisposable
             // explicit 500 rather than swallowed or reported as a rejected command. Be clear about what
             // that costs: the removal DID land and the next snapshot shows the file gone, yet the
             // client's banner reads as if the host refused the change, and the bytes may remain
-            // unwiped in the incident file. The host side is not notified either; surfacing it
-            // there is a follow-up.
+            // unwiped in the incident file until it is next opened. The host's Lagebuchführer is
+            // told through LocalIncidentSession.FileBytesNotWiped (#762).
             if (command is RemoveFileCommand && removedFile is not null)
             {
                 try

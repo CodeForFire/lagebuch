@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
@@ -382,9 +383,31 @@ public sealed class LocalIncidentSession : IIncidentSession
     /// <c>RemoveFileCommand</c> via <see cref="LageBuch.Sync.CommandApplier"/>, whose metadata
     /// mutation already ran on the UI thread; this byte delete runs off it and throws if the bytes cannot be wiped, mirroring
     /// <see cref="SaveFileStreamAsync"/>'s split for <c>AddFileCommand</c>'s upload half.
+    /// A failure also raises <see cref="FileBytesNotWiped"/> before it propagates (#762).
     /// </summary>
-    public Task DeleteFileBytesAsync(string storageFileName, CancellationToken cancellationToken = default) =>
-        _store.DeleteFileBytesAsync(Path, storageFileName, cancellationToken);
+    public async Task DeleteFileBytesAsync(string storageFileName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _store.DeleteFileBytesAsync(Path, storageFileName, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileBytesNotWiped?.Invoke(ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Raised when <see cref="DeleteFileBytesAsync"/> fails, on whatever thread the host's request
+    /// runs on. The joined client only gets a 500; this is how the host's own Lagebuchführer, who
+    /// hands this file on, learns that a removed attachment's bytes are still in it (#762).
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1003",
+        Justification = "A plain Exception payload doesn't warrant a bespoke EventArgs type; matches IIncidentStore.SaveFailed.")]
+    public event Action<Exception>? FileBytesNotWiped;
 
     public void AddCoBuilding(
         string name,

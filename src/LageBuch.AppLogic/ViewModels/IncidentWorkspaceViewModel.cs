@@ -66,6 +66,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _alarm = alarm;
         _hostController = hostController;
         _hostController.JoinsClosedChanged += OnJoinsClosedChanged;
+        if (_local is not null)
+        {
+            _local.FileBytesNotWiped += OnFileBytesNotWiped;
+        }
+
         _alarmMute = alarmMute;
         if (_alarmMute is not null)
         {
@@ -875,6 +880,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _session.Changed -= RefreshIncidentData;
         PendingLeadershipPersonDialog = null;
         _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
+        if (_local is not null)
+        {
+            _local.FileBytesNotWiped -= OnFileBytesNotWiped;
+        }
+
         _clockSkewRefresh?.Dispose();
         if (_alarmMute is not null)
         {
@@ -1631,6 +1641,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // ÜBER sets the switch on the UI thread today; marshal anyway, like every other event here.
     private void OnAlarmMuteChanged(object? sender, EventArgs e) =>
         _uiDispatcher.Post(() => OnPropertyChanged(nameof(AlarmsMuted)));
+
+    // Raised on the host's request thread, after the removal has already been broadcast.
+    private void OnFileBytesNotWiped(Exception ex) =>
+        _uiDispatcher.Post(() => Files.ReportRemoteRemovalNotWiped(ex.Message));
 
     private void OnJoinsClosedChanged(object? sender, EventArgs e) =>
         _uiDispatcher.Post(() =>

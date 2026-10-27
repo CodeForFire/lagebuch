@@ -244,6 +244,13 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
     public void ReportPasteFailed(string reason) => ErrorMessage = $"Bild nicht übernommen: {reason}";
 
     /// <summary>
+    /// A joined client's removal landed, but wiping the bytes from the incident file failed (#762).
+    /// Worded like the same failure of a local removal, so the host reads it the same way.
+    /// </summary>
+    public void ReportRemoteRemovalNotWiped(string reason) =>
+        ErrorMessage = $"Anhang von einem verbundenen Gerät entfernt, Daten konnten nicht aus der Einsatzdatei gelöscht werden: {reason}";
+
+    /// <summary>
     /// A browser drop that carries only a link, no image (#421). The link is deliberately never
     /// fetched — nothing from a drop reaches the network — so point at the way that works.
     /// </summary>
