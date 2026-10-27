@@ -172,8 +172,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _pending = PendingAction.Join;
         PendingPrompt = new OperatorPromptViewModel(collectHost: true)
         {
-            // The host address rarely changes once set up (a station's ELW, a fixed Tailscale
-            // node) -- prefill last time's so the operator doesn't retype it every join.
+            // The host address rarely changes once set up (a station's ELW, a fixed
+            // LAN address) -- prefill last time's so the operator doesn't retype it every join.
             Host = _home.LastConnection?.Host ?? string.Empty,
 
             // The PIN too, valid for as long as the host keeps sharing: reconnecting mid-Einsatz

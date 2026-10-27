@@ -3,7 +3,7 @@ namespace LageBuch.Sync;
 /// <summary>Shared protocol constants and the version-handshake payload (see §7).</summary>
 public static class SyncProtocol
 {
-    /// <summary>Fixed port the host binds on its Tailscale address; clients dial the same.</summary>
+    /// <summary>Fixed port the host binds on every interface; clients dial the same.</summary>
     public const int Port = 5859;
 
     /// <summary>

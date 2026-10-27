@@ -11,11 +11,10 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// Hosting no longer requires Tailscale (#59 follow-up). While sharing, the header line shows only
-// the PIN; the address to dial (LAN + localhost) sits in a flyout behind it, because it is set up
-// once in the ELW and the header line has no room for it next to the Lagebuchführer readout. This
-// pins that the toggle flips the button label, keeps the URLs off the header line and puts them
-// behind the PIN — and doubles as the PR screenshot capture.
+// While sharing, the header line shows only the PIN; the address to dial (LAN + localhost) sits in
+// a flyout behind it, because it is set up once in the ELW and the header line has no room for it
+// next to the Lagebuchführer readout. This pins that the toggle flips the button label, keeps the
+// URLs off the header line and puts them behind the PIN — and doubles as the PR screenshot capture.
 public class SharePanelRenderTests
 {
     private sealed class FakeHost : IIncidentHostController

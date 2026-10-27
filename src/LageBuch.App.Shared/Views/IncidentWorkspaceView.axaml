@@ -176,7 +176,7 @@
                       IsVisible="{Binding OperatorDisplay, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
               <!-- Multi-device sharing (#52): expose this open incident to other devices over the
-                   network (loopback, LAN, or a tailnet) — a compact icon button on the status line
+                   network (loopback or LAN) — a compact icon button on the status line
                    rather than a labelled button on its own row. -->
               <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
                           IsVisible="{Binding CanHost}">

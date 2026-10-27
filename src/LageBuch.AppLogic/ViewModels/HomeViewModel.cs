@@ -220,7 +220,7 @@ public sealed partial class HomeViewModel : ObservableObject
 
     /// <summary>
     /// "‹Stichwort› · ‹time›" under the host on the Home card; the Stichwort is left out while unset.
-    /// A line of its own, so a long tailnet name is trimmed rather than broken mid-word on a phone.
+    /// A line of its own, so a long host name is trimmed rather than broken mid-word on a phone.
     /// </summary>
     public string? LastConnectionDetail => LastConnection is not { } last
         ? null
@@ -680,7 +680,7 @@ public sealed partial class HomeViewModel : ObservableObject
         ClearCertificateChangedHost();
     }
 
-    // The address is normally just a Tailscale name (the host binds the fixed SyncProtocol.Port), but
+    // The address is normally just a host name or IP (the host binds the fixed SyncProtocol.Port), but
     // an explicit "host:port" is accepted too — handy for a non-standard port or for reaching a host
     // on the same machine during testing.
     private static (string Host, int Port) ParseHost(string address)

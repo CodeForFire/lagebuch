@@ -272,8 +272,9 @@ des Geräts an; eine Einschränkung auf bestimmte Adressbereiche findet nicht
 statt. Die im Programm angezeigte Adresse ist nur ein Vorschlag, den man am
 beitretenden Gerät eintragen kann. Praktisch heißt das: **Erreichbarkeit im
 Netz plus PIN ist die gesamte Zugangskontrolle.** Im vorgesehenen Einsatzfall –
-die eigenen Geräte im eigenen WLAN oder über Tailscale – ist das angemessen; in
-einem offenen Netz ist es das nicht.
+die eigenen Geräte im eigenen WLAN – ist das angemessen; in einem offenen Netz
+ist es das nicht. Theoretisch funktioniert jedes Netz, über das die Geräte den
+Gastgeber erreichen, etwa ein VPN wie Tailscale; getestet ist das nicht.
 
 **Android** kann beitreten, aber selbst keinen Einsatz freigeben. Die App ist
 ein Begleitgerät.
@@ -317,8 +318,9 @@ ein Begleitgerät.
   Versandweg, Empfängerkreis, Ablage.
 - **Weitergabe der PIN** im Einsatz: an wen sie gegeben wird und dass sie nicht
   über den Einsatz hinaus verwendet wird.
-- **Auswahl der Netzverbindung** für den Mehrgerätebetrieb: eigenes WLAN oder
-  Tailscale, nicht das offene Gäste-WLAN der Einsatzstelle.
+- **Auswahl der Netzverbindung** für den Mehrgerätebetrieb: eigenes WLAN, nicht
+  das offene Gäste-WLAN der Einsatzstelle. Wer stattdessen ein VPN wie Tailscale
+  einsetzt, betritt ungetestetes Gelände.
 
 ## Einordnung nach DSGVO
 

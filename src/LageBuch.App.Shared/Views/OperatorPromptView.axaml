@@ -30,9 +30,9 @@
           <TextBlock x:Name="PreviousOperatorLine" Classes="secondary" Margin="0,-4,0,8"
                      IsVisible="{Binding IsHandover}"
                      Text="{Binding PreviousOperatorDisplay, StringFormat='Bisher: {0}'}" />
-          <!-- Join flow, first stage (§6, #459): the host's LAN or Tailscale address/name (hosting
-               no longer requires Tailscale, #59 follow-up) and its PIN. Who documents here is
-               asked only once the host is reached, so its own personnel can be suggested. -->
+          <!-- Join flow, first stage (§6, #459): the host's LAN address or name and its
+               PIN. Who documents here is asked only once the host is reached, so its own
+               personnel can be suggested. -->
           <StackPanel IsVisible="{Binding IsHostStage}" Spacing="3">
             <HeaderedContentControl Classes="field required" Header="GERÄT (NAME ODER IP-ADRESSE)"
                                     Margin="0,4,0,0" ctrl:Field.Error="{Binding HostError}">

@@ -71,7 +71,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     // Quiet until the first press: a prompt that opens already scolding teaches nothing.
     private bool _errorsShown;
 
-    // The host's LAN or Tailscale address/name, entered only in the join flow. Mandatory there (gates Confirm).
+    // The host's LAN address or name, entered only in the join flow. Mandatory there (gates Confirm).
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HostError))]
     private string _host = string.Empty;
