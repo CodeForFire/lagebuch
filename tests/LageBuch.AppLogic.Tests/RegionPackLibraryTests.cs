@@ -267,6 +267,56 @@ public sealed class RegionPackLibraryTests : IDisposable
         Assert.Empty(Directory.GetFileSystemEntries(Root));
     }
 
+    // The catalogue's checksum matches, so only the zip itself can tell it was cut off on the way.
+    [Fact]
+    public async Task A_truncated_zip_is_refused_and_the_older_copy_stays()
+    {
+        var v1 = PackZip("tiles-v1");
+        _handler.Respond(_ => Ok(v1));
+        var library = Library();
+        await library.InstallAsync(Pack(v1));
+
+        var whole = PackZip(new string('x', 200_000));
+        var truncated = whole[..(whole.Length / 2)];
+        _handler.Respond(_ => Ok(truncated));
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(truncated)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt.", e.Message);
+        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).TilesPath));
+        Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
+    }
+
+    // A zip bomb with a valid outer checksum: more zeros than the whole 2 GB cap, compressed to a
+    // few MB, where pack.json promises five bytes. Cut off at the cap, it would read as "entpackt
+    // zu groß"; cut off at its declared size, it reads as not matching pack.json.
+    [Fact]
+    public async Task An_entry_that_expands_past_its_declared_size_is_cut_off_there()
+    {
+        var zip = ZipWithBomb(InstalledRegionPack.TilesFileName, RegionPackLibrary.MaxUnpackedBytes + (1024 * 1024));
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
+        Assert.Empty(library.GetInstalled());
+        Assert.Empty(Directory.GetFileSystemEntries(Root));
+    }
+
+    [Theory]
+    [InlineData("\"map.mbtiles\": {\"bytes\": 5", "\"map.mbtiles\": {\"bytes\": -5")]
+    [InlineData("\"map.mbtiles\": {\"bytes\": 5", "\"map.mbtiles\": {\"bytes\": \"5\"")]
+    [InlineData("\"map.mbtiles\": {\"bytes\": 5, \"sha256\": \"", "\"map.mbtiles\": {\"bytes\": 5, \"sha256\": \"X")]
+    public async Task A_declared_size_or_checksum_that_is_no_number_or_hash_refuses_the_pack(string field, string replacement)
+    {
+        var zip = Zip([.. Files("tiles", manifest => manifest.Replace(field, replacement, StringComparison.Ordinal))]);
+        _handler.Respond(_ => Ok(zip));
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
+    }
+
     [Fact]
     public async Task A_pack_of_a_newer_format_asks_for_a_newer_app()
     {
@@ -674,6 +724,33 @@ public sealed class RegionPackLibraryTests : IDisposable
             {
                 using var writer = new StreamWriter(zip.CreateEntry(name).Open());
                 writer.Write(content);
+            }
+        }
+
+        return buffer.ToArray();
+    }
+
+    // A well-formed pack whose entry `name` holds `size` zeros instead, written in chunks so the
+    // bomb never sits in memory whole.
+    private static byte[] ZipWithBomb(string name, long size)
+    {
+        using var buffer = new MemoryStream();
+        using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (entryName, content) in Files())
+            {
+                using var entry = zip.CreateEntry(entryName, CompressionLevel.Fastest).Open();
+                if (entryName != name)
+                {
+                    entry.Write(Encoding.UTF8.GetBytes(content));
+                    continue;
+                }
+
+                var zeros = new byte[1024 * 1024];
+                for (long written = 0; written < size; written += zeros.Length)
+                {
+                    entry.Write(zeros, 0, (int)Math.Min(zeros.Length, size - written));
+                }
             }
         }
 
