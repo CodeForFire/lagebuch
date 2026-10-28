@@ -95,7 +95,7 @@ public class MainActivity : AvaloniaMainActivity
             new MasterDataFileService(),
             new NoopIncidentHostController(),
             new LageBuch.App.Shared.Services.AvaloniaUiDispatcher(),
-            typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+            AppVersionText.Of(typeof(MainActivity).Assembly),
             lastSaveFolder: null,
             attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
             trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)),

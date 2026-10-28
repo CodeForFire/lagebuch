@@ -118,7 +118,7 @@ internal static class Program
         }
     }
 
-    private static string AppVersion => typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+    private static string AppVersion => AppVersionText.Of(typeof(Program).Assembly);
 
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<LageBuch.App.Shared.App>()
