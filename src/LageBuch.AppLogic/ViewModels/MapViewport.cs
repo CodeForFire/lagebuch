@@ -47,7 +47,7 @@ public sealed partial class MapViewport : ObservableObject
             return;
         }
 
-        var source = new MbTilesFileSource(pack.TilesPath);
+        var source = LayerOf(pack).Tiles;
         TileSource = source;
         Attribution = pack.Info.Attribution;
         if (source.GetTileBounds() is { } bounds)
@@ -66,24 +66,6 @@ public sealed partial class MapViewport : ObservableObject
     public void ShowAll(IReadOnlyList<InstalledRegionPack> packs, bool centerOnPacks)
     {
         ArgumentNullException.ThrowIfNull(packs);
-
-        // POC for CodeForFire/lagebuch-geodata#5, not for merge: a PMTiles vector archive named by
-        // this variable replaces every pack's raster tiles. Hydranten and addresses still come
-        // from the installed packs.
-        if (Environment.GetEnvironmentVariable("LAGEBUCH_POC_PMTILES") is { Length: > 0 } vectorArchive)
-        {
-            var vector = new CombinedMapTileSource([new MapTileLayer(new PmTilesFileSource(vectorArchive), null)]);
-            TileSource = vector;
-            Attribution = "Karte: © OpenStreetMap-Mitwirkende (ODbL), Protomaps-Basemap.";
-            if (centerOnPacks && vector.GetTileBounds() is { } vectorBounds)
-            {
-                Center = WebMercator.CenterOfTiles(vectorBounds.Zoom, vectorBounds.MinX, vectorBounds.MaxX, vectorBounds.MinY, vectorBounds.MaxY);
-                Zoom = Math.Clamp(vectorBounds.Zoom + 1, MinZoom, MaxZoom);
-            }
-
-            return;
-        }
-
         if (packs.Count == 0)
         {
             TileSource = null;
@@ -92,9 +74,10 @@ public sealed partial class MapViewport : ObservableObject
         }
 
         // A pack without a known area is drawn first and whole, so that a pack that has one is laid
-        // over its empty margin rather than under it.
+        // over its empty margin rather than under it. Vector packs come first too: they have no
+        // margin to cover a neighbour with.
         var layers = packs
-            .Select(p => new MapTileLayer(new MbTilesFileSource(p.TilesPath), BoundaryGeoJson.Read(p.BoundaryPath)))
+            .Select(LayerOf)
             .OrderBy(l => l.Boundary is null ? 0 : 1)
             .ToList();
         var source = new CombinedMapTileSource(layers);
@@ -106,6 +89,13 @@ public sealed partial class MapViewport : ObservableObject
             Zoom = Math.Clamp(bounds.Zoom + 1, MinZoom, MaxZoom);
         }
     }
+
+    // A pack's vector tiles when it has them, else its raster tiles within its area. Vector tiles
+    // are cut to the area when the pack is built, so they need no clip: outside it they hold nothing.
+    private static MapTileLayer LayerOf(InstalledRegionPack pack) =>
+        File.Exists(pack.VectorTilesPath)
+            ? new MapTileLayer(new PmTilesFileSource(pack.VectorTilesPath), null)
+            : new MapTileLayer(new MbTilesFileSource(pack.TilesPath), BoundaryGeoJson.Read(pack.BoundaryPath));
 
     [RelayCommand]
     private void ChangeView(MapViewChange? change)

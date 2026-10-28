@@ -23,7 +23,7 @@ public sealed class MapTileCache
     private readonly Dictionary<(IMapTileSource Layer, int Zoom, int X, int Y), LinkedListNode<Entry>> _entries = new();
     private readonly LinkedList<Entry> _recent = new();
 
-    // POC (lagebuch-geodata#5): decoded vector tiles, so the 16 tiles of z17 cut from one z15 tile
+    // Decoded vector tiles, so that the 16 tiles of z17 cut from one z15 tile
     // parse it once. A handful is enough: a screen at z17 spans few z15 tiles.
     private readonly Dictionary<(IMapTileSource Layer, int Zoom, int X, int Y), IReadOnlyList<VectorLayer>?> _vectors = new();
     private readonly Queue<(IMapTileSource Layer, int Zoom, int X, int Y)> _vectorOrder = new();

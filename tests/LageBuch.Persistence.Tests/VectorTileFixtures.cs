@@ -65,13 +65,13 @@ internal static class VectorTileFixtures
     /// An archive of a root directory, optional leaf directories and gzipped tiles, laid out as
     /// the spec's writers do. <paramref name="tiles"/> are (z, x, y, uncompressed MVT bytes).
     /// </summary>
-    public static byte[] Archive(IReadOnlyList<(int Z, int X, int Y, byte[] Tile)> tiles, Func<byte[], byte[]>? root = null, byte[]? leaves = null, int maxZoom = 15)
+    public static byte[] Archive(IReadOnlyList<(int Z, int X, int Y, byte[] Tile)> tiles, Func<byte[], byte[]>? root = null, byte[]? leaves = null, int maxZoom = 15, bool gzipTiles = true)
     {
         var data = new List<byte>();
         var entries = new List<PmTilesEntry>();
         foreach (var (z, x, y, tile) in tiles.OrderBy(t => PmTilesFileSource.TileId(t.Z, t.X, t.Y)))
         {
-            var blob = Gzip(tile);
+            var blob = gzipTiles ? Gzip(tile) : tile;
             entries.Add(new PmTilesEntry(PmTilesFileSource.TileId(z, x, y), 1, (uint)blob.Length, (ulong)data.Count));
             data.AddRange(blob);
         }
@@ -79,14 +79,15 @@ internal static class VectorTileFixtures
         var rootBytes = Gzip(Directory([.. entries]));
         rootBytes = root?.Invoke(rootBytes) ?? rootBytes;
         leaves ??= [];
-        return Assemble(rootBytes, leaves, [.. data], maxZoom);
+        return Assemble(rootBytes, leaves, [.. data], maxZoom, tileCompression: gzipTiles ? (byte)2 : (byte)1);
     }
 
-    public static byte[] Assemble(byte[] root, byte[] leaves, byte[] data, int maxZoom = 15, byte internalCompression = 2)
+    /// <summary>Header, root directory, leaf directories and tile data, in that order, as the spec's writers lay them out.</summary>
+    public static byte[] Assemble(byte[] root, byte[] leaves, byte[] data, int maxZoom = 15, byte internalCompression = 2, int minZoom = 0, byte tileCompression = 2, byte tileType = 1, byte version = 3)
     {
         var header = new byte[PmTilesFileSource.HeaderLength];
         "PMTiles"u8.CopyTo(header);
-        header[7] = 3;
+        header[7] = version;
         ulong rootOffset = PmTilesFileSource.HeaderLength;
         var leafOffset = rootOffset + (ulong)root.Length;
         var dataOffset = leafOffset + (ulong)leaves.Length;
@@ -98,9 +99,9 @@ internal static class VectorTileFixtures
         BinaryPrimitives.WriteUInt64LittleEndian(header.AsSpan(64), (ulong)data.Length);
         header[96] = 1;
         header[97] = internalCompression;
-        header[98] = 2;
-        header[99] = 1;
-        header[100] = 0;
+        header[98] = tileCompression;
+        header[99] = tileType;
+        header[100] = (byte)minZoom;
         header[101] = (byte)maxZoom;
         BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(102), 109_500_000);
         BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(106), 480_600_000);

@@ -7,6 +7,9 @@ public sealed record InstalledRegionPack(RegionPackInfo Info, string FolderPath)
 {
     public const string TilesFileName = "map.mbtiles";
 
+    /// <summary>The same map as vector tiles; a pack built before them, or in a schema this app cannot style, has none.</summary>
+    public const string VectorTilesFileName = "map.pmtiles";
+
     public const string WaterFileName = "water.geojson";
 
     public const string AddressesFileName = "addresses.sqlite";
@@ -15,6 +18,8 @@ public sealed record InstalledRegionPack(RegionPackInfo Info, string FolderPath)
     public const string BoundaryFileName = "boundary.geojson";
 
     public string TilesPath => Path.Join(FolderPath, TilesFileName);
+
+    public string VectorTilesPath => Path.Join(FolderPath, VectorTilesFileName);
 
     public string WaterPath => Path.Join(FolderPath, WaterFileName);
 

@@ -11,7 +11,7 @@ namespace LageBuch.Persistence.Map.Vector;
 /// because the format is five messages and a generator would be a new dependency.
 /// </summary>
 /// <remarks>
-/// POC for CodeForFire/lagebuch-geodata#5. A tile is untrusted input: every length is checked
+/// A tile comes out of a downloaded pack, so it is untrusted input: every length is checked
 /// against the buffer, and the number of layers, features and coordinates is capped, so a tile
 /// cannot make the renderer allocate without bound. A malformed tile throws
 /// <see cref="FormatException"/>.

@@ -10,7 +10,7 @@ namespace LageBuch.Persistence.Map.Vector;
 /// already decompressed, not with an image: the map renders them itself.
 /// </summary>
 /// <remarks>
-/// POC for CodeForFire/lagebuch-geodata#5. The archive is untrusted input like any pack file, so
+/// The archive is untrusted input like any pack file, so
 /// every offset and length is checked against the file and every directory and tile is capped
 /// before and after decompression. A damaged archive costs a blank tile, never the map.
 /// Opens the file per call, as <see cref="MbTilesFileSource"/> does, so it is never held locked;
@@ -213,7 +213,7 @@ public sealed class PmTilesFileSource : IMapTileSource
             {
                 _opened = true;
                 _header = ReadHeader(file);
-                _root = _header is { } h ? ReadDirectory(file, h, h.RootOffset, h.RootLength) : null;
+                _root = _header is { } h ? ReadDirectory(file, h, h.RootOffset, h.RootLength, 0, h.RootLength) : null;
             }
 
             return _header is null || _root is null ? null : read(file);
@@ -250,13 +250,13 @@ public sealed class PmTilesFileSource : IMapTileSource
 
             if (entry.RunLength > 0)
             {
-                return ReadBlob(file, header, header.TileDataOffset, header.TileDataLength, entry.Offset, entry.Length, header.TileCompression, MaxTileBytes);
+                return ReadBlob(file, header.TileDataOffset, header.TileDataLength, entry.Offset, entry.Length, header.TileCompression, MaxTileBytes);
             }
 
             var key = (entry.Offset, (ulong)entry.Length);
             if (!_leaves.TryGetValue(key, out var leaf))
             {
-                leaf = ReadDirectory(file, header, header.LeafOffset + entry.Offset, entry.Length, header.LeafOffset, header.LeafLength);
+                leaf = ReadDirectory(file, header, header.LeafOffset, header.LeafLength, entry.Offset, entry.Length);
                 if (leaf is null)
                 {
                     return null;
@@ -305,7 +305,7 @@ public sealed class PmTilesFileSource : IMapTileSource
     private static Header? ReadHeader(FileStream file)
     {
         Span<byte> h = stackalloc byte[HeaderLength];
-        if (file.Length < HeaderLength || file.ReadAtLeast(h, HeaderLength, throwOnEndOfStream: false) != HeaderLength)
+        if (file.ReadAtLeast(h, HeaderLength, throwOnEndOfStream: false) != HeaderLength)
         {
             return null;
         }
@@ -332,25 +332,24 @@ public sealed class PmTilesFileSource : IMapTileSource
             North: BinaryPrimitives.ReadInt32LittleEndian(h[114..]) / 1e7,
             FileLength: (ulong)file.Length);
 
-        var sectionsFit = Within(header.RootOffset, header.RootLength, 0, header.FileLength)
-            && Within(header.LeafOffset, header.LeafLength, 0, header.FileLength)
-            && Within(header.TileDataOffset, header.TileDataLength, 0, header.FileLength);
+        // Every read later stays inside one of these sections, so each must lie inside the file.
+        var sectionsFit = Within(header.RootOffset, header.RootLength, header.FileLength)
+            && Within(header.LeafOffset, header.LeafLength, header.FileLength)
+            && Within(header.TileDataOffset, header.TileDataLength, header.FileLength);
         var zoomsValid = header.MinZoom <= header.MaxZoom && header.MaxZoom <= MbTilesFileSource.MaxSupportedZoom;
         return sectionsFit && zoomsValid ? header : null;
     }
 
-    private static PmTilesEntry[]? ReadDirectory(FileStream file, Header header, ulong offset, ulong length) =>
-        ReadDirectory(file, header, offset, length, 0, header.FileLength);
-
-    private static PmTilesEntry[]? ReadDirectory(FileStream file, Header header, ulong offset, ulong length, ulong sectionStart, ulong sectionLength) =>
-        ReadBlob(file, header, sectionStart, sectionLength, offset - sectionStart, length, header.InternalCompression, MaxDirectoryBytes) is { } bytes
+    private static PmTilesEntry[]? ReadDirectory(FileStream file, Header header, ulong sectionStart, ulong sectionLength, ulong offset, ulong length) =>
+        ReadBlob(file, sectionStart, sectionLength, offset, length, header.InternalCompression, MaxDirectoryBytes) is { } bytes
             ? ParseDirectory(bytes)
             : null;
 
-    // Reads length bytes at offset within a section, then decompresses them up to the cap.
-    private static byte[]? ReadBlob(FileStream file, Header header, ulong sectionStart, ulong sectionLength, ulong offset, ulong length, byte compression, int cap)
+    // Reads length bytes at offset within a section the header has placed inside the file, then
+    // decompresses them up to the cap.
+    private static byte[]? ReadBlob(FileStream file, ulong sectionStart, ulong sectionLength, ulong offset, ulong length, byte compression, int cap)
     {
-        if (length > (ulong)cap || !Within(offset, length, 0, sectionLength) || !Within(sectionStart + offset, length, 0, header.FileLength))
+        if (length > (ulong)cap || !Within(offset, length, sectionLength))
         {
             return null;
         }
@@ -390,8 +389,8 @@ public sealed class PmTilesFileSource : IMapTileSource
         return output.ToArray();
     }
 
-    private static bool Within(ulong offset, ulong length, ulong start, ulong end) =>
-        offset >= start && length <= end - start && offset - start <= end - start - length;
+    // Whether [offset, offset + length) lies inside [0, end), written so no sum can overflow.
+    private static bool Within(ulong offset, ulong length, ulong end) => length <= end && offset <= end - length;
 
     private sealed record Header(
         ulong RootOffset,

@@ -32,4 +32,4 @@ The script:
 
 The style is the app's `VectorTileRenderer` style, rewritten for VexTile by `VexTileBench/make_style.py`; rerun the script after changing either. VexTile evaluates a 256 px tile's style two zoom levels low, and the generated style allows for that.
 
-To run the app itself on an archive, set `LAGEBUCH_POC_PMTILES=/path/to/ffb.pmtiles`. The KARTE tab then draws the archive instead of the raster packs, and shows the render time per tile in its top-left corner.
+The app draws a pack's `map.pmtiles` whenever the installed pack has one; there is nothing to switch on.

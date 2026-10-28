@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
@@ -15,10 +14,10 @@ namespace LageBuch.App.Shared.Controls;
 /// clips and places it like any raster tile.
 /// </summary>
 /// <remarks>
-/// POC for CodeForFire/lagebuch-geodata#5: a fixed style in code, labels without collision
-/// detection, and a label cut where the tile ends. Past the archive's deepest zoom it renders the
-/// matching part of the ancestor tile at the target zoom, so lines stay sharp and labels keep
-/// their size instead of being enlarged with the pixels.
+/// The style is fixed in code, for the schema RegionPackLibrary.VectorSchema names. Labels are
+/// placed per tile, without collision detection, so one can be cut where its tile ends. Past
+/// the archive's deepest zoom it renders the matching part of the ancestor tile at the target
+/// zoom, so lines stay sharp and labels keep their size instead of being enlarged with the pixels.
 /// </remarks>
 public static class VectorTileRenderer
 {
@@ -81,30 +80,29 @@ public static class VectorTileRenderer
     private static readonly IPen Track = new ImmutablePen(Solid(0x99, 0x66, 0x00), 1.2, new ImmutableDashStyle([3, 1.5], 0));
     private static readonly IPen Rail = new ImmutablePen(Solid(0x70, 0x70, 0x70), 2);
 
-    /// <summary>Milliseconds per rendered tile since the app started, for the POC's on-map readout.</summary>
-    public static RenderTimings Timings { get; } = new();
-
     /// <summary>
     /// Renders the part of <paramref name="layers"/> -- a tile at <c>zoom - levels</c> -- that
     /// the tile at <paramref name="zoom"/> with index offset (<paramref name="subX"/>,
     /// <paramref name="subY"/>) inside it covers. With <paramref name="levels"/> 0 that is the
     /// whole tile.
     /// </summary>
+    /// <remarks>
+    /// The bitmap starts transparent and the <c>earth</c> layer paints the land. A pack's tiles
+    /// are cut to its area, so outside it they show nothing, and a neighbouring pack drawn
+    /// underneath shows through.
+    /// </remarks>
     public static RenderTargetBitmap Render(IReadOnlyList<VectorLayer> layers, int zoom, int levels, int subX, int subY)
     {
         ArgumentNullException.ThrowIfNull(layers);
-        var started = Stopwatch.GetTimestamp();
         var bitmap = new RenderTargetBitmap(new PixelSize(Size, Size));
         using (var context = bitmap.CreateDrawingContext())
         {
-            context.FillRectangle(Earth, new Rect(0, 0, Size, Size));
             using (context.PushClip(new Rect(0, 0, Size, Size)))
             {
                 Draw(context, layers, zoom, levels, subX, subY);
             }
         }
 
-        Timings.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         return bitmap;
     }
 
@@ -114,6 +112,11 @@ public static class VectorTileRenderer
 
         // Line widths follow Carto's growth: about half again per zoom level.
         var widthScale = Math.Pow(1.6, zoom - 15);
+
+        if (Layer("earth") is { } earth)
+        {
+            context.DrawGeometry(Earth, null, Polygons(earth.Features.Where(f => f.Type == VectorGeometryType.Polygon), Projection(earth.Extent, levels, subX, subY)));
+        }
 
         if (Layer("landuse") is { } landuse)
         {
@@ -245,6 +248,11 @@ public static class VectorTileRenderer
             }
 
             var center = Centroid(feature.Parts[0], project);
+            if (!OnTile(center))
+            {
+                continue;
+            }
+
             var text = Label(number, 9, HouseNumberInk);
             context.DrawText(text, new Point(center.X - (text.Width / 2), center.Y - (text.Height / 2)));
         }
@@ -265,16 +273,23 @@ public static class VectorTileRenderer
                 "neighbourhood" or "macrohood" => 11.0,
                 _ => 0.0,
             };
-            if (size <= 0)
+
+            // The schema says from which zoom a place is worth a label: a hamlet is not at zoom 12.
+            var shownFrom = double.TryParse(feature.Get("min_zoom"), NumberStyles.Float, CultureInfo.InvariantCulture, out var minZoom) ? minZoom : 0;
+            var at = project(feature.Parts[0][0]);
+            if (size <= 0 || zoom < shownFrom || !OnTile(at))
             {
                 continue;
             }
 
             var text = Label(name, size, LabelInk);
-            var at = project(feature.Parts[0][0]);
             DrawHaloed(context, text, new Point(at.X - (text.Width / 2), at.Y - (text.Height / 2)), LabelInk);
         }
     }
+
+    // A tile also carries the features just past its edge, as a buffer for lines and areas. A
+    // label for a point there belongs to the neighbouring tile, or it would be drawn twice.
+    private static bool OnTile(Point at) => at.X is >= 0 and < Size && at.Y is >= 0 and < Size;
 
     private static void DrawHaloed(DrawingContext context, FormattedText text, Point origin, IBrush ink)
     {
@@ -354,6 +369,9 @@ public static class VectorTileRenderer
         g.EndFigure(closed);
     }
 
+    // The longest stretch of the road that lies on this tile. A segment that runs on past the tile
+    // counts with its visible part only, so a long straight road is labelled on every tile it
+    // crosses, and never with a name hanging off the edge.
     private static (Point A, Point B)? LongestSegment(VectorFeature feature, Func<(int X, int Y), Point> project)
     {
         (Point A, Point B)? best = null;
@@ -362,11 +380,13 @@ public static class VectorTileRenderer
         {
             for (var i = 1; i < line.Count; i++)
             {
-                var a = project(line[i - 1]);
-                var b = project(line[i]);
+                if (ClipToTile(project(line[i - 1]), project(line[i])) is not var (a, b))
+                {
+                    continue;
+                }
+
                 var length = Distance(a, b);
-                var inside = a.X is >= 0 and <= Size && a.Y is >= 0 and <= Size && b.X is >= 0 and <= Size && b.Y is >= 0 and <= Size;
-                if (inside && length > bestLength)
+                if (length > bestLength)
                 {
                     bestLength = length;
                     best = (a, b);
@@ -375,6 +395,39 @@ public static class VectorTileRenderer
         }
 
         return best;
+    }
+
+    // Liang-Barsky: the part of the segment from a to b inside the tile, or null if none is.
+    private static (Point A, Point B)? ClipToTile(Point a, Point b)
+    {
+        var dx = b.X - a.X;
+        var dy = b.Y - a.Y;
+        double enter = 0, leave = 1;
+        foreach (var (p, q) in new[] { (-dx, a.X), (dx, Size - a.X), (-dy, a.Y), (dy, Size - a.Y) })
+        {
+            if (Math.Abs(p) < 1e-12)
+            {
+                // Parallel to this edge: wholly outside it, or no limit from it.
+                if (q < 0)
+                {
+                    return null;
+                }
+
+                continue;
+            }
+
+            var t = q / p;
+            if (p < 0)
+            {
+                enter = Math.Max(enter, t);
+            }
+            else
+            {
+                leave = Math.Min(leave, t);
+            }
+        }
+
+        return enter < leave ? (new Point(a.X + (enter * dx), a.Y + (enter * dy)), new Point(a.X + (leave * dx), a.Y + (leave * dy))) : null;
     }
 
     private static Point Centroid(IReadOnlyList<(int X, int Y)> ring, Func<(int X, int Y), Point> project)

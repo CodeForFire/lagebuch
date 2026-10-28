@@ -55,6 +55,27 @@ public sealed class LagekarteRenderTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void A_pack_with_vector_tiles_is_drawn_from_them_with_its_Einsatzort_units_and_hydranten()
+    {
+        var (window, view, vm, session) = Show(vectorMap: true);
+        WaitForWaterPoints(vm);
+        session.SetIncidentLocation(Marktplatz);
+        session.PlaceForceUnit(session.Incident.Forces[0].Id, new GeoPoint(48.1792, 11.2541));
+        session.PlaceForceUnit(session.Incident.Forces[1].Id, new GeoPoint(48.1779, 11.2572));
+        vm.CenterOnEinsatzortCommand.Execute(null);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        var layer = Assert.Single(Assert.IsType<Persistence.Map.CombinedMapTileSource>(vm.Map.TileSource).Layers);
+        Assert.IsType<Persistence.Map.Vector.PmTilesFileSource>(layer.Tiles);
+        Assert.Null(layer.Boundary);
+        Assert.Equal(3, view.GetVisualDescendants().OfType<MapMarkerPanel>().Single().Children.Count);
+
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-vektor.png"));
+    }
+
+    [AvaloniaFact]
     public void Close_up_the_packs_hydranten_are_drawn_and_the_note_says_they_are_from_OSM()
     {
         var (window, view, vm, _) = Show();
@@ -210,10 +231,10 @@ public sealed class LagekarteRenderTests : IDisposable
         workspace.Dispose();
     }
 
-    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show()
+    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show(bool vectorMap = false)
     {
         var root = Path.Join(_dir, "regions");
-        FictionalRegionPack.Install(root);
+        FictionalRegionPack.Install(root, vectorMap);
         var session = NewSession();
         session.AddForceUnit("FF Musterstadt", 9, "Florian Musterstadt 40/1", "Im Einsatz");
         session.AddForceUnit("FF Musterstadt", 3, "Florian Musterstadt 11/1", "Im Einsatz");

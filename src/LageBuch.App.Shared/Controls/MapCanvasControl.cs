@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
@@ -152,18 +151,7 @@ public sealed class MapCanvasControl : Control
         {
             MapDrawing.DrawWaterPoints(context, water, center, Zoom, Bounds.Size, SelectedWaterPoint);
         }
-
-        // POC for CodeForFire/lagebuch-geodata#5: the vector render cost, readable on a tablet.
-        if (VectorTileRenderer.Timings.Summary() is { } timings)
-        {
-            var text = new FormattedText(timings, CultureInfo.GetCultureInfo("de-DE"), FlowDirection.LeftToRight, Typeface.Default, 12, Brushes.Black);
-            var box = new Rect(8, 8, text.Width + 12, text.Height + 6);
-            context.FillRectangle(TimingsBackground, box);
-            context.DrawText(text, new Point(box.X + 6, box.Y + 3));
-        }
     }
-
-    private static readonly IBrush TimingsBackground = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF));
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
