@@ -98,7 +98,9 @@
     -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Lagebuch jetzt starten" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
-    <Property Id="WixShellExecTarget" Value="[INSTALLFOLDER]LageBuch.App.exe" />
+    <!-- Set in the UI sequence, where the finish dialog runs it, once INSTALLFOLDER is resolved;
+         a <Property> value cannot reference another property (WIX1077). -->
+    <SetProperty Id="WixShellExecTarget" Value="[INSTALLFOLDER]LageBuch.App.exe" After="CostFinalize" Sequence="ui" />
     <CustomAction Id="LaunchLagebuch" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" />
 
     <UI Id="LagebuchUI">
