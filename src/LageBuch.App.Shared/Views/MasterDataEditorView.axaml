@@ -477,7 +477,7 @@
 
               <!-- Checkliste template editor (Aufbau/Abbau): text + mandatory, reorderable -->
               <DataTemplate x:DataType="vm:ChecklistTemplateSection">
-                <DockPanel Classes="add-below">
+                <DockPanel Classes="add-below" Grid.IsSharedSizeScope="True">
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
 
@@ -496,7 +496,14 @@
                   </Grid>
 
                   <!-- Column headers (#137): each row is unlabeled otherwise. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistMandatory" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistMoveUp" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistMoveDown" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistRemove" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="TEXT" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="PFLICHT" Classes="overline" FontSize="10" />
                   </Grid>
@@ -504,7 +511,14 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ChecklistTemplateRow">
-                          <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
+                          <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistMandatory" />
+                              <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistMoveUp" />
+                              <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistMoveDown" />
+                              <ColumnDefinition Width="Auto" SharedSizeGroup="ChecklistRemove" />
+                            </Grid.ColumnDefinitions>
                             <TextBox Grid.Column="0" Text="{Binding Text}" Margin="0,0,6,0" />
                             <CheckBox Grid.Column="1" Content="Pflicht" IsChecked="{Binding IsMandatory}"
                                       VerticalAlignment="Center" Margin="0,0,6,0" />
