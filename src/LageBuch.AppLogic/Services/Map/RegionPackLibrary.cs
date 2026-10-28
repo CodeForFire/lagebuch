@@ -45,15 +45,11 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     // The data files pack.json lists with size and SHA-256. elevation.tif is the Wasserförderung's
     // terrain model (#587); it is installed and checked, not yet read.
     private static readonly string[] DataFiles =
-        [InstalledRegionPack.TilesFileName, "elevation.tif", InstalledRegionPack.WaterFileName, InstalledRegionPack.AddressesFileName];
+        [InstalledRegionPack.TilesFileName, "elevation.tif", InstalledRegionPack.WaterFileName, InstalledRegionPack.AddressesFileName, InstalledRegionPack.BoundaryFileName];
 
     // Everything a zip holds, at its root: FORMAT.md says exactly these, and a zip with any other
     // entry is refused. Each is written under this fixed name, so no entry name reaches a path.
     private static readonly string[] PackFiles = [ManifestFileName, "ATTRIBUTION.md", .. DataFiles];
-
-    // A zip may also carry its area. Then pack.json declares it like a data file, and the
-    // catalogue's boundaryUrl is not fetched.
-    private static readonly string[] OptionalFiles = [InstalledRegionPack.BoundaryFileName];
 
     private readonly HttpClient _http;
     private readonly string _root;
@@ -151,7 +147,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
             }
 
             Unpack(zipPath, staging, pack);
-            await FetchBoundaryAsync(pack, Path.Join(staging, InstalledRegionPack.BoundaryFileName), cancellationToken);
+            CheckBoundary(Path.Join(staging, InstalledRegionPack.BoundaryFileName));
 
             new JsonFileStore<RegionPackInfo>(Path.Join(staging, InfoFileName)).Write(pack);
 
@@ -322,16 +318,15 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         {
             using var zip = ZipFile.OpenRead(zipPath);
             var names = zip.Entries.Select(e => e.FullName).ToList();
-            var optional = OptionalFiles.Where(names.Contains).ToList();
-            if (names.Count != PackFiles.Length + optional.Count
-                || !names.Order(StringComparer.Ordinal).SequenceEqual(PackFiles.Concat(optional).Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            if (names.Count != PackFiles.Length
+                || !names.Order(StringComparer.Ordinal).SequenceEqual(PackFiles.Order(StringComparer.Ordinal), StringComparer.Ordinal))
             {
                 throw new RegionPackException("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.");
             }
 
             var manifestPath = Path.Join(staging, ManifestFileName);
             Extract(zip, ManifestFileName, manifestPath, MaxManifestBytes, ref total);
-            var declared = ReadManifest(manifestPath, pack, [.. DataFiles, .. optional]);
+            var declared = ReadManifest(manifestPath, pack, DataFiles);
             Extract(zip, "ATTRIBUTION.md", Path.Join(staging, "ATTRIBUTION.md"), MaxManifestBytes, ref total);
             foreach (var (name, (bytes, sha256)) in declared)
             {
@@ -430,27 +425,10 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
 
     private static RegionPackException Damaged() => new("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).");
 
-    // The pack's area, when the zip did not bring it: from the catalogue's boundaryUrl, over https
-    // and capped like the catalogue. Either way it has to be an area, or the pack is not installed.
-    private async Task FetchBoundaryAsync(RegionPackInfo pack, string path, CancellationToken cancellationToken)
+    // The pack's area, as its zip carried it: it has to be an area, or the pack is not installed.
+    private static void CheckBoundary(string path)
     {
-        if (!File.Exists(path))
-        {
-            if (pack.BoundaryUrl is null)
-            {
-                return;
-            }
-
-            if (!Uri.TryCreate(pack.BoundaryUrl, UriKind.Absolute, out var url) || url.Scheme != Uri.UriSchemeHttps)
-            {
-                throw new RegionPackException("Die Gebietsgrenze des Kartenpakets hat keine gültige https-Adresse.");
-            }
-
-            await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            await DownloadAsync(url, file, BoundaryGeoJson.MaxFileBytes, null, null, "Die Gebietsgrenze des Kartenpakets", cancellationToken);
-        }
-
-        if (new FileInfo(path).Length > BoundaryGeoJson.MaxFileBytes || BoundaryGeoJson.Parse(await File.ReadAllBytesAsync(path, cancellationToken)) is null)
+        if (new FileInfo(path).Length > BoundaryGeoJson.MaxFileBytes || BoundaryGeoJson.Parse(File.ReadAllBytes(path)) is null)
         {
             throw new RegionPackException("Die Gebietsgrenze des Kartenpakets ist beschädigt.");
         }

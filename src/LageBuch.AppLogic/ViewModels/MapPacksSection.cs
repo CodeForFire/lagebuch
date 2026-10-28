@@ -223,20 +223,15 @@ public sealed class AvailableMapPackRow(RegionPackInfo info, RegionPackInfo? ins
 
     public string Detail => MapPacksSection.Detail(Info);
 
-    /// <summary>
-    /// The device holds exactly this edition; there is nothing to download. A pack installed before
-    /// the catalogue named its area is not, so AKTUALISIEREN fetches the area too.
-    /// </summary>
+    /// <summary>The device holds exactly this edition; there is nothing to download.</summary>
     public bool IsCurrent => installed is not null
         && installed.Version == Info.Version
-        && string.Equals(installed.Sha256, Info.Sha256, StringComparison.Ordinal)
-        && string.Equals(installed.BoundaryUrl, Info.BoundaryUrl, StringComparison.Ordinal);
+        && string.Equals(installed.Sha256, Info.Sha256, StringComparison.Ordinal);
 
     public string ActionLabel => installed is null ? "HERUNTERLADEN" : IsCurrent ? "INSTALLIERT" : "AKTUALISIEREN";
 
     /// <summary>Why AKTUALISIEREN is offered, so an update with the same version number is not a riddle; null otherwise.</summary>
     public string? UpdateReason => installed is null || IsCurrent ? null
         : installed.Version != Info.Version ? $"Neue Version {Formatting.Number(Info.Version)} – installiert ist Version {Formatting.Number(installed.Version)}."
-        : !string.Equals(installed.Sha256, Info.Sha256, StringComparison.Ordinal) ? $"Neu gebaut am {MapPacksSection.BuiltDay(Info)} – installiert ist der Stand vom {MapPacksSection.BuiltDay(installed)}."
-        : "Lädt die Gebietsgrenze nach, damit angrenzende Karten nahtlos aneinander passen.";
+        : $"Neu gebaut am {MapPacksSection.BuiltDay(Info)} – installiert ist der Stand vom {MapPacksSection.BuiltDay(installed)}.";
 }

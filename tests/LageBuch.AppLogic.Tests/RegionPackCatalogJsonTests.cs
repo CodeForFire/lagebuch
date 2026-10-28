@@ -39,15 +39,7 @@ public class RegionPackCatalogJsonTests
         Assert.Equal(11, pack.MinZoom);
         Assert.Equal(17, pack.MaxZoom);
         Assert.Equal("2026-10-27T20:15:49Z", pack.BuiltAt);
-        Assert.Equal("https://raw.githubusercontent.com/CodeForFire/lagebuch-geodata/main/boundaries/ffb.geojson", pack.BoundaryUrl);
-    }
-
-    [Fact]
-    public void An_entry_without_a_boundary_address_is_kept_without_one()
-    {
-        var entry = Ffb.Replace("\"boundaryUrl\": \"https://raw.githubusercontent.com/CodeForFire/lagebuch-geodata/main/boundaries/ffb.geojson\",", string.Empty, StringComparison.Ordinal);
-
-        Assert.Null(Assert.Single(Catalogue($"[{entry}]")).BoundaryUrl);
+        Assert.Equal("Karte, Wasserentnahmestellen, Adressen: © OpenStreetMap-Mitwirkende (ODbL).", pack.Attribution);
     }
 
     [Theory]

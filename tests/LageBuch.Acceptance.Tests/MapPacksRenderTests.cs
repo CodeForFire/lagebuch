@@ -65,10 +65,9 @@ public sealed class MapPacksRenderTests : IDisposable
         FictionalRegionPack.Install(root);
         using var handler = new CatalogueHandler($$"""
             {"formatVersion": 2, "packs": [{"slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1,
-              "downloadUrl": "https://example.org/ffb-v1.zip", "sizeBytes": 264978779, "sha256": "{{new string('a', 64)}}",
+              "downloadUrl": "https://example.org/ffb-v1.zip", "sizeBytes": 264978779, "sha256": "{{new string('b', 64)}}",
               "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 11, "maxZoom": 17,
-              "builtAt": "2026-10-27T20:15:49Z", "attribution": "{{FictionalRegionPack.Attribution}}",
-              "boundaryUrl": "https://example.org/boundaries/ffb.geojson"}]}
+              "builtAt": "2026-11-03T20:15:49Z", "attribution": "{{FictionalRegionPack.Attribution}}"}]}
             """);
         using var http = new HttpClient(handler);
         var vm = new MasterDataEditorViewModel(new EmptyProvider(), new FakeDialogs(), new NoFiles(), new RegionPackLibrary(http, root));
@@ -83,6 +82,7 @@ public sealed class MapPacksRenderTests : IDisposable
 
         var row = Assert.Single(section.Available);
         Assert.Equal("AKTUALISIEREN", row.ActionLabel);
+        Assert.Equal("Neu gebaut am 03.11.2026 – installiert ist der Stand vom 27.10.2026.", row.UpdateReason);
         var reason = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == row.UpdateReason);
         Assert.True(reason.IsVisible);
 

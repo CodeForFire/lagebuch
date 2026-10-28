@@ -11,7 +11,7 @@ public sealed record InstalledRegionPack(RegionPackInfo Info, string FolderPath)
 
     public const string AddressesFileName = "addresses.sqlite";
 
-    /// <summary>The pack's area, from the zip or its <c>boundaryUrl</c>; a pack may lack it.</summary>
+    /// <summary>The pack's area, as its zip carries it.</summary>
     public const string BoundaryFileName = "boundary.geojson";
 
     public string TilesPath => Path.Join(FolderPath, TilesFileName);

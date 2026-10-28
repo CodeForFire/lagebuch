@@ -291,16 +291,6 @@ public class MapPacksSectionTests
     }
 
     [Fact]
-    public void A_pack_installed_before_the_catalogue_named_its_area_is_offered_as_an_update()
-    {
-        var row = new AvailableMapPackRow(Ffb with { BoundaryUrl = "https://example.org/boundaries/ffb.geojson" }, Ffb);
-
-        Assert.False(row.IsCurrent);
-        Assert.Equal("AKTUALISIEREN", row.ActionLabel);
-        Assert.Equal("Lädt die Gebietsgrenze nach, damit angrenzende Karten nahtlos aneinander passen.", row.UpdateReason);
-    }
-
-    [Fact]
     public void An_update_names_the_new_version_or_the_new_build_day()
     {
         Assert.Equal(

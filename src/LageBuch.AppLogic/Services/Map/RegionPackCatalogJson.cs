@@ -94,9 +94,7 @@ public static partial class RegionPackCatalogJson
             return false;
         }
 
-        // Optional: without an area the pack is drawn whole, as it was before areas were published.
-        var boundaryUrl = TryGetText(entry, "boundaryUrl", out var b) ? b : null;
-        pack = new RegionPackInfo(name, slug, version, downloadUrl, sizeBytes, sha256, west, south, east, north, minZoom, maxZoom, builtAt, attribution, boundaryUrl);
+        pack = new RegionPackInfo(name, slug, version, downloadUrl, sizeBytes, sha256, west, south, east, north, minZoom, maxZoom, builtAt, attribution);
         return true;
     }
 

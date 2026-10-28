@@ -15,8 +15,7 @@ namespace LageBuch.AppLogic.Services.Map;
 /// refused, and one whose SHA-256 is not <see cref="Sha256"/> (lower-case hex) is never unpacked.
 /// <see cref="Version"/> rises with every rebuild. <see cref="BuiltAt"/> is the build time as the
 /// catalogue writes it; <see cref="Attribution"/> is the licence line every map drawn from the
-/// pack has to show. <see cref="BoundaryUrl"/> is where the pack's area is published, fetched at
-/// install when the zip does not carry it; null when the catalogue names none.
+/// pack has to show.
 /// </remarks>
 [SuppressMessage("Design", "CA1054", Justification = "Catalogue data, kept as the string it arrived as; RegionPackLibrary parses and checks it before any request.")]
 [SuppressMessage("Design", "CA1056", Justification = "Catalogue data, kept as the string it arrived as; RegionPackLibrary parses and checks it before any request.")]
@@ -34,8 +33,7 @@ public sealed record RegionPackInfo(
     int MinZoom,
     int MaxZoom,
     string BuiltAt,
-    string Attribution,
-    string? BoundaryUrl = null)
+    string Attribution)
 {
     /// <summary>Whether <paramref name="point"/> lies inside the pack's bounding box, edges included.</summary>
     public bool Covers(GeoPoint point)

@@ -5,7 +5,7 @@ namespace LageBuch.AppLogic.Services.Map;
 
 /// <summary>
 /// Reads a Kartenpaket's area, <c>boundary.geojson</c>: the Landkreis plus its buffer, as one
-/// Polygon or MultiPolygon in WGS84 (FORMAT.md, <c>boundaryUrl</c>). A pack's tiles are complete
+/// Polygon or MultiPolygon in WGS84 (FORMAT.md). A pack's tiles are complete
 /// inside it and empty land outside, so the map draws each pack only within its own area.
 /// </summary>
 public static class BoundaryGeoJson

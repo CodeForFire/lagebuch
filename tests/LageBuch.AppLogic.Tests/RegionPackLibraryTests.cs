@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using LageBuch.AppLogic.Services.Map;
 
 namespace LageBuch.AppLogic.Tests;
@@ -39,7 +40,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         Assert.Equal("water", await File.ReadAllTextAsync(installed.WaterPath));
         Assert.Equal("addresses", await File.ReadAllTextAsync(installed.AddressesPath));
         Assert.Equal(
-            ["ATTRIBUTION.md", "addresses.sqlite", "elevation.tif", "installed.json", "map.mbtiles", "pack.json", "water.geojson"],
+            ["ATTRIBUTION.md", "addresses.sqlite", "boundary.geojson", "elevation.tif", "installed.json", "map.mbtiles", "pack.json", "water.geojson"],
             Directory.GetFiles(installed.FolderPath).Select(Path.GetFileName).Order(StringComparer.Ordinal));
         var listed = Assert.Single(library.GetInstalled());
         Assert.Equal(Pack(zip), listed.Info);
@@ -223,6 +224,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     [InlineData("map.mbtiles")]
     [InlineData("pack.json")]
     [InlineData("ATTRIBUTION.md")]
+    [InlineData("boundary.geojson")]
     public async Task A_zip_missing_one_of_its_files_is_refused_and_installs_nothing(string missing)
     {
         var zip = Zip([.. Files().Where(f => f.Name != missing)]);
@@ -460,29 +462,12 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Fact]
-    public async Task A_packs_area_is_fetched_from_its_boundary_address_and_kept_with_it()
+    public async Task A_packs_area_comes_from_its_zip_and_nothing_more_is_fetched()
     {
         var zip = PackZip();
-        var requested = new List<string>();
-        _handler.Respond(r =>
-        {
-            requested.Add(r.RequestUri!.AbsoluteUri);
-            return Ok(r.RequestUri.AbsolutePath.EndsWith(".geojson", StringComparison.Ordinal) ? Encoding.UTF8.GetBytes(Area) : zip);
-        });
+        _handler.Respond(_ => Ok(zip));
 
-        var installed = await Library().InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/boundaries/ffb.geojson" });
-
-        Assert.Equal(["https://example.org/ffb-v1.zip", "https://example.org/boundaries/ffb.geojson"], requested);
-        Assert.Equal(Area, await File.ReadAllTextAsync(installed.BoundaryPath));
-    }
-
-    [Fact]
-    public async Task An_area_inside_the_zip_is_checked_like_a_data_file_and_nothing_more_is_fetched()
-    {
-        var zip = Zip([.. Files("tiles", boundary: Area)]);
-        _handler.Respond(r => r.RequestUri!.AbsolutePath.EndsWith(".zip", StringComparison.Ordinal) ? Ok(zip) : throw new InvalidOperationException("Fetched the area anyway."));
-
-        var installed = await Library().InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/boundaries/ffb.geojson" });
+        var installed = await Library().InstallAsync(Pack(zip));
 
         Assert.Equal(Area, await File.ReadAllTextAsync(installed.BoundaryPath));
         Assert.Equal(1, _handler.Requests);
@@ -491,7 +476,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task An_area_inside_the_zip_that_pack_json_does_not_declare_refuses_the_pack()
     {
-        var zip = Zip([.. Files("tiles"), ("boundary.geojson", Area)]);
+        var zip = Zip([.. Files("tiles", manifest => Regex.Replace(manifest, @", ""boundary\.geojson"": \{[^}]*\}", string.Empty))]);
         _handler.Respond(_ => Ok(zip));
 
         var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip)));
@@ -500,47 +485,18 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Theory]
-    [InlineData("http://example.org/ffb.geojson", "Die Gebietsgrenze des Kartenpakets hat keine gültige https-Adresse.")]
-    [InlineData("file:///etc/passwd", "Die Gebietsgrenze des Kartenpakets hat keine gültige https-Adresse.")]
-    public async Task An_area_address_that_is_not_https_is_never_requested_and_installs_nothing(string address, string message)
-    {
-        var zip = PackZip();
-        _handler.Respond(_ => Ok(zip));
-        var library = Library();
-
-        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip) with { BoundaryUrl = address }));
-
-        Assert.Equal(message, e.Message);
-        Assert.Equal(1, _handler.Requests);
-        Assert.Empty(library.GetInstalled());
-    }
-
-    [Theory]
     [InlineData("<html>")]
     [InlineData("""{"type": "Point", "coordinates": [11, 48]}""")]
     public async Task An_area_that_is_no_polygon_installs_nothing(string body)
     {
-        var zip = PackZip();
-        _handler.Respond(r => Ok(r.RequestUri!.AbsolutePath.EndsWith(".geojson", StringComparison.Ordinal) ? Encoding.UTF8.GetBytes(body) : zip));
+        var zip = Zip([.. Files(boundary: body)]);
+        _handler.Respond(_ => Ok(zip));
         var library = Library();
 
-        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/ffb.geojson" }));
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
 
         Assert.Equal("Die Gebietsgrenze des Kartenpakets ist beschädigt.", e.Message);
         Assert.Empty(library.GetInstalled());
-    }
-
-    [Fact]
-    public async Task An_area_larger_than_its_cap_is_cut_off()
-    {
-        var zip = PackZip();
-        _handler.Respond(r => r.RequestUri!.AbsolutePath.EndsWith(".geojson", StringComparison.Ordinal)
-            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new DeclaredLengthContent(new byte[BoundaryGeoJson.MaxFileBytes + 1], declaredLength: null) }
-            : Ok(zip));
-
-        var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip) with { BoundaryUrl = "https://example.org/ffb.geojson" }));
-
-        Assert.Equal("Die Gebietsgrenze des Kartenpakets ist größer als angekündigt. Download abgebrochen.", e.Message);
     }
 
     [Fact]
@@ -677,11 +633,11 @@ public sealed class RegionPackLibraryTests : IDisposable
 
     private static byte[] PackZip(string tiles = "tiles") => Zip([.. Files(tiles)]);
 
-    // The files of a well-formed pack, its pack.json declaring each data file truly, the area too when given.
+    // The files of a well-formed pack, its pack.json declaring each data file truly.
     // shapeManifest bends that pack.json into one that lies.
-    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null, string? boundary = null)
+    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null, string boundary = Area)
     {
-        (string Name, string Content)[] data = [("map.mbtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses"), .. boundary is null ? Array.Empty<(string, string)>() : [("boundary.geojson", boundary)]];
+        (string Name, string Content)[] data = [("map.mbtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses"), ("boundary.geojson", boundary)];
         var files = string.Join(", ", data.Select(d => $$"""
             "{{d.Name}}": {"bytes": {{Encoding.UTF8.GetByteCount(d.Content)}}, "sha256": "{{Sha(d.Content)}}"}
             """));
