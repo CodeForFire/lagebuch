@@ -264,8 +264,10 @@ fi
 # a virtual one provided by libssl3t64 on trixie and noble, hence the alternation.
 #
 # The ICU alternation is newest-first because apt takes the first alternative it can resolve:
-# 76 trixie, 74 noble, 72 bookworm, 70 jammy — all four verified against the real archives. A
-# future release adds a new head entry; nothing else changes.
+# 78 forky and current Ubuntu, 76 trixie, 74 noble, 72 bookworm, 70 jammy — all verified against
+# the real archives; no distro ever packaged 77. A machine with only 78 could not install v0.9.1
+# (#801). The "Check .deb installs on current distros" step in release.yml now fails the tag
+# when debian:testing or ubuntu:devel moves to an ICU missing here: add it as the new head entry.
 #
 # Recommends, not Depends, for the rest — apt installs recommends by default, so they still arrive
 # on a normal `apt install ./lagebuch.deb`, but none of them can keep the app from starting:
@@ -300,7 +302,7 @@ Priority: optional
 Architecture: amd64
 Depends: libc6 (>= 2.34), libstdc++6 (>= 6), libgcc-s1, zlib1g,
  libfontconfig1,
- libicu76 | libicu74 | libicu72 | libicu70,
+ libicu78 | libicu76 | libicu74 | libicu72 | libicu70,
  libssl3 | libssl3t64,
  libx11-6, libxext6, libxi6, libice6, libsm6,
  hicolor-icon-theme, shared-mime-info, desktop-file-utils,
