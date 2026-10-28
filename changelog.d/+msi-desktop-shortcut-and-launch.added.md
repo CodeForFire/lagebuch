@@ -1,0 +1,1 @@
+The Windows installer adds a desktop shortcut, offers to start Lagebuch when it finishes so it can be pinned to the taskbar, and gives Lagebuch one AppUserModelID so a pin and the Start menu entry stay one app.
