@@ -187,6 +187,23 @@ jobs:
             src/LageBuch.App/Assets/icon.svg \
             src/LageBuch.App/Assets/document-1024.png \
             dist
+      # The Depends line names exact ICU sonames, so a distro that moves to a newer ICU cannot
+      # install the package at all (#801). A simulated install resolves every Depends against that
+      # release's archive without installing anything. testing and devel are the early warning:
+      # when one fails here, add the new libicuNN head entry in build-deb.sh.
+      - name: Check .deb installs on current distros
+        run: |
+          failed=0
+          for image in debian:stable debian:testing ubuntu:latest ubuntu:devel; do
+            echo "::group::${image}"
+            if ! docker run --rm -v "$PWD/dist:/dist:ro" "$image" sh -c \
+                'apt-get update -qq && apt-get install -s -y /dist/lagebuch_*.deb'; then
+              echo "::error::lagebuch .deb is not installable on ${image}"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$failed"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deb
