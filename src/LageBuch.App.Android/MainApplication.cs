@@ -32,7 +32,7 @@ public class MainApplication : AvaloniaAndroidApplication<SharedApp>
         // exception that escapes on a Java-driven thread through AndroidEnvironment, the rest
         // through the AppDomain; both leave the same report, announced on the next start.
         var crashRoot = FilesDir!.AbsolutePath;
-        var version = typeof(MainApplication).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+        var version = LageBuch.AppLogic.Services.AppVersionText.Of(typeof(MainApplication).Assembly);
         AndroidEnvironment.UnhandledExceptionRaiser += (_, e) =>
             _ = LageBuch.AppLogic.Services.CrashReports.TryWrite(crashRoot, e.Exception, version, TimeProvider.System.GetUtcNow());
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
