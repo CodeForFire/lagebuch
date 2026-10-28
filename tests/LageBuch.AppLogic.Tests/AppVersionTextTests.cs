@@ -40,9 +40,14 @@ public class AppVersionTextTests
     [Fact]
     public void Of_reads_the_informational_version_of_an_assembly()
     {
-        var text = AppVersionText.Of(typeof(AppVersionText).Assembly);
+        var assembly = typeof(AppVersionText).Assembly;
+        var version = assembly.GetName().Version;
+        Assert.NotNull(version);
 
+        var text = AppVersionText.Of(assembly);
+
+        Assert.NotNull(text);
+        Assert.StartsWith(version.ToString(3), text, StringComparison.Ordinal);
         Assert.DoesNotContain("+", text, StringComparison.Ordinal);
-        Assert.NotEqual("0.0.0", text);
     }
 }
