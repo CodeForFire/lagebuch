@@ -14,14 +14,20 @@ namespace LageBuch.App.Shared.Controls;
 /// clips and places it like any raster tile.
 /// </summary>
 /// <remarks>
-/// The style is fixed in code, for the schema RegionPackLibrary.VectorSchema names. Labels are
-/// placed per tile, without collision detection, so one can be cut where its tile ends. Past
-/// the archive's deepest zoom it renders the matching part of the ancestor tile at the target
-/// zoom, so lines stay sharp and labels keep their size instead of being enlarged with the pixels.
+/// The style is fixed in code, for the schema RegionPackLibrary.VectorSchema names. Names are not
+/// in the bitmap: <see cref="Labels"/> hands them to the map, which places those of every tile in
+/// one pass. Past the archive's deepest zoom it renders the matching part of the ancestor tile at
+/// the target zoom, so lines stay sharp and labels keep their size instead of being enlarged.
 /// </remarks>
 public static class VectorTileRenderer
 {
     private const int Size = WebMercator.TileSizePixels;
+
+    // Placed in this order; a later label that would overlap an earlier one is left out.
+    private const int TownPriority = 0;
+    private const int DistrictPriority = 1;
+    private const int StreetPriority = 2;
+    private const int HouseNumberPriority = 3;
 
     private static readonly CultureInfo LabelCulture = CultureInfo.GetCultureInfo("de-DE");
 
@@ -158,21 +164,35 @@ public static class VectorTileRenderer
         {
             context.DrawGeometry(null, Boundary, Lines(boundaries.Features, Projection(boundaries.Extent, levels, subX, subY)));
         }
+    }
 
-        if (roads is not null && zoom >= 15)
-        {
-            DrawRoadNames(context, roads, zoom, Projection(roads.Extent, levels, subX, subY));
-        }
+    /// <summary>
+    /// The names on the tile <see cref="Render"/> draws with the same arguments, in its pixels:
+    /// places, street names from zoom 15 and house numbers from zoom 17. A label may reach past
+    /// the tile's edge; the map draws it whole.
+    /// </summary>
+    public static IReadOnlyList<MapLabel> Labels(IReadOnlyList<VectorLayer> layers, int zoom, int levels, int subX, int subY)
+    {
+        ArgumentNullException.ThrowIfNull(layers);
+        VectorLayer? Layer(string name) => layers.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
 
-        if (buildings is not null && zoom >= 17)
-        {
-            DrawHouseNumbers(context, buildings, Projection(buildings.Extent, levels, subX, subY));
-        }
-
+        var labels = new List<MapLabel>();
         if (Layer("places") is { } places)
         {
-            DrawPlaces(context, places, zoom, Projection(places.Extent, levels, subX, subY));
+            PlaceNames(labels, places, zoom, Projection(places.Extent, levels, subX, subY));
         }
+
+        if (Layer("roads") is { } roads && zoom >= 15)
+        {
+            RoadNames(labels, roads, zoom, Projection(roads.Extent, levels, subX, subY));
+        }
+
+        if (Layer("buildings") is { } buildings && zoom >= 17)
+        {
+            HouseNumbers(labels, buildings, Projection(buildings.Extent, levels, subX, subY));
+        }
+
+        return labels;
     }
 
     private static void DrawRoads(DrawingContext context, VectorLayer roads, int zoom, double widthScale, Func<(int X, int Y), Point> project)
@@ -208,7 +228,7 @@ public static class VectorTileRenderer
     }
 
     // A road's name on its longest segment, turned so it never reads upside down.
-    private static void DrawRoadNames(DrawingContext context, VectorLayer roads, int zoom, Func<(int X, int Y), Point> project)
+    private static void RoadNames(List<MapLabel> labels, VectorLayer roads, int zoom, Func<(int X, int Y), Point> project)
     {
         var fontSize = zoom >= 17 ? 12.0 : 10.0;
         foreach (var feature in roads.Features)
@@ -229,16 +249,12 @@ public static class VectorTileRenderer
                 angle += Math.PI;
             }
 
-            var text = Label(name, fontSize, LabelInk);
             var middle = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
-            using (context.PushTransform(Matrix.CreateTranslation(-text.Width / 2, -text.Height / 2) * Matrix.CreateRotation(angle) * Matrix.CreateTranslation(middle.X, middle.Y)))
-            {
-                DrawHaloed(context, text, default, LabelInk);
-            }
+            labels.Add(Label(name, fontSize, LabelInk, Halo, StreetPriority, angle, middle));
         }
     }
 
-    private static void DrawHouseNumbers(DrawingContext context, VectorLayer buildings, Func<(int X, int Y), Point> project)
+    private static void HouseNumbers(List<MapLabel> labels, VectorLayer buildings, Func<(int X, int Y), Point> project)
     {
         foreach (var feature in buildings.Features)
         {
@@ -253,12 +269,11 @@ public static class VectorTileRenderer
                 continue;
             }
 
-            var text = Label(number, 9, HouseNumberInk);
-            context.DrawText(text, new Point(center.X - (text.Width / 2), center.Y - (text.Height / 2)));
+            labels.Add(Label(number, 9, HouseNumberInk, null, HouseNumberPriority, 0, center));
         }
     }
 
-    private static void DrawPlaces(DrawingContext context, VectorLayer places, int zoom, Func<(int X, int Y), Point> project)
+    private static void PlaceNames(List<MapLabel> labels, VectorLayer places, int zoom, Func<(int X, int Y), Point> project)
     {
         foreach (var feature in places.Features)
         {
@@ -267,11 +282,11 @@ public static class VectorTileRenderer
                 continue;
             }
 
-            var size = feature.Get("kind") switch
+            var (size, priority) = feature.Get("kind") switch
             {
-                "locality" => zoom >= 14 ? 16.0 : 13.0,
-                "neighbourhood" or "macrohood" => 11.0,
-                _ => 0.0,
+                "locality" => (zoom >= 14 ? 16.0 : 13.0, TownPriority),
+                "neighbourhood" or "macrohood" => (11.0, DistrictPriority),
+                _ => (0.0, 0),
             };
 
             // The schema says from which zoom a place is worth a label: a hamlet is not at zoom 12.
@@ -282,8 +297,7 @@ public static class VectorTileRenderer
                 continue;
             }
 
-            var text = Label(name, size, LabelInk);
-            DrawHaloed(context, text, new Point(at.X - (text.Width / 2), at.Y - (text.Height / 2)), LabelInk);
+            labels.Add(Label(name, size, LabelInk, Halo, priority, 0, at));
         }
     }
 
@@ -291,17 +305,14 @@ public static class VectorTileRenderer
     // label for a point there belongs to the neighbouring tile, or it would be drawn twice.
     private static bool OnTile(Point at) => at.X is >= 0 and < Size && at.Y is >= 0 and < Size;
 
-    private static void DrawHaloed(DrawingContext context, FormattedText text, Point origin, IBrush ink)
+    // The text centred on `at`, turned by `angle` around it.
+    private static MapLabel Label(string text, double size, IImmutableBrush ink, IPen? halo, int priority, double angle, Point at)
     {
-        if (text.BuildGeometry(origin) is { } outline)
-        {
-            context.DrawGeometry(null, Halo, outline);
-            context.DrawGeometry(ink, null, outline);
-        }
+        var formatted = new FormattedText(text, LabelCulture, FlowDirection.LeftToRight, Typeface.Default, size, ink);
+        var placement = Matrix.CreateTranslation(-formatted.Width / 2, -formatted.Height / 2) * Matrix.CreateRotation(angle) * Matrix.CreateTranslation(at.X, at.Y);
+        var outline = formatted.BuildGeometry(default) ?? new StreamGeometry();
+        return new MapLabel(text, outline, placement, new Rect(0, 0, formatted.Width, formatted.Height).TransformToAABB(placement), priority, ink, halo);
     }
-
-    private static FormattedText Label(string text, double size, IImmutableBrush ink) =>
-        new(text, LabelCulture, FlowDirection.LeftToRight, Typeface.Default, size, ink);
 
     // Tile coordinates of the source tile to pixels of the target tile.
     private static Func<(int X, int Y), Point> Projection(int extent, int levels, int subX, int subY)

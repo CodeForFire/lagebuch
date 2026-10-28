@@ -1,11 +1,13 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using LageBuch.App.Shared.Controls;
 using LageBuch.Persistence.Map.Vector;
+using LageBuch.Persistence.Tests;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -52,6 +54,54 @@ public class VectorTileRendererTests
 
         Assert.Equal(WaterBlue, PixelAt(west, 250, 250));
         Assert.Equal(Land, PixelAt(east, 5, 5));
+    }
+
+    [AvaloniaFact]
+    public void A_place_by_the_tile_s_edge_hands_its_whole_name_to_the_map_instead_of_drawing_it_cut()
+    {
+        // Fürstenfeldbruck, a few pixels in from the tile's right edge.
+        var tile = MvtTile.Decode([.. Layer("earth", "earth", WholeTile), .. Place("Fürstenfeldbruck", "locality", (4000, 2048))]);
+
+        using var bitmap = VectorTileRenderer.Render(tile, zoom: 12, levels: 0, subX: 0, subY: 0);
+        var label = Assert.Single(VectorTileRenderer.Labels(tile, zoom: 12, levels: 0, subX: 0, subY: 0));
+
+        Assert.Equal("Fürstenfeldbruck", label.Text);
+        Assert.True(label.Bounds.Right > 256, $"The label ends at {label.Bounds.Right}, on the tile.");
+        Assert.Equal(new Point(250, 128), label.Bounds.Center, new PointNear());
+
+        // The bitmap carries no glyphs: the left end of the name would be drawn here.
+        Assert.Equal(Land, PixelAt(bitmap, 230, 128));
+    }
+
+    [AvaloniaFact]
+    public void A_place_in_the_tile_s_buffer_is_left_to_the_tile_it_lies_on()
+    {
+        var tile = MvtTile.Decode(Place("Grafrath", "locality", (4200, 2048)));
+
+        Assert.Empty(VectorTileRenderer.Labels(tile, zoom: 12, levels: 0, subX: 0, subY: 0));
+    }
+
+    [AvaloniaFact]
+    public void A_town_outranks_a_district()
+    {
+        var tile = MvtTile.Decode(VectorTileFixtures.Tile(
+            "places",
+            (VectorGeometryType.Point, [("kind", "neighbourhood"), ("name", "Buchenau"), ("min_zoom", "0")], [[(1000, 1000)]]),
+            (VectorGeometryType.Point, [("kind", "locality"), ("name", "Fürstenfeldbruck"), ("min_zoom", "0")], [[(2000, 2000)]])));
+
+        var labels = VectorTileRenderer.Labels(tile, zoom: 14, levels: 0, subX: 0, subY: 0);
+
+        Assert.True(labels.Single(l => l.Text == "Fürstenfeldbruck").Priority < labels.Single(l => l.Text == "Buchenau").Priority);
+    }
+
+    private static byte[] Place(string name, string kind, (int X, int Y) at) =>
+        VectorTileFixtures.Tile("places", (VectorGeometryType.Point, [("kind", kind), ("name", name), ("min_zoom", "0")], [[at]]));
+
+    private sealed class PointNear : IEqualityComparer<Point>
+    {
+        public bool Equals(Point x, Point y) => Math.Abs(x.X - y.X) <= 1 && Math.Abs(x.Y - y.Y) <= 1;
+
+        public int GetHashCode(Point obj) => 0;
     }
 
     private static Color PixelAt(RenderTargetBitmap bitmap, int x, int y)

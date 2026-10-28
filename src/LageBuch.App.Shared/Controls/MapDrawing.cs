@@ -36,22 +36,75 @@ public static class MapDrawing
         // Several packs are drawn one over the other, each only within its own area: outside it a
         // pack's tiles are empty land that would cover its neighbour's streets.
         IReadOnlyList<MapTileLayer> layers = source is CombinedMapTileSource combined ? combined.Layers : [new MapTileLayer(source, null)];
+        var labels = new List<(MapLabel Label, Vector Offset)>();
         foreach (var layer in layers)
         {
             if (layer.Boundary is null)
             {
-                DrawLayer(context, tiles, layer.Tiles, center, zoom, size);
+                DrawLayer(context, tiles, layer.Tiles, center, zoom, size, labels);
                 continue;
             }
 
             using (context.PushGeometryClip(Area(layer.Boundary, center, zoom, size)))
             {
-                DrawLayer(context, tiles, layer.Tiles, center, zoom, size);
+                DrawLayer(context, tiles, layer.Tiles, center, zoom, size, labels);
+            }
+        }
+
+        // The names of every vector tile, over all tiles and unclipped, so none is cut at a tile's edge.
+        foreach (var (label, offset) in PlaceLabels(labels, size))
+        {
+            using (context.PushTransform(label.Placement * Matrix.CreateTranslation(offset)))
+            {
+                if (label.Halo is { } halo)
+                {
+                    context.DrawGeometry(null, halo, label.Outline);
+                }
+
+                context.DrawGeometry(label.Ink, null, label.Outline);
             }
         }
     }
 
-    private static void DrawLayer(DrawingContext context, MapTileCache tiles, IMapTileSource layer, GeoPoint center, int zoom, Size size)
+    /// <summary>
+    /// Which of the tiles' labels to draw, in order: the most important first, and each only if
+    /// it lies on the screen, overlaps none placed before it and does not repeat a name placed
+    /// within <see cref="RepeatDistance"/>. <paramref name="labels"/> pairs each label with the
+    /// screen position of its tile's top left corner.
+    /// </summary>
+    public static IReadOnlyList<(MapLabel Label, Vector Offset)> PlaceLabels(IEnumerable<(MapLabel Label, Vector Offset)> labels, Size size)
+    {
+        ArgumentNullException.ThrowIfNull(labels);
+        var screen = new Rect(size);
+        var placed = new List<(MapLabel Label, Vector Offset)>();
+        var taken = new List<Rect>();
+        foreach (var (label, offset) in labels.OrderBy(l => l.Label.Priority))
+        {
+            var bounds = label.Bounds.Translate(offset);
+            if (!screen.Intersects(bounds)
+                || taken.Exists(t => t.Intersects(bounds.Inflate(LabelGap)))
+                || placed.Exists(p => string.Equals(p.Label.Text, label.Text, StringComparison.Ordinal)
+                    && Distance(p.Label.Bounds.Translate(p.Offset).Center, bounds.Center) < RepeatDistance))
+            {
+                continue;
+            }
+
+            placed.Add((label, offset));
+            taken.Add(bounds);
+        }
+
+        return placed;
+    }
+
+    /// <summary>A street named again closer than this, in pixels, is named once.</summary>
+    public const double RepeatDistance = 256;
+
+    // Free space kept around a label, so two names never touch.
+    private const double LabelGap = 2;
+
+    private static double Distance(Point a, Point b) => Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));
+
+    private static void DrawLayer(DrawingContext context, MapTileCache tiles, IMapTileSource layer, GeoPoint center, int zoom, Size size, List<(MapLabel Label, Vector Offset)> labels)
     {
         var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
         var left = centerX - (size.Width / 2);
@@ -74,6 +127,7 @@ public static class MapDrawing
                 if (tiles.Get(layer, zoom, tx, ty) is { } bitmap)
                 {
                     context.DrawImage(bitmap, target);
+                    labels.AddRange(tiles.Labels(layer, zoom, tx, ty).Select(l => (l, (Vector)target.TopLeft)));
                 }
                 else if (Overzoom(zoom, tx, ty, maxZoom) is { } ancestor
                     && tiles.Get(layer, ancestor.Zoom, ancestor.X, ancestor.Y) is { } coarse)

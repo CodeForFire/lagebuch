@@ -65,8 +65,9 @@ public sealed class MapTileCache
             return node.Value.Bitmap;
         }
 
-        var bitmap = layer is PmTilesFileSource vector ? RenderVector(vector, zoom, x, y) : Decode(layer.GetTile(zoom, x, y));
-        _entries[key] = _recent.AddFirst(new Entry(key, bitmap));
+        IReadOnlyList<MapLabel> labels = [];
+        var bitmap = layer is PmTilesFileSource vector ? RenderVector(vector, zoom, x, y, out labels) : Decode(layer.GetTile(zoom, x, y));
+        _entries[key] = _recent.AddFirst(new Entry(key, bitmap, labels));
         if (_entries.Count > Capacity && _recent.Last is { } oldest)
         {
             _recent.RemoveLast();
@@ -76,6 +77,14 @@ public sealed class MapTileCache
 
         return bitmap;
     }
+
+    /// <summary>
+    /// The names a vector tile wants drawn over the map, in the tile's pixels, once
+    /// <see cref="Get(IMapTileSource, int, int, int)"/> has fetched it; empty for a raster tile,
+    /// whose names are in its pixels, and for a tile not fetched.
+    /// </summary>
+    public IReadOnlyList<MapLabel> Labels(IMapTileSource layer, int zoom, int x, int y) =>
+        _entries.TryGetValue((layer, zoom, x, y), out var node) ? node.Value.Labels : [];
 
     public void Clear()
     {
@@ -92,8 +101,9 @@ public sealed class MapTileCache
 
     // Past the archive's deepest zoom, the tile is the matching part of its ancestor, rendered at
     // this zoom rather than enlarged.
-    private RenderTargetBitmap? RenderVector(PmTilesFileSource source, int zoom, int x, int y)
+    private RenderTargetBitmap? RenderVector(PmTilesFileSource source, int zoom, int x, int y, out IReadOnlyList<MapLabel> labels)
     {
+        labels = [];
         if (source.GetMaxZoom() is not { } maxZoom)
         {
             return null;
@@ -113,7 +123,14 @@ public sealed class MapTileCache
             }
         }
 
-        return layers is null ? null : VectorTileRenderer.Render(layers, zoom, levels, x - (key.Item3 << levels), y - (key.Item4 << levels));
+        if (layers is null)
+        {
+            return null;
+        }
+
+        var (subX, subY) = (x - (key.Item3 << levels), y - (key.Item4 << levels));
+        labels = VectorTileRenderer.Labels(layers, zoom, levels, subX, subY);
+        return VectorTileRenderer.Render(layers, zoom, levels, subX, subY);
     }
 
     private static IReadOnlyList<VectorLayer>? DecodeVector(byte[]? bytes)
@@ -152,5 +169,5 @@ public sealed class MapTileCache
         }
     }
 
-    private sealed record Entry((IMapTileSource Layer, int Zoom, int X, int Y) Key, Bitmap? Bitmap);
+    private sealed record Entry((IMapTileSource Layer, int Zoom, int X, int Y) Key, Bitmap? Bitmap, IReadOnlyList<MapLabel> Labels);
 }
