@@ -84,6 +84,50 @@ public sealed class AddressIndexTests : IDisposable
         Assert.Equal(string.Empty, hit.City);
     }
 
+    // "Haupt Allee" sorts before "Hauptstraße" and shares its stem, so these rows come first.
+    [Fact]
+    public void A_street_behind_more_other_streets_than_the_candidate_cap_is_still_found()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(AddressPath))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2100) " +
+                "INSERT INTO addresses SELECT 'Haupt Allee', '12', '82140', 'Olching', '', 48.2, 11.3, 'node/2' FROM n;";
+            cmd.ExecuteNonQuery();
+        }
+
+        Assert.Equal("Maisach", Assert.Single(Search("Hauptstraße 12 Maisach")).City);
+    }
+
+    [Theory]
+    [InlineData("ölmühlweg 4")]
+    [InlineData("Ölmühlweg 4")]
+    [InlineData("ÖLMÜHLWEG 4")]
+    public void A_street_starting_with_an_umlaut_is_found_in_any_case(string query)
+    {
+        Create(("Ölmühlweg", "4", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Equal("Ölmühlweg", Assert.Single(Search(query)).Street);
+    }
+
+    [Fact]
+    public void An_umlaut_after_the_first_letter_is_found_in_any_case()
+    {
+        Create(("Mühlweg", "4", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Equal("Mühlweg", Assert.Single(Search("MÜHLWEG 4")).Street);
+    }
+
+    [Fact]
+    public void A_cancelled_search_stops_instead_of_reading_on()
+    {
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => new AddressIndex(AddressPath).Search("Hauptstraße 1", cancellationToken: cancelled.Token));
+    }
+
     [Theory]
     [InlineData("%")]
     [InlineData("_auptstraße")]

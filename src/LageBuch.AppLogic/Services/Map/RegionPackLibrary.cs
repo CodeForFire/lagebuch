@@ -216,7 +216,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         ArgumentNullException.ThrowIfNull(pack);
         ArgumentNullException.ThrowIfNull(query);
         var index = new AddressIndex(pack.AddressesPath);
-        return Task.Run(() => index.Search(query), cancellationToken);
+        return Task.Run(() => index.Search(query, cancellationToken: cancellationToken), cancellationToken);
     }
 
     public void Remove(InstalledRegionPack pack)

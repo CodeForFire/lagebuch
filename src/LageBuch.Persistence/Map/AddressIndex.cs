@@ -23,8 +23,9 @@ public sealed partial class AddressIndex
     /// <summary>A query longer than this is no address.</summary>
     public const int MaxQueryLength = 100;
 
-    // Candidates read before the street and place are compared word by word; the SQL prefix only
-    // narrows by the street's first letters, so it reads more than it returns.
+    // Hits kept after the street and place are compared word by word. The cap counts hits, not
+    // rows read: the SQL prefix only narrows by the street's first letters, and a short one such
+    // as "Am" matches thousands of other streets that sort before the one asked for.
     private const int CandidateLimit = 2000;
 
     private readonly string _path;
@@ -41,7 +42,7 @@ public sealed partial class AddressIndex
     /// gives no place at all, and otherwise by street and number.
     /// Empty when nothing matches, the query names no street, or the file is no address table.
     /// </summary>
-    public IReadOnlyList<AddressHit> Search(string query, int limit = 20)
+    public IReadOnlyList<AddressHit> Search(string query, int limit = 20, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
@@ -58,6 +59,7 @@ public sealed partial class AddressIndex
             stem = street;
         }
 
+        var (prefix, otherCase) = LikePrefixes(stem);
         var wantedStreet = Normalize(street);
         var hits = new List<(AddressHit Hit, int Rank)>();
         try
@@ -66,19 +68,24 @@ public sealed partial class AddressIndex
             using var cmd = cn.CreateCommand();
             cmd.CommandText =
                 "SELECT street, housenumber, postcode, city, suburb, lat, lon FROM addresses " +
-                "WHERE street LIKE $street ESCAPE '\\' AND housenumber LIKE $number ESCAPE '\\' " +
-                "ORDER BY street, length(housenumber), housenumber LIMIT $limit;";
-            cmd.Parameters.AddWithValue("$street", EscapeLike(stem) + "%");
+                "WHERE (street LIKE $street ESCAPE '\\' OR street LIKE $otherCase ESCAPE '\\') AND housenumber LIKE $number ESCAPE '\\' " +
+                "ORDER BY street, length(housenumber), housenumber;";
+            cmd.Parameters.AddWithValue("$street", EscapeLike(prefix) + "%");
+            cmd.Parameters.AddWithValue("$otherCase", EscapeLike(otherCase) + "%");
             cmd.Parameters.AddWithValue("$number", EscapeLike(houseNumber ?? string.Empty) + "%");
-            cmd.Parameters.AddWithValue("$limit", CandidateLimit);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (Row(reader) is { } hit && Matches(hit, wantedStreet, place))
                 {
                     var exactNumber = houseNumber is null || string.Equals(hit.HouseNumber, houseNumber, StringComparison.OrdinalIgnoreCase);
                     var placeUnknown = place.Count > 0 && hit is { City: "", Suburb: "", Postcode: "" };
                     hits.Add((hit, (exactNumber ? 0 : 2) + (placeUnknown ? 1 : 0)));
+                    if (hits.Count == CandidateLimit)
+                    {
+                        break;
+                    }
                 }
             }
         }
@@ -145,6 +152,16 @@ public sealed partial class AddressIndex
         }
 
         return new AddressHit(street, houseNumber, reader.GetValue(2) as string ?? string.Empty, reader.GetValue(3) as string ?? string.Empty, reader.GetValue(4) as string ?? string.Empty, position);
+    }
+
+    // SQLite's LIKE folds the case of ASCII letters only, so the prefix stops before any other
+    // letter, and the first letter is bound in both cases: "ölmühlweg" reads "Ölm" or "ölm".
+    private static (string Prefix, string OtherCase) LikePrefixes(string stem)
+    {
+        var other = stem.AsSpan(1).IndexOfAnyExceptInRange('\0', '\x7f');
+        var prefix = other < 0 ? stem : stem[..(other + 1)];
+        var german = CultureInfo.GetCultureInfo("de-DE");
+        return (char.ToUpper(prefix[0], german) + prefix[1..], char.ToLower(prefix[0], german) + prefix[1..]);
     }
 
     private static string EscapeLike(string value)
