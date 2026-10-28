@@ -1,0 +1,398 @@
+using System.Diagnostics;
+using System.Globalization;
+using Avalonia;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Media.Immutable;
+using LageBuch.AppLogic.Services.Map;
+using LageBuch.Persistence.Map.Vector;
+
+namespace LageBuch.App.Shared.Controls;
+
+/// <summary>
+/// Rasterises one decoded vector tile in the Protomaps basemap schema into a 256 px bitmap, in
+/// colours close to OSM Carto so it can stand next to the raster packs. The map then caches,
+/// clips and places it like any raster tile.
+/// </summary>
+/// <remarks>
+/// POC for CodeForFire/lagebuch-geodata#5: a fixed style in code, labels without collision
+/// detection, and a label cut where the tile ends. Past the archive's deepest zoom it renders the
+/// matching part of the ancestor tile at the target zoom, so lines stay sharp and labels keep
+/// their size instead of being enlarged with the pixels.
+/// </remarks>
+public static class VectorTileRenderer
+{
+    private const int Size = WebMercator.TileSizePixels;
+
+    private static readonly CultureInfo LabelCulture = CultureInfo.GetCultureInfo("de-DE");
+
+    private static readonly IImmutableBrush Earth = Solid(0xF2, 0xEF, 0xE9);
+    private static readonly IImmutableBrush Water = Solid(0xAA, 0xD3, 0xDF);
+    private static readonly IImmutableBrush Building = Solid(0xD9, 0xD0, 0xC9);
+    private static readonly IPen BuildingOutline = new ImmutablePen(Solid(0xC4, 0xB6, 0xAB), 0.5);
+    private static readonly IPen Boundary = new ImmutablePen(Solid(0xAC, 0x46, 0xAC), 1.5, new ImmutableDashStyle([4, 2], 0));
+    private static readonly IImmutableBrush LabelInk = Solid(0x33, 0x33, 0x33);
+    private static readonly IImmutableBrush HouseNumberInk = Solid(0x66, 0x66, 0x66);
+    private static readonly IPen Halo = new ImmutablePen(Solid(0xFF, 0xFF, 0xFF), 3, lineJoin: PenLineJoin.Round);
+
+    private static readonly Dictionary<string, IImmutableBrush> Landuse = new(StringComparer.Ordinal)
+    {
+        ["residential"] = Solid(0xE0, 0xDF, 0xDF),
+        ["industrial"] = Solid(0xEB, 0xDB, 0xE8),
+        ["commercial"] = Solid(0xF2, 0xDA, 0xD9),
+        ["retail"] = Solid(0xFF, 0xD6, 0xD1),
+        ["farmland"] = Solid(0xEE, 0xF0, 0xD5),
+        ["farmyard"] = Solid(0xF5, 0xDC, 0xBA),
+        ["forest"] = Solid(0xAD, 0xD1, 0x9E),
+        ["wood"] = Solid(0xAD, 0xD1, 0x9E),
+        ["grass"] = Solid(0xCD, 0xEB, 0xB0),
+        ["meadow"] = Solid(0xCD, 0xEB, 0xB0),
+        ["park"] = Solid(0xC8, 0xFA, 0xCC),
+        ["garden"] = Solid(0xC8, 0xFA, 0xCC),
+        ["playground"] = Solid(0xDF, 0xFC, 0xE2),
+        ["pitch"] = Solid(0x88, 0xE0, 0xBE),
+        ["cemetery"] = Solid(0xAA, 0xCB, 0xAF),
+        ["allotments"] = Solid(0xC9, 0xE1, 0xBF),
+        ["school"] = Solid(0xFF, 0xFF, 0xE5),
+        ["hospital"] = Solid(0xFF, 0xFF, 0xE5),
+        ["pedestrian"] = Solid(0xDD, 0xDD, 0xE8),
+        ["railway"] = Solid(0xEB, 0xDB, 0xE8),
+        ["military"] = Solid(0xF2, 0xE4, 0xE4),
+        ["wetland"] = Solid(0xD6, 0xEB, 0xE0),
+    };
+
+    // OSM highway value -> fill, casing, width in px at zoom 15.
+    private static readonly Dictionary<string, RoadStyle> Roads = new(StringComparer.Ordinal)
+    {
+        ["motorway"] = new(Solid(0xE8, 0x92, 0xA2), Solid(0xDC, 0x2A, 0x67), 7),
+        ["trunk"] = new(Solid(0xF9, 0xB2, 0x9C), Solid(0xC8, 0x4E, 0x2F), 7),
+        ["primary"] = new(Solid(0xFC, 0xD6, 0xA4), Solid(0xA0, 0x6B, 0x00), 7),
+        ["secondary"] = new(Solid(0xF7, 0xFA, 0xBF), Solid(0x70, 0x7D, 0x05), 6.5),
+        ["tertiary"] = new(Solid(0xFF, 0xFF, 0xFF), Solid(0x8F, 0x8F, 0x8F), 6),
+        ["unclassified"] = new(Solid(0xFF, 0xFF, 0xFF), Solid(0xBB, 0xBB, 0xBB), 4.5),
+        ["residential"] = new(Solid(0xFF, 0xFF, 0xFF), Solid(0xBB, 0xBB, 0xBB), 4.5),
+        ["living_street"] = new(Solid(0xED, 0xED, 0xED), Solid(0xBB, 0xBB, 0xBB), 4.5),
+        ["service"] = new(Solid(0xFF, 0xFF, 0xFF), Solid(0xBB, 0xBB, 0xBB), 2.5),
+        ["pedestrian"] = new(Solid(0xDD, 0xDD, 0xE8), Solid(0x99, 0x99, 0x99), 4),
+    };
+
+    private static readonly IPen Footway = new ImmutablePen(Solid(0xFA, 0x80, 0x72), 1.2, new ImmutableDashStyle([1.5, 1.5], 0));
+    private static readonly IPen Cycleway = new ImmutablePen(Solid(0x00, 0x00, 0xFF), 1.2, new ImmutableDashStyle([1.5, 1.5], 0));
+    private static readonly IPen Track = new ImmutablePen(Solid(0x99, 0x66, 0x00), 1.2, new ImmutableDashStyle([3, 1.5], 0));
+    private static readonly IPen Rail = new ImmutablePen(Solid(0x70, 0x70, 0x70), 2);
+
+    /// <summary>Milliseconds per rendered tile since the app started, for the POC's on-map readout.</summary>
+    public static RenderTimings Timings { get; } = new();
+
+    /// <summary>
+    /// Renders the part of <paramref name="layers"/> -- a tile at <c>zoom - levels</c> -- that
+    /// the tile at <paramref name="zoom"/> with index offset (<paramref name="subX"/>,
+    /// <paramref name="subY"/>) inside it covers. With <paramref name="levels"/> 0 that is the
+    /// whole tile.
+    /// </summary>
+    public static RenderTargetBitmap Render(IReadOnlyList<VectorLayer> layers, int zoom, int levels, int subX, int subY)
+    {
+        ArgumentNullException.ThrowIfNull(layers);
+        var started = Stopwatch.GetTimestamp();
+        var bitmap = new RenderTargetBitmap(new PixelSize(Size, Size));
+        using (var context = bitmap.CreateDrawingContext())
+        {
+            context.FillRectangle(Earth, new Rect(0, 0, Size, Size));
+            using (context.PushClip(new Rect(0, 0, Size, Size)))
+            {
+                Draw(context, layers, zoom, levels, subX, subY);
+            }
+        }
+
+        Timings.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+        return bitmap;
+    }
+
+    private static void Draw(DrawingContext context, IReadOnlyList<VectorLayer> layers, int zoom, int levels, int subX, int subY)
+    {
+        VectorLayer? Layer(string name) => layers.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+
+        // Line widths follow Carto's growth: about half again per zoom level.
+        var widthScale = Math.Pow(1.6, zoom - 15);
+
+        if (Layer("landuse") is { } landuse)
+        {
+            var project = Projection(landuse.Extent, levels, subX, subY);
+            foreach (var group in landuse.Features.Where(f => f.Type == VectorGeometryType.Polygon).GroupBy(f => f.Get("kind") ?? string.Empty, StringComparer.Ordinal))
+            {
+                if (Landuse.TryGetValue(group.Key, out var brush))
+                {
+                    context.DrawGeometry(brush, null, Polygons(group, project));
+                }
+            }
+        }
+
+        if (Layer("water") is { } water)
+        {
+            var project = Projection(water.Extent, levels, subX, subY);
+            context.DrawGeometry(Water, null, Polygons(water.Features.Where(f => f.Type == VectorGeometryType.Polygon), project));
+            foreach (var group in water.Features.Where(f => f.Type == VectorGeometryType.LineString).GroupBy(f => f.Get("kind") ?? string.Empty, StringComparer.Ordinal))
+            {
+                var width = group.Key switch { "river" => 5.0, "canal" => 4.0, _ => 1.5 } * widthScale;
+                context.DrawGeometry(null, new ImmutablePen(Water, width, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), Lines(group, project));
+            }
+        }
+
+        var buildings = Layer("buildings");
+        if (buildings is not null && zoom >= 14)
+        {
+            var project = Projection(buildings.Extent, levels, subX, subY);
+            context.DrawGeometry(Building, zoom >= 16 ? BuildingOutline : null, Polygons(buildings.Features.Where(f => f.Type == VectorGeometryType.Polygon), project));
+        }
+
+        var roads = Layer("roads");
+        if (roads is not null)
+        {
+            DrawRoads(context, roads, zoom, widthScale, Projection(roads.Extent, levels, subX, subY));
+        }
+
+        if (Layer("boundaries") is { } boundaries)
+        {
+            context.DrawGeometry(null, Boundary, Lines(boundaries.Features, Projection(boundaries.Extent, levels, subX, subY)));
+        }
+
+        if (roads is not null && zoom >= 15)
+        {
+            DrawRoadNames(context, roads, zoom, Projection(roads.Extent, levels, subX, subY));
+        }
+
+        if (buildings is not null && zoom >= 17)
+        {
+            DrawHouseNumbers(context, buildings, Projection(buildings.Extent, levels, subX, subY));
+        }
+
+        if (Layer("places") is { } places)
+        {
+            DrawPlaces(context, places, zoom, Projection(places.Extent, levels, subX, subY));
+        }
+    }
+
+    private static void DrawRoads(DrawingContext context, VectorLayer roads, int zoom, double widthScale, Func<(int X, int Y), Point> project)
+    {
+        var lines = roads.Features.Where(f => f.Type == VectorGeometryType.LineString && f.Get("is_tunnel") != "true").ToList();
+
+        context.DrawGeometry(null, Rail, Lines(lines.Where(f => f.Get("kind") == "rail"), project));
+
+        if (zoom >= 14)
+        {
+            context.DrawGeometry(null, Track, Lines(lines.Where(f => f.Get("kind_detail") == "track"), project));
+            context.DrawGeometry(null, Cycleway, Lines(lines.Where(f => f.Get("kind_detail") == "cycleway"), project));
+            context.DrawGeometry(null, Footway, Lines(lines.Where(f => f.Get("kind_detail") is "footway" or "path" or "steps" or "bridleway"), project));
+        }
+
+        // Minor roads first, so a primary road is drawn over the junction; all casings before
+        // all fills, so crossing roads of one class merge instead of cutting each other.
+        var classes = Roads.Reverse().ToList();
+        var groups = classes
+            .Select(c => (Style: c.Value, Geometry: Lines(lines.Where(f => string.Equals(f.Get("kind_detail"), c.Key, StringComparison.Ordinal)), project)))
+            .ToList();
+        foreach (var (style, geometry) in groups)
+        {
+            var width = Math.Max(style.WidthAt15 * widthScale, 1.0);
+            context.DrawGeometry(null, new ImmutablePen(style.Casing, width + 1.5, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), geometry);
+        }
+
+        foreach (var (style, geometry) in groups)
+        {
+            var width = Math.Max(style.WidthAt15 * widthScale, 1.0);
+            context.DrawGeometry(null, new ImmutablePen(style.Fill, width, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), geometry);
+        }
+    }
+
+    // A road's name on its longest segment, turned so it never reads upside down.
+    private static void DrawRoadNames(DrawingContext context, VectorLayer roads, int zoom, Func<(int X, int Y), Point> project)
+    {
+        var fontSize = zoom >= 17 ? 12.0 : 10.0;
+        foreach (var feature in roads.Features)
+        {
+            if (feature.Type != VectorGeometryType.LineString || feature.Get("name") is not { Length: > 0 } name || !Roads.ContainsKey(feature.Get("kind_detail") ?? string.Empty))
+            {
+                continue;
+            }
+
+            if (LongestSegment(feature, project) is not var (a, b) || Distance(a, b) < name.Length * fontSize * 0.55)
+            {
+                continue;
+            }
+
+            var angle = Math.Atan2(b.Y - a.Y, b.X - a.X);
+            if (angle > Math.PI / 2 || angle < -Math.PI / 2)
+            {
+                angle += Math.PI;
+            }
+
+            var text = Label(name, fontSize, LabelInk);
+            var middle = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
+            using (context.PushTransform(Matrix.CreateTranslation(-text.Width / 2, -text.Height / 2) * Matrix.CreateRotation(angle) * Matrix.CreateTranslation(middle.X, middle.Y)))
+            {
+                DrawHaloed(context, text, default, LabelInk);
+            }
+        }
+    }
+
+    private static void DrawHouseNumbers(DrawingContext context, VectorLayer buildings, Func<(int X, int Y), Point> project)
+    {
+        foreach (var feature in buildings.Features)
+        {
+            if (feature.Get("addr_housenumber") is not { Length: > 0 } number || feature.Parts.Count == 0)
+            {
+                continue;
+            }
+
+            var center = Centroid(feature.Parts[0], project);
+            var text = Label(number, 9, HouseNumberInk);
+            context.DrawText(text, new Point(center.X - (text.Width / 2), center.Y - (text.Height / 2)));
+        }
+    }
+
+    private static void DrawPlaces(DrawingContext context, VectorLayer places, int zoom, Func<(int X, int Y), Point> project)
+    {
+        foreach (var feature in places.Features)
+        {
+            if (feature.Type != VectorGeometryType.Point || feature.Get("name") is not { Length: > 0 } name || feature.Parts.Count == 0 || feature.Parts[0].Count == 0)
+            {
+                continue;
+            }
+
+            var size = feature.Get("kind") switch
+            {
+                "locality" => zoom >= 14 ? 16.0 : 13.0,
+                "neighbourhood" or "macrohood" => 11.0,
+                _ => 0.0,
+            };
+            if (size <= 0)
+            {
+                continue;
+            }
+
+            var text = Label(name, size, LabelInk);
+            var at = project(feature.Parts[0][0]);
+            DrawHaloed(context, text, new Point(at.X - (text.Width / 2), at.Y - (text.Height / 2)), LabelInk);
+        }
+    }
+
+    private static void DrawHaloed(DrawingContext context, FormattedText text, Point origin, IBrush ink)
+    {
+        if (text.BuildGeometry(origin) is { } outline)
+        {
+            context.DrawGeometry(null, Halo, outline);
+            context.DrawGeometry(ink, null, outline);
+        }
+    }
+
+    private static FormattedText Label(string text, double size, IImmutableBrush ink) =>
+        new(text, LabelCulture, FlowDirection.LeftToRight, Typeface.Default, size, ink);
+
+    // Tile coordinates of the source tile to pixels of the target tile.
+    private static Func<(int X, int Y), Point> Projection(int extent, int levels, int subX, int subY)
+    {
+        var part = (double)extent / (1 << levels);
+        var scale = Size / part;
+        var left = subX * part;
+        var top = subY * part;
+        return p => new Point((p.X - left) * scale, (p.Y - top) * scale);
+    }
+
+    private static StreamGeometry Polygons(IEnumerable<VectorFeature> features, Func<(int X, int Y), Point> project)
+    {
+        var geometry = new StreamGeometry();
+        using (var g = geometry.Open())
+        {
+            g.SetFillRule(FillRule.EvenOdd);
+            foreach (var feature in features)
+            {
+                foreach (var ring in feature.Parts)
+                {
+                    Figure(g, ring, project, closed: true);
+                }
+            }
+        }
+
+        return geometry;
+    }
+
+    private static StreamGeometry Lines(IEnumerable<VectorFeature> features, Func<(int X, int Y), Point> project)
+    {
+        var geometry = new StreamGeometry();
+        using (var g = geometry.Open())
+        {
+            foreach (var feature in features)
+            {
+                if (feature.Type != VectorGeometryType.LineString)
+                {
+                    continue;
+                }
+
+                foreach (var line in feature.Parts)
+                {
+                    Figure(g, line, project, closed: false);
+                }
+            }
+        }
+
+        return geometry;
+    }
+
+    private static void Figure(StreamGeometryContext g, IReadOnlyList<(int X, int Y)> points, Func<(int X, int Y), Point> project, bool closed)
+    {
+        if (points.Count < 2)
+        {
+            return;
+        }
+
+        g.BeginFigure(project(points[0]), isFilled: closed);
+        for (var i = 1; i < points.Count; i++)
+        {
+            g.LineTo(project(points[i]));
+        }
+
+        g.EndFigure(closed);
+    }
+
+    private static (Point A, Point B)? LongestSegment(VectorFeature feature, Func<(int X, int Y), Point> project)
+    {
+        (Point A, Point B)? best = null;
+        var bestLength = 0.0;
+        foreach (var line in feature.Parts)
+        {
+            for (var i = 1; i < line.Count; i++)
+            {
+                var a = project(line[i - 1]);
+                var b = project(line[i]);
+                var length = Distance(a, b);
+                var inside = a.X is >= 0 and <= Size && a.Y is >= 0 and <= Size && b.X is >= 0 and <= Size && b.Y is >= 0 and <= Size;
+                if (inside && length > bestLength)
+                {
+                    bestLength = length;
+                    best = (a, b);
+                }
+            }
+        }
+
+        return best;
+    }
+
+    private static Point Centroid(IReadOnlyList<(int X, int Y)> ring, Func<(int X, int Y), Point> project)
+    {
+        double x = 0, y = 0;
+        foreach (var p in ring)
+        {
+            var s = project(p);
+            x += s.X;
+            y += s.Y;
+        }
+
+        return new Point(x / ring.Count, y / ring.Count);
+    }
+
+    private static double Distance(Point a, Point b) => Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));
+
+    private static ImmutableSolidColorBrush Solid(byte r, byte g, byte b) => new(Color.FromRgb(r, g, b));
+
+    private sealed record RoadStyle(IImmutableBrush Fill, IImmutableBrush Casing, double WidthAt15);
+}

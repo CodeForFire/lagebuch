@@ -1,0 +1,1 @@
+Proof of concept, not for release: the Lagekarte can draw a PMTiles vector archive named by `LAGEBUCH_POC_PMTILES` instead of the raster packs, rendering each tile itself and showing its render time on the map (CodeForFire/lagebuch-geodata#5).

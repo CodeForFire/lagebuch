@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Avalonia.Media.Imaging;
 using LageBuch.Persistence.Map;
+using LageBuch.Persistence.Map.Vector;
 
 namespace LageBuch.App.Shared.Controls;
 
@@ -21,6 +22,11 @@ public sealed class MapTileCache
 
     private readonly Dictionary<(IMapTileSource Layer, int Zoom, int X, int Y), LinkedListNode<Entry>> _entries = new();
     private readonly LinkedList<Entry> _recent = new();
+
+    // POC (lagebuch-geodata#5): decoded vector tiles, so the 16 tiles of z17 cut from one z15 tile
+    // parse it once. A handful is enough: a screen at z17 spans few z15 tiles.
+    private readonly Dictionary<(IMapTileSource Layer, int Zoom, int X, int Y), IReadOnlyList<VectorLayer>?> _vectors = new();
+    private readonly Queue<(IMapTileSource Layer, int Zoom, int X, int Y)> _vectorOrder = new();
 
     public IMapTileSource? Source { get; private set; }
 
@@ -59,7 +65,7 @@ public sealed class MapTileCache
             return node.Value.Bitmap;
         }
 
-        var bitmap = Decode(layer.GetTile(zoom, x, y));
+        var bitmap = layer is PmTilesFileSource vector ? RenderVector(vector, zoom, x, y) : Decode(layer.GetTile(zoom, x, y));
         _entries[key] = _recent.AddFirst(new Entry(key, bitmap));
         if (_entries.Count > Capacity && _recent.Last is { } oldest)
         {
@@ -80,6 +86,51 @@ public sealed class MapTileCache
 
         _recent.Clear();
         _entries.Clear();
+        _vectors.Clear();
+        _vectorOrder.Clear();
+    }
+
+    // Past the archive's deepest zoom, the tile is the matching part of its ancestor, rendered at
+    // this zoom rather than enlarged.
+    private RenderTargetBitmap? RenderVector(PmTilesFileSource source, int zoom, int x, int y)
+    {
+        if (source.GetMaxZoom() is not { } maxZoom)
+        {
+            return null;
+        }
+
+        var sourceZoom = Math.Min(zoom, maxZoom);
+        var levels = zoom - sourceZoom;
+        var key = ((IMapTileSource)source, sourceZoom, x >> levels, y >> levels);
+        if (!_vectors.TryGetValue(key, out var layers))
+        {
+            layers = DecodeVector(source.GetTile(sourceZoom, key.Item3, key.Item4));
+            _vectors[key] = layers;
+            _vectorOrder.Enqueue(key);
+            if (_vectorOrder.Count > 16)
+            {
+                _vectors.Remove(_vectorOrder.Dequeue());
+            }
+        }
+
+        return layers is null ? null : VectorTileRenderer.Render(layers, zoom, levels, x - (key.Item3 << levels), y - (key.Item4 << levels));
+    }
+
+    private static IReadOnlyList<VectorLayer>? DecodeVector(byte[]? bytes)
+    {
+        if (bytes is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return MvtTile.Decode(bytes);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     [SuppressMessage("Design", "CA1031", Justification = "A tile whose bytes are no image is drawn as missing: null is the documented result.")]
