@@ -456,6 +456,8 @@ standing replacement for the persona prompts.
 **Evidence**
 - Run a clean build with `make clean ci`. An incremental build hides XAML
   deprecations.
+- Run `make codeql` when the diff touches `.cs` code. A green `make clean ci`
+  says nothing about CodeQL; see [Static analysis](#static-analysis).
 - When a test fails, search the log for `Test Run Failed`. The tail of the log
   says `0 Error(s)` even when a test assembly failed.
 - "Done" means you saw the output, not that you expect it to pass.
@@ -537,6 +539,33 @@ Write code that trips neither:
   occurrence with a written justification; never widen `NoWarn`.
   A `PART_` name in a control template is not an obsolete member —
   `TextBox /template/ TextBlock#PART_Watermark` stays exactly as it is.
+
+These queries came back on pull request after pull request in September and
+October 2026: 69 review comments across 22 PRs, every one of which had passed
+`make clean ci`. Where a Roslyn rule covers part of a query, `.editorconfig`
+now raises it into the build, so that part fails locally. The rest is shape to
+avoid:
+
+| Query | Shape that trips it | Write instead | Build catches |
+|---|---|---|---|
+| `cs/useless-upcast`, `cs/useless-cast-to-self` | `(IFoo)foo`, or `(Guid?)null` inside a tuple, to steer type inference | Give the type its own place: `IFoo key = foo;`, `Assert.Equal<(Kind, Guid?)>((Kind.A, null), …)`, `Select<TIn, TOut>(…)` | `IDE0004`, the plain casts only |
+| `cs/loss-of-precision` | `14 * depth` or `tile * 256` handed to a `float`/`double`/`long` | Widen an operand first: `14f * depth`, `tile * 256.0`, `(long)a * b` | — |
+| `cs/constant-condition` | A `switch` arm or `?.` that the preceding code already decided, e.g. `null =>` after a non-null pattern | Drop the arm or the `?`; cover the remaining cases with `_ =>` | `CA1508`, in part |
+| `cs/reference-equality-with-object` | `b.DataContext == row`: both sides typed `object` | `ReferenceEquals(b.DataContext, row)` | — |
+| `cs/missed-readonly-modifier` | A field assigned only in the constructor | `readonly` | `IDE0044` |
+| `cs/empty-catch-block` | `catch (X) { }` | A comment inside the block saying why the failure may vanish, or the failure surfacing as [above](#c-and-net) | — |
+| `cs/catch-nullreferenceexception` | `catch (NullReferenceException)` | Check for `null` before the call | — |
+| `cs/complex-block` | Four loops or `if`s with bodies one after another in one block | Pull the repeated loop into a helper | — |
+
+**Run `make codeql` before pushing a branch that touches `.cs` code.** It runs
+the pull request's CodeQL analysis on this machine: the same CodeQL bundle (read
+from the action commit `codeql.yml` pins), the same `security-and-quality`
+queries, the same build and the same exclusions. It fails when a result lands
+on a line the branch changed, which is what the ruleset would block. A first
+run takes about ten minutes; the bundle is cached under `~/.cache/lagebuch-codeql`.
+`scripts/codeql-results.py` is shared with CI. It drops every result in generated
+code under `obj/` before upload, because `paths-ignore` cannot. Generated code
+therefore never opens an alert and never needs an exclusion.
 
 When a new CodeQL alert appears, never leave it open and never dismiss it
 without a written reason:

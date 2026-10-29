@@ -62,7 +62,25 @@ jobs:
       - name: Build
         run: dotnet build LageBuch.Desktop.slnf -c Release
 
+      # Analysis and upload are split so that generated code can be dropped in
+      # between: paths-ignore does not work under build-mode: manual, and the
+      # Regex and xunit source generators' output under obj/ otherwise opens
+      # alerts nobody can fix. `make codeql` reads the results the same way.
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
+          category: /language:csharp
+          upload: never
+          output: sarif-results
+
+      - name: Drop results in generated code
+        run: |
+          python3 -I scripts/codeql-results.py --self-test
+          python3 -I scripts/codeql-results.py filter --config .github/codeql/codeql-config.yml \
+            sarif-results/csharp.sarif sarif-results/csharp.sarif
+
+      - name: Upload CodeQL results
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: sarif-results/csharp.sarif
           category: /language:csharp

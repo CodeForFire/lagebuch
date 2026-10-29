@@ -170,7 +170,7 @@ public class FilesTabRenderTests
         WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
         using var bitmap = SmallBitmap();
         var clipboard = new DataTransfer();
-        clipboard.Add(DataTransferItem.Create(DataFormat.Bitmap, (Bitmap)bitmap));
+        clipboard.Add(DataTransferItem.Create(DataFormat.Bitmap, bitmap));
         await window.Clipboard!.SetDataAsync(clipboard);
 
         window.Press(PhysicalKey.V, RawInputModifiers.Control);
@@ -191,7 +191,7 @@ public class FilesTabRenderTests
         WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
         using var bitmap = SmallBitmap();
         var clipboard = new DataTransfer();
-        clipboard.Add(DataTransferItem.Create(DataFormat.Bitmap, (Bitmap)bitmap));
+        clipboard.Add(DataTransferItem.Create(DataFormat.Bitmap, bitmap));
         await window.Clipboard!.SetDataAsync(clipboard);
 
         var rename = window.GetVisualDescendants().OfType<FilesView>().Single()
@@ -213,7 +213,7 @@ public class FilesTabRenderTests
         var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
         using var bitmap = SmallBitmap();
         var transfer = new DataTransfer();
-        transfer.Add(DataTransferItem.Create(DataFormat.Bitmap, (Bitmap)bitmap));
+        transfer.Add(DataTransferItem.Create(DataFormat.Bitmap, bitmap));
 
         dropZone.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, transfer, dropZone, new Point(10, 10), KeyModifiers.None));
         await WaitUntilAsync(() => vm.Files.Files.Count == 1);

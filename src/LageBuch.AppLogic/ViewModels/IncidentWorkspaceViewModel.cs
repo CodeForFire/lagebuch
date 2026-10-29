@@ -275,9 +275,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public bool HasUndoNotice => UndoNotice is not null;
 
+    private readonly IDisposable? _clockSkewRefresh;
+
     // Ticks only while a notice shows, so an idle workspace holds no ticker subscription for it.
     private IDisposable? _undoNoticeExpiry;
-    private IDisposable? _clockSkewRefresh;
 
     // The create-task overlay behind an ETB row's button (#88); null while no dialog is open.
     [ObservableProperty]

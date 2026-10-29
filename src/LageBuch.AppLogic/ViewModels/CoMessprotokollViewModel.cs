@@ -731,7 +731,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
     public double OpenBarWidth => ProgressTrackWidth - SearchedBarWidth - AffectedBarWidth;
 
     private double BarWidth(int count) =>
-        TotalUnits <= 0 ? 0 : Math.Round(ProgressTrackWidth * count / (double)TotalUnits, 1);
+        TotalUnits <= 0 ? 0 : Math.Round(ProgressTrackWidth * count / TotalUnits, 1);
 
     [RelayCommand]
     private void ShowAll() => Filter = CoUnitFilter.All;
