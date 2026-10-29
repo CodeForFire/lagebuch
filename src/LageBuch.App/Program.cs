@@ -36,6 +36,13 @@ internal static class Program
         _ = Task.Run(() => RemoteIncidentSession.ClearAttachmentCache(AppPaths.AttachmentCacheDir));
 
         LageBuch.App.Shared.App.CreateMainViewModel = CreateMainViewModel;
+
+        // A start that throws is shown rather than crashed, so the hook above never sees it; the
+        // report is written here instead, and announced on the next start that gets that far.
+        LageBuch.App.Shared.App.ReportStartupFailure = failure =>
+            CrashReports.TryWrite(AppPaths.Root, failure, AppVersion, TimeProvider.System.GetUtcNow())
+                ? CrashReports.Folder(AppPaths.Root)
+                : null;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
