@@ -512,6 +512,16 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Send(new PlaceRoleAssignmentCommand(Op(), assignmentId, nodeId, slot));
 
+    public void SetNavVisibility(string key, bool visible) =>
+        Send(new SetNavVisibilityCommand(Op(), key, visible));
+
+    public void AddChecklist(ChecklistSeed seed)
+    {
+        ArgumentNullException.ThrowIfNull(seed);
+        Send(new AddChecklistCommand(
+            Op(), seed.Id, seed.Title, seed.Items.Select(i => new ChecklistSeedItemDto(i.Text, i.IsMandatory)).ToList()));
+    }
+
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Send(new SetFuehrungsstufeCommand(Op(), stufe));
 

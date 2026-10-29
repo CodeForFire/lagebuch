@@ -261,4 +261,13 @@ public class VersionHandshakeTests
         Assert.Equal(27, SyncProtocol.ProtocolVersion);
         Assert.Equal(27, SyncProtocol.MinimumProtocolVersion);
     }
+
+    [Fact]
+    public void The_per_Einsatz_rail_raises_the_protocol_and_the_floor_to_twenty_seven()
+    {
+        // 27 adds setNavVisibility and addChecklist, commands a client may send. A host at 26 has
+        // neither in its allowlist and would reject them, so a 26 and a 27 must not connect.
+        Assert.Equal(27, SyncProtocol.ProtocolVersion);
+        Assert.Equal(27, SyncProtocol.MinimumProtocolVersion);
+    }
 }

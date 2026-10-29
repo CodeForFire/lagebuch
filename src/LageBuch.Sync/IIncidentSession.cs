@@ -123,6 +123,12 @@ public interface IIncidentSession
     /// <summary>Sets the Führungsstufe; null clears it.</summary>
     void SetFuehrungsstufe(Fuehrungsstufe? stufe);
 
+    /// <summary>Hides or shows one rail entry for this Einsatz. See <c>Incident.SetNavVisibility</c>.</summary>
+    void SetNavVisibility(string key, bool visible);
+
+    /// <summary>Adds a Checkliste from a Vorlage to the running Einsatz. See <c>Incident.AddChecklist</c>.</summary>
+    void AddChecklist(ChecklistSeed seed);
+
     void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe);
 
     void AddForceUnit(

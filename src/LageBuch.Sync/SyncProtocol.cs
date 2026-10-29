@@ -159,6 +159,11 @@ public static class SyncProtocol
     /// 27: a client may send <c>editRoleAssignment</c>, which corrects a Funktion's person without a
     /// handover. A host at 26 does not know it, so the floor rises to 27.
     /// </para>
+    /// <para>
+    /// 27: per-Einsatz rail. A client may send <c>setNavVisibility</c> and <c>addChecklist</c>,
+    /// which a host at 26 does not know, so the floor rises to 27. The snapshot carries
+    /// <c>navOverrides</c>.
+    /// </para>
     /// </summary>
     public const int ProtocolVersion = 27;
 

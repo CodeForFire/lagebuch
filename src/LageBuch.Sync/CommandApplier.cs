@@ -97,6 +97,15 @@ public static class CommandApplier
             case SetFuehrungsstufeCommand c:
                 incident.SetFuehrungsstufe(clock, Operator(c.Operator), c.Stufe);
                 break;
+            case SetNavVisibilityCommand c:
+                incident.SetNavVisibility(c.Key, c.Visible);
+                break;
+            case AddChecklistCommand c:
+                incident.AddChecklist(
+                    clock,
+                    Operator(c.Operator),
+                    new ChecklistSeed(c.TemplateId, c.Title, c.Items.Select(i => (i.Text, i.IsMandatory)).ToList()));
+                break;
             case UpdateLeadershipPostCommand c:
                 incident.UpdateLeadershipPost(clock, Operator(c.Operator), c.Standort, c.Rufname, c.Telefon, c.Funkgruppe);
                 break;

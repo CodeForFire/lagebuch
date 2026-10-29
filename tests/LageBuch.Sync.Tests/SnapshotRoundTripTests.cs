@@ -191,6 +191,33 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void Nav_overrides_round_trip_through_the_snapshot()
+    {
+        var clock = new FixedClock();
+        var incident = Incident.Start(clock, new SessionOperator("Müller", "FFB 12/1"));
+        incident.SetNavVisibility("lagekarte", false);
+        incident.SetNavVisibility("etb", true);
+
+        var r = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(2, r.NavOverrides.Count);
+        Assert.False(r.NavOverrides["lagekarte"]);
+        Assert.True(r.NavOverrides["etb"]);
+    }
+
+    [Fact]
+    public void A_snapshot_without_nav_overrides_reads_as_none()
+    {
+        var incident = Incident.Start(new FixedClock(), new SessionOperator("Müller", "FFB 12/1"));
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident) with { NavOverrides = null });
+
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Empty(r.NavOverrides);
+    }
+
+    [Fact]
     public void Round_trip_preserves_abschnitte_placements_stufe_and_the_leadership_post()
     {
         var clock = new FixedClock();

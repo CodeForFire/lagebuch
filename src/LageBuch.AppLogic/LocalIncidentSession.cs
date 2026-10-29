@@ -191,6 +191,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Mutate(() => Incident.PlaceRoleAssignment(_clock, RequireOperator(), assignmentId, nodeId, slot));
 
+    public void SetNavVisibility(string key, bool visible) =>
+        Mutate(() => Incident.SetNavVisibility(key, visible));
+
+    public void AddChecklist(ChecklistSeed seed) =>
+        Mutate(() => Incident.AddChecklist(_clock, RequireOperator(), seed));
+
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Mutate(() => Incident.SetFuehrungsstufe(_clock, RequireOperator(), stufe));
 

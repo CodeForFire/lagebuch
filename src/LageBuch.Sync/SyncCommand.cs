@@ -30,6 +30,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(PlaceForceUnitCommand), "placeForceUnit")]
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
 [JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
+[JsonDerivedType(typeof(SetNavVisibilityCommand), "setNavVisibility")]
+[JsonDerivedType(typeof(AddChecklistCommand), "addChecklist")]
 [JsonDerivedType(typeof(UpdateLeadershipPostCommand), "updateLeadershipPost")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
@@ -151,6 +153,15 @@ public sealed record PlaceRoleAssignmentCommand(OperatorDto Operator, Guid Assig
 
 /// <summary>Sets the Führungsstufe; a null Stufe clears it.</summary>
 public sealed record SetFuehrungsstufeCommand(OperatorDto Operator, Fuehrungsstufe? Stufe) : SyncCommand;
+
+/// <summary>Hides or shows one rail entry for this Einsatz; see <c>Incident.SetNavVisibility</c>.</summary>
+public sealed record SetNavVisibilityCommand(OperatorDto Operator, string Key, bool Visible) : SyncCommand;
+
+/// <summary>Adds a Checkliste from a Vorlage mid-Einsatz; the Vorlage's text travels with it.</summary>
+public sealed record AddChecklistCommand(
+    OperatorDto Operator, Guid TemplateId, string Title, IReadOnlyList<ChecklistSeedItemDto> Items) : SyncCommand;
+
+public sealed record ChecklistSeedItemDto(string Text, bool IsMandatory);
 
 public sealed record UpdateLeadershipPostCommand(
     OperatorDto Operator, string? Standort, string? Rufname, string? Telefon, string? Funkgruppe) : SyncCommand;

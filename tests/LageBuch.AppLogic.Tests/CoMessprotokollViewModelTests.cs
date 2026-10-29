@@ -1308,6 +1308,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
 
+    public void SetNavVisibility(string key, bool visible) => _inner.SetNavVisibility(key, visible);
+
+    public void AddChecklist(ChecklistSeed seed) => _inner.AddChecklist(seed);
+
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) => _inner.SetFuehrungsstufe(stufe);
 
     public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe) =>
