@@ -1,0 +1,1 @@
+The FÜHRUNG board calls the FüAss Führungsunterstützung and can correct or hand over each one in place, and FUNKTIONEN gains BEARBEITEN to fix a holder's name, Funkrufname, Handynummer or typed Abschnitt without a handover.

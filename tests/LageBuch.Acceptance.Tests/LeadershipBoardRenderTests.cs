@@ -88,7 +88,8 @@ public class LeadershipBoardRenderTests
         session.SetFuehrungsstufe(Fuehrungsstufe.B);
     }
 
-    private sealed record Board(Window Window, LeadershipView View, LocalIncidentSession? Session, LeadershipViewModel Vm);
+    private sealed record Board(
+        Window Window, LeadershipView View, LocalIncidentSession? Session, LeadershipViewModel Vm, IncidentWorkspaceViewModel Workspace);
 
     // What the FÜHRUNG tab gives a module in a 1400 px window: the rail takes 172 px.
     private const double WorkspaceHostWidth = 1228;
@@ -141,7 +142,7 @@ public class LeadershipBoardRenderTests
         var window = new Window { Content = root, Width = width ?? (narrow ? 400 : 1400), Height = narrow ? 2900 : width is null ? 1500 : 2000 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        return new(window, view, writable, workspace.Leadership);
+        return new(window, view, writable, workspace.Leadership, workspace);
     }
 
     // A control inside a card template: its name is the template's, not the view's.
@@ -265,6 +266,48 @@ public class LeadershipBoardRenderTests
         Assert.False(OffersUnterabschnitt(Card(view, "Polizei")));
 
         Capture(board.Window, "fuehrung-board.png");
+    }
+
+    // Feedback from an Übung: a Führungsunterstützung could be added on the board and then neither
+    // corrected nor handed over there.
+    [AvaloniaFact]
+    public void A_fuehrungsunterstuetzung_is_corrected_and_handed_over_on_the_einsatzleitung()
+    {
+        var board = Show();
+        var el = Named<Border>(board.View, "ElCard");
+        Assert.Contains(
+            "FÜHRUNGSUNTERSTÜTZUNG", el.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        Assert.Equal("+ HINZUFÜGEN", Named<Button>(el, "AddAssistantButton").Content);
+
+        // Under the name, inside the card: a long Funktion and name must not push the card wider.
+        var edit = Named<Button>(el, "EditAssistantButton");
+        var right = edit.TranslatePoint(new Point(edit.Bounds.Width, 0), el)!.Value.X;
+        Assert.True(right <= el.Bounds.Width, $"ÄNDERN ends at {right}, card is {el.Bounds.Width}");
+        Assert.Equal("S2 Lage (Erika Musterfrau) ändern", AutomationProperties.GetName(edit));
+
+        Press(edit);
+        var dialog = Assert.IsType<RoleAssignmentDialogViewModel>(board.Workspace.PendingRoleAssignmentDialog);
+        Assert.Equal(RoleAssignmentDialogMode.Edit, dialog.Mode);
+        dialog.PersonName = "Erika Musterfrau-Huber";
+        dialog.SaveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(board.Workspace.PendingRoleAssignmentDialog);
+        Assert.Contains(
+            "Erika Musterfrau-Huber",
+            Named<ItemsControl>(el, "ElAssistantRows").GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+
+        Press(Named<Button>(el, "TransferAssistantButton"));
+        var handover = Assert.IsType<RoleAssignmentDialogViewModel>(board.Workspace.PendingRoleAssignmentDialog);
+        Assert.Equal(RoleAssignmentDialogMode.Transfer, handover.Mode);
+        handover.PersonName = "Lena Lehner";
+        handover.SaveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var s2 = board.Session!.Incident.Roles.Where(r => r.Role == "S2 Lage").ToList();
+        Assert.Equal(2, s2.Count);
+        Assert.Equal("Lena Lehner", s2.Single(r => r.To is null).PersonName);
+        Assert.Equal(RoleSlot.Fuehrungsassistent, s2.Single(r => r.To is null).Slot);
     }
 
     // The sheet's top row: the Einsatzleitung with its peers beside it, one dashed line between each.

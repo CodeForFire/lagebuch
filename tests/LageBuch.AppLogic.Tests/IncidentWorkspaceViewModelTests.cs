@@ -1074,6 +1074,29 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void Funktionens_bearbeiten_is_hosted_as_an_overlay_until_it_closes()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.Roles.NewRole = "S2 Lage";
+        vm.Roles.NewPersonName = "Musterfru, Erika";
+        vm.Roles.AddRoleCommand.Execute(null);
+
+        vm.Roles.Roles.Single().BeginEditCommand.Execute(null);
+
+        var dialog = Assert.IsType<RoleAssignmentDialogViewModel>(vm.PendingRoleAssignmentDialog);
+        dialog.PersonName = "Musterfrau, Erika";
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Null(vm.PendingRoleAssignmentDialog);
+        Assert.Equal("Musterfrau, Erika", vm.Roles.Roles.Single().PersonName);
+
+        vm.Roles.Roles.Single().BeginEditCommand.Execute(null);
+        Assert.NotNull(vm.PendingRoleAssignmentDialog);
+        vm.Dispose();
+        Assert.Null(vm.PendingRoleAssignmentDialog);
+    }
+
+    [Fact]
     public void A_replaced_or_dropped_person_dialog_stops_following_the_session()
     {
         var vm = NewWorkspace(out _, out _);

@@ -20,6 +20,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
 [JsonDerivedType(typeof(TransferRoleCommand), "transferRole")]
 [JsonDerivedType(typeof(EditRolePhoneCommand), "editRolePhone")]
+[JsonDerivedType(typeof(EditRoleAssignmentCommand), "editRoleAssignment")]
 [JsonDerivedType(typeof(AddCommandNodeCommand), "addCommandNode")]
 [JsonDerivedType(typeof(UpdateCommandNodeCommand), "updateCommandNode")]
 [JsonDerivedType(typeof(DissolveCommandNodeCommand), "dissolveCommandNode")]
@@ -109,6 +110,11 @@ public sealed record TransferRoleCommand(
     OperatorDto Operator, Guid AssignmentId, string NewPersonName, string? NewCallSign, string? NewPhone) : SyncCommand;
 
 public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentId, string? Phone) : SyncCommand;
+
+// The whole corrected state rather than a diff, as updateDwellingDetails does: the host compares it
+// with what it holds and logs only what changed.
+public sealed record EditRoleAssignmentCommand(
+    OperatorDto Operator, Guid AssignmentId, string PersonName, string? CallSign, string? Phone, string? Section) : SyncCommand;
 
 /// <summary>Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung.</summary>
 public sealed record AddCommandNodeCommand(

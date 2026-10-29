@@ -1,4 +1,5 @@
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 
 namespace LageBuch.Domain.Tests;
 
@@ -675,6 +676,109 @@ public class IncidentOperationsTests
         incident.EditRolePhone(clock, op, assigned.Id, " 0171 ");
 
         Assert.Equal(before, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_logs_only_the_fields_that_changed()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "S2", "Meier", phone: "0171", section: "Nord");
+        var before = incident.Journal.Count;
+
+        var updated = incident.EditRoleAssignment(clock, op, assigned.Id, " Maier ", "Florian 1/11", "0171", "Nord");
+
+        Assert.Equal(assigned.Id, updated.Id);
+        Assert.Equal("Maier", updated.PersonName);
+        Assert.Equal("Florian 1/11", updated.CallSign);
+        Assert.Equal(assigned.From, updated.From);
+        Assert.Single(incident.Roles);
+        Assert.Equal(before + 1, incident.Journal.Count);
+        Assert.Equal("Funktion S2 korrigiert: Name Meier → Maier, Funkrufname — → Florian 1/11", incident.Journal[^1].Text);
+        Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_moves_an_unplaced_one_to_another_abschnitt()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "S2", "Meier", section: "Nord");
+
+        var updated = incident.EditRoleAssignment(clock, op, assigned.Id, "Meier", null, null, " ");
+
+        Assert.Null(updated.Section);
+        Assert.Equal("Funktion S2 korrigiert: Abschnitt Nord → —", incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_without_a_change_writes_nothing()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "S2", "Meier", "Florian 1/11", phone: "0171");
+        var before = incident.Journal.Count;
+
+        incident.EditRoleAssignment(clock, op, assigned.Id, "Meier ", " Florian 1/11", "0171", null);
+
+        Assert.Equal(before, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_refuses_a_blank_name()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "S2", "Meier");
+
+        Assert.Throws<ArgumentException>(() => incident.EditRoleAssignment(clock, op, assigned.Id, " ", null, null, null));
+        Assert.Equal("Meier", incident.Roles[0].PersonName);
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_refuses_an_ended_one()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "S2", "Meier");
+        incident.TransferRole(clock, op, assigned.Id, "Schulz", null, null);
+
+        Assert.Throws<InvalidOperationException>(
+            () => incident.EditRoleAssignment(clock, op, assigned.Id, "Maier", null, null, null));
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_refuses_an_unknown_id()
+    {
+        var incident = NewIncident(out var clock, out var op);
+
+        Assert.Throws<ArgumentException>(
+            () => incident.EditRoleAssignment(clock, op, Guid.NewGuid(), "Maier", null, null, null));
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_refuses_to_move_one_the_board_placed()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var inNode = incident.AssignRole(clock, op, "Melder", "Meier", nodeId: node.Id, slot: RoleSlot.Melder);
+        var atEl = incident.AssignRole(clock, op, "S2", "Schulz", slot: RoleSlot.Fuehrungsassistent);
+
+        Assert.Throws<InvalidOperationException>(
+            () => incident.EditRoleAssignment(clock, op, inNode.Id, "Meier", null, null, "Süd"));
+        Assert.Throws<InvalidOperationException>(
+            () => incident.EditRoleAssignment(clock, op, atEl.Id, "Schulz", null, null, "Süd"));
+
+        // Its own place passed back unchanged is no move: the name is still corrected.
+        var renamed = incident.EditRoleAssignment(clock, op, inNode.Id, "Maier", null, null, "Nord");
+        Assert.Equal("Maier", renamed.PersonName);
+        Assert.Equal(node.Id, renamed.NodeId);
+    }
+
+    [Fact]
+    public void Editing_a_role_assignment_refuses_on_a_closed_incident()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "S2", "Meier");
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(
+            () => incident.EditRoleAssignment(clock, op, assigned.Id, "Maier", null, null, null));
     }
 
     // #470: RolesViewModel asks the aggregate who currently holds a Funktion, so a unique one can be

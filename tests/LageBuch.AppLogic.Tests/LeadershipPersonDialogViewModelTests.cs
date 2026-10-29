@@ -76,7 +76,7 @@ public class LeadershipPersonDialogViewModelTests
     [Theory]
     [InlineData(RoleSlot.Leiter, "EL festlegen", "FESTLEGEN")]
     [InlineData(RoleSlot.Melder, "Melder festlegen – Einsatzleitung", "FESTLEGEN")]
-    [InlineData(RoleSlot.Fuehrungsassistent, "FüAss hinzufügen", "HINZUFÜGEN")]
+    [InlineData(RoleSlot.Fuehrungsassistent, "Führungsunterstützung hinzufügen", "HINZUFÜGEN")]
     [InlineData(RoleSlot.Fachberater, "Fachberater hinzufügen", "HINZUFÜGEN")]
     public void At_the_einsatzleitung_the_title_and_button_follow_the_slot(RoleSlot slot, string title, string primary)
     {

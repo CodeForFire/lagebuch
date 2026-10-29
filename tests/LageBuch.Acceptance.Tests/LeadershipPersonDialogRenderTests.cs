@@ -13,7 +13,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// The person dialog behind the FÜHRUNG board (Leiter, Melder, Führungsassistenz, Fachberater).
+// The person dialog behind the FÜHRUNG board (Leiter, Melder, Führungsunterstützung, Fachberater).
 // Hosted directly, same idiom as CommandNodeDialogRenderTests; the saved PNGs are the PR's
 // "after" screenshots.
 public class LeadershipPersonDialogRenderTests

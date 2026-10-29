@@ -73,6 +73,27 @@ public sealed record RoleAssignment(
     /// <summary>Returns a copy with a corrected phone number, normalised the same way <see cref="Create"/> does.</summary>
     public RoleAssignment WithPhone(string? phone) => this with { Phone = Trimmed(phone) };
 
+    /// <summary>
+    /// Returns a copy with the person's details corrected, normalised the same way
+    /// <see cref="Create"/> does. Funktion, Von and the board's place stay; it is still the same
+    /// assignment, not a handover.
+    /// </summary>
+    public RoleAssignment WithDetails(string personName, string? callSign, string? phone, string? section)
+    {
+        if (string.IsNullOrWhiteSpace(personName))
+        {
+            throw new ArgumentException("Name darf nicht leer sein.", nameof(personName));
+        }
+
+        return this with
+        {
+            PersonName = personName.Trim(),
+            CallSign = Trimmed(callSign),
+            Phone = Trimmed(phone),
+            Section = Trimmed(section),
+        };
+    }
+
     private static string? Trimmed(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

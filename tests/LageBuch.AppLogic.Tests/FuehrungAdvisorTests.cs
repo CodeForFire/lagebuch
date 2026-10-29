@@ -92,7 +92,7 @@ public class FuehrungAdvisorTests
         var suggestion = FuehrungsstufeAdvisor.Suggest(incident);
 
         Assert.Equal(Fuehrungsstufe.C, suggestion.Stufe);
-        Assert.Equal("FüAss besetzt", suggestion.Reason);
+        Assert.Equal("Führungsunterstützung besetzt", suggestion.Reason);
     }
 
     [Fact]

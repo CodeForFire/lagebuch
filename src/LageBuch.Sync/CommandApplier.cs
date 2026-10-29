@@ -57,6 +57,9 @@ public static class CommandApplier
             case EditRolePhoneCommand c:
                 incident.EditRolePhone(clock, Operator(c.Operator), c.AssignmentId, c.Phone);
                 break;
+            case EditRoleAssignmentCommand c:
+                incident.EditRoleAssignment(clock, Operator(c.Operator), c.AssignmentId, c.PersonName, c.CallSign, c.Phone, c.Section);
+                break;
             case AddCommandNodeCommand c:
                 incident.AddCommandNode(
                     clock,

@@ -56,6 +56,7 @@ public class OverlayContractTests
         new("Workspace.SpellingHelper", typeof(IncidentWorkspaceViewModel), typeof(SpellingHelperDialogViewModel), OpenWorkspaceSpellingHelper),
         new("Workspace.CommandNodeDialog", typeof(IncidentWorkspaceViewModel), typeof(CommandNodeDialogViewModel), OpenWorkspaceCommandNodeDialog),
         new("Workspace.LeadershipPersonDialog", typeof(IncidentWorkspaceViewModel), typeof(LeadershipPersonDialogViewModel), OpenWorkspaceLeadershipPersonDialog),
+        new("Workspace.RoleAssignmentDialog", typeof(IncidentWorkspaceViewModel), typeof(RoleAssignmentDialogViewModel), OpenWorkspaceRoleAssignmentDialog),
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
         new("Main.About", typeof(MainWindowViewModel), typeof(AboutViewModel), OpenMainAbout),
         new("Main.ShortcutOverview", typeof(MainWindowViewModel), typeof(ShortcutOverviewViewModel), OpenMainShortcutOverview),
@@ -354,6 +355,15 @@ public class OverlayContractTests
         var opener = Named<Button>(window, "LeadershipSetElButton");
         Activate(opener);
         return new(window, opener, ViewOf<LeadershipPersonDialogView>(window), () => vm.PendingLeadershipPersonDialog is null, () => vm.PendingLeadershipPersonDialog?.CancelCommand.Execute(null));
+    }
+
+    private static Opened OpenWorkspaceRoleAssignmentDialog()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AssignRole("ZF", AnonymizedExampleData.OperatorSurname));
+        WorkspaceRenderHelper.SelectTab(window, "FUNKTIONEN");
+        var opener = RowButton(window, "RolesGrid", b => b.Name == "EditRowButton");
+        Activate(opener);
+        return new(window, opener, ViewOf<RoleAssignmentDialogView>(window), () => vm.PendingRoleAssignmentDialog is null, () => vm.PendingRoleAssignmentDialog?.CancelCommand.Execute(null));
     }
 
     // A row's own button, the way a keyboard user reaches it: Tab into the grid, then to the row.

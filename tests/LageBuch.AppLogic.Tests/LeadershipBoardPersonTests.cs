@@ -62,7 +62,7 @@ public class LeadershipBoardPersonTests
         vm.AddFachberaterCommand.Execute(null);
 
         Assert.Equal(
-            ["EL festlegen", "Melder festlegen – Einsatzleitung", "FüAss hinzufügen", "Fachberater hinzufügen"],
+            ["EL festlegen", "Melder festlegen – Einsatzleitung", "Führungsunterstützung hinzufügen", "Fachberater hinzufügen"],
             opened.Select(d => d.Title));
     }
 

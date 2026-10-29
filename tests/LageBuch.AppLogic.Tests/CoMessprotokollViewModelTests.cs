@@ -1278,6 +1278,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void EditRolePhone(Guid assignmentId, string? phone) => _inner.EditRolePhone(assignmentId, phone);
 
+    public void EditRoleAssignment(Guid assignmentId, string personName, string? callSign, string? phone, string? section) =>
+        _inner.EditRoleAssignment(assignmentId, personName, callSign, phone, section);
+
     public void AddCommandNode(
         CommandNodeKind kind,
         string name,

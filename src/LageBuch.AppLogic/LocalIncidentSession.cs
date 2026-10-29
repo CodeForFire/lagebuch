@@ -154,6 +154,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
 
+    public void EditRoleAssignment(Guid assignmentId, string personName, string? callSign, string? phone, string? section) =>
+        Mutate(() => Incident.EditRoleAssignment(_clock, RequireOperator(), assignmentId, personName, callSign, phone, section));
+
     public void AddCommandNode(
         CommandNodeKind kind,
         string name,
