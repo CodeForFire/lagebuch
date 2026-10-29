@@ -24,4 +24,9 @@
     <ProjectReference Include="..\..\src\LageBuch.App.Shared\LageBuch.App.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The byte-level PMTiles/MVT builder, so FictionalRegionPack can write a vector map too. -->
+    <Compile Include="..\LageBuch.Persistence.Tests\VectorTileFixtures.cs" Link="VectorTileFixtures.cs" />
+  </ItemGroup>
+
 </Project>

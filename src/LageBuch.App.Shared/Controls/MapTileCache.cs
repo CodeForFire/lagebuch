@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Avalonia.Media.Imaging;
 using LageBuch.Persistence.Map;
+using LageBuch.Persistence.Map.Vector;
 
 namespace LageBuch.App.Shared.Controls;
 
@@ -21,6 +22,11 @@ public sealed class MapTileCache
 
     private readonly Dictionary<(IMapTileSource Layer, int Zoom, int X, int Y), LinkedListNode<Entry>> _entries = new();
     private readonly LinkedList<Entry> _recent = new();
+
+    // Decoded vector tiles, so that the 16 tiles of z17 cut from one z15 tile
+    // parse it once. A handful is enough: a screen at z17 spans few z15 tiles.
+    private readonly Dictionary<(IMapTileSource Layer, int Zoom, int X, int Y), IReadOnlyList<VectorLayer>?> _vectors = new();
+    private readonly Queue<(IMapTileSource Layer, int Zoom, int X, int Y)> _vectorOrder = new();
 
     public IMapTileSource? Source { get; private set; }
 
@@ -59,8 +65,9 @@ public sealed class MapTileCache
             return node.Value.Bitmap;
         }
 
-        var bitmap = Decode(layer.GetTile(zoom, x, y));
-        _entries[key] = _recent.AddFirst(new Entry(key, bitmap));
+        IReadOnlyList<MapLabel> labels = [];
+        var bitmap = layer is PmTilesFileSource vector ? RenderVector(vector, zoom, x, y, out labels) : Decode(layer.GetTile(zoom, x, y));
+        _entries[key] = _recent.AddFirst(new Entry(key, bitmap, labels));
         if (_entries.Count > Capacity && _recent.Last is { } oldest)
         {
             _recent.RemoveLast();
@@ -71,6 +78,14 @@ public sealed class MapTileCache
         return bitmap;
     }
 
+    /// <summary>
+    /// The names a vector tile wants drawn over the map, in the tile's pixels, once
+    /// <see cref="Get(IMapTileSource, int, int, int)"/> has fetched it; empty for a raster tile,
+    /// whose names are in its pixels, and for a tile not fetched.
+    /// </summary>
+    public IReadOnlyList<MapLabel> Labels(IMapTileSource layer, int zoom, int x, int y) =>
+        _entries.TryGetValue((layer, zoom, x, y), out var node) ? node.Value.Labels : [];
+
     public void Clear()
     {
         foreach (var entry in _recent)
@@ -80,6 +95,59 @@ public sealed class MapTileCache
 
         _recent.Clear();
         _entries.Clear();
+        _vectors.Clear();
+        _vectorOrder.Clear();
+    }
+
+    // Past the archive's deepest zoom, the tile is the matching part of its ancestor, rendered at
+    // this zoom rather than enlarged.
+    private RenderTargetBitmap? RenderVector(PmTilesFileSource source, int zoom, int x, int y, out IReadOnlyList<MapLabel> labels)
+    {
+        labels = [];
+        if (source.GetMaxZoom() is not { } maxZoom)
+        {
+            return null;
+        }
+
+        var sourceZoom = Math.Min(zoom, maxZoom);
+        var levels = zoom - sourceZoom;
+        (IMapTileSource Layer, int Zoom, int X, int Y) key = (source, sourceZoom, x >> levels, y >> levels);
+        if (!_vectors.TryGetValue(key, out var layers))
+        {
+            layers = DecodeVector(source.GetTile(sourceZoom, key.X, key.Y));
+            _vectors[key] = layers;
+            _vectorOrder.Enqueue(key);
+            if (_vectorOrder.Count > 16)
+            {
+                _vectors.Remove(_vectorOrder.Dequeue());
+            }
+        }
+
+        if (layers is null)
+        {
+            return null;
+        }
+
+        var (subX, subY) = (x - (key.X << levels), y - (key.Y << levels));
+        labels = VectorTileRenderer.Labels(layers, zoom, levels, subX, subY);
+        return VectorTileRenderer.Render(layers, zoom, levels, subX, subY);
+    }
+
+    private static IReadOnlyList<VectorLayer>? DecodeVector(byte[]? bytes)
+    {
+        if (bytes is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return MvtTile.Decode(bytes);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     [SuppressMessage("Design", "CA1031", Justification = "A tile whose bytes are no image is drawn as missing: null is the documented result.")]
@@ -101,5 +169,5 @@ public sealed class MapTileCache
         }
     }
 
-    private sealed record Entry((IMapTileSource Layer, int Zoom, int X, int Y) Key, Bitmap? Bitmap);
+    private sealed record Entry((IMapTileSource Layer, int Zoom, int X, int Y) Key, Bitmap? Bitmap, IReadOnlyList<MapLabel> Labels);
 }

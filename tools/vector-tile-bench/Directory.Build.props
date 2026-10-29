@@ -1,0 +1,13 @@
+<Project>
+  <!-- POC for CodeForFire/lagebuch-geodata#5, not part of LageBuch.sln. Stops the repository's
+       Directory.Build.props from applying: these are throwaway measuring tools, and VexTile pins
+       SkiaSharp 2.88, which the app's analyzers and locked restore have no business with. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+</Project>

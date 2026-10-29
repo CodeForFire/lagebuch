@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -50,6 +51,15 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     // Everything a zip holds, at its root: FORMAT.md says exactly these, and a zip with any other
     // entry is refused. Each is written under this fixed name, so no entry name reaches a path.
     private static readonly string[] PackFiles = [ManifestFileName, "ATTRIBUTION.md", .. DataFiles];
+
+    // A pack built since lagebuch-geodata#25 also holds the map as vector tiles. One built before
+    // does not, and still installs.
+    private static readonly string[] VectorPackFiles = [.. PackFiles, InstalledRegionPack.VectorTilesFileName];
+
+    /// <summary>The vector tile schema this app styles: the Protomaps basemap, version 4.</summary>
+    public const string VectorSchema = "protomaps-basemap";
+
+    public const int VectorSchemaMajorVersion = 4;
 
     private readonly HttpClient _http;
     private readonly string _root;
@@ -318,15 +328,23 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         {
             using var zip = ZipFile.OpenRead(zipPath);
             var names = zip.Entries.Select(e => e.FullName).ToList();
-            if (names.Count != PackFiles.Length
-                || !names.Order(StringComparer.Ordinal).SequenceEqual(PackFiles.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            var withVector = HoldsExactly(names, VectorPackFiles);
+            if (!withVector && !HoldsExactly(names, PackFiles))
             {
                 throw new RegionPackException("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.");
             }
 
             var manifestPath = Path.Join(staging, ManifestFileName);
             Extract(zip, ManifestFileName, manifestPath, MaxManifestBytes, ref total);
-            var declared = ReadManifest(manifestPath, pack, DataFiles);
+            var declared = ReadManifest(manifestPath, pack, withVector ? [.. DataFiles, InstalledRegionPack.VectorTilesFileName] : DataFiles);
+
+            // Vector tiles in a schema this app cannot style are left in the zip: the map then
+            // draws the pack's raster tiles, which every pack has.
+            if (withVector && !StylesVectorMap(manifestPath))
+            {
+                declared.Remove(InstalledRegionPack.VectorTilesFileName);
+            }
+
             Extract(zip, "ATTRIBUTION.md", Path.Join(staging, "ATTRIBUTION.md"), MaxManifestBytes, ref total);
             foreach (var (name, (bytes, sha256)) in declared)
             {
@@ -421,6 +439,24 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         {
             throw new RegionPackException(Damaged().Message, e);
         }
+    }
+
+    private static bool HoldsExactly(List<string> names, string[] expected) =>
+        names.Count == expected.Length
+        && names.Order(StringComparer.Ordinal).SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal);
+
+    // Whether pack.json's vectorMap names the schema and major version this app's style is for.
+    // Read after ReadManifest has accepted the file, so a malformed document is already refused.
+    private static bool StylesVectorMap(string manifestPath)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
+        return doc.RootElement.TryGetProperty("vectorMap", out var vector) && vector.ValueKind == JsonValueKind.Object
+            && vector.TryGetProperty("schema", out var schema) && schema.ValueKind == JsonValueKind.String
+            && string.Equals(schema.GetString(), VectorSchema, StringComparison.Ordinal)
+            && vector.TryGetProperty("schemaVersion", out var version) && version.ValueKind == JsonValueKind.String
+            && version.GetString() is { } text
+            && int.TryParse(text.Split('.')[0], NumberStyles.None, CultureInfo.InvariantCulture, out var major)
+            && major == VectorSchemaMajorVersion;
     }
 
     private static RegionPackException Damaged() => new("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).");

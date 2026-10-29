@@ -2,6 +2,7 @@ using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map;
+using LageBuch.Persistence.Map.Vector;
 using LageBuch.Persistence.Sqlite;
 
 namespace LageBuch.AppLogic.Tests;
@@ -120,6 +121,39 @@ public class MapViewportTests
             var layers = Assert.IsType<CombinedMapTileSource>(viewport.TileSource).Layers;
             Assert.Null(layers[0].Boundary);
             Assert.Equal(4, Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyList<GeoPoint>>>(layers[1].Boundary)).Count);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void A_pack_with_vector_tiles_draws_them_unclipped_and_one_without_draws_its_raster_tiles_in_its_area()
+    {
+        var root = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
+        try
+        {
+            var ffb = Directory.CreateDirectory(Path.Join(root, "ffb")).FullName;
+            var sta = Directory.CreateDirectory(Path.Join(root, "sta")).FullName;
+            const string Area = """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.4, 48.0], [11.4, 48.3], [11.0, 48.0]]]}}""";
+            File.WriteAllText(Path.Join(ffb, InstalledRegionPack.BoundaryFileName), Area);
+            File.WriteAllText(Path.Join(sta, InstalledRegionPack.BoundaryFileName), Area);
+            File.WriteAllText(Path.Join(ffb, InstalledRegionPack.VectorTilesFileName), "vector");
+            var viewport = new MapViewport();
+
+            viewport.ShowAll(
+                [
+                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"), sta),
+                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"), ffb),
+                ],
+                centerOnPacks: false);
+
+            var layers = Assert.IsType<CombinedMapTileSource>(viewport.TileSource).Layers;
+            Assert.IsType<PmTilesFileSource>(layers[0].Tiles);
+            Assert.Null(layers[0].Boundary);
+            Assert.IsType<MbTilesFileSource>(layers[1].Tiles);
+            Assert.NotNull(layers[1].Boundary);
         }
         finally
         {

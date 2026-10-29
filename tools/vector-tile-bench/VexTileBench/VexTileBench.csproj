@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- VexTile (the MVT renderer Mapsui's vector tiles use) on the same tiles. A process of its
+       own, because it pins SkiaSharp 2.88 and Avalonia 12 loads SkiaSharp 3.119. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\LageBuch.Persistence\LageBuch.Persistence.csproj" />
+    <PackageReference Include="VexTile.Renderer.Mvt.AliFlux" Version="1.0.2" />
+    <!-- SkiaSharp 2.88 ships no Linux native library on its own. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" />
+    <None Include="protomaps-carto-lite.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

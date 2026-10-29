@@ -9,6 +9,8 @@ namespace LageBuch.AppLogic.Tests;
 
 public sealed class RegionPackLibraryTests : IDisposable
 {
+    private const string KnownVectorMap = """{"minZoom": 0, "maxZoom": 15, "schema": "protomaps-basemap", "schemaVersion": "4.15.2"}""";
+
     private const string Area = """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.4, 48.0], [11.4, 48.3], [11.0, 48.0]]]}}""";
 
     private readonly string _dir = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
@@ -44,6 +46,61 @@ public sealed class RegionPackLibraryTests : IDisposable
             Directory.GetFiles(installed.FolderPath).Select(Path.GetFileName).Order(StringComparer.Ordinal));
         var listed = Assert.Single(library.GetInstalled());
         Assert.Equal(Pack(zip), listed.Info);
+    }
+
+    [Fact]
+    public async Task A_pack_with_vector_tiles_in_the_schema_this_app_styles_installs_them_beside_the_raster_tiles()
+    {
+        var zip = Zip([.. Files(vectorTiles: "vector")]);
+        _handler.Respond(_ => Ok(zip));
+
+        var installed = await Library().InstallAsync(Pack(zip));
+
+        Assert.Equal("vector", await File.ReadAllTextAsync(installed.VectorTilesPath));
+        Assert.Equal("tiles", await File.ReadAllTextAsync(installed.TilesPath));
+    }
+
+    [Theory]
+    [InlineData("""{"minZoom": 0, "maxZoom": 15, "schema": "protomaps-basemap", "schemaVersion": "5.0.0"}""")]
+    [InlineData("""{"minZoom": 0, "maxZoom": 14, "schema": "openmaptiles", "schemaVersion": "4.0"}""")]
+    [InlineData("""{"minZoom": 0, "maxZoom": 15}""")]
+    [InlineData("\"protomaps-basemap\"")]
+    public async Task Vector_tiles_in_a_schema_this_app_cannot_style_are_left_out_and_the_pack_installs_with_its_raster_tiles(string vectorMap)
+    {
+        var zip = Zip([.. Files(vectorTiles: "vector", vectorMap: vectorMap)]);
+        _handler.Respond(_ => Ok(zip));
+
+        var installed = await Library().InstallAsync(Pack(zip));
+
+        Assert.False(File.Exists(installed.VectorTilesPath));
+        Assert.Equal("tiles", await File.ReadAllTextAsync(installed.TilesPath));
+    }
+
+    [Fact]
+    public async Task Vector_tiles_that_pack_json_does_not_declare_refuse_the_pack()
+    {
+        var zip = Zip([.. Files(), ("map.pmtiles", "vector")]);
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
+        Assert.Empty(library.GetInstalled());
+    }
+
+    [Fact]
+    public async Task Vector_tiles_whose_bytes_differ_from_pack_json_refuse_the_pack()
+    {
+        var files = Files(vectorTiles: "vector");
+        var zip = Zip([.. files.Select(f => f.Name == "map.pmtiles" ? (f.Name, "vectoR") : f)]);
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
+        Assert.Empty(library.GetInstalled());
     }
 
     [Fact]
@@ -635,13 +692,20 @@ public sealed class RegionPackLibraryTests : IDisposable
 
     // The files of a well-formed pack, its pack.json declaring each data file truly.
     // shapeManifest bends that pack.json into one that lies.
-    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null, string boundary = Area)
+    // With vectorTiles, the pack also holds map.pmtiles, described by vectorMap.
+    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null, string boundary = Area, string? vectorTiles = null, string vectorMap = KnownVectorMap)
     {
         (string Name, string Content)[] data = [("map.mbtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses"), ("boundary.geojson", boundary)];
+        if (vectorTiles is not null)
+        {
+            data = [.. data, ("map.pmtiles", vectorTiles)];
+        }
+
         var files = string.Join(", ", data.Select(d => $$"""
             "{{d.Name}}": {"bytes": {{Encoding.UTF8.GetByteCount(d.Content)}}, "sha256": "{{Sha(d.Content)}}"}
             """));
-        var manifest = """{"formatVersion": 2, "slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1, "files": {""" + files + "}}";
+        var vector = vectorTiles is null ? string.Empty : $"\"vectorMap\": {vectorMap}, ";
+        var manifest = """{"formatVersion": 2, "slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1, """ + vector + "\"files\": {" + files + "}}";
         return [("pack.json", shapeManifest?.Invoke(manifest) ?? manifest), ("ATTRIBUTION.md", "© OpenStreetMap-Mitwirkende"), .. data];
     }
 
