@@ -2,7 +2,8 @@
 <!--
   WiX v5 authoring for the Lagebuch MSI. Built in CI with:
     wix build packaging/windows/Lagebuch.wxs -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext
-      -culture de-DE -d Version=<v> -d PublishDir=<dir> -d IconFile=<ico> -d DocumentIconFile=<ico> -o out.msi
+      -culture de-DE -d Version=<v> -d PublishDir=<dir> -d IconFile=<ico> -d DocumentIconFile=<ico>
+      -d BannerBmp=<bmp> -d DialogBmp=<bmp> -o out.msi
 
   The UpgradeCode is fixed forever: it is what lets a new version replace the old one instead of
   installing side by side. The ProductCode is auto-generated per build (Package/@Id defaults to "*").
@@ -102,6 +103,11 @@
          a <Property> value cannot reference another property (WIX1077). -->
     <SetProperty Id="WixShellExecTarget" Value="[INSTALLFOLDER]LageBuch.App.exe" After="CostFinalize" Sequence="ui" />
     <CustomAction Id="LaunchLagebuch" BinaryRef="Wix4UtilCA_X64" DllEntry="WixShellExec" Impersonate="yes" />
+
+    <!-- Lagebuch's own artwork in place of WiX's placeholders; make-installer-bitmaps.sh renders
+         both from the app icon. -->
+    <WixVariable Id="WixUIBannerBmp" Value="$(BannerBmp)" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(DialogBmp)" />
 
     <UI Id="LagebuchUI">
       <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />

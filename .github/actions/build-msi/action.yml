@@ -61,4 +61,6 @@ runs:
         -d "PublishDir=$env:GITHUB_WORKSPACE\publish"
         -d "IconFile=$env:GITHUB_WORKSPACE\src\LageBuch.App\Assets\icon.ico"
         -d "DocumentIconFile=$env:GITHUB_WORKSPACE\src\LageBuch.App\Assets\document.ico"
+        -d "BannerBmp=$env:GITHUB_WORKSPACE\packaging\windows\banner.bmp"
+        -d "DialogBmp=$env:GITHUB_WORKSPACE\packaging\windows\dialog.bmp"
         -o "$env:FILE_NAME"
