@@ -15,6 +15,12 @@ namespace LageBuch.Domain;
 /// </remarks>
 public sealed class ChecklistList
 {
+    /// <summary>The longest title <see cref="Incident.AddChecklist"/> accepts.</summary>
+    public const int MaxTitleLength = 200;
+
+    /// <summary>The most items <see cref="Incident.AddChecklist"/> accepts in one list.</summary>
+    public const int MaxItemCount = 200;
+
     private readonly List<ChecklistItem> _items = new();
 
     private ChecklistList(Guid id, string title)

@@ -2,6 +2,9 @@ namespace LageBuch.Domain;
 
 public sealed class ChecklistItem
 {
+    /// <summary>The longest item text <see cref="Incident.AddChecklist"/> accepts.</summary>
+    public const int MaxTextLength = 1000;
+
     public ChecklistItem(string text, bool isMandatory)
     {
         if (string.IsNullOrWhiteSpace(text))

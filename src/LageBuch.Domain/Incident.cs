@@ -14,6 +14,10 @@ namespace LageBuch.Domain;
 
 public sealed class Incident
 {
+    private const int MaxNavKeyLength = 64;
+    private const int MaxNavOverrides = 64;
+
+    private readonly Dictionary<string, bool> _navOverrides = new(StringComparer.Ordinal);
     private readonly List<ChecklistList> _checklists = new();
     private readonly List<EtbEntry> _journal = new();
     private readonly List<RoleAssignment> _roles = new();
@@ -66,6 +70,12 @@ public sealed class Incident
 
     /// <summary>The Einsatz's Checklisten, in order — 0..n of them, each its own copy of a template.</summary>
     public IReadOnlyList<ChecklistList> Checklists => _checklists;
+
+    /// <summary>
+    /// Per-Einsatz overrides of the left rail: nav key (or Checkliste id, "D" format) to whether
+    /// the entry is shown. A key without an override follows the Stammdaten layout.
+    /// </summary>
+    public IReadOnlyDictionary<string, bool> NavOverrides => _navOverrides;
 
     public IReadOnlyList<EtbEntry> Journal => _journal;
 
@@ -187,7 +197,8 @@ public sealed class Incident
         IEnumerable<CommandNode>? commandNodes = null,
         Fuehrungsstufe? fuehrungsstufe = null,
         LeadershipPost? leadershipPost = null,
-        GeoPoint? location = null)
+        GeoPoint? location = null,
+        IReadOnlyDictionary<string, bool>? navOverrides = null)
     {
         var incident = new Incident
         {
@@ -208,6 +219,15 @@ public sealed class Incident
             LeadershipPost = leadershipPost ?? LeadershipPost.Empty,
             Location = location,
         };
+        foreach (var (key, visible) in navOverrides ?? new Dictionary<string, bool>())
+        {
+            // Rehydrate is never strict: an entry over the caps is dropped, not an error.
+            if (IsValidNavKey(key) && (incident._navOverrides.Count < MaxNavOverrides || incident._navOverrides.ContainsKey(key)))
+            {
+                incident._navOverrides[key] = visible;
+            }
+        }
+
         incident._checklists.AddRange(checklists);
         incident._journal.AddRange(journal);
         incident._roles.AddRange(roles.Select(r => Enum.IsDefined(r.Slot) ? r : r with { Slot = RoleSlot.None }));
@@ -843,6 +863,67 @@ public sealed class Incident
         }
 
         return updated;
+    }
+
+    private static bool IsValidNavKey(string key) =>
+        !string.IsNullOrWhiteSpace(key) && key.Length <= MaxNavKeyLength;
+
+    /// <summary>
+    /// Shows or hides a left-rail entry for this Einsatz only. Silent in the ETB: it is a view
+    /// preference, not an operational fact.
+    /// </summary>
+    public void SetNavVisibility(string key, bool visible)
+    {
+        EnsureOpen();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (!IsValidNavKey(key))
+        {
+            throw new ArgumentException($"Navigationsschlüssel muss 1 bis {MaxNavKeyLength} Zeichen lang sein.", nameof(key));
+        }
+
+        if (!_navOverrides.ContainsKey(key) && _navOverrides.Count >= MaxNavOverrides)
+        {
+            throw new ArgumentException($"Mehr als {MaxNavOverrides} Navigationsüberschreibungen sind nicht möglich.", nameof(key));
+        }
+
+        _navOverrides[key] = visible;
+    }
+
+    /// <summary>
+    /// Takes a Checkliste from the Stammdaten into the running Einsatz, shows it in the rail and
+    /// logs it. Unlike seeding at start this enforces the size caps, because the content may come
+    /// from a sync peer.
+    /// </summary>
+    public ChecklistList AddChecklist(IClock clock, SessionOperator op, ChecklistSeed seed)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ArgumentNullException.ThrowIfNull(seed);
+
+        if (_checklists.Any(l => l.Id == seed.Id))
+        {
+            throw new InvalidOperationException("Diese Checkliste ist bereits im Einsatz.");
+        }
+
+        if (seed.Title.Length > ChecklistList.MaxTitleLength
+            || seed.Items.Count > ChecklistList.MaxItemCount
+            || seed.Items.Any(i => i.Text.Length > ChecklistItem.MaxTextLength))
+        {
+            throw new ArgumentException("Checkliste überschreitet die zulässige Größe.", nameof(seed));
+        }
+
+        var list = ChecklistList.FromSeed(seed);
+        var key = seed.Id.ToString("D");
+        if (!_navOverrides.ContainsKey(key) && _navOverrides.Count >= MaxNavOverrides)
+        {
+            throw new ArgumentException($"Mehr als {MaxNavOverrides} Navigationsüberschreibungen sind nicht möglich.", nameof(seed));
+        }
+
+        _checklists.Add(list);
+        _navOverrides[key] = true;
+        AppendSystemEntry(clock, op, $"Checkliste „{list.Title}“ hinzugefügt");
+        return list;
     }
 
     /// <summary>Sets or clears the Führungsstufe. A no-op when unchanged.</summary>
