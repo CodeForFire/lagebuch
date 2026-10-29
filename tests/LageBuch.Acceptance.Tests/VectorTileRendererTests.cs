@@ -148,8 +148,8 @@ public class VectorTileRendererTests
 
         void Move((int X, int Y) p)
         {
-            geometry.AddRange(Varint((ulong)(uint)(((p.X - cx) << 1) ^ ((p.X - cx) >> 31))));
-            geometry.AddRange(Varint((ulong)(uint)(((p.Y - cy) << 1) ^ ((p.Y - cy) >> 31))));
+            geometry.AddRange(Varint((uint)(((p.X - cx) << 1) ^ ((p.X - cx) >> 31))));
+            geometry.AddRange(Varint((uint)(((p.Y - cy) << 1) ^ ((p.Y - cy) >> 31))));
             (cx, cy) = p;
         }
     }

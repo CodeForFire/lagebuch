@@ -9,6 +9,13 @@ dotnet_diagnostic.IDE0005.severity = warning
 # threshold TreatWarningsAsErrors acts on, so dead assignments accumulated silently until
 # CodeQL's cs/useless-assignment-to-local flagged seven of them. Raise it into the build.
 dotnet_diagnostic.IDE0059.severity = warning
+# The same move for three more CodeQL queries that kept arriving as PR review comments
+# (AGENTS.md, "Static analysis"): IDE0004 catches part of cs/useless-upcast and
+# cs/useless-cast-to-self, IDE0044 all of cs/missed-readonly-modifier, CA1508 part of
+# cs/constant-condition. `make codeql` covers what no Roslyn rule sees.
+dotnet_diagnostic.IDE0004.severity = warning
+dotnet_diagnostic.IDE0044.severity = warning
+dotnet_diagnostic.CA1508.severity = warning
 csharp_style_namespace_declarations = file_scoped:warning
 
 # Desktop Avalonia app: awaited continuations must keep the UI Dispatcher context, so

@@ -178,5 +178,5 @@ internal static class VectorTileFixtures
         }
     }
 
-    private static ulong ZigZag(int n) => (ulong)(uint)((n << 1) ^ (n >> 31));
+    private static ulong ZigZag(int n) => (uint)((n << 1) ^ (n >> 31));
 }

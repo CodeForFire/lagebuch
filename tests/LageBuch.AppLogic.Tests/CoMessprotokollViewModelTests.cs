@@ -107,6 +107,42 @@ public class CoMessprotokollViewModelTests
         Assert.All(vm.MatrixRows, r => Assert.Equal(3, r.Cells.Count));
     }
 
+    [Fact]
+    public void Progress_bar_splits_its_track_by_searched_affected_and_open_wohnungen()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        session.SetDwellingStatus(buildingId, 0, 1, DwellingStatus.Searched);
+        session.SetDwellingStatus(buildingId, 0, 2, DwellingStatus.Searched);
+        session.SetDwellingStatus(buildingId, 0, 3, DwellingStatus.Searched);
+        session.SetDwellingStatus(buildingId, 1, 1, DwellingStatus.Affected);
+
+        // 9 Wohnungen on a 420 px track: 3 searched, 1 affected, 5 open.
+        Assert.Equal(9, vm.TotalUnits);
+        Assert.Equal(140.0, vm.SearchedBarWidth, precision: 6);
+        Assert.Equal(46.7, vm.AffectedBarWidth, precision: 6);
+        Assert.Equal(233.3, vm.OpenBarWidth, precision: 6);
+    }
+
+    [Fact]
+    public void Progress_bar_without_any_wohnung_is_all_open()
+    {
+        var store = new FakeStore();
+        var session = TestSession.StartNew(
+            store,
+            Clock,
+            new SessionOperator("Test", null),
+            Path.GetTempFileName(),
+            Enumerable.Empty<(string, bool)>(),
+            Enumerable.Empty<(string, bool)>());
+        var vm = new CoMessprotokollViewModel(session, Clock, () => { });
+
+        Assert.Equal(0, vm.TotalUnits);
+        Assert.Equal(0.0, vm.SearchedBarWidth, precision: 6);
+        Assert.Equal(0.0, vm.AffectedBarWidth, precision: 6);
+        Assert.Equal(420.0, vm.OpenBarWidth, precision: 6);
+    }
+
     // --- Issue #265: per-floor Wohnungen counts and labels (Option B) ------------------------
     [Fact]
     public void ChangingApartmentCount_OnOneFloor_RebuildsOnlyThatRow()

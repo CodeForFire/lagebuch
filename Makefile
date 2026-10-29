@@ -70,7 +70,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .DEFAULT_GOAL := help
 
-.PHONY: help restore build build-all test test-all mutate run format format-check ci clean \
+.PHONY: help restore build build-all test test-all mutate run format format-check codeql ci clean \
         android-image android-image-rebuild apk aab emulator install run-android \
         logcat uninstall package-linux logo-assets samples screenshots demo-gif \
         play-listing-check play-screenshots phone-screenshots emulator-phone osm-streets
@@ -152,6 +152,11 @@ format: ## Apply dotnet format (whitespace + style)
 format-check: ## Fail if dotnet format would change anything
 	$(DOTNET) format whitespace $(SLNF) --verify-no-changes
 	$(DOTNET) format style $(SLNF) --verify-no-changes
+
+BASE ?= origin/main
+
+codeql: ## Run the PR's CodeQL analysis locally; fail on a result in lines changed since BASE (origin/main)
+	scripts/codeql-local.sh "$(BASE)"
 
 ci: ## Reproduce the CI build+test legs locally (desktop projects only — excludes the Android head)
 	$(DOTNET) restore $(SLNF)

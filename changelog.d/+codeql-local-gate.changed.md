@@ -1,0 +1,1 @@
+Contributors can run the pull request's CodeQL analysis locally with `make codeql`, the build now fails on three more of the findings CodeQL kept raising, and results in generated code no longer open alerts.

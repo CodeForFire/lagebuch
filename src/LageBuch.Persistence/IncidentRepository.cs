@@ -397,7 +397,7 @@ public sealed class IncidentRepository
                     p("$an", d.ApartmentNumber);
                     p("$rn", (object?)d.ResidentName ?? DBNull.Value);
                     p("$st", (int)d.Status);
-                    p("$kv", Domain.CoMeasurement.KeyAvailabilityEncoding.ToNullableBool(d.KeyAvailable) is { } k ? (object)(k ? 1 : 0) : DBNull.Value);
+                    p("$kv", Domain.CoMeasurement.KeyAvailabilityEncoding.ToNullableBool(d.KeyAvailable) is { } k ? (k ? 1 : 0) : DBNull.Value);
                     p("$cv", (object?)d.CoValue ?? DBNull.Value);
                     p("$kn", (object?)d.KeyNumber ?? DBNull.Value);
                 });
