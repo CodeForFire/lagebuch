@@ -37,9 +37,6 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
 
     private const string ManifestFileName = "pack.json";
 
-    // The raster map packs carried until lagebuch-geodata built vector tiles only.
-    private const string RasterTilesFileName = "map.mbtiles";
-
     // Downloading is the slow part; the last tenth of the bar is left for unpacking.
     private const double DownloadShare = 0.9;
 
@@ -54,10 +51,6 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     // Everything a zip holds, at its root: FORMAT.md says exactly these, and a zip with any other
     // entry is refused. Each is written under this fixed name, so no entry name reaches a path.
     private static readonly string[] PackFiles = [ManifestFileName, "ATTRIBUTION.md", .. DataFiles];
-
-    // Packs built before lagebuch-geodata dropped its raster tiles still carry them. Such a zip
-    // installs without them, until every published pack has been rebuilt.
-    private static readonly string[] PackFilesWithRaster = [.. PackFiles, RasterTilesFileName];
 
     /// <summary>The vector tile schema this app styles: the Protomaps basemap, version 4.</summary>
     public const string VectorSchema = "protomaps-basemap";
@@ -333,7 +326,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         {
             using var zip = ZipFile.OpenRead(zipPath);
             var names = zip.Entries.Select(e => e.FullName).ToList();
-            if (!HoldsExactly(names, PackFiles) && !HoldsExactly(names, PackFilesWithRaster))
+            if (!HoldsExactly(names, PackFiles))
             {
                 throw new RegionPackException("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.");
             }
