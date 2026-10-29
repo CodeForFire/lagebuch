@@ -123,8 +123,9 @@ public static class SpellingAlphabet
     private static readonly string[] GermanDigits =
         ["null", "eins", "zwo", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"];
 
+    // ICAO radiotelephony says "tree", "fife" and "niner" so 3, 5 and 9 cannot be misheard.
     private static readonly string[] IcaoDigits =
-        ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Niner"];
+        ["Zero", "One", "Two", "Tree", "Four", "Fife", "Six", "Seven", "Eight", "Niner"];
 
     /// <summary>
     /// The table for <paramref name="kind"/> in alphabetical order, the way it is printed on a
