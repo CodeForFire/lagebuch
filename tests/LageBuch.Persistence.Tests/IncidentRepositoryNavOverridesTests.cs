@@ -34,6 +34,25 @@ public sealed class IncidentRepositoryNavOverridesTests : IDisposable
     }
 
     [Fact]
+    public void An_einsatz_at_the_override_caps_survives_save_and_load()
+    {
+        var incident = NewIncident();
+        var keys = Enumerable.Range(0, Incident.MaxNavOverrides)
+            .Select(i => i.ToString("D2", System.Globalization.CultureInfo.InvariantCulture) + new string('ä', Incident.MaxNavKeyLength - 2))
+            .ToList();
+        foreach (var key in keys)
+        {
+            incident.SetNavVisibility(key, false);
+        }
+
+        IncidentRepository.Save(Path_, incident);
+        var loaded = IncidentRepository.Load(Path_);
+
+        Assert.Equal(Incident.MaxNavOverrides, loaded.NavOverrides.Count);
+        Assert.All(keys, k => Assert.False(loaded.NavOverrides[k]));
+    }
+
+    [Fact]
     public void An_einsatz_without_overrides_writes_null()
     {
         IncidentRepository.Save(Path_, NewIncident());
@@ -55,7 +74,7 @@ public sealed class IncidentRepositoryNavOverridesTests : IDisposable
     public void An_oversized_nav_overrides_value_opens_with_none()
     {
         IncidentRepository.Save(Path_, NewIncident());
-        var huge = "{\"etb\":false,\"pad\":\"" + new string('x', 5000) + "\"}";
+        var huge = "{\"etb\":false,\"pad\":\"" + new string('x', 30000) + "\"}";
         Tamper($"UPDATE incident_meta SET nav_overrides = '{huge}';");
 
         Assert.Empty(IncidentRepository.Load(Path_).NavOverrides);

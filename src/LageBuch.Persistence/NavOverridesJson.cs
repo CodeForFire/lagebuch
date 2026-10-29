@@ -8,7 +8,10 @@ namespace LageBuch.Persistence;
 /// </summary>
 internal static class NavOverridesJson
 {
-    internal const int MaxLength = 4096;
+    // Covers the largest object the writer can produce: the domain caps allow MaxNavOverrides keys of
+    // MaxNavKeyLength chars, each of which JSON may escape to six chars (\uXXXX), plus quotes,
+    // colon, value and comma. A smaller cap would make a legal Einsatz lose every override on reopen.
+    internal const int MaxLength = Domain.Incident.MaxNavOverrides * ((Domain.Incident.MaxNavKeyLength * 6) + 16);
 
     internal static string? Write(IReadOnlyDictionary<string, bool> overrides)
     {
