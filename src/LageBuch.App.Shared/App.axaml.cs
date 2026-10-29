@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using LageBuch.App.Shared.Views;
@@ -24,7 +25,38 @@ public partial class App : Application
     /// </summary>
     public static Func<MainWindowViewModel>? CreateMainViewModel { get; set; }
 
+    /// <summary>
+    /// Set by the desktop entry point next to <see cref="CreateMainViewModel"/>: writes the crash
+    /// report for a start that threw and returns the folder it went to, or <see langword="null"/>
+    /// when it could not be written.
+    /// </summary>
+    public static Func<Exception, string?>? ReportStartupFailure { get; set; }
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
+
+    /// <summary>
+    /// The desktop's main window, or -- when building it throws -- a <see cref="StartupFailureWindow"/>
+    /// in its place. Left to the unhandled-exception hook, such a failure had no window to show
+    /// on, and the report it left was taken by the next start before that start failed the same
+    /// way, so a store that broke every start broke it silently.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Anything that stops the main window being built must reach the screen; the failure is reported and shown, not swallowed.")]
+    public static Window CreateDesktopMainWindow(Func<MainWindowViewModel> createViewModel, Func<Exception, string?> reportStartupFailure)
+    {
+        ArgumentNullException.ThrowIfNull(createViewModel);
+        ArgumentNullException.ThrowIfNull(reportStartupFailure);
+        try
+        {
+            return new MainWindow(createViewModel());
+        }
+        catch (Exception ex)
+        {
+            return new StartupFailureWindow(ex, reportStartupFailure(ex));
+        }
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -33,7 +65,11 @@ public partial class App : Application
         // straight through to base — dereferencing CreateMainViewModel here would NRE every test.
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow(CreateMainViewModel!());
+            desktop.MainWindow = CreateDesktopMainWindow(CreateMainViewModel!, ReportStartupFailure ?? (_ => null));
+            if (desktop.MainWindow is StartupFailureWindow)
+            {
+                desktop.Exit += (_, e) => e.ApplicationExitCode = 1;
+            }
         }
         else if (ApplicationLifetime is IActivityApplicationLifetime activity)
         {
