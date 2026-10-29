@@ -105,6 +105,12 @@ public interface IIncidentSession
     /// <summary>Places a unit in a node; a null <paramref name="nodeId"/> returns it to "nicht zugeordnet".</summary>
     void MoveForceUnit(Guid unitId, Guid? nodeId);
 
+    /// <summary>Marks the Einsatzort on the Lagekarte; null takes the mark off. See <c>Incident.SetLocation</c>.</summary>
+    void SetIncidentLocation(GeoPoint? location);
+
+    /// <summary>Puts a unit on the Lagekarte; null takes it off. See <c>Incident.PlaceForceUnit</c>.</summary>
+    void PlaceForceUnit(Guid unitId, GeoPoint? position);
+
     /// <summary>Places a running Funktion in a node and board slot; a null <paramref name="nodeId"/> is the Einsatzleitung.</summary>
     void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot);
 

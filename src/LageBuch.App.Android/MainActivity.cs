@@ -6,6 +6,7 @@ using Avalonia.Android;
 using LageBuch.App.Android.Services;
 using LageBuch.App.Shared;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
 
@@ -33,6 +34,10 @@ namespace LageBuch.App.Android;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity
 {
+    // Process-wide, like the alarm service: the activity is recreated on rotation, the client is not.
+    // Only the Kartenpakete download through it, on the Lagebuchführer's request.
+    private static readonly HttpClient MapPackHttp = new();
+
     // OpenDocument (rather than GetContent) accepts multiple MIME types on Launch, needed
     // since an attachment can be any of several image types or a PDF.
     private static readonly string[] AttachmentMimeTypes =
@@ -102,7 +107,8 @@ public class MainActivity : AvaloniaMainActivity
             pdfExporter: new NoopIncidentPdfExporter(),
             lastConnection: new JsonLastConnectionStore(AndroidAppPaths.LastConnectionJsonPath(this)),
             lastCrashReport: CrashReports.TakePending(FilesDir!.AbsolutePath),
-            alarmMute: new AlarmMute(AndroidAppPaths.AlarmMuteJsonPath(this)));
+            alarmMute: new AlarmMute(AndroidAppPaths.AlarmMuteJsonPath(this)),
+            mapPacks: new RegionPackLibrary(MapPackHttp, AndroidAppPaths.RegionPacksDir(this)));
 
         base.OnCreate(savedInstanceState);
     }

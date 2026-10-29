@@ -1263,6 +1263,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void MoveForceUnit(Guid unitId, Guid? nodeId) => _inner.MoveForceUnit(unitId, nodeId);
 
+    public void SetIncidentLocation(GeoPoint? location) => _inner.SetIncidentLocation(location);
+
+    public void PlaceForceUnit(Guid unitId, GeoPoint? position) => _inner.PlaceForceUnit(unitId, position);
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
 
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) => _inner.SetFuehrungsstufe(stufe);

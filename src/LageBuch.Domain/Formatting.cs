@@ -1,5 +1,6 @@
 using System.Globalization;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Domain;
 
@@ -10,7 +11,22 @@ public static class Formatting
     /// <summary>A whole number the way the user reads it (de-DE grouping).</summary>
     public static string Number(int value) => value.ToString("N0", De);
 
+    /// <summary>
+    /// A position as decimal degrees, five places (about a metre), hemisphere as a letter:
+    /// "48,17850° N, 11,25550° O". O, not E: it is read out in German.
+    /// </summary>
+    public static string Coordinates(GeoPoint point)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        var lat = Math.Abs(point.Latitude).ToString("0.00000", De);
+        var lon = Math.Abs(point.Longitude).ToString("0.00000", De);
+        return $"{lat}° {(point.Latitude < 0 ? "S" : "N")}, {lon}° {(point.Longitude < 0 ? "W" : "O")}";
+    }
+
     public static string Timestamp(DateTimeOffset t) => t.ToString("dd.MM.yyyy HH:mm", De);
+
+    /// <summary>A calendar day alone, "27.10.2026", for something dated rather than timed.</summary>
+    public static string Date(DateTimeOffset t) => t.ToString("dd.MM.yyyy", De);
 
     /// <summary>Clock time alone, for series read within one Einsatz (a CO-Messreihe), where the
     /// date is the same on every line and only the minute carries information.</summary>

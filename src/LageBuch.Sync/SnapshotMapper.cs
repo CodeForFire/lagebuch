@@ -61,7 +61,9 @@ public static class SnapshotMapper
                 f.OfficerCount,
                 f.Edits.Select(x => new ForceUnitStrengthEditDto(x.PreviousOfficerCount, x.PreviousPersonnelCount, x.PreviousScbaCount, x.EditedBy, x.EditedAt, x.PreviousZugfuehrerCount)).ToList(),
                 f.ZugfuehrerCount,
-                f.NodeId)).ToList(),
+                f.NodeId,
+                f.Position?.Latitude,
+                f.Position?.Longitude)).ToList(),
             incident.ScbaTrupps.Select(ToDto).ToList(),
             incident.Audit.Select(a => new AuditEventDto(a.At, a.Action, a.By)).ToList(),
             incident.Timers.Select(t => new TimerDto(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)).ToList(),
@@ -134,7 +136,9 @@ public static class SnapshotMapper
             ElStandort: incident.LeadershipPost.Standort,
             ElRufname: incident.LeadershipPost.Rufname,
             ElTelefon: incident.LeadershipPost.Telefon,
-            ElFunkgruppe: incident.LeadershipPost.Funkgruppe);
+            ElFunkgruppe: incident.LeadershipPost.Funkgruppe,
+            LocationLatitude: incident.Location?.Latitude,
+            LocationLongitude: incident.Location?.Longitude);
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -176,7 +180,8 @@ public static class SnapshotMapper
                 f.OfficerCount,
                 f.Edits.Select(x => new ForceUnitStrengthEdit(x.PreviousOfficerCount, x.PreviousPersonnelCount, x.PreviousScbaCount, x.EditedBy, x.EditedAt, x.PreviousZugfuehrerCount)),
                 f.ZugfuehrerCount,
-                f.NodeId)),
+                f.NodeId,
+                GeoPoint.TryCreate(f.PositionLatitude, f.PositionLongitude))),
             snapshot.ScbaTrupps.Select(FromDto),
             snapshot.Audit.Select(a => new AuditEvent(a.At, a.Action, a.By)),
             snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)),
@@ -246,7 +251,8 @@ public static class SnapshotMapper
             (snapshot.CommandNodes ?? []).Select(n => CommandNode.Rehydrate(
                 n.Id, n.Kind, n.Name, n.ParentId, n.Auftrag, n.Standort, n.Funkgruppe, n.Rufname, n.Telefon, n.DissolvedAt)),
             snapshot.Fuehrungsstufe,
-            new LeadershipPost(snapshot.ElStandort, snapshot.ElRufname, snapshot.ElTelefon, snapshot.ElFunkgruppe));
+            new LeadershipPost(snapshot.ElStandort, snapshot.ElRufname, snapshot.ElTelefon, snapshot.ElFunkgruppe),
+            GeoPoint.TryCreate(snapshot.LocationLatitude, snapshot.LocationLongitude));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

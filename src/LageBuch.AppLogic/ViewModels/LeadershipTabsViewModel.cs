@@ -3,8 +3,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// The Führung rail entry: the Führungsorganisation board, Funktionen and Kräfte as three tabs of
-/// one module. They describe the same structure — who leads, who holds which post, which unit
+/// The Führung rail entry: the Führungsorganisation board, Funktionen, Kräfte and the Lagekarte as
+/// tabs of one module. They describe the same structure — who leads, who holds which post, which unit
 /// sits where — and as three rail entries they crowded the rail and the phone's bottom bar.
 /// </summary>
 /// <remarks>
@@ -22,16 +22,21 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
     /// <summary>The KRÄFTE tab.</summary>
     public const int ForcesTab = 2;
 
-    public LeadershipTabsViewModel(LeadershipViewModel board, RolesViewModel roles, ForcesViewModel forces, int selectedTabIndex = OrganisationTab)
+    /// <summary>The KARTE tab.</summary>
+    public const int MapTab = 3;
+
+    public LeadershipTabsViewModel(LeadershipViewModel board, RolesViewModel roles, ForcesViewModel forces, LagekarteViewModel map, int selectedTabIndex = OrganisationTab)
     {
         ArgumentNullException.ThrowIfNull(board);
         ArgumentNullException.ThrowIfNull(roles);
         ArgumentNullException.ThrowIfNull(forces);
+        ArgumentNullException.ThrowIfNull(map);
 
         Board = board;
         Roles = roles;
         Forces = forces;
-        _selectedTabIndex = selectedTabIndex is >= OrganisationTab and <= ForcesTab ? selectedTabIndex : OrganisationTab;
+        Map = map;
+        _selectedTabIndex = selectedTabIndex is >= OrganisationTab and <= MapTab ? selectedTabIndex : OrganisationTab;
     }
 
     public LeadershipViewModel Board { get; }
@@ -40,12 +45,24 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
 
     public ForcesViewModel Forces { get; }
 
-    /// <summary>The open tab, one of <see cref="OrganisationTab"/>, <see cref="RolesTab"/> and <see cref="ForcesTab"/>.</summary>
+    public LagekarteViewModel Map { get; }
+
+    /// <summary>The open tab, one of <see cref="OrganisationTab"/>, <see cref="RolesTab"/>, <see cref="ForcesTab"/> and <see cref="MapTab"/>.</summary>
     [ObservableProperty]
     private int _selectedTabIndex;
 
     [ObservableProperty]
     private bool _isNarrow;
+
+    // A Kartenpaket downloaded under Stammdaten while this Einsatz is open shows up the next time
+    // KARTE is opened, not only after the Einsatz is reopened.
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        if (value == MapTab)
+        {
+            Map.ReloadPacks();
+        }
+    }
 
     // Each tab lays out differently on a phone, and the workspace hands the flag only to the
     // modules in its rail -- this is the one it sees.
@@ -54,5 +71,6 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
         Board.IsNarrow = value;
         Roles.IsNarrow = value;
         Forces.IsNarrow = value;
+        Map.IsNarrow = value;
     }
 }

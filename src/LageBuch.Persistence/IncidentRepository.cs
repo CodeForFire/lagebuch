@@ -73,7 +73,7 @@ public sealed class IncidentRepository
 
         Run(
             inserts,
-            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, fuehrungsstufe, el_standort, el_rufname, el_telefon, el_funkgruppe) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$houseNumber,$postalCode,$place,$stufe,$elStandort,$elRufname,$elTelefon,$elFunkgruppe);",
+            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, fuehrungsstufe, el_standort, el_rufname, el_telefon, el_funkgruppe, location_lat, location_lon) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$houseNumber,$postalCode,$place,$stufe,$elStandort,$elRufname,$elTelefon,$elFunkgruppe,$lat,$lon);",
             p =>
             {
                 p("$id", incident.Id.ToString());
@@ -98,6 +98,8 @@ public sealed class IncidentRepository
                 p("$elRufname", (object?)incident.LeadershipPost.Rufname ?? DBNull.Value);
                 p("$elTelefon", (object?)incident.LeadershipPost.Telefon ?? DBNull.Value);
                 p("$elFunkgruppe", (object?)incident.LeadershipPost.Funkgruppe ?? DBNull.Value);
+                p("$lat", (object?)incident.Location?.Latitude ?? DBNull.Value);
+                p("$lon", (object?)incident.Location?.Longitude ?? DBNull.Value);
             });
 
         for (var i = 0; i < incident.Checklists.Count; i++)
@@ -194,7 +196,7 @@ public sealed class IncidentRepository
             var f = incident.Forces[i];
             Run(
                 inserts,
-                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc,$node);",
+                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id, position_lat, position_lon) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc,$node,$lat,$lon);",
                 p =>
                 {
                     p("$id", f.Id.ToString());
@@ -208,6 +210,8 @@ public sealed class IncidentRepository
                     p("$oc", f.OfficerCount);
                     p("$zc", f.ZugfuehrerCount);
                     p("$node", (object?)f.NodeId?.ToString() ?? DBNull.Value);
+                    p("$lat", (object?)f.Position?.Latitude ?? DBNull.Value);
+                    p("$lon", (object?)f.Position?.Longitude ?? DBNull.Value);
                 });
 
             for (var j = 0; j < f.Edits.Count; j++)
@@ -653,7 +657,7 @@ public sealed class IncidentRepository
 
         var meta = ReadRow(
             cn,
-            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, fuehrungsstufe, el_standort, el_rufname, el_telefon, el_funkgruppe FROM incident_meta LIMIT 1;");
+            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, fuehrungsstufe, el_standort, el_rufname, el_telefon, el_funkgruppe, location_lat, location_lon FROM incident_meta LIMIT 1;");
 
         // One query per table, grouped in C# -- the same shape as editsByEntry below. Items whose
         // list_id matches no list row are dropped: V23 fills list_id for every row it finds, so a
@@ -730,7 +734,7 @@ public sealed class IncidentRepository
 
         var forces = ReadAll(
             cn,
-            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id FROM force_units ORDER BY ordinal;",
+            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id, position_lat, position_lon FROM force_units ORDER BY ordinal;",
             r => Domain.ForceUnit.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -742,7 +746,8 @@ public sealed class IncidentRepository
                 r.GetInt32(7),
                 strengthEditsByUnit.TryGetValue(Guid.Parse(r.GetString(0)), out var eds) ? eds : null,
                 r.GetInt32(8),
-                NullableGuid(r, 9)));
+                NullableGuid(r, 9),
+                Domain.ValueObjects.GeoPoint.TryCreate(NullableDouble(r, 10), NullableDouble(r, 11))));
 
         var membersByTrupp = ReadAll(
             cn,
@@ -997,7 +1002,8 @@ public sealed class IncidentRepository
             issuedItems,
             commandNodes,
             LeadershipKeys.StufeFrom(meta[14] as string),
-            new Domain.Leadership.LeadershipPost(meta[15] as string, meta[16] as string, meta[17] as string, meta[18] as string));
+            new Domain.Leadership.LeadershipPost(meta[15] as string, meta[16] as string, meta[17] as string, meta[18] as string),
+            Domain.ValueObjects.GeoPoint.TryCreate(Real(meta[19]), Real(meta[20])));
     }
 
     private static DateTimeOffset ParseDate(string s) =>
@@ -1006,6 +1012,17 @@ public sealed class IncidentRepository
     private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
     private static int? NullableInt(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
+
+    // A coordinate is only taken as a number. A hostile file can store text in a REAL column, and a
+    // position that does not read costs the mark on the Lagekarte, not the Einsatz.
+    private static double? NullableDouble(SqliteDataReader r, int i) => Real(r.IsDBNull(i) ? null : r.GetValue(i));
+
+    private static double? Real(object? value) => value switch
+    {
+        double d => d,
+        long l => l,
+        _ => null,
+    };
 
     // TryParse rather than Parse: an unreadable id degrades to "no Sicherheitstrupp recorded",
     // which is the same stance Rehydrate takes on a stored crew -- a file that opens imperfectly

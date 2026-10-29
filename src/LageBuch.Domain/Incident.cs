@@ -55,6 +55,9 @@ public sealed class Incident
 
     public string? District { get; private set; }
 
+    /// <summary>The Einsatzort as marked on the Lagekarte; null until someone marks it.</summary>
+    public GeoPoint? Location { get; private set; }
+
     public string? Status { get; private set; }
 
     public DateTimeOffset? ClosedAt { get; private set; }
@@ -183,7 +186,8 @@ public sealed class Incident
         IEnumerable<IssuedItem>? issuedItems = null,
         IEnumerable<CommandNode>? commandNodes = null,
         Fuehrungsstufe? fuehrungsstufe = null,
-        LeadershipPost? leadershipPost = null)
+        LeadershipPost? leadershipPost = null,
+        GeoPoint? location = null)
     {
         var incident = new Incident
         {
@@ -202,6 +206,7 @@ public sealed class Incident
             ClosedBy = closedBy,
             Fuehrungsstufe = fuehrungsstufe is { } stufe && Enum.IsDefined(stufe) ? stufe : null,
             LeadershipPost = leadershipPost ?? LeadershipPost.Empty,
+            Location = location,
         };
         incident._checklists.AddRange(checklists);
         incident._journal.AddRange(journal);
@@ -1127,6 +1132,67 @@ public sealed class Incident
             ? $"{Label(updated)} → {target.Name}"
             : $"{Label(updated)}: Abschnitt aufgehoben (vorher {oldName ?? "unbekannt"})";
         AppendSystemEntry(clock, op, text, from: updated.CallSign);
+        return updated;
+    }
+
+    /// <summary>
+    /// Marks the Einsatzort on the Lagekarte, moves the mark, or takes it off with null. The ETB
+    /// records each, with the coordinates, so the Bericht says where the Einsatz was marked.
+    /// </summary>
+    public void SetLocation(IClock clock, SessionOperator op, GeoPoint? location)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        if (Location == location)
+        {
+            return;
+        }
+
+        var text = (Location, location) switch
+        {
+            (null, { } p) => $"Einsatzort auf der Lagekarte gesetzt ({Formatting.Coordinates(p)})",
+            (_, { } p) => $"Einsatzort auf der Lagekarte verlegt ({Formatting.Coordinates(p)})",
+            _ => "Einsatzort von der Lagekarte genommen",
+        };
+        Location = location;
+        AppendSystemEntry(clock, op, text);
+    }
+
+    /// <summary>
+    /// Puts a unit on the Lagekarte at <paramref name="position"/>, or takes it off with null.
+    /// The ETB records the first placement and the removal; moving a unit already on the map is
+    /// tidying the picture, and writing each drag down would bury the entries that matter.
+    /// </summary>
+    public ForceUnit PlaceForceUnit(IClock clock, SessionOperator op, Guid unitId, GeoPoint? position)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+        }
+
+        var previous = _forces[index];
+        if (previous.Position == position)
+        {
+            return previous;
+        }
+
+        var updated = previous.WithPosition(position);
+        _forces[index] = updated;
+        if (previous.Position is null)
+        {
+            AppendSystemEntry(clock, op, $"{Label(updated)} auf der Lagekarte eingetragen", from: updated.CallSign);
+        }
+        else if (position is null)
+        {
+            AppendSystemEntry(clock, op, $"{Label(updated)} von der Lagekarte genommen", from: updated.CallSign);
+        }
+
         return updated;
     }
 
