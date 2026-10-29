@@ -21,6 +21,77 @@ public class MapViewportTests
     }
 
     [Theory]
+    [InlineData(30, 30)]
+    [InlineData(-15, 345)]
+    [InlineData(375, 15)]
+    [InlineData(-720, 0)]
+    public void A_turn_from_the_map_is_kept_as_a_turn_from_0_up_to_360(double turned, double kept)
+    {
+        var viewport = new MapViewport();
+
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, turned));
+
+        Assert.Equal(kept, viewport.Rotation, precision: 9);
+    }
+
+    [Fact]
+    public void Moving_the_view_on_purpose_keeps_the_map_turned()
+    {
+        var viewport = new MapViewport();
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, 90));
+
+        viewport.ChangeViewCommand.Execute(new MapViewChange(new GeoPoint(48.1, 11.2), 17));
+
+        Assert.Equal(90, viewport.Rotation, precision: 9);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void A_turn_that_is_no_number_leaves_the_map_as_it_was(double turned)
+    {
+        var viewport = new MapViewport();
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, 40));
+
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, turned));
+
+        Assert.Equal(40, viewport.Rotation, precision: 9);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0.4, false)]
+    [InlineData(359.6, false)]
+    [InlineData(0.5, true)]
+    [InlineData(359.5, true)]
+    [InlineData(180, true)]
+    public void The_north_button_is_offered_only_on_a_map_turned_by_more_than_an_eye_can_tell(double turned, bool offered)
+    {
+        var viewport = new MapViewport();
+
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, turned));
+
+        Assert.Equal(offered, viewport.IsRotated);
+        Assert.Equal(offered, viewport.FaceNorthCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void The_north_button_turns_the_map_back_and_then_is_no_longer_offered()
+    {
+        var viewport = new MapViewport();
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, 135));
+        var changes = new List<string?>();
+        viewport.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        viewport.FaceNorthCommand.Execute(null);
+
+        Assert.Equal(0, viewport.Rotation, precision: 9);
+        Assert.False(viewport.IsRotated);
+        Assert.Contains(nameof(MapViewport.IsRotated), changes);
+        Assert.False(viewport.FaceNorthCommand.CanExecute(null));
+    }
+
+    [Theory]
     [InlineData(2, MapViewport.MinZoom)]
     [InlineData(25, MapViewport.MaxZoom)]
     public void A_zoom_past_what_the_map_can_show_stops_at_its_limit(int requested, int expected)

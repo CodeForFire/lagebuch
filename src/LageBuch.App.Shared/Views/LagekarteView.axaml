@@ -150,13 +150,14 @@
                             SelectedWaterPoint="{Binding SelectedWaterPoint}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
+                            Rotation="{Binding Map.Rotation}"
                             ViewChangedCommand="{Binding Map.ChangeViewCommand}"
                             TappedCommand="{Binding MapTappedCommand}" />
 
         <ItemsControl x:Name="Marks" ItemsSource="{Binding Markers}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate x:DataType="vm:LagekarteViewModel">
-              <c:MapMarkerPanel Center="{Binding Map.Center}" Zoom="{Binding Map.Zoom}" />
+              <c:MapMarkerPanel Center="{Binding Map.Center}" Zoom="{Binding Map.Zoom}" Rotation="{Binding Map.Rotation}" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.Styles>
@@ -292,6 +293,12 @@
           <Button Classes="icon-btn" ToolTip.Tip="Verkleinern" AutomationProperties.Name="Verkleinern"
                   Command="{Binding Map.ZoomOutCommand}">
             <PathIcon Data="M19 13H5v-2h14v2z" />
+          </Button>
+          <!-- Only on a turned map: the needle shows where north is, a press turns it back. -->
+          <Button x:Name="FaceNorthButton" Classes="icon-btn" ToolTip.Tip="Norden nach oben"
+                  AutomationProperties.Name="Norden nach oben"
+                  IsVisible="{Binding Map.IsRotated}" Command="{Binding Map.FaceNorthCommand}">
+            <c:CompassNeedle Angle="{Binding Map.Rotation}" />
           </Button>
           <ToggleButton x:Name="WaterPointsToggle" Classes="icon-btn" ToolTip.Tip="Hydranten zeigen"
                         AutomationProperties.Name="Hydranten zeigen"

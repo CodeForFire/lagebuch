@@ -10,10 +10,11 @@ using LageBuch.Persistence.Map;
 namespace LageBuch.App.Shared.Controls;
 
 /// <summary>
-/// An offline map: the tiles of a Kartenpaket around <see cref="Center"/> at <see cref="Zoom"/>.
-/// Dragging pans, the wheel and a pinch zoom towards the pointer. The control never changes its
-/// own view; it reports each pan or zoom through <see cref="ViewChangedCommand"/> and redraws when
-/// the view model hands the new view back.
+/// An offline map: the tiles of a Kartenpaket around <see cref="Center"/> at <see cref="Zoom"/>,
+/// turned by <see cref="Rotation"/>. Dragging pans, the wheel and a pinch zoom towards the pointer;
+/// twisting two fingers, Shift+wheel and Shift+arrow turn it. The control never changes its own
+/// view; it reports each pan, zoom or turn through <see cref="ViewChangedCommand"/> and redraws
+/// when the view model hands the new view back.
 /// </summary>
 public sealed class MapCanvasControl : Control
 {
@@ -25,6 +26,10 @@ public sealed class MapCanvasControl : Control
 
     public static readonly StyledProperty<int> ZoomProperty =
         AvaloniaProperty.Register<MapCanvasControl, int>(nameof(Zoom), defaultValue: 13);
+
+    /// <summary>How far the map is turned clockwise, in degrees; 0 is north up.</summary>
+    public static readonly StyledProperty<double> RotationProperty =
+        AvaloniaProperty.Register<MapCanvasControl, double>(nameof(Rotation));
 
     /// <summary>
     /// Zoom on the wheel only with Ctrl held. For a map inside a scrolling page, where a plain
@@ -53,6 +58,12 @@ public sealed class MapCanvasControl : Control
     // A finger rests a little unsteadily; a press that moves less than this is a tap, not a pan.
     private const double TapSlop = 6;
 
+    // Shift+arrow and a Shift+wheel notch turn the map by this many degrees.
+    private const double RotationStep = 15;
+
+    // Two fingers that only pinch still turn a little against each other; less than this is no turn.
+    private const double TwistSlop = 10;
+
     private readonly MapTileCache _tiles = new();
 
     // Where a drag started, on screen and on the map; null while no drag is under way.
@@ -60,12 +71,16 @@ public sealed class MapCanvasControl : Control
     private GeoPoint? _dragStartCenter;
     private bool _dragMoved;
 
-    // A pinch reports its scale relative to where it began, so the zoom is derived from the start.
+    // A pinch reports its scale relative to where it began, so the zoom is derived from the start;
+    // its angle is absolute, so the turn is measured from the angle it began with.
     private int? _pinchStartZoom;
+    private double _pinchStartRotation;
+    private double? _pinchStartAngle;
+    private bool _twisting;
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, WaterPointsProperty, SelectedWaterPointProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
@@ -93,6 +108,12 @@ public sealed class MapCanvasControl : Control
     {
         get => GetValue(ZoomProperty);
         set => SetValue(ZoomProperty, value);
+    }
+
+    public double Rotation
+    {
+        get => GetValue(RotationProperty);
+        set => SetValue(RotationProperty, value);
     }
 
     public IReadOnlyList<WaterPoint>? WaterPoints
@@ -129,11 +150,18 @@ public sealed class MapCanvasControl : Control
 
     /// <summary>The position under <paramref name="screen"/>, or null before the map has a centre.</summary>
     public GeoPoint? ScreenToGeo(Point screen) =>
-        Center is { } center ? MapDrawing.ToGeo(center, Zoom, Bounds.Size, screen) : null;
+        Center is { } center ? MapDrawing.ToGeo(center, Zoom, Bounds.Size, screen, Rotation) : null;
 
     /// <summary>Each zoom level doubles the scale, so a pinch to twice the size is one level in.</summary>
     public static int PinchScaleToZoomDelta(double relativeScale) =>
         (int)Math.Round(Math.Log2(Math.Max(relativeScale, 0.01)));
+
+    /// <summary>
+    /// How far two fingers have turned from <paramref name="startAngle"/> to <paramref name="angle"/>,
+    /// both in degrees clockwise as a pinch reports them: the short way round, so a turn across
+    /// 0°/360° is a small step and not nearly a whole turn back.
+    /// </summary>
+    public static double TwistBetween(double startAngle, double angle) => Math.IEEERemainder(angle - startAngle, 360);
 
     public override void Render(DrawingContext context)
     {
@@ -146,10 +174,10 @@ public sealed class MapCanvasControl : Control
 
         // Missing tiles are painted too, so the whole control stays hit-testable for a drag.
         _tiles.Use(TileSource);
-        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size);
+        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation);
         if (WaterPoints is { } water)
         {
-            MapDrawing.DrawWaterPoints(context, water, center, Zoom, Bounds.Size, SelectedWaterPoint);
+            MapDrawing.DrawWaterPoints(context, water, center, Zoom, Bounds.Size, SelectedWaterPoint, Rotation);
         }
     }
 
@@ -206,7 +234,8 @@ public sealed class MapCanvasControl : Control
 
         _dragMoved = true;
         var (x, y) = WebMercator.ToWorldPixel(startCenter, Zoom);
-        Report(WebMercator.ToGeo(x - (position.X - start.X), y - (position.Y - start.Y), Zoom), Zoom);
+        var moved = MapDrawing.ToNorthUp(position - start, Rotation);
+        Report(WebMercator.ToGeo(x - moved.X, y - moved.Y, Zoom), Zoom);
         e.Handled = true;
     }
 
@@ -240,8 +269,29 @@ public sealed class MapCanvasControl : Control
     {
         ArgumentNullException.ThrowIfNull(e);
         base.OnPointerWheelChanged(e);
+
+        // Shift turns: the wheel away from you turns the map clockwise, like a dial. By how far it
+        // scrolled, not by event: a wheel notch is 1 and turns a step, while a touchpad sends many
+        // small scrolls that turn the map smoothly. Some systems send Shift+scroll sideways.
+        if ((e.KeyModifiers & KeyModifiers.Shift) != 0)
+        {
+            var scrolled = Math.Abs(e.Delta.Y) >= Math.Abs(e.Delta.X) ? e.Delta.Y : e.Delta.X;
+            if (Math.Abs(scrolled) > 0)
+            {
+                TurnBy(scrolled * RotationStep);
+                e.Handled = true;
+            }
+
+            return;
+        }
+
         var step = Math.Sign(e.Delta.Y);
-        if (step == 0 || (WheelZoomNeedsControl && (e.KeyModifiers & KeyModifiers.Control) == 0))
+        if (step == 0)
+        {
+            return;
+        }
+
+        if (WheelZoomNeedsControl && (e.KeyModifiers & KeyModifiers.Control) == 0)
         {
             return;
         }
@@ -255,8 +305,15 @@ public sealed class MapCanvasControl : Control
         ArgumentNullException.ThrowIfNull(e);
         base.OnKeyDown(e);
         var middle = new Point(Bounds.Width / 2, Bounds.Height / 2);
+        var shift = (e.KeyModifiers & KeyModifiers.Shift) != 0;
         switch (e.Key)
         {
+            case Key.Left when shift:
+                TurnBy(-RotationStep);
+                break;
+            case Key.Right when shift:
+                TurnBy(RotationStep);
+                break;
             case Key.Add or Key.OemPlus:
                 ZoomAt(middle, Zoom + 1);
                 break;
@@ -289,19 +346,57 @@ public sealed class MapCanvasControl : Control
             return;
         }
 
+        // An arrow moves the map the way it points on screen, however the map is turned.
         var (x, y) = WebMercator.ToWorldPixel(center, Zoom);
-        Report(WebMercator.ToGeo(x + dx, y + dy, Zoom), Zoom);
+        var moved = MapDrawing.ToNorthUp(new Vector(dx, dy), Rotation);
+        Report(WebMercator.ToGeo(x + moved.X, y + moved.Y, Zoom), Zoom);
+    }
+
+    private void TurnBy(double degrees)
+    {
+        if (Center is { } center)
+        {
+            Report(center, Zoom, Rotation + degrees);
+        }
     }
 
     private void OnPinch(object? sender, PinchEventArgs e)
     {
-        _pinchStartZoom ??= Zoom;
+        if (_pinchStartZoom is null)
+        {
+            _pinchStartZoom = Zoom;
+            _pinchStartRotation = Rotation;
+            _pinchStartAngle = e.Angle;
+        }
+
         var origin = new Point(e.ScaleOrigin.X * Bounds.Width, e.ScaleOrigin.Y * Bounds.Height);
         ZoomAt(origin, _pinchStartZoom.Value + PinchScaleToZoomDelta(e.Scale));
+
+        // The map turns once the fingers have clearly twisted, and from there on follows them, without
+        // a jump by the slop it took to get going.
+        var twist = TwistBetween(_pinchStartAngle ?? e.Angle, e.Angle);
+        if (!_twisting && Math.Abs(twist) >= TwistSlop)
+        {
+            _twisting = true;
+            _pinchStartAngle = e.Angle;
+            _pinchStartRotation = Rotation;
+            twist = 0;
+        }
+
+        if (_twisting && Center is { } center)
+        {
+            Report(center, Zoom, _pinchStartRotation + twist);
+        }
+
         e.Handled = true;
     }
 
-    private void OnPinchEnded(object? sender, PinchEndedEventArgs e) => _pinchStartZoom = null;
+    private void OnPinchEnded(object? sender, PinchEndedEventArgs e)
+    {
+        _pinchStartZoom = null;
+        _pinchStartAngle = null;
+        _twisting = false;
+    }
 
     private void EndDrag(IPointer pointer)
     {
@@ -319,16 +414,16 @@ public sealed class MapCanvasControl : Control
         }
 
         var (centerX, centerY) = WebMercator.ToWorldPixel(center, Zoom);
-        var dx = screen.X - (Bounds.Width / 2);
-        var dy = screen.Y - (Bounds.Height / 2);
+        var (dx, dy) = MapDrawing.ToNorthUp(new Vector(screen.X - (Bounds.Width / 2), screen.Y - (Bounds.Height / 2)), Rotation);
         var anchor = WebMercator.ToGeo(centerX + dx, centerY + dy, Zoom);
         var (anchorX, anchorY) = WebMercator.ToWorldPixel(anchor, zoom);
         Report(WebMercator.ToGeo(anchorX - dx, anchorY - dy, zoom), zoom);
     }
 
-    private void Report(GeoPoint center, int zoom)
+    // A pan or zoom leaves the turn as it is: the rotation is null unless the hand turned the map.
+    private void Report(GeoPoint center, int zoom, double? rotation = null)
     {
-        var change = new MapViewChange(center, zoom);
+        var change = new MapViewChange(center, zoom, rotation);
         if (ViewChangedCommand?.CanExecute(change) == true)
         {
             ViewChangedCommand.Execute(change);

@@ -54,6 +54,45 @@ public sealed class LagekarteRenderTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void A_turned_map_keeps_its_marks_on_their_spots_and_offers_the_way_back_to_north()
+    {
+        var (window, view, vm, session) = Show();
+        WaitForWaterPoints(vm);
+        session.SetIncidentLocation(Marktplatz);
+        var unitAt = new GeoPoint(48.1792, 11.2541);
+        session.PlaceForceUnit(session.Incident.Forces[0].Id, unitAt);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+        var north = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "FaceNorthButton");
+        Assert.False(north.IsVisible);
+
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17, 30));
+        Dispatcher.UIThread.RunJobs();
+
+        // The unit's mark sits where the turned map puts its position, and stays upright.
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var panel = view.GetVisualDescendants().OfType<MapMarkerPanel>().Single();
+        var expected = MapDrawing.ToScreen(Marktplatz, 17, map.Bounds.Size, unitAt, 30);
+        var unit = panel.Children.Single(c => MapMarkerPanel.GetPosition(c) == unitAt);
+
+        // Within a pixel: layout rounds the mark's position to whole pixels.
+        Assert.True(Math.Abs(expected.X - unit.Bounds.Center.X) <= 1, $"x {unit.Bounds.Center.X}, expected {expected.X}");
+        Assert.True(Math.Abs(expected.Y - unit.Bounds.Center.Y) <= 1, $"y {unit.Bounds.Center.Y}, expected {expected.Y}");
+        Assert.Null(unit.RenderTransform);
+        Assert.True(north.IsVisible);
+
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(Shots(), "fuehrung-karte-gedreht.png"));
+        }
+
+        north.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, vm.Map.Rotation, precision: 9);
+        Assert.False(north.IsVisible);
+    }
+
+    [AvaloniaFact]
     public void Close_up_the_packs_hydranten_are_drawn_and_the_note_says_they_are_from_OSM()
     {
         var (window, view, vm, _) = Show();
