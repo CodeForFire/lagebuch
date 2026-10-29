@@ -58,7 +58,7 @@ public sealed class MapCanvasControl : Control
     // A finger rests a little unsteadily; a press that moves less than this is a tap, not a pan.
     private const double TapSlop = 6;
 
-    // Shift+wheel and Shift+arrow turn the map by this many degrees a step.
+    // Shift+arrow and a Shift+wheel notch turn the map by this many degrees.
     private const double RotationStep = 15;
 
     // Two fingers that only pinch still turn a little against each other; less than this is no turn.
@@ -269,17 +269,25 @@ public sealed class MapCanvasControl : Control
     {
         ArgumentNullException.ThrowIfNull(e);
         base.OnPointerWheelChanged(e);
-        var step = Math.Sign(e.Delta.Y);
-        if (step == 0)
+
+        // Shift turns: the wheel away from you turns the map clockwise, like a dial. By how far it
+        // scrolled, not by event: a wheel notch is 1 and turns a step, while a touchpad sends many
+        // small scrolls that turn the map smoothly. Some systems send Shift+scroll sideways.
+        if ((e.KeyModifiers & KeyModifiers.Shift) != 0)
         {
+            var scrolled = Math.Abs(e.Delta.Y) >= Math.Abs(e.Delta.X) ? e.Delta.Y : e.Delta.X;
+            if (Math.Abs(scrolled) > 0)
+            {
+                TurnBy(scrolled * RotationStep);
+                e.Handled = true;
+            }
+
             return;
         }
 
-        // Shift turns: the wheel away from you turns the map clockwise, like a dial.
-        if ((e.KeyModifiers & KeyModifiers.Shift) != 0)
+        var step = Math.Sign(e.Delta.Y);
+        if (step == 0)
         {
-            TurnBy(step * RotationStep);
-            e.Handled = true;
             return;
         }
 

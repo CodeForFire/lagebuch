@@ -229,6 +229,31 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
+    public void A_touchpad_s_small_shift_scrolls_turn_the_map_by_as_much_as_was_scrolled()
+    {
+        var (window, _, viewport) = Show(new SolidTiles());
+
+        // A two-finger swipe arrives as many fractions of a wheel notch, not as notches.
+        for (var i = 0; i < 5; i++)
+        {
+            window.MouseWheel(new Point(200, 150), new Vector(0, 0.2), RawInputModifiers.Shift);
+        }
+
+        Assert.Equal(15, viewport.Rotation, precision: 6);
+        Assert.Equal(13, viewport.Zoom);
+    }
+
+    [AvaloniaFact]
+    public void A_shift_scroll_the_system_sends_sideways_turns_the_map_too()
+    {
+        var (window, _, viewport) = Show(new SolidTiles());
+
+        window.MouseWheel(new Point(200, 150), new Vector(1, 0), RawInputModifiers.Shift);
+
+        Assert.Equal(15, viewport.Rotation, precision: 6);
+    }
+
+    [AvaloniaFact]
     public void Shift_and_the_arrows_turn_the_map_and_plain_arrows_still_pan()
     {
         var (window, control, viewport) = Show(new SolidTiles());
