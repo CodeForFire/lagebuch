@@ -14,8 +14,11 @@ namespace LageBuch.Domain;
 
 public sealed class Incident
 {
-    private const int MaxNavKeyLength = 64;
-    private const int MaxNavOverrides = 64;
+    /// <summary>The longest key <see cref="SetNavVisibility"/> accepts.</summary>
+    public const int MaxNavKeyLength = 64;
+
+    /// <summary>The most distinct rail overrides an Einsatz holds.</summary>
+    public const int MaxNavOverrides = 64;
 
     private readonly Dictionary<string, bool> _navOverrides = new(StringComparer.Ordinal);
     private readonly List<ChecklistList> _checklists = new();
