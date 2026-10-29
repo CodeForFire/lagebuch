@@ -174,11 +174,7 @@ public sealed class MapCanvasControl : Control
 
         // Missing tiles are painted too, so the whole control stays hit-testable for a drag.
         _tiles.Use(TileSource);
-        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation);
-        if (WaterPoints is { } water)
-        {
-            MapDrawing.DrawWaterPoints(context, water, center, Zoom, Bounds.Size, SelectedWaterPoint, Rotation);
-        }
+        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

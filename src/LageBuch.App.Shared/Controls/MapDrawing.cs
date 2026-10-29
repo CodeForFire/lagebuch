@@ -26,9 +26,11 @@ public static class MapDrawing
     /// <summary>
     /// The map around <paramref name="center"/> at <paramref name="zoom"/>, turned clockwise by
     /// <paramref name="rotation"/> degrees about the middle of <paramref name="size"/>. Names are
-    /// laid over it upright, a street's name along its street.
+    /// laid over it upright, a street's name along its street, and the
+    /// <paramref name="waterPoints"/> over those: a name that would run under a water point's
+    /// label is left out, since the label is what the crew is looking for.
     /// </summary>
-    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0)
+    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(tiles);
@@ -39,33 +41,39 @@ public static class MapDrawing
         }
 
         context.FillRectangle(Background, new Rect(size));
-        if (tiles.Source is not { } source)
+        var marks = waterPoints is null ? [] : LayOutWaterPoints(waterPoints, center, zoom, size, selected, rotation);
+        if (tiles.Source is { } source)
         {
-            return;
-        }
-
-        // Several packs are drawn one over the other. Each pack's tiles are cut to its area when it
-        // is built, so outside it a pack draws nothing that could cover its neighbour's streets.
-        IReadOnlyList<IMapTileSource> layers = source is CombinedMapTileSource combined ? combined.Layers : [source];
-        var turn = Turn(size, rotation);
-        var labels = new List<(MapLabel Label, Point At)>();
-        foreach (var layer in layers)
-        {
-            DrawLayer(context, tiles, layer, center, zoom, size, turn, labels);
-        }
-
-        // The names of every vector tile, over all tiles and unclipped, so none is cut at a tile's edge.
-        foreach (var (label, placement) in PlaceLabels(labels, size, rotation))
-        {
-            using (context.PushTransform(placement))
+            // Several packs are drawn one over the other. Each pack's tiles are cut to its area when
+            // it is built, so outside it a pack draws nothing that could cover its neighbour's streets.
+            IReadOnlyList<IMapTileSource> layers = source is CombinedMapTileSource combined ? combined.Layers : [source];
+            var turn = Turn(size, rotation);
+            var labels = new List<(MapLabel Label, Point At)>();
+            foreach (var layer in layers)
             {
-                if (label.Halo is { } halo)
-                {
-                    context.DrawGeometry(null, halo, label.Outline);
-                }
-
-                context.DrawGeometry(label.Ink, null, label.Outline);
+                DrawLayer(context, tiles, layer, center, zoom, size, turn, labels);
             }
+
+            // The names of every vector tile, over all tiles and unclipped, so none is cut at a tile's
+            // edge. Only a labelled water point keeps names away: a bare dot is drawn over the name.
+            var reserved = marks.Where(m => m.Text is not null).Select(m => m.Bounds).ToList();
+            foreach (var (label, placement) in PlaceLabels(labels, size, rotation, reserved))
+            {
+                using (context.PushTransform(placement))
+                {
+                    if (label.Halo is { } halo)
+                    {
+                        context.DrawGeometry(null, halo, label.Outline);
+                    }
+
+                    context.DrawGeometry(label.Ink, null, label.Outline);
+                }
+            }
+        }
+
+        foreach (var mark in marks)
+        {
+            DrawWaterPoint(context, mark);
         }
     }
 
@@ -75,15 +83,16 @@ public static class MapDrawing
     /// does not repeat a name placed within <see cref="RepeatDistance"/>. <paramref name="labels"/>
     /// pairs each label with the point on screen it belongs to; on a map turned by
     /// <paramref name="rotation"/> degrees a street's name turns with its street, never upside
-    /// down, and every other name stays level.
+    /// down, and every other name stays level. No name overlaps a rectangle of
+    /// <paramref name="reserved"/>, the screen space of the water points' labels.
     /// </summary>
-    public static IReadOnlyList<(MapLabel Label, Matrix Placement)> PlaceLabels(IEnumerable<(MapLabel Label, Point At)> labels, Size size, double rotation = 0)
+    public static IReadOnlyList<(MapLabel Label, Matrix Placement)> PlaceLabels(IEnumerable<(MapLabel Label, Point At)> labels, Size size, double rotation = 0, IReadOnlyList<Rect>? reserved = null)
     {
         ArgumentNullException.ThrowIfNull(labels);
         var screen = new Rect(size);
         var placed = new List<(MapLabel Label, Point Center)>();
         var result = new List<(MapLabel Label, Matrix Placement)>();
-        var taken = new List<Rect>();
+        var taken = new List<Rect>(reserved ?? []);
         foreach (var (label, at) in labels.OrderBy(l => l.Label.Priority))
         {
             var placement = Placement(label, at, rotation);
@@ -178,20 +187,16 @@ public static class MapDrawing
     private static readonly IBrush LabelText = new ImmutableSolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21));
     private static readonly CultureInfo LabelCulture = CultureInfo.GetCultureInfo("de-DE");
 
-    /// <summary>
-    /// The water points inside the visible map, one symbol per kind -- a red dot for a hydrant, a
-    /// blue ring for a Saugstelle, a blue square for a Löschwasserbehälter, a blue diamond for a
-    /// Löschteich -- and from <see cref="WaterPointLayer.LabelsMinZoom"/> their label. A ring marks
-    /// <paramref name="selected"/>. Nothing below <see cref="WaterPointLayer.MinZoom"/>.
-    /// </summary>
-    public static void DrawWaterPoints(DrawingContext context, IReadOnlyList<WaterPoint> points, GeoPoint center, int zoom, Size size, WaterPoint? selected = null, double rotation = 0)
+    // The water points inside the visible map, one symbol per kind -- a red dot for a hydrant, a
+    // blue ring for a Saugstelle, a blue square for a Löschwasserbehälter, a blue diamond for a
+    // Löschteich -- and from WaterPointLayer.LabelsMinZoom their label. A ring marks `selected`.
+    // Nothing below WaterPointLayer.MinZoom.
+    private static List<WaterPointMark> LayOutWaterPoints(IReadOnlyList<WaterPoint> points, GeoPoint center, int zoom, Size size, WaterPoint? selected, double rotation)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(points);
-        ArgumentNullException.ThrowIfNull(center);
-        if (zoom < WaterPointLayer.MinZoom || size.Width <= 0 || size.Height <= 0)
+        var marks = new List<WaterPointMark>();
+        if (zoom < WaterPointLayer.MinZoom)
         {
-            return;
+            return marks;
         }
 
         // Compared in degrees first: thousands of points, a few dozen of them on screen. On a
@@ -212,19 +217,49 @@ public static class MapDrawing
             }
 
             var at = ToScreen(center, zoom, size, p, rotation);
-            DrawSymbol(context, point.Kind, at, radius);
             var isSelected = ReferenceEquals(point, selected);
-            if (isSelected)
-            {
-                context.DrawEllipse(null, SelectedRing, at, radius + 5, radius + 5);
-            }
-
+            FormattedText? text = null;
+            var origin = default(Point);
             if (zoom >= WaterPointLayer.LabelsMinZoom && point.Label.Length > 0)
             {
-                var text = new FormattedText(point.Label, LabelCulture, FlowDirection.LeftToRight, typeface, 11, LabelText);
-                var origin = new Point(at.X + radius + (isSelected ? 9 : 3), at.Y - (text.Height / 2)); // clear of the selection ring
-                context.FillRectangle(LabelBackground, new Rect(origin.X - 2, origin.Y, text.Width + 4, text.Height), 2);
-                context.DrawText(text, origin);
+                text = new FormattedText(point.Label, LabelCulture, FlowDirection.LeftToRight, typeface, 11, LabelText);
+                origin = new Point(at.X + radius + (isSelected ? 9 : 3), at.Y - (text.Height / 2)); // clear of the selection ring
+            }
+
+            marks.Add(new WaterPointMark(point.Kind, at, radius, isSelected, text, origin));
+        }
+
+        return marks;
+    }
+
+    private static void DrawWaterPoint(DrawingContext context, WaterPointMark mark)
+    {
+        DrawSymbol(context, mark.Kind, mark.At, mark.Radius);
+        if (mark.IsSelected)
+        {
+            context.DrawEllipse(null, SelectedRing, mark.At, mark.Radius + 5, mark.Radius + 5);
+        }
+
+        if (mark.Text is { } text)
+        {
+            context.FillRectangle(LabelBackground, mark.TextBox, 2);
+            context.DrawText(text, mark.TextOrigin);
+        }
+    }
+
+    // A water point on screen: its symbol at `At`, and its label, if shown, from `TextOrigin`.
+    private sealed record WaterPointMark(WaterPointKind Kind, Point At, double Radius, bool IsSelected, FormattedText? Text, Point TextOrigin)
+    {
+        // The label's white box.
+        public Rect TextBox => Text is null ? default : new Rect(TextOrigin.X - 2, TextOrigin.Y, Text.Width + 4, Text.Height);
+
+        // The symbol with its selection ring, and the label's box: what a map name keeps clear of.
+        public Rect Bounds
+        {
+            get
+            {
+                var reach = Radius + (IsSelected ? 6 : 0);
+                return new Rect(At.X - reach, At.Y - reach, 2 * reach, 2 * reach).Union(TextBox);
             }
         }
     }

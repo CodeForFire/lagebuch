@@ -202,6 +202,27 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
+    public void A_place_name_gives_way_to_a_hydrant_s_label()
+    {
+        // The name is centred on the screen; left of the middle is its first half, clear of the hydrant's dot and label.
+        var (window, control, viewport) = Show(new PlaceNameTiles(Fuerstenfeldbruck, "Musterstadt", zoom: WaterPointLayer.LabelsMinZoom));
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.LabelsMinZoom));
+        var farAway = WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, WaterPointLayer.LabelsMinZoom).X, WebMercator.ToWorldPixel(Fuerstenfeldbruck, WaterPointLayer.LabelsMinZoom).Y + 100, WaterPointLayer.LabelsMinZoom);
+        control.WaterPoints = [new WaterPoint(farAway, WaterPointKind.Hydrant, "UH 100")];
+        Dispatcher.UIThread.RunJobs();
+        using (var named = window.CaptureRenderedFrame()!)
+        {
+            Assert.True(HasInk(named, 160, 140, 185, 160));
+        }
+
+        control.WaterPoints = [new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100")];
+        Dispatcher.UIThread.RunJobs();
+
+        using var covered = window.CaptureRenderedFrame()!;
+        Assert.False(HasInk(covered, 160, 140, 185, 160));
+    }
+
+    [AvaloniaFact]
     public void Further_out_than_zoom_15_no_water_point_is_drawn()
     {
         var (window, control, viewport) = Show(new SolidTiles());
@@ -377,6 +398,47 @@ public class MapCanvasControlTests
             Marshal.ReadByte(buffer.Address, offset),
             Marshal.ReadByte(buffer.Address, offset + 1),
             Marshal.ReadByte(buffer.Address, offset + 2));
+    }
+
+    // Whether any pixel in the box is as dark as a name's glyphs.
+    private static bool HasInk(WriteableBitmap frame, int left, int top, int right, int bottom)
+    {
+        for (var x = left; x < right; x++)
+        {
+            for (var y = top; y < bottom; y++)
+            {
+                if (PixelAt(frame, x, y).R < 0x80)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>One town named <paramref name="name"/> at <paramref name="at"/>, on its tile at <paramref name="zoom"/> only.</summary>
+    private sealed class PlaceNameTiles(GeoPoint at, string name, int zoom) : IMapTileSource
+    {
+        private readonly int _zoom = zoom;
+        private readonly (int X, int Y) _tile = WebMercator.ToTileIndex(WebMercator.ToWorldPixel(at, zoom).X, WebMercator.ToWorldPixel(at, zoom).Y);
+        private readonly byte[] _bytes = Persistence.Tests.VectorTileFixtures.Tile(
+            "places",
+            (Persistence.Map.Vector.VectorGeometryType.Point, [("kind", "locality"), ("name", name)], [[InTile(at, zoom)]]));
+
+        public byte[]? GetTile(int zoom, int x, int y) => zoom == _zoom && (x, y) == _tile ? _bytes : null;
+
+        public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
+
+        public int? GetMaxZoom() => _zoom;
+
+        // Where the point lies on its tile, in the tile's 4096 units.
+        private static (int X, int Y) InTile(GeoPoint point, int level)
+        {
+            var (x, y) = WebMercator.ToWorldPixel(point, level);
+            const double unitsPerPixel = 4096.0 / WebMercator.TileSizePixels;
+            return ((int)Math.Round((x % WebMercator.TileSizePixels) * unitsPerPixel), (int)Math.Round((y % WebMercator.TileSizePixels) * unitsPerPixel));
+        }
     }
 
     /// <summary>
