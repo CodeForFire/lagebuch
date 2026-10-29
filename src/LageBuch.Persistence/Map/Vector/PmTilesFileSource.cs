@@ -120,55 +120,41 @@ public sealed class PmTilesFileSource : IMapTileSource
         }
 
         var n = (int)count;
-        var ids = new ulong[n];
-        var runs = new uint[n];
-        var lengths = new uint[n];
-        ulong lastId = 0;
-        for (var i = 0; i < n; i++)
+        if (ReadColumn(bytes, ref pos, n, ulong.MaxValue) is not { } deltas
+            || ReadColumn(bytes, ref pos, n, uint.MaxValue) is not { } runs
+            || ReadColumn(bytes, ref pos, n, int.MaxValue) is not { } lengths
+            || ReadColumn(bytes, ref pos, n, ulong.MaxValue) is not { } offsets)
         {
-            if (!TryVarint(bytes, ref pos, out var delta))
-            {
-                return null;
-            }
-
-            lastId += delta;
-            ids[i] = lastId;
-        }
-
-        for (var i = 0; i < n; i++)
-        {
-            if (!TryVarint(bytes, ref pos, out var run) || run > uint.MaxValue)
-            {
-                return null;
-            }
-
-            runs[i] = (uint)run;
-        }
-
-        for (var i = 0; i < n; i++)
-        {
-            if (!TryVarint(bytes, ref pos, out var length) || length > int.MaxValue)
-            {
-                return null;
-            }
-
-            lengths[i] = (uint)length;
+            return null;
         }
 
         var entries = new PmTilesEntry[n];
+        ulong id = 0;
         for (var i = 0; i < n; i++)
         {
-            if (!TryVarint(bytes, ref pos, out var offset))
-            {
-                return null;
-            }
+            id += deltas[i];
 
             // Zero means "right after the previous entry", which a clustered archive uses throughout.
-            var start = offset == 0 && i > 0 ? entries[i - 1].Offset + entries[i - 1].Length : offset - 1;
-            entries[i] = new PmTilesEntry(ids[i], runs[i], lengths[i], start);
+            var start = offsets[i] == 0 && i > 0 ? entries[i - 1].Offset + entries[i - 1].Length : offsets[i] - 1;
+            entries[i] = new PmTilesEntry(id, (uint)runs[i], (uint)lengths[i], start);
         }
 
         return entries;
+    }
+
+    // One column of a directory: a varint per entry, none of them above max.
+    private static ulong[]? ReadColumn(ReadOnlySpan<byte> bytes, ref int pos, int n, ulong max)
+    {
+        var column = new ulong[n];
+        for (var i = 0; i < n; i++)
+        {
+            if (!TryVarint(bytes, ref pos, out column[i]) || column[i] > max)
+            {
+                return null;
+            }
+        }
+
+        return column;
     }
 
     private static bool TryVarint(ReadOnlySpan<byte> bytes, ref int pos, out ulong value)

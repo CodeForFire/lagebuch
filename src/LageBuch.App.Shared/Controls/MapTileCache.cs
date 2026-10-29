@@ -111,10 +111,10 @@ public sealed class MapTileCache
 
         var sourceZoom = Math.Min(zoom, maxZoom);
         var levels = zoom - sourceZoom;
-        var key = ((IMapTileSource)source, sourceZoom, x >> levels, y >> levels);
+        (IMapTileSource Layer, int Zoom, int X, int Y) key = (source, sourceZoom, x >> levels, y >> levels);
         if (!_vectors.TryGetValue(key, out var layers))
         {
-            layers = DecodeVector(source.GetTile(sourceZoom, key.Item3, key.Item4));
+            layers = DecodeVector(source.GetTile(sourceZoom, key.X, key.Y));
             _vectors[key] = layers;
             _vectorOrder.Enqueue(key);
             if (_vectorOrder.Count > 16)
@@ -128,7 +128,7 @@ public sealed class MapTileCache
             return null;
         }
 
-        var (subX, subY) = (x - (key.Item3 << levels), y - (key.Item4 << levels));
+        var (subX, subY) = (x - (key.X << levels), y - (key.Y << levels));
         labels = VectorTileRenderer.Labels(layers, zoom, levels, subX, subY);
         return VectorTileRenderer.Render(layers, zoom, levels, subX, subY);
     }
