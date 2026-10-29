@@ -104,7 +104,7 @@ public static class CommandApplier
                 incident.AddChecklist(
                     clock,
                     Operator(c.Operator),
-                    new ChecklistSeed(c.TemplateId, c.Title, c.Items.Select(i => (i.Text, i.IsMandatory)).ToList()));
+                    new ChecklistSeed(c.TemplateId, c.Title, ToSeedItems(c.Items)));
                 break;
             case UpdateLeadershipPostCommand c:
                 incident.UpdateLeadershipPost(clock, Operator(c.Operator), c.Standort, c.Rufname, c.Telefon, c.Funkgruppe);
@@ -288,6 +288,18 @@ public static class CommandApplier
         }
 
         return null;
+    }
+
+    // The body is a peer's JSON, which is not nullable-checked: a null list or element becomes an
+    // ArgumentException (a clean 400) instead of a NullReferenceException (a 500).
+    private static List<(string Text, bool IsMandatory)> ToSeedItems(IReadOnlyList<ChecklistSeedItemDto>? items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        return items
+            .Select(i => i is null
+                ? throw new ArgumentException("Ein Checklistenpunkt fehlt.", nameof(items))
+                : (i.Text, i.IsMandatory))
+            .ToList();
     }
 
     private static SessionOperator Operator(OperatorDto dto) => new(dto.Name, dto.CallSign);

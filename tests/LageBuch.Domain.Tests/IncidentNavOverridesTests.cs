@@ -114,6 +114,21 @@ public class IncidentNavOverridesTests
     }
 
     [Fact]
+    public void Adding_a_checklist_with_a_null_title_or_item_text_is_refused_as_an_argument_error()
+    {
+        var (incident, clock, op) = NewIncident();
+        var id = Guid.NewGuid();
+
+        Assert.ThrowsAny<ArgumentException>(
+            () => incident.AddChecklist(clock, op, new ChecklistSeed(id, null!, [("a", true)])));
+        Assert.ThrowsAny<ArgumentException>(
+            () => incident.AddChecklist(clock, op, new ChecklistSeed(id, "T", null!)));
+        Assert.ThrowsAny<ArgumentException>(
+            () => incident.AddChecklist(clock, op, new ChecklistSeed(id, "T", [(null!, true)])));
+        Assert.Empty(incident.Checklists);
+    }
+
+    [Fact]
     public void Adding_a_checklist_already_in_the_einsatz_is_refused()
     {
         var (incident, clock, op) = NewIncident();

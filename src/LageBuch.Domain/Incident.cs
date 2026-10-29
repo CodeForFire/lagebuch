@@ -904,6 +904,14 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(op);
         ArgumentNullException.ThrowIfNull(seed);
 
+        // A sync peer's JSON is not nullable-checked, so a null reaches here as a null.
+        ArgumentNullException.ThrowIfNull(seed.Title);
+        ArgumentNullException.ThrowIfNull(seed.Items);
+        if (seed.Items.Any(i => i.Text is null))
+        {
+            throw new ArgumentNullException(nameof(seed), "Ein Checklistenpunkt ohne Text ist nicht möglich.");
+        }
+
         if (_checklists.Any(l => l.Id == seed.Id))
         {
             throw new InvalidOperationException("Diese Checkliste ist bereits im Einsatz.");

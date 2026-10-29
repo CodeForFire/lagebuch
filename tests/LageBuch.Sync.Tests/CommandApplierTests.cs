@@ -984,6 +984,27 @@ public class CommandApplierTests
         Assert.Equal(journal, incident.Journal.Count);
     }
 
+    [Theory]
+    [InlineData("\"title\":null,\"items\":[]")]
+    [InlineData("\"title\":\"T\",\"items\":null")]
+    [InlineData("\"title\":\"T\",\"items\":[null]")]
+    [InlineData("\"title\":\"T\",\"items\":[{\"text\":null,\"isMandatory\":true}]")]
+    public void An_add_checklist_body_with_null_fields_is_rejected_cleanly(string fields)
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var before = incident.Checklists.Count;
+        var journal = incident.Journal.Count;
+        var json = "{\"$type\":\"addChecklist\",\"operator\":{\"name\":\"Maier\"},\"templateId\":\""
+            + Guid.NewGuid() + "\"," + fields + "}";
+
+        var command = SyncJson.Deserialize<SyncCommand>(json);
+
+        Assert.ThrowsAny<ArgumentException>(() => CommandApplier.Apply(command, incident, clock));
+        Assert.Equal(before, incident.Checklists.Count);
+        Assert.Equal(journal, incident.Journal.Count);
+    }
+
     [Fact]
     public void Adding_a_checklist_already_in_the_einsatz_is_refused()
     {
