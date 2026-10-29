@@ -48,16 +48,18 @@ public sealed class RegionPackLibraryTests : IDisposable
         Assert.Equal(Pack(zip), listed.Info);
     }
 
+    // The raster tiles packs carried until lagebuch-geodata#33 are no file FORMAT.md names any more.
     [Fact]
-    public async Task A_pack_built_with_raster_tiles_too_installs_without_them()
+    public async Task A_pack_that_still_holds_raster_tiles_is_refused()
     {
         var zip = Zip([.. Files(rasterTiles: "raster")]);
         _handler.Respond(_ => Ok(zip));
+        var library = Library();
 
-        var installed = await Library().InstallAsync(Pack(zip));
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
 
-        Assert.Equal("tiles", await File.ReadAllTextAsync(installed.VectorTilesPath));
-        Assert.False(File.Exists(Path.Join(installed.FolderPath, "map.mbtiles")));
+        Assert.Equal("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.", e.Message);
+        Assert.Empty(library.GetInstalled());
     }
 
     [Theory]
