@@ -73,6 +73,24 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void EditRoleAssignment_over_the_wire_corrects_the_holder_in_place()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var assigned = incident.AssignRole(clock, new SessionOperator("Host", "FFB 1"), "S2 Lage", "Meier", section: "Nord");
+
+        ApplyOverWire(
+            new EditRoleAssignmentCommand(new OperatorDto("Client", "RUF 1"), assigned.Id, "Maier", "Florian 1/11", "0171", "Süd"),
+            incident,
+            clock);
+
+        var corrected = Assert.Single(incident.Roles);
+        Assert.Equal(assigned.Id, corrected.Id);
+        Assert.Equal(("Maier", "Florian 1/11", "0171", "Süd"), (corrected.PersonName, corrected.CallSign, corrected.Phone, corrected.Section));
+        Assert.Equal("Client (RUF 1)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Fact]
     public void SetAddress_over_the_wire_sets_hausnummer_plz_and_ort_on_the_host()
     {
         var clock = new FixedClock();

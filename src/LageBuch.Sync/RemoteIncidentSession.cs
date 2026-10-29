@@ -476,6 +476,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Send(new EditRolePhoneCommand(Op(), assignmentId, phone));
 
+    public void EditRoleAssignment(Guid assignmentId, string personName, string? callSign, string? phone, string? section) =>
+        Send(new EditRoleAssignmentCommand(Op(), assignmentId, personName, callSign, phone, section));
+
     public void AddCommandNode(
         CommandNodeKind kind,
         string name,

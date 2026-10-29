@@ -708,6 +708,67 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Corrects who holds a running Funktion and how they are reached: a misspelt name, a missing
+    /// Funkrufname, an Abschnitt typed wrong. Unlike <see cref="TransferRole"/> nothing ends and
+    /// nothing starts, so Von stays. A Funktion the Führung board placed keeps its place, which is
+    /// changed there; only a real change reaches the ETB, as in <see cref="EditRolePhone"/>.
+    /// </summary>
+    public RoleAssignment EditRoleAssignment(
+        IClock clock,
+        SessionOperator op,
+        Guid assignmentId,
+        string personName,
+        string? callSign,
+        string? phone,
+        string? section)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+        {
+            throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        }
+
+        var previous = _roles[index];
+        if (previous.To is not null)
+        {
+            throw new InvalidOperationException("Funktionszuweisung ist bereits beendet.");
+        }
+
+        var updated = previous.WithDetails(personName, callSign, phone, section);
+        if ((previous.NodeId is not null || previous.Slot != RoleSlot.None)
+            && !string.Equals(previous.Section, updated.Section, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Diese Funktion ist unter FÜHRUNG zugeordnet und wird dort verschoben.");
+        }
+
+        var changes = new List<string>();
+        AddChange(changes, "Name", previous.PersonName, updated.PersonName);
+        AddChange(changes, "Funkrufname", previous.CallSign, updated.CallSign);
+        AddChange(changes, "Handynummer", previous.Phone, updated.Phone);
+        AddChange(changes, "Abschnitt", previous.Section, updated.Section);
+        if (changes.Count == 0)
+        {
+            return previous;
+        }
+
+        _roles[index] = updated;
+        AppendSystemEntry(clock, op, $"Funktion {updated.Role} korrigiert: {string.Join(", ", changes)}");
+        return updated;
+
+        static void AddChange(List<string> changes, string label, string? before, string? after)
+        {
+            if (!string.Equals(before, after, StringComparison.Ordinal))
+            {
+                changes.Add($"{label} {before ?? "—"} → {after ?? "—"}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Records a unit and logs it to the ETB. The clock and operator are required rather than
     /// optional because the entry is the point: the Einsatztagebuch has to answer when which
     /// LageBuch was alarmed, so no caller may record a unit without leaving that trace.

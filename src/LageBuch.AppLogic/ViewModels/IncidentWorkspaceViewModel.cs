@@ -299,9 +299,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private CommandNodeDialogViewModel? _pendingCommandNodeDialog;
 
-    // The person dialog behind the Führung board (Leiter, Melder, Führungsassistenz, Fachberater); null while closed.
+    // The person dialog behind the Führung board (Leiter, Melder, Führungsunterstützung, Fachberater); null while closed.
     [ObservableProperty]
     private LeadershipPersonDialogViewModel? _pendingLeadershipPersonDialog;
+
+    // The dialog that corrects or hands over a Funktion already held (Führung board, FUNKTIONEN); null while closed.
+    [ObservableProperty]
+    private RoleAssignmentDialogViewModel? _pendingRoleAssignmentDialog;
 
     // ===== Header: display projections of the incident's head data. None of these write back --
     // the only write path is the Einsatzdaten dialog (EditIncidentData), which replaced the inline
@@ -390,6 +394,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     {
         dialog.Closed += (_, _) => PendingLeadershipPersonDialog = null;
         PendingLeadershipPersonDialog = dialog;
+    }
+
+    partial void OnPendingRoleAssignmentDialogChanged(
+        RoleAssignmentDialogViewModel? oldValue, RoleAssignmentDialogViewModel? newValue) => oldValue?.Detach();
+
+    private void OpenRoleAssignmentDialog(RoleAssignmentDialogViewModel dialog)
+    {
+        dialog.Closed += (_, _) => PendingRoleAssignmentDialog = null;
+        PendingRoleAssignmentDialog = dialog;
     }
 
     private void RefreshIncidentData()
@@ -721,7 +734,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         PendingPrompt is not null || PendingConfirm is not null || PendingTaskDialog is not null
         || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null
         || PendingSpellingHelper is not null
-        || PendingCommandNodeDialog is not null || PendingLeadershipPersonDialog is not null;
+        || PendingCommandNodeDialog is not null || PendingLeadershipPersonDialog is not null
+        || PendingRoleAssignmentDialog is not null;
 
     private bool StepRail(int step)
     {
@@ -884,6 +898,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _disposed = true;
         _session.Changed -= RefreshIncidentData;
         PendingLeadershipPersonDialog = null;
+        PendingRoleAssignmentDialog = null;
         _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
         if (_local is not null)
         {
@@ -1052,7 +1067,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         EtbTabs = new EtbTabsViewModel(Etb, SituationReports, reopenEtbTab);
 
-        Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
+        Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged, OpenRoleAssignmentDialog);
 
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
@@ -1065,7 +1080,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OnChanged,
             (title, message, confirmed, label) => RequestConfirmAs(title, message, label, confirmed),
             OpenCommandNodeDialog,
-            OpenLeadershipPersonDialog);
+            OpenLeadershipPersonDialog,
+            OpenRoleAssignmentDialog);
 
         Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks);
 

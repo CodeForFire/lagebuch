@@ -93,7 +93,7 @@ public class FuehrungsorganisationSectionTests
             Print(incident),
             Heading,
             "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) – Melder: Tobias Wagner · Stufe C",
-            "Führungsassistenz: S2 Lage Erika Musterfrau",
+            "Führungsunterstützung: S2 Lage Erika Musterfrau",
             "Weitere: Einsatzabschnittsleiter Hans Huber");
     }
 
@@ -176,7 +176,7 @@ public class FuehrungsorganisationSectionTests
             text,
             Heading,
             "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Stufe B · Funkgruppe TMO FW_EMMERING 1000",
-            "Führungsassistenz: S2 Lage Erika Musterfrau",
+            "Führungsunterstützung: S2 Lage Erika Musterfrau",
             "Bereitstellung Marktplatz",
             "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppe: DMO 301_F – Stärke 0/0/9/9, AGT 0",
             "Einheiten: Florian Emmering 40/1",
@@ -196,12 +196,23 @@ public class FuehrungsorganisationSectionTests
     }
 
     [Fact]
+    public void A_fuehrungsunterstuetzung_is_set_in_body_weight_under_the_bold_einsatzleitung()
+    {
+        using var document = PdfDocument.Open(IncidentPdf.Generate(FullBoard(), Started, sections: IncidentPdfSections.Fuehrungsorganisation));
+        var words = document.GetPages().SelectMany(p => p.GetWords()).ToList();
+        string FontOf(string text) => words.First(w => w.Text == text).Letters[0].FontName ?? string.Empty;
+
+        Assert.NotEqual(FontOf("Einsatzleitung"), FontOf("Führungsunterstützung:"));
+        Assert.Equal(FontOf("Einheiten:"), FontOf("Führungsunterstützung:"));
+    }
+
+    [Fact]
     public void A_nested_Unterabschnitt_is_a_deeper_headline_after_its_Abschnitts_details()
     {
         var lines = LinePositions(FullBoard());
 
         var el = lines["Einsatzleitung Feuerwehr – EL"];
-        var assistenz = lines["Führungsassistenz: S2 Lage Erika"];
+        var assistenz = lines["Führungsunterstützung: S2 Lage Erika"];
         var bereitstellung = lines["Bereitstellung Marktplatz"];
         var nord = lines["Abschnitt 1 Nord –"];
         var nordUnits = lines["Einheiten: Florian Emmering 40/1"];

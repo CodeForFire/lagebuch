@@ -16,16 +16,23 @@ public sealed partial class ElCard : ObservableObject
     internal const string NoStufeText = "Keine Führungsstufe festgelegt";
 
     private readonly Action<Fuehrungsstufe?> _onSelectStufe;
+    private readonly Action<Guid, RoleAssignmentDialogMode>? _onAssistant;
 
     /// <param name="onSelectStufe">Sets the Führungsstufe (null clears it); the board decides whether that is allowed.</param>
     /// <param name="onEditPost">Opens the dialog for the Einsatzleitung's own post.</param>
     /// <param name="canEdit">False on a read-only Einsatz.</param>
     /// <param name="onPerson">Opens the person dialog for the Einsatzleitung and the given post.</param>
+    /// <param name="onAssistant">Opens the dialog that corrects or hands over a Führungsunterstützung.</param>
     public ElCard(
-        Action<Fuehrungsstufe?> onSelectStufe, Action? onEditPost = null, bool canEdit = true, Action<RoleSlot>? onPerson = null)
+        Action<Fuehrungsstufe?> onSelectStufe,
+        Action? onEditPost = null,
+        bool canEdit = true,
+        Action<RoleSlot>? onPerson = null,
+        Action<Guid, RoleAssignmentDialogMode>? onAssistant = null)
     {
         ArgumentNullException.ThrowIfNull(onSelectStufe);
         _onSelectStufe = onSelectStufe;
+        _onAssistant = canEdit ? onAssistant : null;
         EditPostCommand = new RelayCommand(() => onEditPost?.Invoke(), () => canEdit);
         SetLeiterCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Leiter), () => canEdit);
         SetMelderCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Melder), () => canEdit);
@@ -42,7 +49,7 @@ public sealed partial class ElCard : ObservableObject
     /// <summary>Sets the Einsatzleitung's Melder, handing over from a running one; off on a read-only Einsatz.</summary>
     public IRelayCommand SetMelderCommand { get; }
 
-    /// <summary>Adds a Führungsassistent (S1 to S6); off on a read-only Einsatz.</summary>
+    /// <summary>Adds a Führungsunterstützung (S1 to S6); off on a read-only Einsatz.</summary>
     public IRelayCommand AddAssistantCommand { get; }
 
     [ObservableProperty]
@@ -102,7 +109,7 @@ public sealed partial class ElCard : ObservableObject
         Funkgruppe = post.Funkgruppe;
         Leiter = BoardPersonRow.Follow(Leiter, entry.Leiter);
         Melder = BoardPersonRow.Follow(Melder, entry.Melder);
-        BoardPersonRow.Reconcile(Assistants, entry.Others);
+        BoardPersonRow.Reconcile(Assistants, entry.Others, _onAssistant);
         BoardPersonRow.Reconcile(Further, entry.Further);
         HasFurther = Further.Count > 0;
         StufeText = stufe is { } set ? $"Stufe {FuehrungsstufeLabels.Of(set)}" : NoStufeText;

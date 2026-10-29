@@ -18,6 +18,7 @@ public class CommandSerializationTests
         new AssignRoleCommand(Op, "EL", "Huber", "FFB 1", DateTimeOffset.UnixEpoch, null, "Abschnitt", "0171"),
         new TransferRoleCommand(Op, Guid.NewGuid(), "Schmidt", "FFB 12/2", "0172"),
         new EditRolePhoneCommand(Op, Guid.NewGuid(), "0173"),
+        new EditRoleAssignmentCommand(Op, Guid.NewGuid(), "Maier", "Florian 1/11", "0173", "Nord"),
         new AssignRoleCommand(Op, "Abschnittsleiter", "Huber", null, null, null, null, null, Guid.NewGuid(), RoleSlot.Leiter),
         new AddCommandNodeCommand(Op, CommandNodeKind.Abschnitt, "Nord", null),
         new AddCommandNodeCommand(Op, CommandNodeKind.Unterabschnitt, "Nord 1", Guid.NewGuid()),

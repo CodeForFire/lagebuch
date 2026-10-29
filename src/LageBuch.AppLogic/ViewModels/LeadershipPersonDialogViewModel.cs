@@ -84,7 +84,7 @@ public sealed partial class LeadershipPersonDialogViewModel : ObservableObject
             (RoleSlot.Leiter, _) => ($"{LeiterLabels.Of(node?.Kind)} festlegen – {label}", "FESTLEGEN"),
             (RoleSlot.Melder, null) => ("Melder festlegen – Einsatzleitung", "FESTLEGEN"),
             (RoleSlot.Melder, _) => ($"Melder festlegen – {label}", "FESTLEGEN"),
-            (RoleSlot.Fuehrungsassistent, _) => ("FüAss hinzufügen", "HINZUFÜGEN"),
+            (RoleSlot.Fuehrungsassistent, _) => ("Führungsunterstützung hinzufügen", "HINZUFÜGEN"),
             (RoleSlot.Fachberater, _) => ("Fachberater hinzufügen", "HINZUFÜGEN"),
             _ => ($"Funktion hinzufügen – {label}", "HINZUFÜGEN"),
         };

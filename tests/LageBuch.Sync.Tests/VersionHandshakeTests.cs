@@ -249,7 +249,16 @@ public class VersionHandshakeTests
     {
         // 26 adds setIncidentLocation and placeForceUnit, commands a client may send. A host at 25
         // has neither in its allowlist and would reject them, so a 25 and a 26 must not connect.
-        Assert.Equal(26, SyncProtocol.ProtocolVersion);
-        Assert.Equal(26, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 26, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 26, int.MaxValue);
+    }
+
+    [Fact]
+    public void Correcting_a_funktion_raises_the_protocol_and_the_floor_to_twenty_seven()
+    {
+        // 27 adds editRoleAssignment, a command a client may send. A host at 26 has it nowhere in
+        // its allowlist and would reject it, so a 26 and a 27 must not connect.
+        Assert.Equal(27, SyncProtocol.ProtocolVersion);
+        Assert.Equal(27, SyncProtocol.MinimumProtocolVersion);
     }
 }

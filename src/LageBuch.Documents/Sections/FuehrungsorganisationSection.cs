@@ -87,7 +87,7 @@ public static class FuehrungsorganisationSection
         {
             foreach (var assistant in entry.Others)
             {
-                yield return (sub, $"Führungsassistenz: {assistant.Role} {assistant.PersonName}", false);
+                yield return (sub, $"Führungsunterstützung: {assistant.Role} {assistant.PersonName}", false);
             }
 
             if (entry.Further.Count > 0)

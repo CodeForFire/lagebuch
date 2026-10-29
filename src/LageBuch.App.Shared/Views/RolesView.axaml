@@ -305,7 +305,7 @@
           </DataGridTemplateColumn>
           <DataGridTextColumn Header="VON" Binding="{Binding FromDisplay}" />
           <DataGridTextColumn Header="BIS" Binding="{Binding ToDisplay}" />
-          <DataGridTemplateColumn Header="AKTION" Width="140">
+          <DataGridTemplateColumn Header="AKTION" Width="250">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:RoleAssignmentRow">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -322,6 +322,11 @@
                           IsVisible="{Binding IsRunning}"
                           Command="{Binding BeginTransferCommand}"
                           b:RowKeys.Role="Primary" ToolTip.Tip="Funktion übertragen (Enter)" />
+                  <!-- Corrects a typo without a handover: Von stays, nobody is recorded as leaving. -->
+                  <Button x:Name="EditRowButton" Content="BEARBEITEN" Margin="4,2"
+                          IsVisible="{Binding IsRunning}"
+                          Command="{Binding BeginEditCommand}"
+                          ToolTip.Tip="Name, Funkrufname, Handynummer oder Abschnitt korrigieren" />
                 </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
@@ -366,11 +371,16 @@
                       <TextBlock Text="{Binding ToDisplay}" Classes="mono" FontSize="12" />
                     </StackPanel>
                   </WrapPanel>
-                  <Button Content="ÜBERTRAGEN" HorizontalAlignment="Stretch"
-                          Height="{StaticResource ControlHeightTouch}"
-                          IsVisible="{Binding IsRunning}"
-                          Command="{Binding BeginTransferCommand}"
-                          b:RowKeys.Role="Primary" ToolTip.Tip="Funktion übertragen (Enter)" />
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsRunning}">
+                    <Button Grid.Column="0" Content="ÜBERTRAGEN" HorizontalAlignment="Stretch"
+                            Height="{StaticResource ControlHeightTouch}"
+                            Command="{Binding BeginTransferCommand}"
+                            b:RowKeys.Role="Primary" ToolTip.Tip="Funktion übertragen (Enter)" />
+                    <Button Grid.Column="1" x:Name="EditCardButton" Content="BEARBEITEN" HorizontalAlignment="Stretch"
+                            Height="{StaticResource ControlHeightTouch}"
+                            Command="{Binding BeginEditCommand}"
+                            ToolTip.Tip="Name, Funkrufname, Handynummer oder Abschnitt korrigieren" />
+                  </Grid>
                 </StackPanel>
               </Border>
             </DataTemplate>

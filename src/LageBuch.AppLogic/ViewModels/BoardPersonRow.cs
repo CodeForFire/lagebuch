@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LageBuch.Domain;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -10,7 +11,12 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class BoardPersonRow : ObservableObject
 {
-    public BoardPersonRow(RoleAssignment assignment)
+    /// <param name="assignment">The running Funktion the row shows.</param>
+    /// <param name="onOpen">
+    /// Opens the dialog that corrects or hands over this Funktion; null where the board offers
+    /// neither (a Leiter or Melder post has its own FESTLEGEN, and a read-only Einsatz has none).
+    /// </param>
+    public BoardPersonRow(RoleAssignment assignment, Action<Guid, RoleAssignmentDialogMode>? onOpen = null)
     {
         ArgumentNullException.ThrowIfNull(assignment);
         AssignmentId = assignment.Id;
@@ -18,15 +24,27 @@ public sealed partial class BoardPersonRow : ObservableObject
         _personName = assignment.PersonName;
         _callSign = assignment.CallSign;
         _phone = assignment.Phone;
+        EditCommand = new RelayCommand(() => onOpen?.Invoke(AssignmentId, RoleAssignmentDialogMode.Edit), () => onOpen is not null);
+        TransferCommand = new RelayCommand(() => onOpen?.Invoke(AssignmentId, RoleAssignmentDialogMode.Transfer), () => onOpen is not null);
     }
 
     public Guid AssignmentId { get; }
 
+    /// <summary>ÄNDERN: corrects the holder's name, Funkrufname or Handynummer.</summary>
+    public IRelayCommand EditCommand { get; }
+
+    /// <summary>ÜBERTRAGEN: hands the Funktion over to someone else.</summary>
+    public IRelayCommand TransferCommand { get; }
+
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EditAutomationName))]
+    [NotifyPropertyChangedFor(nameof(TransferAutomationName))]
     private string _role;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Text))]
+    [NotifyPropertyChangedFor(nameof(EditAutomationName))]
+    [NotifyPropertyChangedFor(nameof(TransferAutomationName))]
     private string _personName;
 
     [ObservableProperty]
@@ -38,6 +56,12 @@ public sealed partial class BoardPersonRow : ObservableObject
 
     /// <summary>"Name · Funkrufname", or the name alone when no Funkrufname is recorded.</summary>
     public string Text => string.IsNullOrWhiteSpace(CallSign) ? PersonName : $"{PersonName} · {CallSign}";
+
+    /// <summary>What a screen reader calls ÄNDERN, so the buttons of several rows are told apart.</summary>
+    public string EditAutomationName => $"{Role} ({PersonName}) ändern";
+
+    /// <summary>What a screen reader calls ÜBERTRAGEN.</summary>
+    public string TransferAutomationName => $"{Role} ({PersonName}) übertragen";
 
     /// <summary>
     /// The row for a single post (Leiter, Melder): <paramref name="current"/> brought up to date when it
@@ -71,6 +95,8 @@ public sealed partial class BoardPersonRow : ObservableObject
 
     /// <summary>Brings <paramref name="rows"/> in line with <paramref name="assignments"/>, by id and in place.</summary>
     internal static void Reconcile(
-        System.Collections.ObjectModel.ObservableCollection<BoardPersonRow> rows, IReadOnlyList<RoleAssignment> assignments) =>
-        RowReconciler.Reconcile(rows, assignments, r => r.AssignmentId, a => a.Id, a => new BoardPersonRow(a), (r, a) => r.Update(a));
+        System.Collections.ObjectModel.ObservableCollection<BoardPersonRow> rows,
+        IReadOnlyList<RoleAssignment> assignments,
+        Action<Guid, RoleAssignmentDialogMode>? onOpen = null) =>
+        RowReconciler.Reconcile(rows, assignments, r => r.AssignmentId, a => a.Id, a => new BoardPersonRow(a, onOpen), (r, a) => r.Update(a));
 }

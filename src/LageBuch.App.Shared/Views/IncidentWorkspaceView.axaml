@@ -929,8 +929,12 @@
     <ContentControl Content="{Binding PendingCommandNodeDialog}"
                     IsVisible="{Binding PendingCommandNodeDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-    <!-- Person overlay (Leiter, Melder, Führungsassistenz, Fachberater) from the FÜHRUNG board -->
+    <!-- Person overlay (Leiter, Melder, Führungsunterstützung, Fachberater) from the FÜHRUNG board -->
     <ContentControl Content="{Binding PendingLeadershipPersonDialog}"
                     IsVisible="{Binding PendingLeadershipPersonDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Correct or hand over a Funktion already held: FÜHRUNG's Führungsunterstützung, FUNKTIONEN's BEARBEITEN -->
+    <ContentControl Content="{Binding PendingRoleAssignmentDialog}"
+                    IsVisible="{Binding PendingRoleAssignmentDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>

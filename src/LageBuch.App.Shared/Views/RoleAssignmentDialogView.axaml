@@ -1,0 +1,88 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.RoleAssignmentDialogView"
+             x:DataType="vm:RoleAssignmentDialogViewModel">
+  <!-- The person dialog's shell (LeadershipPersonDialogView), for a Funktion already held: the
+       Funktion is fixed, the person is corrected (BEARBEITEN) or replaced (ÜBERTRAGEN). Initial
+       focus goes to NAME, the field either mode is opened for. -->
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CancelCommand}" b:Overlay.PrimaryCommand="{Binding SaveCommand}"
+          b:Overlay.InitialFocus="{Binding #AssignmentDialogNameBox}">
+    <Border x:Name="AssignmentDialogCard" MaxWidth="480" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="26,22,26,24" Spacing="12">
+            <TextBlock x:Name="AssignmentDialogTitle" Text="{Binding Title}" Classes="display" FontSize="20"
+                       TextWrapping="Wrap" />
+            <HeaderedContentControl Classes="field suggest required" Header="NAME"
+                                    ctrl:Field.Error="{Binding PersonError}">
+              <AutoCompleteBox x:Name="AssignmentDialogNameBox" ItemsSource="{Binding PersonOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                               AutomationProperties.Name="Name"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
+                               Text="{Binding PersonName}" />
+            </HeaderedContentControl>
+            <Grid ColumnDefinitions="3*,2*" ColumnSpacing="12">
+              <HeaderedContentControl Grid.Column="0" Classes="field suggest" Header="FUNKRUFNAME">
+                <AutoCompleteBox x:Name="AssignmentDialogCallSignBox" ItemsSource="{Binding CallSignOptions}"
+                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                                 AutomationProperties.Name="Funkrufname"
+                                 PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                 Text="{Binding CallSign}" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Grid.Column="1" Classes="field" Header="HANDYNUMMER">
+                <TextBox x:Name="AssignmentDialogPhoneBox" Classes="mono" Text="{Binding Phone}" MaxLength="50"
+                         AutomationProperties.Name="Handynummer" />
+              </HeaderedContentControl>
+            </Grid>
+            <!-- Only for a Funktion typed in FUNKTIONEN; one the board placed is moved there. -->
+            <HeaderedContentControl x:Name="AssignmentDialogSectionField" Classes="field" Header="ABSCHNITT" IsVisible="{Binding IsSectionEditable}"
+                                    ctrl:Field.Error="{Binding SectionError}">
+              <TextBox x:Name="AssignmentDialogSectionBox" Text="{Binding Section}" MaxLength="200"
+                       AutomationProperties.Name="Abschnitt"
+                       PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}" />
+            </HeaderedContentControl>
+            <TextBlock x:Name="AssignmentDialogSaveError" Classes="field-error" TextWrapping="Wrap"
+                       Text="{Binding SaveError}"
+                       IsVisible="{Binding SaveError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <!-- Left, primary first (#694): the actions start under the fields they save. -->
+            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0"
+                        IsVisible="{Binding !IsDiscardConfirmOpen}">
+              <Button x:Name="AssignmentDialogSaveButton" Classes="signal" Content="{Binding PrimaryText}"
+                      Command="{Binding SaveCommand}" />
+              <Button x:Name="AssignmentDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+            </StackPanel>
+            <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. -->
+            <Border x:Name="AssignmentDialogDiscardPanel" Margin="0,8,0,0"
+                    IsVisible="{Binding IsDiscardConfirmOpen}"
+                    b:Overlay.IsInline="True"
+                    b:Overlay.CancelCommand="{Binding ConfirmDiscardCommand}"
+                    b:Overlay.InitialFocus="{Binding #AssignmentDialogKeepEditingButton}"
+                    BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+              <StackPanel Spacing="8">
+                <TextBlock Text="ÄNDERUNGEN VERWERFEN?" Classes="overline" />
+                <TextBlock Text="Die Eingaben sind noch nicht gespeichert." TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
+                  <Button x:Name="AssignmentDialogDiscardButton" Classes="signal" Content="ABBRECHEN"
+                          Command="{Binding ConfirmDiscardCommand}" />
+                  <Button x:Name="AssignmentDialogKeepEditingButton" Content="ZURÜCK"
+                          Command="{Binding CancelDiscardCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

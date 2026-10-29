@@ -23,6 +23,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 {
     private readonly Action<RoleAssignmentRow> _onTransfer;
     private readonly Action<RoleAssignmentRow, string?> _onPhoneEdited;
+    private readonly Action<RoleAssignmentRow>? _onEdit;
 
     public RoleAssignmentRow(
         Guid id,
@@ -37,19 +38,21 @@ public sealed partial class RoleAssignmentRow : ObservableObject
         DateTimeOffset? to,
         bool isReadOnly,
         Action<RoleAssignmentRow> onTransfer,
-        Action<RoleAssignmentRow, string?> onPhoneEdited)
+        Action<RoleAssignmentRow, string?> onPhoneEdited,
+        Action<RoleAssignmentRow>? onEdit = null)
     {
         Id = id;
         Role = role;
-        PersonName = personName;
+        _personName = personName;
         _section = section;
         _nodeId = nodeId;
         _sectionLabel = nodeLabel ?? section;
-        CallSign = callSign;
+        _callSign = callSign;
         From = from;
         IsReadOnly = isReadOnly;
         _onTransfer = onTransfer;
         _onPhoneEdited = onPhoneEdited;
+        _onEdit = onEdit;
         _phone = phone; // bypasses the setter below, so building the row doesn't push an edit
         To = to;
     }
@@ -58,7 +61,9 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
     public string Role { get; }
 
-    public string PersonName { get; }
+    /// <summary>Who holds the Funktion; BEARBEITEN corrects it on the same assignment.</summary>
+    [ObservableProperty]
+    private string _personName;
 
     /// <summary>The free-text Abschnitt; for a placed row the node's name, which the incident keeps in step.</summary>
     [ObservableProperty]
@@ -84,7 +89,8 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     /// <summary>Why the cell cannot be typed into, for a placed row; null for one that was typed in.</summary>
     public string? SectionToolTip => IsPlaced ? "Unter FÜHRUNG zugeordnet" : null;
 
-    public string? CallSign { get; }
+    [ObservableProperty]
+    private string? _callSign;
 
     public DateTimeOffset? From { get; }
 
@@ -109,8 +115,9 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     /// <summary>
     /// Brings a kept row in line with its assignment after a change anywhere in the incident (#294),
     /// instead of the row being thrown away and rebuilt. Bis and the Handynummer can move on an
-    /// existing assignment, and so can its place (the board placing it, a node renamed or dissolved);
-    /// a handover ends the assignment and starts a new one, so the rest stays as built.
+    /// existing assignment, and so can its place (the board placing it, a node renamed or dissolved)
+    /// and its holder's name and Funkrufname (BEARBEITEN); a handover ends the assignment and starts a
+    /// new one, so the rest stays as built.
     /// </summary>
     public void Update(Domain.RoleAssignment assignment, string? nodeLabel)
     {
@@ -118,6 +125,8 @@ public sealed partial class RoleAssignmentRow : ObservableObject
         To = assignment.To;
         NodeId = assignment.NodeId;
         Section = assignment.Section;
+        PersonName = assignment.PersonName;
+        CallSign = assignment.CallSign;
         SectionLabel = nodeLabel ?? assignment.Section;
         _pulling = true;
         try
@@ -134,6 +143,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(ToDisplay))]
     [NotifyPropertyChangedFor(nameof(IsRunning))]
     [NotifyCanExecuteChangedFor(nameof(BeginTransferCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginEditCommand))]
     private DateTimeOffset? _to;
 
     /// <summary>
@@ -158,6 +168,13 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
     [RelayCommand(CanExecute = nameof(CanBeginTransfer))]
     private void BeginTransfer() => _onTransfer(this);
+
+    // A correction is for the Funktion as it runs: an ended one is the record of a handover.
+    private bool CanBeginEdit => _onEdit is not null && CanBeginTransfer;
+
+    /// <summary>BEARBEITEN: corrects Name, Funkrufname, Handynummer and a typed Abschnitt without a handover.</summary>
+    [RelayCommand(CanExecute = nameof(CanBeginEdit))]
+    private void BeginEdit() => _onEdit?.Invoke(this);
 }
 
 public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
@@ -167,6 +184,8 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     private readonly Action _onChanged;
     private readonly IReadOnlyList<Person> _personnel;
     private readonly IReadOnlyList<Role> _roles;
+    private readonly MasterDataSet _masterData;
+    private readonly Action<RoleAssignmentDialogViewModel>? _openEditDialog;
 
     // Every rendered row, regardless of the filter; Roles is the visible subset — mirrors
     // EtbViewModel's _all/Entries split, so ShowAllRoles can reconcile Roles without re-reading the
@@ -190,11 +209,25 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     private static readonly CompositeFormat HeldInSectionFormat =
         CompositeFormat.Parse(ValidationMessages.FunctionAlreadyHeldInSection);
 
-    public RolesViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
+    /// <param name="session">The incident whose Funktionen are listed.</param>
+    /// <param name="clock">Stamps Von on a new assignment.</param>
+    /// <param name="masterData">The Funktionen, Personal and Funkrufnamen offered as suggestions.</param>
+    /// <param name="onChanged">Tells the host something was written.</param>
+    /// <param name="openEditDialog">
+    /// Hands the host the dialog behind BEARBEITEN to show; without it the rows offer no BEARBEITEN.
+    /// </param>
+    public RolesViewModel(
+        IIncidentSession session,
+        IClock clock,
+        MasterDataSet masterData,
+        Action onChanged,
+        Action<RoleAssignmentDialogViewModel>? openEditDialog = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
+        _masterData = masterData;
+        _openEditDialog = openEditDialog;
         _clock = clock;
         _onChanged = onChanged;
         _personnel = masterData.Personnel;
@@ -674,7 +707,24 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     }
 
     private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>
-        new(r.Id, r.Role, r.PersonName, r.Section, r.NodeId, _session.Incident.NodeLabel(r.NodeId), r.CallSign, r.Phone, r.From, r.To, IsReadOnly, BeginTransfer, EditPhone);
+        new(
+            r.Id,
+            r.Role,
+            r.PersonName,
+            r.Section,
+            r.NodeId,
+            _session.Incident.NodeLabel(r.NodeId),
+            r.CallSign,
+            r.Phone,
+            r.From,
+            r.To,
+            IsReadOnly,
+            BeginTransfer,
+            EditPhone,
+            _openEditDialog is null ? null : BeginEdit);
+
+    private void BeginEdit(RoleAssignmentRow row) =>
+        _openEditDialog?.Invoke(new RoleAssignmentDialogViewModel(_session, _masterData, row.Id, RoleAssignmentDialogMode.Edit, _onChanged));
 
     private void EditPhone(RoleAssignmentRow row, string? phone)
     {

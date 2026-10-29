@@ -80,6 +80,12 @@ public interface IIncidentSession
     /// <summary>Corrects a role assignment's phone number. Logs to the ETB only on a real change.</summary>
     void EditRolePhone(Guid assignmentId, string? phone);
 
+    /// <summary>
+    /// Corrects a running assignment's person, Funkrufname, Handynummer and free-text Abschnitt
+    /// without a handover. Logs to the ETB only on a real change.
+    /// </summary>
+    void EditRoleAssignment(Guid assignmentId, string personName, string? callSign, string? phone, string? section);
+
     /// <summary>Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung.</summary>
     void AddCommandNode(
         CommandNodeKind kind,

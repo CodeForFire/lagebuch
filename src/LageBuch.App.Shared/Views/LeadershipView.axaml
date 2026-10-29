@@ -293,6 +293,24 @@
         <TextBlock Classes="field-value" Text="{Binding Text}" />
       </StackPanel>
     </DataTemplate>
+
+    <!-- A Führungsunterstützung: the person row, then what can be done to it. The buttons sit under
+         the name, so a long Funktion and name keep the card's width (and a phone's). -->
+    <DataTemplate x:Key="AssistantRowTemplate" x:DataType="vm:BoardPersonRow">
+      <StackPanel Spacing="4">
+        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PersonRowTemplate}" />
+        <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
+          <Button x:Name="EditAssistantButton" Classes="board-action" Content="ÄNDERN"
+                  ToolTip.Tip="Name, Funkrufname oder Handynummer korrigieren"
+                  AutomationProperties.Name="{Binding EditAutomationName}"
+                  Command="{Binding EditCommand}" />
+          <Button x:Name="TransferAssistantButton" Classes="board-action" Content="ÜBERTRAGEN"
+                  ToolTip.Tip="Funktion an eine andere Person übergeben"
+                  AutomationProperties.Name="{Binding TransferAutomationName}"
+                  Command="{Binding TransferCommand}" />
+        </WrapPanel>
+      </StackPanel>
+    </DataTemplate>
   </UserControl.Resources>
 
   <UserControl.DataTemplates>
@@ -323,17 +341,27 @@
                     Command="{Binding SetMelderCommand}" />
           </Grid>
 
-          <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
-            <TextBlock Grid.Column="0" Classes="field-label" Text="FüAss" VerticalAlignment="Top" Margin="0,4,0,0" />
-            <StackPanel Grid.Column="1" Spacing="4">
-              <TextBlock Classes="field-value" Text="—"
-                         IsVisible="{Binding !Assistants.Count}" />
-              <ItemsControl ItemsSource="{Binding Assistants}" ItemTemplate="{StaticResource PersonRowTemplate}" />
-            </StackPanel>
-            <Button Grid.Column="2" Classes="board-action" Content="+ FüAss" VerticalAlignment="Top"
-                    ToolTip.Tip="FüAss hinzufügen" AutomationProperties.Name="FüAss hinzufügen"
-                    Command="{Binding AddAssistantCommand}" />
-          </Grid>
+          <!-- Label above the list, as FÜHRUNGSSTUFE below: "FÜHRUNGSUNTERSTÜTZUNG" needs the
+               card's width, not the 96px label column. -->
+          <StackPanel x:Name="ElAssistants" Spacing="4">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <TextBlock Grid.Column="0" Classes="field-label" Text="FÜHRUNGSUNTERSTÜTZUNG" />
+              <Button Grid.Column="1" x:Name="AddAssistantButton" Classes="board-action" Content="+ HINZUFÜGEN"
+                      ToolTip.Tip="Führungsunterstützung hinzufügen"
+                      AutomationProperties.Name="Führungsunterstützung hinzufügen"
+                      Command="{Binding AddAssistantCommand}" />
+            </Grid>
+            <TextBlock Classes="field-value" Text="—"
+                       IsVisible="{Binding !Assistants.Count}" />
+            <ItemsControl x:Name="ElAssistantRows" ItemsSource="{Binding Assistants}"
+                          ItemTemplate="{StaticResource AssistantRowTemplate}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </StackPanel>
 
           <!-- A second Leiter or Melder typed on FUNKTIONEN without an Abschnitt (an EAL beside the
                EL): shown, so nobody the Bericht prints is missing from the board. -->
