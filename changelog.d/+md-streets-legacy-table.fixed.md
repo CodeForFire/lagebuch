@@ -1,0 +1,1 @@
+Lagebuch starts again on a Stammdaten database created before the Straßen list was first removed, instead of crashing with "no such column: postal_code": the leftover streets table is now widened with an empty PLZ and Ort.

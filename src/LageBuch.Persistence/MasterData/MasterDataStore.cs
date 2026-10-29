@@ -340,7 +340,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_keywords (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_devices (value TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL, place TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL DEFAULT '', place TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT);
             CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT);
@@ -443,6 +443,12 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "apartments_per_floor", "INTEGER NOT NULL DEFAULT 10");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "underground_floor_count", "INTEGER NOT NULL DEFAULT 1");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_premises", "apartment_labels", "TEXT NOT NULL DEFAULT '{}'");
+
+        // Widen an md_streets left behind by a build before #173, which removed the Straßen but not
+        // their table: #735's CREATE above then finds name/district only. Those streets read with
+        // no PLZ or Ort, which is all the old shape knew.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_streets", "postal_code", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_streets", "place", "TEXT NOT NULL DEFAULT ''");
 
         // md_devices arrived complete too; held to the same rule.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_devices", "count", "INTEGER NOT NULL DEFAULT 0");

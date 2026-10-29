@@ -460,6 +460,29 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_database_left_with_the_pre_173_streets_table_widens_in_place_and_reads_its_streets()
+    {
+        // Builds before #173 created md_streets with only name and district; #173 dropped the code
+        // but never the table, so #735's CREATE TABLE IF NOT EXISTS finds the old shape and is a no-op.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
+                INSERT INTO md_streets (name, district) VALUES ('Hauptstraße', 'Puch');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new Street("Hauptstraße", "Puch"), Assert.Single(set.Streets));
+    }
+
+    [Fact]
     public void Save_round_trips_a_checklist_reorder_and_delete()
     {
         MasterDataStore.Save(_path, MasterDataSet.Empty with
