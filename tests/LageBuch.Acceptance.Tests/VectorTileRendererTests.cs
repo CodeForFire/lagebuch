@@ -66,8 +66,10 @@ public class VectorTileRendererTests
         var label = Assert.Single(VectorTileRenderer.Labels(tile, zoom: 12, levels: 0, subX: 0, subY: 0));
 
         Assert.Equal("Fürstenfeldbruck", label.Text);
-        Assert.True(label.Bounds.Right > 256, $"The label ends at {label.Bounds.Right}, on the tile.");
-        Assert.Equal(new Point(250, 128), label.Bounds.Center, new PointNear());
+        Assert.Equal(new Point(250, 128), label.Anchor, new PointNear());
+        Assert.Null(label.Angle);
+        var right = label.Anchor.X + (label.TextSize.Width / 2);
+        Assert.True(right > 256, $"The label ends at {right}, on the tile.");
 
         // The bitmap carries no glyphs: the left end of the name would be drawn here.
         Assert.Equal(Land, PixelAt(bitmap, 230, 128));

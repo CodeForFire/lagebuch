@@ -214,6 +214,110 @@ public class MapCanvasControlTests
         Assert.Equal(Land, PixelAt(frame, 200, 150));
     }
 
+    [AvaloniaFact]
+    public void Shift_and_the_wheel_turn_the_map_a_step_and_leave_the_zoom_alone()
+    {
+        var (window, _, viewport) = Show(new SolidTiles());
+
+        window.MouseWheel(new Point(200, 150), new Vector(0, 1), RawInputModifiers.Shift);
+        Assert.Equal(15, viewport.Rotation, precision: 9);
+
+        window.MouseWheel(new Point(200, 150), new Vector(0, -1), RawInputModifiers.Shift);
+        window.MouseWheel(new Point(200, 150), new Vector(0, -1), RawInputModifiers.Shift);
+        Assert.Equal(345, viewport.Rotation, precision: 9);
+        Assert.Equal(13, viewport.Zoom);
+    }
+
+    [AvaloniaFact]
+    public void Shift_and_the_arrows_turn_the_map_and_plain_arrows_still_pan()
+    {
+        var (window, control, viewport) = Show(new SolidTiles());
+        control.Focus();
+        var before = viewport.Center;
+
+        window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.Shift);
+        Assert.Equal(15, viewport.Rotation, precision: 9);
+        Assert.Equal(before, viewport.Center);
+
+        window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.Shift);
+        window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.Shift);
+        Assert.Equal(345, viewport.Rotation, precision: 9);
+
+        window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+        Assert.NotEqual(before, viewport.Center);
+        Assert.Equal(345, viewport.Rotation, precision: 9);
+    }
+
+    [AvaloniaFact]
+    public void On_a_turned_map_a_point_east_of_the_centre_is_drawn_below_it_at_a_quarter_turn()
+    {
+        var east = WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, 13).X + 100, WebMercator.ToWorldPixel(Fuerstenfeldbruck, 13).Y, 13);
+        var size = new Size(400, 300);
+
+        var at = MapDrawing.ToScreen(Fuerstenfeldbruck, 13, size, east, rotation: 90);
+
+        Assert.Equal(200, at.X, precision: 6);
+        Assert.Equal(250, at.Y, precision: 6);
+        var back = MapDrawing.ToGeo(Fuerstenfeldbruck, 13, size, at, rotation: 90);
+        Assert.Equal(east.Latitude, back.Latitude, precision: 9);
+        Assert.Equal(east.Longitude, back.Longitude, precision: 9);
+    }
+
+    [AvaloniaFact]
+    public void On_a_turned_map_dragging_keeps_the_grabbed_spot_under_the_hand()
+    {
+        var (window, control, viewport) = Show(new SolidTiles());
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, 60));
+        Dispatcher.UIThread.RunJobs();
+        var grabbed = control.ScreenToGeo(new Point(200, 150))!;
+
+        window.MouseDown(new Point(200, 150), MouseButton.Left);
+        window.MouseMove(new Point(300, 200), RawInputModifiers.LeftMouseButton);
+        window.MouseUp(new Point(300, 200), MouseButton.Left);
+
+        var under = control.ScreenToGeo(new Point(300, 200))!;
+        Assert.Equal(grabbed.Latitude, under.Latitude, precision: 6);
+        Assert.Equal(grabbed.Longitude, under.Longitude, precision: 6);
+        Assert.Equal(60, viewport.Rotation, precision: 9);
+    }
+
+    [AvaloniaFact]
+    public void On_a_turned_map_the_wheel_zooms_towards_the_spot_under_the_pointer()
+    {
+        var (window, control, viewport) = Show(new SolidTiles());
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, 200));
+        Dispatcher.UIThread.RunJobs();
+        var pointer = new Point(300, 100);
+        var before = control.ScreenToGeo(pointer)!;
+
+        window.MouseWheel(pointer, new Vector(0, 1));
+
+        var after = control.ScreenToGeo(pointer)!;
+        Assert.Equal(14, viewport.Zoom);
+        Assert.Equal(before.Latitude, after.Latitude, precision: 5);
+        Assert.Equal(before.Longitude, after.Longitude, precision: 5);
+    }
+
+    [AvaloniaFact]
+    public void A_turned_map_still_fills_every_corner_of_the_screen()
+    {
+        var (window, _, viewport) = Show(new SolidTiles());
+        viewport.ChangeViewCommand.Execute(new MapViewChange(viewport.Center, 13, 45));
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.All([(1, 1), (398, 1), (1, 298), (398, 298)], c => Assert.Equal(Land, PixelAt(frame, c.Item1, c.Item2)));
+    }
+
+    [AvaloniaTheory]
+    [InlineData(10, 40, 30)]
+    [InlineData(40, 10, -30)]
+    [InlineData(350, 10, 20)] // across north: a small turn, not nearly a whole one back
+    [InlineData(10, 350, -20)]
+    public void A_twist_is_measured_the_short_way_round(double start, double angle, double twist) =>
+        Assert.Equal(twist, MapCanvasControl.TwistBetween(start, angle), precision: 9);
+
     private static (Window Window, MapCanvasControl Control, MapViewport Viewport) Show(IMapTileSource? tiles)
     {
         var viewport = new MapViewport { TileSource = tiles, Center = Fuerstenfeldbruck, Zoom = 13 };
@@ -222,6 +326,7 @@ public class MapCanvasControlTests
             [!MapCanvasControl.TileSourceProperty] = new Avalonia.Data.Binding(nameof(MapViewport.TileSource)),
             [!MapCanvasControl.CenterProperty] = new Avalonia.Data.Binding(nameof(MapViewport.Center)),
             [!MapCanvasControl.ZoomProperty] = new Avalonia.Data.Binding(nameof(MapViewport.Zoom)),
+            [!MapCanvasControl.RotationProperty] = new Avalonia.Data.Binding(nameof(MapViewport.Rotation)),
             ViewChangedCommand = viewport.ChangeViewCommand,
             DataContext = viewport,
         };

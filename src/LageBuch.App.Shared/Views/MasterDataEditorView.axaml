@@ -678,6 +678,7 @@
                                           TileSource="{Binding Preview.TileSource}"
                                           Center="{Binding Preview.Center}"
                                           Zoom="{Binding Preview.Zoom}"
+                                          Rotation="{Binding Preview.Rotation}"
                                           WheelZoomNeedsControl="True"
                                           ViewChangedCommand="{Binding Preview.ChangeViewCommand}" />
                       <!-- On the app's dark surface, so the buttons stand out against a light map. -->
@@ -690,6 +691,10 @@
                         <Button Classes="icon-btn" ToolTip.Tip="Verkleinern" AutomationProperties.Name="Verkleinern"
                                 Command="{Binding Preview.ZoomOutCommand}">
                           <PathIcon Data="M19 13H5v-2h14v2z" />
+                        </Button>
+                        <Button Classes="icon-btn" ToolTip.Tip="Norden nach oben" AutomationProperties.Name="Norden nach oben"
+                                IsVisible="{Binding Preview.IsRotated}" Command="{Binding Preview.FaceNorthCommand}">
+                          <c:CompassNeedle Angle="{Binding Preview.Rotation}" />
                         </Button>
                       </StackPanel>
                       <!-- ODbL: every map drawn from OSM data names its source. -->

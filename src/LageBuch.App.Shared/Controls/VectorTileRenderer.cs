@@ -243,12 +243,8 @@ public static class VectorTileRenderer
                 continue;
             }
 
+            // The map turns the name the right way up, for however the map itself is turned.
             var angle = Math.Atan2(b.Y - a.Y, b.X - a.X);
-            if (angle > Math.PI / 2 || angle < -Math.PI / 2)
-            {
-                angle += Math.PI;
-            }
-
             var middle = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
             labels.Add(Label(name, fontSize, LabelInk, Halo, StreetPriority, angle, middle));
         }
@@ -269,7 +265,7 @@ public static class VectorTileRenderer
                 continue;
             }
 
-            labels.Add(Label(number, 9, HouseNumberInk, null, HouseNumberPriority, 0, center));
+            labels.Add(Label(number, 9, HouseNumberInk, null, HouseNumberPriority, null, center));
         }
     }
 
@@ -297,7 +293,7 @@ public static class VectorTileRenderer
                 continue;
             }
 
-            labels.Add(Label(name, size, LabelInk, Halo, priority, 0, at));
+            labels.Add(Label(name, size, LabelInk, Halo, priority, null, at));
         }
     }
 
@@ -305,13 +301,12 @@ public static class VectorTileRenderer
     // label for a point there belongs to the neighbouring tile, or it would be drawn twice.
     private static bool OnTile(Point at) => at.X is >= 0 and < Size && at.Y is >= 0 and < Size;
 
-    // The text centred on `at`, turned by `angle` around it.
-    private static MapLabel Label(string text, double size, IImmutableBrush ink, IPen? halo, int priority, double angle, Point at)
+    // The text to be centred on `at`, along a street running at `angle`, or level when null.
+    private static MapLabel Label(string text, double size, IImmutableBrush ink, IPen? halo, int priority, double? angle, Point at)
     {
         var formatted = new FormattedText(text, LabelCulture, FlowDirection.LeftToRight, Typeface.Default, size, ink);
-        var placement = Matrix.CreateTranslation(-formatted.Width / 2, -formatted.Height / 2) * Matrix.CreateRotation(angle) * Matrix.CreateTranslation(at.X, at.Y);
         var outline = formatted.BuildGeometry(default) ?? new StreamGeometry();
-        return new MapLabel(text, outline, placement, new Rect(0, 0, formatted.Width, formatted.Height).TransformToAABB(placement), priority, ink, halo);
+        return new MapLabel(text, outline, new Size(formatted.Width, formatted.Height), at, angle, priority, ink, halo);
     }
 
     // Tile coordinates of the source tile to pixels of the target tile.

@@ -5,8 +5,8 @@ using LageBuch.Domain.ValueObjects;
 namespace LageBuch.App.Shared.Controls;
 
 /// <summary>
-/// Lays its children over a <see cref="MapCanvasControl"/> showing the same <see cref="Center"/>
-/// and <see cref="Zoom"/>: each child sits centred on its <see cref="PositionProperty"/>. Marks are
+/// Lays its children over a <see cref="MapCanvasControl"/> showing the same <see cref="Center"/>,
+/// <see cref="Zoom"/> and <see cref="Rotation"/>: each child sits centred on its <see cref="PositionProperty"/>. Marks are
 /// real controls rather than drawn pixels, so they carry automation names, take focus and can be
 /// dragged. A child without a position, or one off the visible map, is not shown.
 /// </summary>
@@ -18,12 +18,16 @@ public sealed class MapMarkerPanel : Panel
     public static readonly StyledProperty<int> ZoomProperty =
         AvaloniaProperty.Register<MapMarkerPanel, int>(nameof(Zoom), defaultValue: 13);
 
+    /// <summary>The map's turn in degrees clockwise. The marks move with the map and stay upright.</summary>
+    public static readonly StyledProperty<double> RotationProperty =
+        AvaloniaProperty.Register<MapMarkerPanel, double>(nameof(Rotation));
+
     public static readonly AttachedProperty<GeoPoint?> PositionProperty =
         AvaloniaProperty.RegisterAttached<MapMarkerPanel, Control, GeoPoint?>("Position");
 
     static MapMarkerPanel()
     {
-        AffectsArrange<MapMarkerPanel>(CenterProperty, ZoomProperty);
+        AffectsArrange<MapMarkerPanel>(CenterProperty, ZoomProperty, RotationProperty);
         AffectsParentArrange<MapMarkerPanel>(PositionProperty);
         ClipToBoundsProperty.OverrideDefaultValue<MapMarkerPanel>(true);
     }
@@ -38,6 +42,12 @@ public sealed class MapMarkerPanel : Panel
     {
         get => GetValue(ZoomProperty);
         set => SetValue(ZoomProperty, value);
+    }
+
+    public double Rotation
+    {
+        get => GetValue(RotationProperty);
+        set => SetValue(RotationProperty, value);
     }
 
     public static GeoPoint? GetPosition(Control control)
@@ -76,7 +86,7 @@ public sealed class MapMarkerPanel : Panel
                 continue;
             }
 
-            var at = MapDrawing.ToScreen(center, Zoom, finalSize, position);
+            var at = MapDrawing.ToScreen(center, Zoom, finalSize, position, Rotation);
             var size = child.DesiredSize;
             child.Arrange(new Rect(new Point(at.X - (size.Width / 2), at.Y - (size.Height / 2)), size));
         }

@@ -8,9 +8,9 @@ using LageBuch.Persistence.Map.Vector;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// What a map shows: which Kartenpaket, where and how close. The map control draws it and reports
-/// pans and zooms back through <see cref="ChangeViewCommand"/>, so the view survives the control
-/// being rebuilt by a tab switch.
+/// What a map shows: which Kartenpaket, where, how close and how turned. The map control draws it
+/// and reports pans, zooms and turns back through <see cref="ChangeViewCommand"/>, so the view
+/// survives the control being rebuilt by a tab switch.
 /// </summary>
 public sealed partial class MapViewport : ObservableObject
 {
@@ -18,6 +18,9 @@ public sealed partial class MapViewport : ObservableObject
     public const int MinZoom = 8;
 
     public const int MaxZoom = 19;
+
+    // Closer to north than this, in degrees, the map counts as north up.
+    private const double NorthTolerance = 0.5;
 
     // Fürstenfeldbruck, only so that a map without a pack still opens somewhere in Bavaria.
     private static readonly GeoPoint FallbackCenter = new(48.1785, 11.2555);
@@ -36,6 +39,18 @@ public sealed partial class MapViewport : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ZoomInCommand))]
     [NotifyCanExecuteChangedFor(nameof(ZoomOutCommand))]
     private int _zoom = 13;
+
+    /// <summary>
+    /// How far the map is turned clockwise, in degrees from 0 up to 360. At 0 north is up; at 90
+    /// north points right and west is at the top. It is also where the compass needle points.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRotated))]
+    [NotifyCanExecuteChangedFor(nameof(FaceNorthCommand))]
+    private double _rotation;
+
+    /// <summary>Whether north is off the top by more than an eye can tell.</summary>
+    public bool IsRotated => Math.Min(Rotation, 360 - Rotation) >= NorthTolerance;
 
     /// <summary>Shows <paramref name="pack"/>, centred on its tiles; null shows no map.</summary>
     public void Show(InstalledRegionPack? pack)
@@ -94,7 +109,21 @@ public sealed partial class MapViewport : ObservableObject
 
         Center = change.Center;
         Zoom = Math.Clamp(change.Zoom, MinZoom, MaxZoom);
+        if (change.Rotation is { } rotation && double.IsFinite(rotation))
+        {
+            Rotation = Normalize(rotation);
+        }
     }
+
+    /// <summary><paramref name="degrees"/> as a turn from 0 up to 360, whichever way round it was counted.</summary>
+    public static double Normalize(double degrees)
+    {
+        var turn = degrees % 360;
+        return turn < 0 ? turn + 360 : turn;
+    }
+
+    [RelayCommand(CanExecute = nameof(IsRotated))]
+    private void FaceNorth() => Rotation = 0;
 
     private bool CanZoomIn => Zoom < MaxZoom;
 
