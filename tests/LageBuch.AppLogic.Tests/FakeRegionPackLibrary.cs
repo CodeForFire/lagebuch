@@ -37,7 +37,7 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
     public List<string> Searches { get; } = new();
 
     public static RegionPackInfo Pack(string slug, string name, int version = 1) =>
-        new(name, slug, version, $"https://example.org/{slug}.zip", 16 * 1024 * 1024, new string('a', 64), 10.99, 48.08, 11.41, 48.29, 11, 17, "2026-10-27T20:15:49Z", "© OpenStreetMap contributors");
+        new(name, slug, version, $"https://example.org/{slug}.zip", 16 * 1024 * 1024, new string('a', 64), 10.99, 48.08, 11.41, 48.29, 0, 15, "2026-10-27T20:15:49Z", "© OpenStreetMap contributors");
 
     public void Preinstall(RegionPackInfo info) => _installed.Add(new InstalledRegionPack(info, Path.Join("regions", info.Slug)));
 

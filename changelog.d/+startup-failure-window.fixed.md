@@ -1,0 +1,1 @@
+A start that fails before the main window opens now shows a window naming the error and the folder its crash report went to, instead of closing without a word on every start while the report it left was never announced.

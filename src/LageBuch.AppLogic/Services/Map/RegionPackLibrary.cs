@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -22,7 +23,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     /// <summary>A catalogue larger than this is not a list of Landkreise.</summary>
     public const long MaxCatalogBytes = 1024 * 1024;
 
-    /// <summary>The largest zip accepted, whatever the catalogue claims. A Landkreis at zoom 17 with its DGM5 is about 270 MB.</summary>
+    /// <summary>The largest zip accepted, whatever the catalogue claims; far above any Landkreis with its DGM5.</summary>
     public const long MaxPackBytes = 1024L * 1024 * 1024;
 
     /// <summary>The most a pack may unpack to, all files together.</summary>
@@ -36,6 +37,9 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
 
     private const string ManifestFileName = "pack.json";
 
+    // The raster map packs carried until lagebuch-geodata built vector tiles only.
+    private const string RasterTilesFileName = "map.mbtiles";
+
     // Downloading is the slow part; the last tenth of the bar is left for unpacking.
     private const double DownloadShare = 0.9;
 
@@ -45,11 +49,20 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     // The data files pack.json lists with size and SHA-256. elevation.tif is the Wasserförderung's
     // terrain model (#587); it is installed and checked, not yet read.
     private static readonly string[] DataFiles =
-        [InstalledRegionPack.TilesFileName, "elevation.tif", InstalledRegionPack.WaterFileName, InstalledRegionPack.AddressesFileName, InstalledRegionPack.BoundaryFileName];
+        [InstalledRegionPack.VectorTilesFileName, "elevation.tif", InstalledRegionPack.WaterFileName, InstalledRegionPack.AddressesFileName, InstalledRegionPack.BoundaryFileName];
 
     // Everything a zip holds, at its root: FORMAT.md says exactly these, and a zip with any other
     // entry is refused. Each is written under this fixed name, so no entry name reaches a path.
     private static readonly string[] PackFiles = [ManifestFileName, "ATTRIBUTION.md", .. DataFiles];
+
+    // Packs built before lagebuch-geodata dropped its raster tiles still carry them. Such a zip
+    // installs without them, until every published pack has been rebuilt.
+    private static readonly string[] PackFilesWithRaster = [.. PackFiles, RasterTilesFileName];
+
+    /// <summary>The vector tile schema this app styles: the Protomaps basemap, version 4.</summary>
+    public const string VectorSchema = "protomaps-basemap";
+
+    public const int VectorSchemaMajorVersion = 4;
 
     private readonly HttpClient _http;
     private readonly string _root;
@@ -101,8 +114,10 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
                     continue;
                 }
 
+                // A folder from before the packs carried vector tiles has no map to draw; leaving
+                // it out offers the pack for download again, which installs over it.
                 var pack = new InstalledRegionPack(info, folder);
-                if (File.Exists(pack.TilesPath))
+                if (File.Exists(pack.VectorTilesPath))
                 {
                     packs.Add(pack);
                 }
@@ -318,8 +333,7 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         {
             using var zip = ZipFile.OpenRead(zipPath);
             var names = zip.Entries.Select(e => e.FullName).ToList();
-            if (names.Count != PackFiles.Length
-                || !names.Order(StringComparer.Ordinal).SequenceEqual(PackFiles.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            if (!HoldsExactly(names, PackFiles) && !HoldsExactly(names, PackFilesWithRaster))
             {
                 throw new RegionPackException("Das Kartenpaket hat einen unerwarteten Inhalt und wird nicht installiert.");
             }
@@ -327,6 +341,14 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
             var manifestPath = Path.Join(staging, ManifestFileName);
             Extract(zip, ManifestFileName, manifestPath, MaxManifestBytes, ref total);
             var declared = ReadManifest(manifestPath, pack, DataFiles);
+
+            // The vector tiles are the only map a pack has, so a schema this app cannot style is a
+            // pack it cannot show.
+            if (!StylesVectorMap(manifestPath))
+            {
+                throw new RegionPackException("Das Kartenpaket braucht eine neuere Lagebuch-Version. Lagebuch aktualisieren.");
+            }
+
             Extract(zip, "ATTRIBUTION.md", Path.Join(staging, "ATTRIBUTION.md"), MaxManifestBytes, ref total);
             foreach (var (name, (bytes, sha256)) in declared)
             {
@@ -421,6 +443,24 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
         {
             throw new RegionPackException(Damaged().Message, e);
         }
+    }
+
+    private static bool HoldsExactly(List<string> names, string[] expected) =>
+        names.Count == expected.Length
+        && names.Order(StringComparer.Ordinal).SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal);
+
+    // Whether pack.json's vectorMap names the schema and major version this app's style is for.
+    // Read after ReadManifest has accepted the file, so a malformed document is already refused.
+    private static bool StylesVectorMap(string manifestPath)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
+        return doc.RootElement.TryGetProperty("vectorMap", out var vector) && vector.ValueKind == JsonValueKind.Object
+            && vector.TryGetProperty("schema", out var schema) && schema.ValueKind == JsonValueKind.String
+            && string.Equals(schema.GetString(), VectorSchema, StringComparison.Ordinal)
+            && vector.TryGetProperty("schemaVersion", out var version) && version.ValueKind == JsonValueKind.String
+            && version.GetString() is { } text
+            && int.TryParse(text.Split('.')[0], NumberStyles.None, CultureInfo.InvariantCulture, out var major)
+            && major == VectorSchemaMajorVersion;
     }
 
     private static RegionPackException Damaged() => new("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).");

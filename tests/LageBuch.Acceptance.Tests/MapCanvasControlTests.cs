@@ -20,14 +20,18 @@ public class MapCanvasControlTests
 {
     private static readonly GeoPoint Fuerstenfeldbruck = new(48.1785, 11.2555);
 
+    // The vector style's land and water, which a tile of one whole polygon shows.
+    private static readonly Color Land = Color.FromRgb(0xF2, 0xEF, 0xE9);
+    private static readonly Color Water = Color.FromRgb(0xAA, 0xD3, 0xDF);
+
     [AvaloniaFact]
     public void The_tiles_of_the_pack_are_drawn_under_the_centre()
     {
-        var (window, _, _) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, _, _) = Show(new SolidTiles());
 
         using var frame = window.CaptureRenderedFrame()!;
 
-        Assert.Equal(Colors.SteelBlue, PixelAt(frame, 200, 150));
+        Assert.Equal(Land, PixelAt(frame, 200, 150));
     }
 
     [AvaloniaFact]
@@ -41,21 +45,21 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
-    public void Past_the_pack_s_finest_zoom_its_tiles_are_enlarged_rather_than_missing()
+    public void Past_the_pack_s_finest_zoom_its_tiles_are_drawn_rather_than_missing()
     {
-        var (window, _, viewport) = Show(new SolidTiles(Colors.SeaGreen, maxZoom: 15));
+        var (window, _, viewport) = Show(new SolidTiles(maxZoom: 15));
         viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, 18));
         Dispatcher.UIThread.RunJobs();
 
         using var frame = window.CaptureRenderedFrame()!;
 
-        Assert.Equal(Colors.SeaGreen, PixelAt(frame, 200, 150));
+        Assert.Equal(Land, PixelAt(frame, 200, 150));
     }
 
     [AvaloniaFact]
     public void Dragging_moves_the_map_with_the_hand()
     {
-        var (window, _, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, _, viewport) = Show(new SolidTiles());
         var before = viewport.Center;
 
         window.MouseDown(new Point(200, 150), MouseButton.Left);
@@ -74,7 +78,7 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void Moving_without_a_button_held_does_not_pan()
     {
-        var (window, _, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, _, viewport) = Show(new SolidTiles());
         var before = viewport.Center;
 
         window.MouseMove(new Point(300, 200));
@@ -85,7 +89,7 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void The_wheel_zooms_and_keeps_the_spot_under_the_pointer_in_place()
     {
-        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, control, viewport) = Show(new SolidTiles());
         var pointer = new Point(300, 100);
         var before = GeoUnder(control, viewport, pointer);
 
@@ -100,7 +104,7 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void A_map_inside_a_scrolling_page_zooms_on_the_wheel_only_with_ctrl()
     {
-        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, control, viewport) = Show(new SolidTiles());
         control.WheelZoomNeedsControl = true;
 
         window.MouseWheel(new Point(200, 150), new Vector(0, 1));
@@ -113,7 +117,7 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void The_keyboard_zooms_and_pans()
     {
-        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, control, viewport) = Show(new SolidTiles());
         control.Focus();
         var before = viewport.Center;
 
@@ -134,38 +138,24 @@ public class MapCanvasControlTests
     public void A_pinch_to_twice_the_size_is_one_zoom_level(double scale, int delta) =>
         Assert.Equal(delta, MapCanvasControl.PinchScaleToZoomDelta(scale));
 
-    // Two neighbouring packs whose tiles are opaque everywhere, as real edge tiles are: empty land
-    // outside the pack's area. Each must show only within its own area, or the first (or last)
-    // pack's empty margin covers the other's streets.
+    // Each pack's tiles are cut to its area, so the packs are simply drawn in order, the later on top.
     [AvaloniaFact]
-    public void Each_pack_is_drawn_only_within_its_own_area()
+    public void Several_packs_are_drawn_one_over_the_other_in_their_order()
     {
-        GeoPoint[] Box(double west, double east) => [new(47, west), new(47, east), new(49, east), new(49, west)];
-        var west = new MapTileLayer(new SolidTiles(Colors.IndianRed), [Box(10, Fuerstenfeldbruck.Longitude)]);
-        var east = new MapTileLayer(new SolidTiles(Colors.SteelBlue), [Box(Fuerstenfeldbruck.Longitude, 12)]);
-        var (window, _, _) = Show(new CombinedMapTileSource([west, east]));
+        var (waterOnTop, _, _) = Show(new CombinedMapTileSource([new SolidTiles("earth"), new SolidTiles("water")]));
+        var (landOnTop, _, _) = Show(new CombinedMapTileSource([new SolidTiles("water"), new SolidTiles("earth")]));
 
-        using var frame = window.CaptureRenderedFrame()!;
+        using var water = waterOnTop.CaptureRenderedFrame()!;
+        using var land = landOnTop.CaptureRenderedFrame()!;
 
-        Assert.Equal(Colors.IndianRed, PixelAt(frame, 100, 150));
-        Assert.Equal(Colors.SteelBlue, PixelAt(frame, 300, 150));
-    }
-
-    [AvaloniaFact]
-    public void Outside_every_area_the_map_is_plain_land_colour()
-    {
-        GeoPoint[] box = [new(48.17, 11.25), new(48.17, 11.26), new(48.18, 11.26), new(48.18, 11.25)];
-        var (window, _, _) = Show(new CombinedMapTileSource([new MapTileLayer(new SolidTiles(Colors.SteelBlue), [box])]));
-
-        using var frame = window.CaptureRenderedFrame()!;
-
-        Assert.Equal(Color.FromRgb(0xE5, 0xE3, 0xDF), PixelAt(frame, 5, 5));
+        Assert.Equal(Water, PixelAt(water, 200, 150));
+        Assert.Equal(Land, PixelAt(land, 200, 150));
     }
 
     [AvaloniaFact]
     public void Each_kind_of_water_point_has_its_own_symbol_from_zoom_15()
     {
-        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, control, viewport) = Show(new SolidTiles());
         GeoPoint East(double pixels) => WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).X + pixels, WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).Y, 15);
         control.WaterPoints =
         [
@@ -188,20 +178,20 @@ public class MapCanvasControlTests
 
         // A Löschteich is a diamond: blue in the middle, but not in the corners a square would fill.
         Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 320, 150));
-        Assert.Equal(Colors.SteelBlue, PixelAt(frame, 325, 145));
+        Assert.Equal(Land, PixelAt(frame, 325, 145));
     }
 
     [AvaloniaFact]
     public void The_water_point_whose_card_is_open_is_ringed()
     {
-        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, control, viewport) = Show(new SolidTiles());
         var hydrant = new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100");
         control.WaterPoints = [hydrant];
         viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MinZoom));
         Dispatcher.UIThread.RunJobs();
         using (var before = window.CaptureRenderedFrame()!)
         {
-            Assert.Equal(Colors.SteelBlue, PixelAt(before, 210, 150));
+            Assert.Equal(Land, PixelAt(before, 210, 150));
         }
 
         control.SelectedWaterPoint = hydrant;
@@ -214,28 +204,15 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void Further_out_than_zoom_15_no_water_point_is_drawn()
     {
-        var (window, control, viewport) = Show(new SolidTiles(Colors.SteelBlue));
+        var (window, control, viewport) = Show(new SolidTiles());
         control.WaterPoints = [new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100")];
         viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MinZoom - 1));
         Dispatcher.UIThread.RunJobs();
 
         using var frame = window.CaptureRenderedFrame()!;
 
-        Assert.Equal(Colors.SteelBlue, PixelAt(frame, 200, 150));
+        Assert.Equal(Land, PixelAt(frame, 200, 150));
     }
-
-    [AvaloniaFact]
-    public void An_overzoomed_tile_reads_its_quarter_of_the_parent()
-    {
-        // Zoom 16, tile (3, 1) lies in the right half, top half of zoom-15 tile (1, 0).
-        var (zoom, x, y, source) = Assert.NotNull(MapDrawing.Overzoom(16, 3, 1, 15));
-
-        Assert.Equal((15, 1, 0), (zoom, x, y));
-        Assert.Equal(new Rect(128, 128, 128, 128), source);
-    }
-
-    [AvaloniaFact]
-    public void Within_the_pack_s_zoom_nothing_is_overzoomed() => Assert.Null(MapDrawing.Overzoom(15, 3, 1, 15));
 
     private static (Window Window, MapCanvasControl Control, MapViewport Viewport) Show(IMapTileSource? tiles)
     {
@@ -272,28 +249,20 @@ public class MapCanvasControlTests
             Marshal.ReadByte(buffer.Address, offset + 2));
     }
 
-    /// <summary>Every tile one colour, down to <paramref name="maxZoom"/> and none finer.</summary>
-    private sealed class SolidTiles(Color color, int maxZoom = 19) : IMapTileSource
+    /// <summary>
+    /// Every tile one polygon of <paramref name="layer"/> covering it whole, down to
+    /// <paramref name="maxZoom"/> and none finer, so the map shows that layer's colour.
+    /// </summary>
+    private sealed class SolidTiles(string layer = "earth", int maxZoom = 19) : IMapTileSource
     {
-        private readonly byte[] _png = Png(color);
+        private readonly byte[] _tile = Persistence.Tests.VectorTileFixtures.Tile(
+            layer,
+            (Persistence.Map.Vector.VectorGeometryType.Polygon, [("kind", layer)], [[(0, 0), (4096, 0), (4096, 4096), (0, 4096)]]));
 
-        public byte[]? GetTile(int zoom, int x, int y) => zoom <= maxZoom ? _png : null;
+        public byte[]? GetTile(int zoom, int x, int y) => zoom <= maxZoom ? _tile : null;
 
         public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
 
         public int? GetMaxZoom() => maxZoom;
-
-        private static byte[] Png(Color color)
-        {
-            using var bitmap = new RenderTargetBitmap(new PixelSize(256, 256));
-            using (var context = bitmap.CreateDrawingContext())
-            {
-                context.FillRectangle(new SolidColorBrush(color), new Rect(0, 0, 256, 256));
-            }
-
-            using var stream = new MemoryStream();
-            bitmap.Save(stream, PngBitmapEncoderOptions.Default);
-            return stream.ToArray();
-        }
     }
 }

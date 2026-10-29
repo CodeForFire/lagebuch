@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Raster decode vs. the app's own PMTiles + MVT + Avalonia rasteriser, on the same tiles. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\LageBuch.App.Shared\LageBuch.App.Shared.csproj" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Headless" Version="12.1.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" />
+  </ItemGroup>
+</Project>

@@ -9,6 +9,8 @@ namespace LageBuch.AppLogic.Tests;
 
 public sealed class RegionPackLibraryTests : IDisposable
 {
+    private const string KnownVectorMap = """{"minZoom": 0, "maxZoom": 15, "schema": "protomaps-basemap", "schemaVersion": "4.15.2"}""";
+
     private const string Area = """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.4, 48.0], [11.4, 48.3], [11.0, 48.0]]]}}""";
 
     private readonly string _dir = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
@@ -36,14 +38,72 @@ public sealed class RegionPackLibraryTests : IDisposable
         var installed = await library.InstallAsync(Pack(zip));
 
         Assert.Equal(Path.Join(Root, "ffb"), installed.FolderPath);
-        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(installed.TilesPath));
+        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(installed.VectorTilesPath));
         Assert.Equal("water", await File.ReadAllTextAsync(installed.WaterPath));
         Assert.Equal("addresses", await File.ReadAllTextAsync(installed.AddressesPath));
         Assert.Equal(
-            ["ATTRIBUTION.md", "addresses.sqlite", "boundary.geojson", "elevation.tif", "installed.json", "map.mbtiles", "pack.json", "water.geojson"],
+            ["ATTRIBUTION.md", "addresses.sqlite", "boundary.geojson", "elevation.tif", "installed.json", "map.pmtiles", "pack.json", "water.geojson"],
             Directory.GetFiles(installed.FolderPath).Select(Path.GetFileName).Order(StringComparer.Ordinal));
         var listed = Assert.Single(library.GetInstalled());
         Assert.Equal(Pack(zip), listed.Info);
+    }
+
+    [Fact]
+    public async Task A_pack_built_with_raster_tiles_too_installs_without_them()
+    {
+        var zip = Zip([.. Files(rasterTiles: "raster")]);
+        _handler.Respond(_ => Ok(zip));
+
+        var installed = await Library().InstallAsync(Pack(zip));
+
+        Assert.Equal("tiles", await File.ReadAllTextAsync(installed.VectorTilesPath));
+        Assert.False(File.Exists(Path.Join(installed.FolderPath, "map.mbtiles")));
+    }
+
+    [Theory]
+    [InlineData("""{"minZoom": 0, "maxZoom": 15, "schema": "protomaps-basemap", "schemaVersion": "5.0.0"}""")]
+    [InlineData("""{"minZoom": 0, "maxZoom": 14, "schema": "openmaptiles", "schemaVersion": "4.0"}""")]
+    [InlineData("""{"minZoom": 0, "maxZoom": 15}""")]
+    [InlineData("\"protomaps-basemap\"")]
+    public async Task A_pack_whose_vector_tiles_this_app_cannot_style_asks_for_a_newer_app_and_installs_nothing(string vectorMap)
+    {
+        var zip = Zip([.. Files(vectorMap: vectorMap)]);
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket braucht eine neuere Lagebuch-Version. Lagebuch aktualisieren.", e.Message);
+        Assert.Empty(library.GetInstalled());
+        Assert.Empty(Directory.GetFileSystemEntries(Root));
+    }
+
+    [Fact]
+    public async Task A_pack_folder_without_vector_tiles_is_not_listed_so_it_is_offered_for_download_again()
+    {
+        var zip = PackZip();
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+        var installed = await library.InstallAsync(Pack(zip));
+
+        // What a pack installed before packs carried vector tiles looks like.
+        File.Delete(installed.VectorTilesPath);
+
+        Assert.Empty(library.GetInstalled());
+    }
+
+    [Fact]
+    public async Task Vector_tiles_whose_bytes_differ_from_pack_json_refuse_the_pack()
+    {
+        var files = Files();
+        var zip = Zip([.. files.Select(f => f.Name == "map.pmtiles" ? (f.Name, "tileS") : f)]);
+        _handler.Respond(_ => Ok(zip));
+        var library = Library();
+
+        var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(zip)));
+
+        Assert.Equal("Das Kartenpaket ist beschädigt (pack.json passt nicht zum Inhalt).", e.Message);
+        Assert.Empty(library.GetInstalled());
     }
 
     [Fact]
@@ -59,7 +119,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         _handler.Respond(_ => Ok(v2));
         var installed = await library.InstallAsync(Pack(v2) with { Version = 2 });
 
-        Assert.Equal("tiles-v2", await File.ReadAllTextAsync(installed.TilesPath));
+        Assert.Equal("tiles-v2", await File.ReadAllTextAsync(installed.VectorTilesPath));
         Assert.False(File.Exists(Path.Join(installed.FolderPath, "stray.txt")));
         Assert.Equal(2, Assert.Single(library.GetInstalled()).Info.Version);
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
@@ -117,7 +177,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(100)));
 
         Assert.Contains("größer als angekündigt", e.Message, StringComparison.Ordinal);
-        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).TilesPath));
+        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).VectorTilesPath));
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
     }
 
@@ -131,14 +191,14 @@ public sealed class RegionPackLibraryTests : IDisposable
 
         // What an install killed halfway leaves behind.
         Directory.CreateDirectory(Path.Join(Root, ".ffb.staging"));
-        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.staging", "map.mbtiles"), "half");
+        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.staging", "map.pmtiles"), "half");
         Directory.CreateDirectory(Path.Join(Root, ".ffb.previous"));
-        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.previous", "map.mbtiles"), "old");
+        await File.WriteAllTextAsync(Path.Join(Root, ".ffb.previous", "map.pmtiles"), "old");
         var v2 = PackZip("tiles-v2");
         _handler.Respond(_ => Ok(v2));
         var installed = await library.InstallAsync(Pack(v2));
 
-        Assert.Equal("tiles-v2", await File.ReadAllTextAsync(installed.TilesPath));
+        Assert.Equal("tiles-v2", await File.ReadAllTextAsync(installed.VectorTilesPath));
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
     }
 
@@ -197,7 +257,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(swapped) with { Sha256 = Sha(v1) }));
 
         Assert.Equal("Das Kartenpaket ist beschädigt (Prüfsumme stimmt nicht). Erneut herunterladen.", e.Message);
-        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).TilesPath));
+        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).VectorTilesPath));
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
     }
 
@@ -205,7 +265,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     [InlineData("../../evil.txt")]
     [InlineData("sub/../../../evil.txt")]
     [InlineData("readme.txt")]
-    [InlineData("sub/map.mbtiles")]
+    [InlineData("sub/map.pmtiles")]
     public async Task A_zip_with_an_entry_format_md_does_not_name_is_refused_and_nothing_is_written(string extra)
     {
         var zip = Zip([.. Files(), (extra, "x")]);
@@ -221,7 +281,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Theory]
-    [InlineData("map.mbtiles")]
+    [InlineData("map.pmtiles")]
     [InlineData("pack.json")]
     [InlineData("ATTRIBUTION.md")]
     [InlineData("boundary.geojson")]
@@ -241,7 +301,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task A_zip_holding_a_file_twice_is_refused()
     {
-        var zip = Zip([.. Files(), ("map.mbtiles", "second")]);
+        var zip = Zip([.. Files(), ("map.pmtiles", "second")]);
         _handler.Respond(_ => Ok(zip));
 
         var e = await Assert.ThrowsAsync<RegionPackException>(() => Library().InstallAsync(Pack(zip)));
@@ -252,7 +312,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Theory]
     [InlineData("\"slug\": \"ffb\"", "\"slug\": \"sta\"")]
     [InlineData("\"slug\": \"ffb\", ", "")]
-    [InlineData("\"map.mbtiles\": {\"bytes\": 5", "\"map.mbtiles\": {\"bytes\": 6")]
+    [InlineData("\"map.pmtiles\": {\"bytes\": 5", "\"map.pmtiles\": {\"bytes\": 6")]
     [InlineData("\"water.geojson\": {\"bytes\": 5, \"sha256\": \"", "\"water.geojson\": {\"bytes\": 5, \"sha256\": \"0")]
     [InlineData("\"addresses.sqlite\"", "\"other.sqlite\"")]
     [InlineData("{\"formatVersion\"", "[{\"formatVersion\"")]
@@ -284,7 +344,7 @@ public sealed class RegionPackLibraryTests : IDisposable
         var e = await Assert.ThrowsAsync<RegionPackException>(() => library.InstallAsync(Pack(truncated)));
 
         Assert.Equal("Das Kartenpaket ist beschädigt.", e.Message);
-        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).TilesPath));
+        Assert.Equal("tiles-v1", await File.ReadAllTextAsync(Assert.Single(library.GetInstalled()).VectorTilesPath));
         Assert.Equal(["ffb"], Directory.GetFileSystemEntries(Root).Select(Path.GetFileName));
     }
 
@@ -294,7 +354,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     [Fact]
     public async Task An_entry_that_expands_past_its_declared_size_is_cut_off_there()
     {
-        var zip = ZipWithBomb(InstalledRegionPack.TilesFileName, RegionPackLibrary.MaxUnpackedBytes + (1024 * 1024));
+        var zip = ZipWithBomb(InstalledRegionPack.VectorTilesFileName, RegionPackLibrary.MaxUnpackedBytes + (1024 * 1024));
         _handler.Respond(_ => Ok(zip));
         var library = Library();
 
@@ -306,9 +366,9 @@ public sealed class RegionPackLibraryTests : IDisposable
     }
 
     [Theory]
-    [InlineData("\"map.mbtiles\": {\"bytes\": 5", "\"map.mbtiles\": {\"bytes\": -5")]
-    [InlineData("\"map.mbtiles\": {\"bytes\": 5", "\"map.mbtiles\": {\"bytes\": \"5\"")]
-    [InlineData("\"map.mbtiles\": {\"bytes\": 5, \"sha256\": \"", "\"map.mbtiles\": {\"bytes\": 5, \"sha256\": \"X")]
+    [InlineData("\"map.pmtiles\": {\"bytes\": 5", "\"map.pmtiles\": {\"bytes\": -5")]
+    [InlineData("\"map.pmtiles\": {\"bytes\": 5", "\"map.pmtiles\": {\"bytes\": \"5\"")]
+    [InlineData("\"map.pmtiles\": {\"bytes\": 5, \"sha256\": \"", "\"map.pmtiles\": {\"bytes\": 5, \"sha256\": \"X")]
     public async Task A_declared_size_or_checksum_that_is_no_number_or_hash_refuses_the_pack(string field, string replacement)
     {
         var zip = Zip([.. Files("tiles", manifest => manifest.Replace(field, replacement, StringComparison.Ordinal))]);
@@ -634,14 +694,21 @@ public sealed class RegionPackLibraryTests : IDisposable
     private static byte[] PackZip(string tiles = "tiles") => Zip([.. Files(tiles)]);
 
     // The files of a well-formed pack, its pack.json declaring each data file truly.
-    // shapeManifest bends that pack.json into one that lies.
-    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null, string boundary = Area)
+    // shapeManifest bends that pack.json into one that lies. vectorMap describes map.pmtiles.
+    // With rasterTiles, the pack also holds the map.mbtiles packs carried until lagebuch-geodata
+    // stopped building them, declared as they declared it.
+    private static List<(string Name, string Content)> Files(string tiles = "tiles", Func<string, string>? shapeManifest = null, string boundary = Area, string vectorMap = KnownVectorMap, string? rasterTiles = null)
     {
-        (string Name, string Content)[] data = [("map.mbtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses"), ("boundary.geojson", boundary)];
+        (string Name, string Content)[] data = [("map.pmtiles", tiles), ("elevation.tif", "dem"), ("water.geojson", "water"), ("addresses.sqlite", "addresses"), ("boundary.geojson", boundary)];
+        if (rasterTiles is not null)
+        {
+            data = [.. data, ("map.mbtiles", rasterTiles)];
+        }
+
         var files = string.Join(", ", data.Select(d => $$"""
             "{{d.Name}}": {"bytes": {{Encoding.UTF8.GetByteCount(d.Content)}}, "sha256": "{{Sha(d.Content)}}"}
             """));
-        var manifest = """{"formatVersion": 2, "slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1, "files": {""" + files + "}}";
+        var manifest = """{"formatVersion": 2, "slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1, "vectorMap": """ + vectorMap + ", \"files\": {" + files + "}}";
         return [("pack.json", shapeManifest?.Invoke(manifest) ?? manifest), ("ATTRIBUTION.md", "© OpenStreetMap-Mitwirkende"), .. data];
     }
 
@@ -651,7 +718,7 @@ public sealed class RegionPackLibraryTests : IDisposable
     {
         if (OperatingSystem.IsWindows())
         {
-            using (new FileStream(pack.TilesPath, FileMode.Open, FileAccess.Read, FileShare.None))
+            using (new FileStream(pack.VectorTilesPath, FileMode.Open, FileAccess.Read, FileShare.None))
             {
                 return act();
             }

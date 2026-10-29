@@ -18,7 +18,7 @@ public static partial class RegionPackCatalogJson
     /// <summary>A catalogue with more entries than this is not a list of Landkreise.</summary>
     public const int MaxEntries = 500;
 
-    /// <summary>No tile address is deeper than this; see <c>MbTilesFileSource.MaxSupportedZoom</c>.</summary>
+    /// <summary>No tile address is deeper than this; see <c>PmTilesFileSource.MaxSupportedZoom</c>.</summary>
     public const int MaxZoomLevel = 22;
 
     private const int MaxTextLength = 300;

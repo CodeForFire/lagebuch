@@ -1,0 +1,6 @@
+<Project>
+  <!-- See Directory.Build.props: versions are pinned in each project, not centrally. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

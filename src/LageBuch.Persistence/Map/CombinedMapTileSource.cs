@@ -4,29 +4,26 @@ namespace LageBuch.Persistence.Map;
 /// Several Kartenpakete drawn as one map, so that a Landkreis border is a seam, not an edge.
 /// </summary>
 /// <remarks>
-/// A pack's tiles along its edge are only partly map: the rest is empty land, because the OSM data
-/// was cut to the pack's area before rendering. So a whole tile cannot simply come from the first
-/// pack that has one -- the map draws each of <see cref="Layers"/> clipped to its own area. Where
-/// two areas overlap, as neighbouring Landkreise do by their buffer, both show the same streets.
+/// A pack's vector tiles are cut to its area when it is built, so along its edge a tile holds
+/// only what lies inside. A whole tile therefore cannot come from the first pack that has one --
+/// the map draws every one of <see cref="Layers"/> on top of the last. Where two areas overlap,
+/// as neighbouring Landkreise do by their buffer, both draw the same streets.
 /// <see cref="GetTile"/> answers for a caller that draws one tile per address: the first pack's.
 /// </remarks>
 public sealed class CombinedMapTileSource : IMapTileSource
 {
-    private readonly IReadOnlyList<IMapTileSource> _sources;
-
-    public CombinedMapTileSource(IReadOnlyList<MapTileLayer> layers)
+    public CombinedMapTileSource(IReadOnlyList<IMapTileSource> layers)
     {
         ArgumentNullException.ThrowIfNull(layers);
         Layers = layers;
-        _sources = [.. layers.Select(l => l.Tiles)];
     }
 
-    /// <summary>The packs, each with its area, in the order the map draws them.</summary>
-    public IReadOnlyList<MapTileLayer> Layers { get; }
+    /// <summary>The packs, in the order the map draws them.</summary>
+    public IReadOnlyList<IMapTileSource> Layers { get; }
 
     public byte[]? GetTile(int zoom, int x, int y)
     {
-        foreach (var source in _sources)
+        foreach (var source in Layers)
         {
             if (source.GetTile(zoom, x, y) is { } tile)
             {
@@ -40,7 +37,7 @@ public sealed class CombinedMapTileSource : IMapTileSource
     /// <summary>The range covering every pack, at the lowest zoom any of them has.</summary>
     public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds()
     {
-        var all = _sources.Select(s => s.GetTileBounds()).OfType<(int Zoom, int MinX, int MaxX, int MinY, int MaxY)>().ToList();
+        var all = Layers.Select(s => s.GetTileBounds()).OfType<(int Zoom, int MinX, int MaxX, int MinY, int MaxY)>().ToList();
         if (all.Count == 0)
         {
             return null;
@@ -57,5 +54,5 @@ public sealed class CombinedMapTileSource : IMapTileSource
             all.Max(b => b.MaxY >> (b.Zoom - zoom)));
     }
 
-    public int? GetMaxZoom() => _sources.Select(s => s.GetMaxZoom()).Max();
+    public int? GetMaxZoom() => Layers.Select(s => s.GetMaxZoom()).Max();
 }

@@ -45,13 +45,12 @@ public sealed class LagekarteRenderTests : IDisposable
         Assert.Equal(3, panel.Children.Count);
         Assert.Equal(3, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "UnitList").ItemCount);
         Assert.False(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "NoMapBanner").IsVisible);
-        Assert.NotNull(view.GetVisualDescendants().OfType<MapCanvasControl>().Single().TileSource);
+        var layer = Assert.Single(Assert.IsType<Persistence.Map.CombinedMapTileSource>(vm.Map.TileSource).Layers);
+        Assert.IsType<Persistence.Map.Vector.PmTilesFileSource>(layer);
 
         // The PR screenshot.
-        var shots = Path.Join(Path.GetTempPath(), "lagebuch-shots");
-        Directory.CreateDirectory(shots);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Join(shots, "fuehrung-karte.png"));
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte.png"));
     }
 
     [AvaloniaFact]

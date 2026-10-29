@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -65,8 +66,8 @@ public sealed class MapPacksRenderTests : IDisposable
         FictionalRegionPack.Install(root);
         using var handler = new CatalogueHandler($$"""
             {"formatVersion": 2, "packs": [{"slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1,
-              "downloadUrl": "https://example.org/ffb-v1.zip", "sizeBytes": 264978779, "sha256": "{{new string('b', 64)}}",
-              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 11, "maxZoom": 17,
+              "downloadUrl": "https://example.org/ffb-v1.zip", "sizeBytes": 52731904, "sha256": "{{new string('b', 64)}}",
+              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 0, "maxZoom": 15,
               "builtAt": "2026-11-03T20:15:49Z", "attribution": "{{FictionalRegionPack.Attribution}}"}]}
             """);
         using var http = new HttpClient(handler);
@@ -90,6 +91,56 @@ public sealed class MapPacksRenderTests : IDisposable
         frame.SavePng(Path.Join(Shots(), "stammdaten-karten-grund.png"));
     }
 
+    [AvaloniaTheory]
+    [InlineData(1024, 600)] // a small laptop
+    [InlineData(400, 780)] // a phone, where the section opens full width
+    public async Task On_a_short_screen_the_whole_catalogue_and_the_download_progress_scroll_into_view_above_the_map(int width, int height)
+    {
+        var root = Path.Join(_dir, "regions");
+        FictionalRegionPack.Install(root);
+        var packs = string.Join(",", Enumerable.Range(1, 8).Select(i => $$"""
+            {"slug": "lk{{i}}", "name": "Landkreis Muster {{i}}", "version": 1,
+              "downloadUrl": "https://example.org/lk{{i}}-v1.zip", "sizeBytes": 52731904, "sha256": "{{new string('b', 64)}}",
+              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 0, "maxZoom": 15,
+              "builtAt": "2026-11-03T20:15:49Z", "attribution": "{{FictionalRegionPack.Attribution}}"}
+            """));
+        using var handler = new CatalogueHandler($$"""{"formatVersion": 2, "packs": [{{packs}}]}""");
+        using var http = new HttpClient(handler);
+        var vm = new MasterDataEditorViewModel(new EmptyProvider(), new FakeDialogs(), new NoFiles(), new RegionPackLibrary(http, root));
+        var section = vm.Sections.OfType<MapPacksSection>().Single();
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = width, Height = height };
+        window.Show();
+        await section.LoadCatalogCommand.ExecuteAsync(null);
+        vm.IsDetailOpen = true;
+        section.IsBusy = true;
+        section.Progress = 0.4;
+        Dispatcher.UIThread.RunJobs();
+
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var mapTop = map.TranslatePoint(default, window)!.Value.Y;
+        var last = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Landkreis Muster 8");
+        var bar = view.GetVisualDescendants().OfType<ProgressBar>().Single();
+        var bottoms = new List<(string Name, double Bottom)>();
+        foreach (var control in new Control[] { last, bar })
+        {
+            control.BringIntoView();
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(control.IsEffectivelyVisible);
+            bottoms.Add((control.GetType().Name, control.TranslatePoint(new Point(0, control.Bounds.Height), window)!.Value.Y));
+        }
+
+        // Before the assertions, so a failing layout still leaves its picture behind.
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(Shots(), $"stammdaten-karten-{width}x{height}.png"));
+        }
+
+        Assert.All(bottoms, b => Assert.True(b.Bottom <= mapTop, $"{b.Name} ends at {b.Bottom}, under the map at {mapTop}."));
+        Assert.True(map.Bounds.Height >= 150, $"The map is {map.Bounds.Height}px high.");
+    }
+
     [AvaloniaFact]
     public void Without_a_pack_the_Karten_section_says_so_and_shows_no_map()
     {
@@ -103,6 +154,9 @@ public sealed class MapPacksRenderTests : IDisposable
 
         Assert.True(view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "NoMapPacksHint").IsEffectivelyVisible);
         Assert.False(view.GetVisualDescendants().OfType<MapCanvasControl>().Single().IsEffectivelyVisible);
+
+        // The lists take the map's half too.
+        Assert.Equal(2, Grid.GetRowSpan(view.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "MapPacksScroll")));
     }
 
     private sealed class EmptyProvider : IMasterDataProvider

@@ -1,0 +1,1 @@
+The Lagekarte draws a Kartenpaket from its vector tiles (`map.pmtiles`), with sharp streets and whole, non-overlapping place and street names down to the closest zoom (CodeForFire/lagebuch-geodata#5).

@@ -35,6 +35,13 @@ runs:
       run: | # zizmor: ignore[github-env]
         dotnet tool install --global wix --version 5.0.2
         echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+    # The installer dialogs (UI) and the start-Lagebuch-on-finish action (Util), at wix's own
+    # version: an extension built for another WiX release refuses to load.
+    - name: Install WiX extensions
+      shell: pwsh
+      run: |
+        wix extension add -g WixToolset.UI.wixext/5.0.2
+        wix extension add -g WixToolset.Util.wixext/5.0.2
     - name: Build MSI
       # Absolute paths: WiX resolves <Files Include> relative to the .wxs file's own directory,
       # not the working directory, so a bare "publish" would look under packaging/windows.
@@ -42,14 +49,18 @@ runs:
       # v0.6.0-beta.1 release identifies itself as 0.6.0. The file name keeps the full version.
       # -arch x64: WiX defaults to an x86 package, which installs ProgramFiles64Folder into
       # "Program Files (x86)" and registers under WOW6432Node — wrong for a win-x64 publish.
+      # -culture de-DE: the stock installer dialogs in German, like the rest of the app.
       shell: pwsh
       env:
         MSI_VERSION: ${{ inputs.msi-version }}
         FILE_NAME: ${{ inputs.file-name }}
       run: >
         wix build packaging/windows/Lagebuch.wxs -arch x64
+        -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -culture de-DE
         -d "Version=$env:MSI_VERSION"
         -d "PublishDir=$env:GITHUB_WORKSPACE\publish"
         -d "IconFile=$env:GITHUB_WORKSPACE\src\LageBuch.App\Assets\icon.ico"
         -d "DocumentIconFile=$env:GITHUB_WORKSPACE\src\LageBuch.App\Assets\document.ico"
+        -d "BannerBmp=$env:GITHUB_WORKSPACE\packaging\windows\banner.bmp"
+        -d "DialogBmp=$env:GITHUB_WORKSPACE\packaging\windows\dialog.bmp"
         -o "$env:FILE_NAME"

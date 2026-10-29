@@ -1,0 +1,27 @@
+<!-- Shown in place of the main window when building it threw (see App.CreateDesktopMainWindow).
+     Deliberately plain: whatever broke the start may have broken more, so it binds nothing and
+     leans on as little of the app as it can. -->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LageBuch.App.Shared.Views.StartupFailureWindow"
+        Width="560" SizeToContent="Height" MinWidth="380"
+        WindowStartupLocation="CenterScreen" CanResize="False"
+        Title="Lagebuch – Start fehlgeschlagen"
+        Background="{StaticResource SurfaceRaisedBrush}">
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}" />
+    <StackPanel Margin="26,22,26,24" Spacing="12">
+      <TextBlock Text="Lagebuch konnte nicht gestartet werden." Classes="display" FontSize="22" TextWrapping="Wrap" />
+      <TextBlock Classes="secondary" TextWrapping="Wrap"
+                 Text="Bitte die folgenden Angaben und den Fehlerbericht einer Fehlermeldung beilegen." />
+      <TextBlock Text="TECHNISCHE DETAILS" Classes="overline" FontSize="10" />
+      <!-- FontFamily set here: the theme's TextBlock style does not reach a SelectableTextBlock. -->
+      <SelectableTextBlock x:Name="FailureDetails" FontFamily="{StaticResource MonoFont}" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextPrimaryBrush}" />
+      <SelectableTextBlock x:Name="ReportLocation" FontFamily="{StaticResource BodyFont}" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextSecondaryBrush}" />
+      <Button x:Name="CloseButton" Classes="signal" Content="SCHLIESSEN"
+              HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnCloseClick" />
+    </StackPanel>
+  </DockPanel>
+</Window>
