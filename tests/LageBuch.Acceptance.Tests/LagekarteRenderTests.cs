@@ -45,34 +45,12 @@ public sealed class LagekarteRenderTests : IDisposable
         Assert.Equal(3, panel.Children.Count);
         Assert.Equal(3, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "UnitList").ItemCount);
         Assert.False(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "NoMapBanner").IsVisible);
-        Assert.NotNull(view.GetVisualDescendants().OfType<MapCanvasControl>().Single().TileSource);
+        var layer = Assert.Single(Assert.IsType<Persistence.Map.CombinedMapTileSource>(vm.Map.TileSource).Layers);
+        Assert.IsType<Persistence.Map.Vector.PmTilesFileSource>(layer);
 
         // The PR screenshot.
-        var shots = Path.Join(Path.GetTempPath(), "lagebuch-shots");
-        Directory.CreateDirectory(shots);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Join(shots, "fuehrung-karte.png"));
-    }
-
-    [AvaloniaFact]
-    public void A_pack_with_vector_tiles_is_drawn_from_them_with_its_Einsatzort_units_and_hydranten()
-    {
-        var (window, view, vm, session) = Show(vectorMap: true);
-        WaitForWaterPoints(vm);
-        session.SetIncidentLocation(Marktplatz);
-        session.PlaceForceUnit(session.Incident.Forces[0].Id, new GeoPoint(48.1792, 11.2541));
-        session.PlaceForceUnit(session.Incident.Forces[1].Id, new GeoPoint(48.1779, 11.2572));
-        vm.CenterOnEinsatzortCommand.Execute(null);
-        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
-        Dispatcher.UIThread.RunJobs();
-
-        var layer = Assert.Single(Assert.IsType<Persistence.Map.CombinedMapTileSource>(vm.Map.TileSource).Layers);
-        Assert.IsType<Persistence.Map.Vector.PmTilesFileSource>(layer.Tiles);
-        Assert.Null(layer.Boundary);
-        Assert.Equal(3, view.GetVisualDescendants().OfType<MapMarkerPanel>().Single().Children.Count);
-
-        using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-vektor.png"));
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte.png"));
     }
 
     [AvaloniaFact]
@@ -231,10 +209,10 @@ public sealed class LagekarteRenderTests : IDisposable
         workspace.Dispose();
     }
 
-    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show(bool vectorMap = false)
+    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show()
     {
         var root = Path.Join(_dir, "regions");
-        FictionalRegionPack.Install(root, vectorMap);
+        FictionalRegionPack.Install(root);
         var session = NewSession();
         session.AddForceUnit("FF Musterstadt", 9, "Florian Musterstadt 40/1", "Im Einsatz");
         session.AddForceUnit("FF Musterstadt", 3, "Florian Musterstadt 11/1", "Im Einsatz");

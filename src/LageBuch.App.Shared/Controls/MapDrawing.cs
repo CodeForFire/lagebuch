@@ -14,7 +14,7 @@ namespace LageBuch.App.Shared.Controls;
 /// </summary>
 public static class MapDrawing
 {
-    // OSM's own land colour, so the gap around a pack's edge reads as "no map here", not as an error.
+    // A shade darker than the map's land, so the gap around a pack's edge reads as "no map here", not as an error.
     private static readonly IBrush Background = new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Color.FromRgb(0xE5, 0xE3, 0xDF));
 
     public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size)
@@ -33,22 +33,13 @@ public static class MapDrawing
             return;
         }
 
-        // Several packs are drawn one over the other, each only within its own area: outside it a
-        // pack's tiles are empty land that would cover its neighbour's streets.
-        IReadOnlyList<MapTileLayer> layers = source is CombinedMapTileSource combined ? combined.Layers : [new MapTileLayer(source, null)];
+        // Several packs are drawn one over the other. Each pack's tiles are cut to its area when it
+        // is built, so outside it a pack draws nothing that could cover its neighbour's streets.
+        IReadOnlyList<IMapTileSource> layers = source is CombinedMapTileSource combined ? combined.Layers : [source];
         var labels = new List<(MapLabel Label, Vector Offset)>();
         foreach (var layer in layers)
         {
-            if (layer.Boundary is null)
-            {
-                DrawLayer(context, tiles, layer.Tiles, center, zoom, size, labels);
-                continue;
-            }
-
-            using (context.PushGeometryClip(Area(layer.Boundary, center, zoom, size)))
-            {
-                DrawLayer(context, tiles, layer.Tiles, center, zoom, size, labels);
-            }
+            DrawLayer(context, tiles, layer, center, zoom, size, labels);
         }
 
         // The names of every vector tile, over all tiles and unclipped, so none is cut at a tile's edge.
@@ -111,7 +102,6 @@ public static class MapDrawing
         var top = centerY - (size.Height / 2);
         var (firstX, firstY) = WebMercator.ToTileIndex(left, top);
         var (lastX, lastY) = WebMercator.ToTileIndex(left + size.Width, top + size.Height);
-        var maxZoom = layer.GetMaxZoom();
         var tilesPerSide = 1 << zoom;
 
         for (var tx = Math.Max(firstX, 0); tx <= Math.Min(lastX, tilesPerSide - 1); tx++)
@@ -124,40 +114,15 @@ public static class MapDrawing
                     WebMercator.TileSizePixels,
                     WebMercator.TileSizePixels);
 
+                // Past the pack's deepest zoom the cache draws the ancestor's part of the tile at
+                // this zoom, so a missing tile here is one the pack does not have.
                 if (tiles.Get(layer, zoom, tx, ty) is { } bitmap)
                 {
                     context.DrawImage(bitmap, target);
                     labels.AddRange(tiles.Labels(layer, zoom, tx, ty).Select(l => (l, (Vector)target.TopLeft)));
                 }
-                else if (Overzoom(zoom, tx, ty, maxZoom) is { } ancestor
-                    && tiles.Get(layer, ancestor.Zoom, ancestor.X, ancestor.Y) is { } coarse)
-                {
-                    context.DrawImage(coarse, ancestor.SourceRect, target);
-                }
             }
         }
-    }
-
-    // The area in screen coordinates. Filled even-odd, so a hole in it stays a hole.
-    private static StreamGeometry Area(IReadOnlyList<IReadOnlyList<GeoPoint>> rings, GeoPoint center, int zoom, Size size)
-    {
-        var geometry = new StreamGeometry();
-        using (var area = geometry.Open())
-        {
-            area.SetFillRule(FillRule.EvenOdd);
-            foreach (var ring in rings)
-            {
-                area.BeginFigure(ToScreen(center, zoom, size, ring[0]), isFilled: true);
-                for (var i = 1; i < ring.Count; i++)
-                {
-                    area.LineTo(ToScreen(center, zoom, size, ring[i]));
-                }
-
-                area.EndFigure(isClosed: true);
-            }
-        }
-
-        return geometry;
     }
 
     // DIN 14090 colours: hydrants red, open water and tanks blue.
@@ -262,24 +227,5 @@ public static class MapDrawing
     {
         var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
         return WebMercator.ToGeo(centerX + screen.X - (size.Width / 2), centerY + screen.Y - (size.Height / 2), zoom);
-    }
-
-    /// <summary>
-    /// For a zoom past the pack's finest, the ancestor tile at that finest zoom and the part of it
-    /// covering this tile: a blurrier but still placed map instead of nothing. Null when the zoom is
-    /// within the pack, or the pack has no tiles.
-    /// </summary>
-    public static (int Zoom, int X, int Y, Rect SourceRect)? Overzoom(int zoom, int x, int y, int? sourceMaxZoom)
-    {
-        if (sourceMaxZoom is not { } maxZoom || zoom <= maxZoom)
-        {
-            return null;
-        }
-
-        var levels = zoom - maxZoom;
-        var ancestorX = x >> levels;
-        var ancestorY = y >> levels;
-        var side = (double)WebMercator.TileSizePixels / (1 << levels);
-        return (maxZoom, ancestorX, ancestorY, new Rect((x - (ancestorX << levels)) * side, (y - (ancestorY << levels)) * side, side, side));
     }
 }

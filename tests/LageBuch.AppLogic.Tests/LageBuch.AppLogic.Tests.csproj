@@ -26,4 +26,9 @@
     <ProjectReference Include="..\..\src\LageBuch.Documents\LageBuch.Documents.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The byte-level PMTiles/MVT builder, so a viewport test can show a real archive. -->
+    <Compile Include="..\LageBuch.Persistence.Tests\VectorTileFixtures.cs" Link="VectorTileFixtures.cs" />
+  </ItemGroup>
+
 </Project>

@@ -5,8 +5,8 @@ namespace LageBuch.AppLogic.Services.Map;
 
 /// <summary>
 /// Reads a Kartenpaket's area, <c>boundary.geojson</c>: the Landkreis plus its buffer, as one
-/// Polygon or MultiPolygon in WGS84 (FORMAT.md). A pack's tiles are complete
-/// inside it and empty land outside, so the map draws each pack only within its own area.
+/// Polygon or MultiPolygon in WGS84 (FORMAT.md). A pack is refused unless it carries one; the
+/// area is what its tiles, water points and addresses are complete in.
 /// </summary>
 public static class BoundaryGeoJson
 {
@@ -68,22 +68,6 @@ public static class BoundaryGeoJson
         }
         catch (JsonException)
         {
-            return null;
-        }
-    }
-
-    /// <summary>The boundary stored with an installed pack, or null when it has none or it cannot be read.</summary>
-    public static IReadOnlyList<IReadOnlyList<GeoPoint>>? Read(string path)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        try
-        {
-            var file = new FileInfo(path);
-            return file.Exists && file.Length <= MaxFileBytes ? Parse(File.ReadAllBytes(path)) : null;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // A pack without a readable area is drawn whole, as before there were areas.
             return null;
         }
     }

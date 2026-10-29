@@ -10,8 +10,8 @@ namespace LageBuch.App.Shared.Controls;
 
 /// <summary>
 /// Rasterises one decoded vector tile in the Protomaps basemap schema into a 256 px bitmap, in
-/// colours close to OSM Carto so it can stand next to the raster packs. The map then caches,
-/// clips and places it like any raster tile.
+/// colours close to OSM Carto, the look a crew knows from openstreetmap.org. The map then caches
+/// and places the bitmaps tile by tile.
 /// </summary>
 /// <remarks>
 /// The style is fixed in code, for the schema RegionPackLibrary.VectorSchema names. Names are not
