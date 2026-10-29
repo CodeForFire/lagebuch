@@ -61,13 +61,15 @@ fi
 # A clean build, so every file is compiled under the tracer; an incremental one
 # would hand CodeQL only the projects that happened to be stale. For the same
 # reason no build may run outside it: an MSBuild node or compiler server left
-# over from an earlier build takes projects on untraced, and the database then
-# silently lacks them (a second run once saw 257 of 763 files). So shut them
-# down first and start no new long-lived ones.
+# over from an earlier build takes projects on untraced. So shut them down first
+# and start no new long-lived ones. And start from no database at all: over the
+# previous run's, even with --overwrite, the extractor skipped most compilations
+# and a run saw 258 of 764 files.
 dotnet build-server shutdown >/dev/null
 export MSBUILDDISABLENODEREUSE=1
+rm -rf "$out/db"
 
-"$codeql" database create "$out/db" --overwrite --language=csharp --build-mode=manual \
+"$codeql" database create "$out/db" --language=csharp --build-mode=manual \
   --source-root="$root" \
   --command="dotnet build LageBuch.Desktop.slnf -c Release --no-incremental -nodeReuse:false -p:UseSharedCompilation=false"
 
