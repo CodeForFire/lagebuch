@@ -1,9 +1,9 @@
 namespace LageBuch.Persistence.Map;
 
-/// <summary>Raster tiles of an installed Kartenpaket, addressed in the XYZ scheme (row 0 is north).</summary>
+/// <summary>Vector tiles of an installed Kartenpaket, addressed in the XYZ scheme (row 0 is north).</summary>
 public interface IMapTileSource
 {
-    /// <summary>The PNG or JPEG bytes of one tile, or null when the pack has none there.</summary>
+    /// <summary>The Mapbox Vector Tile bytes of one tile, decompressed, or null when the pack has none there.</summary>
     byte[]? GetTile(int zoom, int x, int y);
 
     /// <summary>
@@ -13,8 +13,8 @@ public interface IMapTileSource
     (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds();
 
     /// <summary>
-    /// The pack's highest zoom, or null for a pack without tiles. Past it the map enlarges the
-    /// ancestor tile rather than drawing nothing.
+    /// The pack's highest zoom, or null for a pack without tiles. Past it the map draws the
+    /// ancestor tile's part at the finer zoom rather than nothing.
     /// </summary>
     int? GetMaxZoom();
 }

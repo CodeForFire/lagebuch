@@ -1,19 +1,16 @@
-// POC for CodeForFire/lagebuch-geodata#5: raster tile decode vs. the app's vector rasteriser.
-// Usage: AvaloniaBench <map.mbtiles> <archive.pmtiles> <out-dir> [tiles-per-zoom]
+// Times the app's vector rasteriser on a pack's map.pmtiles (first written for lagebuch-geodata#5).
+// Usage: AvaloniaBench <archive.pmtiles> <out-dir> [tiles-per-zoom]
 using System.Globalization;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Media.Imaging;
 using LageBuch.App.Shared.Controls;
-using LageBuch.Persistence.Map;
 using LageBuch.Persistence.Map.Vector;
-using Microsoft.Data.Sqlite;
 using VectorTileBench;
 
-var mbtilesPath = args[0];
-var pmtilesPath = args[1];
-var outDir = Directory.CreateDirectory(args[2]).FullName;
-var perZoom = args.Length > 3 ? int.Parse(args[3], CultureInfo.InvariantCulture) : 1500;
+var pmtilesPath = args[0];
+var outDir = Directory.CreateDirectory(args[1]).FullName;
+var perZoom = args.Length > 2 ? int.Parse(args[2], CultureInfo.InvariantCulture) : 1500;
 int[] zooms = [13, 15, 17];
 
 AppBuilder.Configure<Application>()
@@ -21,7 +18,6 @@ AppBuilder.Configure<Application>()
     .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
     .SetupWithoutStarting();
 
-var raster = new MbTilesFileSource(mbtilesPath);
 var vector = new PmTilesFileSource(pmtilesPath);
 var vectorMaxZoom = vector.GetMaxZoom() ?? throw new InvalidOperationException("Not a readable PMTiles MVT archive.");
 
@@ -30,23 +26,11 @@ Console.WriteLine(Measure.Header);
 
 foreach (var zoom in zooms)
 {
-    // The raster pack's own tiles at this zoom are the area; the vector archive covers the same.
-    var all = TilesOf(mbtilesPath, zoom);
+    // Every tile in the archive's bounds at this zoom; those outside the area have no map.
+    var all = TilesOf(vector, zoom);
     var stride = Math.Max(1, all.Count / perZoom);
     var tiles = all.Where((_, i) => i % stride == 0).Take(perZoom).ToList();
     File.WriteAllLines(Measure.TileListPath(outDir, zoom), tiles.Select(t => string.Create(CultureInfo.InvariantCulture, $"{t.X} {t.Y}")));
-
-    Measure.Run(outDir, "raster PNG decode", zoom, tiles, (x, y) =>
-    {
-        if (raster.GetTile(zoom, x, y) is not { } png)
-        {
-            return false;
-        }
-
-        using var stream = new MemoryStream(png);
-        using var bitmap = new Bitmap(stream);
-        return true;
-    });
 
     var sourceZoom = Math.Min(zoom, vectorMaxZoom);
     var levels = zoom - sourceZoom;
@@ -91,7 +75,6 @@ foreach (var zoom in zooms)
 foreach (var zoom in new[] { 15, 17 })
 {
     var (cx, cy) = Measure.TileAt(Measure.CenterLat, Measure.CenterLon, zoom);
-    Compose(Path.Join(outDir, $"raster-z{zoom}.png"), cx, cy, (x, y) => raster.GetTile(zoom, x, y) is { } png ? new Bitmap(new MemoryStream(png)) : null);
     var sourceZoom = Math.Min(zoom, vectorMaxZoom);
     var levels = zoom - sourceZoom;
     Compose(Path.Join(outDir, $"vector-ours-z{zoom}.png"), cx, cy, (x, y) =>
@@ -103,18 +86,17 @@ foreach (var zoom in new[] { 15, 17 })
 Console.WriteLine($"Peak working set: {System.Diagnostics.Process.GetCurrentProcess().PeakWorkingSet64 / 1024 / 1024} MB");
 File.AppendAllLines(Path.Join(outDir, "results.md"), [string.Empty, $"Peak working set: {System.Diagnostics.Process.GetCurrentProcess().PeakWorkingSet64 / 1024 / 1024} MB"]);
 
-static List<(int X, int Y)> TilesOf(string mbtiles, int zoom)
+static List<(int X, int Y)> TilesOf(PmTilesFileSource archive, int zoom)
 {
-    using var cn = new SqliteConnection($"Data Source={mbtiles};Mode=ReadOnly");
-    cn.Open();
-    using var cmd = cn.CreateCommand();
-    cmd.CommandText = "SELECT tile_column, tile_row FROM tiles WHERE zoom_level = $z ORDER BY tile_column, tile_row;";
-    cmd.Parameters.AddWithValue("$z", zoom);
-    using var reader = cmd.ExecuteReader();
+    var (boundsZoom, minX, maxX, minY, maxY) = archive.GetTileBounds() ?? throw new InvalidOperationException("The archive has no bounds.");
+    var shift = zoom - boundsZoom;
     var list = new List<(int, int)>();
-    while (reader.Read())
+    for (var x = minX << shift; x < (maxX + 1) << shift; x++)
     {
-        list.Add((reader.GetInt32(0), (1 << zoom) - 1 - reader.GetInt32(1)));
+        for (var y = minY << shift; y < (maxY + 1) << shift; y++)
+        {
+            list.Add((x, y));
+        }
     }
 
     return list;

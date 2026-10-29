@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Avalonia.Media.Imaging;
 using LageBuch.Persistence.Map;
 using LageBuch.Persistence.Map.Vector;
@@ -6,9 +5,9 @@ using LageBuch.Persistence.Map.Vector;
 namespace LageBuch.App.Shared.Controls;
 
 /// <summary>
-/// Decoded tiles of one <see cref="IMapTileSource"/> -- of each of its packs, for a
+/// Rendered tiles of one <see cref="IMapTileSource"/> -- of each of its packs, for a
 /// <see cref="CombinedMapTileSource"/> -- so that a pan redraws from memory instead of reading and
-/// decoding every visible tile on every frame. A tile the pack lacks is remembered
+/// rendering every visible tile on every frame. A tile the pack lacks is remembered
 /// as missing too, so the map does not ask the file for it again.
 /// </summary>
 /// <remarks>
@@ -17,7 +16,7 @@ namespace LageBuch.App.Shared.Controls;
 /// </remarks>
 public sealed class MapTileCache
 {
-    /// <summary>About four screens of tiles on an ELW monitor, at 256 KB each once decoded.</summary>
+    /// <summary>About four screens of tiles on an ELW monitor, at 256 KB each once rendered.</summary>
     public const int Capacity = 256;
 
     private readonly Dictionary<(IMapTileSource Layer, int Zoom, int X, int Y), LinkedListNode<Entry>> _entries = new();
@@ -65,8 +64,7 @@ public sealed class MapTileCache
             return node.Value.Bitmap;
         }
 
-        IReadOnlyList<MapLabel> labels = [];
-        var bitmap = layer is PmTilesFileSource vector ? RenderVector(vector, zoom, x, y, out labels) : Decode(layer.GetTile(zoom, x, y));
+        var bitmap = Render(layer, zoom, x, y, out var labels);
         _entries[key] = _recent.AddFirst(new Entry(key, bitmap, labels));
         if (_entries.Count > Capacity && _recent.Last is { } oldest)
         {
@@ -80,8 +78,7 @@ public sealed class MapTileCache
 
     /// <summary>
     /// The names a vector tile wants drawn over the map, in the tile's pixels, once
-    /// <see cref="Get(IMapTileSource, int, int, int)"/> has fetched it; empty for a raster tile,
-    /// whose names are in its pixels, and for a tile not fetched.
+    /// <see cref="Get(IMapTileSource, int, int, int)"/> has fetched it; empty for a tile not fetched.
     /// </summary>
     public IReadOnlyList<MapLabel> Labels(IMapTileSource layer, int zoom, int x, int y) =>
         _entries.TryGetValue((layer, zoom, x, y), out var node) ? node.Value.Labels : [];
@@ -101,7 +98,7 @@ public sealed class MapTileCache
 
     // Past the archive's deepest zoom, the tile is the matching part of its ancestor, rendered at
     // this zoom rather than enlarged.
-    private RenderTargetBitmap? RenderVector(PmTilesFileSource source, int zoom, int x, int y, out IReadOnlyList<MapLabel> labels)
+    private RenderTargetBitmap? Render(IMapTileSource source, int zoom, int x, int y, out IReadOnlyList<MapLabel> labels)
     {
         labels = [];
         if (source.GetMaxZoom() is not { } maxZoom)
@@ -145,25 +142,6 @@ public sealed class MapTileCache
             return MvtTile.Decode(bytes);
         }
         catch (FormatException)
-        {
-            return null;
-        }
-    }
-
-    [SuppressMessage("Design", "CA1031", Justification = "A tile whose bytes are no image is drawn as missing: null is the documented result.")]
-    private static Bitmap? Decode(byte[]? bytes)
-    {
-        if (bytes is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            using var stream = new MemoryStream(bytes);
-            return new Bitmap(stream);
-        }
-        catch (Exception)
         {
             return null;
         }

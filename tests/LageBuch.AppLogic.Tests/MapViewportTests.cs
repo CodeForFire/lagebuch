@@ -3,7 +3,7 @@ using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map;
 using LageBuch.Persistence.Map.Vector;
-using LageBuch.Persistence.Sqlite;
+using LageBuch.Persistence.Tests;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -75,20 +75,17 @@ public class MapViewportTests
         var folder = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
         try
         {
-            // Far from where an empty viewport starts. MBTiles stores XYZ row 300 at zoom 10 as 1023 - 300.
-            using (var cn = SqliteConnectionFactory.OpenReadWrite(Path.Join(folder, InstalledRegionPack.TilesFileName)))
-            using (var cmd = cn.CreateCommand())
-            {
-                cmd.CommandText = "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);" +
-                    "INSERT INTO tiles VALUES (10, 200, 723, x'00');";
-                cmd.ExecuteNonQuery();
-            }
-
+            // The fixture archive covers Fürstenfeldbruck, W 10.95 to E 11.45 and S 48.06 to N 48.32.
+            File.WriteAllBytes(Path.Join(folder, InstalledRegionPack.VectorTilesFileName), VectorTileFixtures.Archive([(11, 1086, 709, [0x1A, 0x00])]));
             var viewport = new MapViewport();
             viewport.Show(new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"), folder));
 
-            var expected = WebMercator.CenterOfTiles(10, 200, 200, 300, 300);
-            Assert.Equal(11, viewport.Zoom);
+            var (west, north) = WebMercator.ToWorldPixel(new GeoPoint(48.32, 10.95), 11);
+            var (east, south) = WebMercator.ToWorldPixel(new GeoPoint(48.06, 11.45), 11);
+            var (westX, northY) = WebMercator.ToTileIndex(west, north);
+            var (eastX, southY) = WebMercator.ToTileIndex(east, south);
+            var expected = WebMercator.CenterOfTiles(11, westX, eastX, northY, southY);
+            Assert.Equal(12, viewport.Zoom);
             Assert.Equal(expected.Latitude, viewport.Center.Latitude, precision: 6);
             Assert.Equal(expected.Longitude, viewport.Center.Longitude, precision: 6);
         }
@@ -99,66 +96,20 @@ public class MapViewportTests
     }
 
     [Fact]
-    public void Several_packs_become_layers_each_with_its_area_and_those_without_one_underneath()
+    public void Several_packs_become_one_layer_each_drawn_from_its_vector_tiles_in_their_order()
     {
-        var root = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
-        try
-        {
-            var ffb = Directory.CreateDirectory(Path.Join(root, "ffb")).FullName;
-            var sta = Directory.CreateDirectory(Path.Join(root, "sta")).FullName;
-            File.WriteAllText(
-                Path.Join(ffb, InstalledRegionPack.BoundaryFileName),
-                """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.4, 48.0], [11.4, 48.3], [11.0, 48.0]]]}}""");
-            var viewport = new MapViewport();
+        var viewport = new MapViewport();
 
-            viewport.ShowAll(
-                [
-                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"), ffb),
-                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"), sta),
-                ],
-                centerOnPacks: false);
+        viewport.ShowAll(
+            [
+                new InstalledRegionPack(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"), Path.Join("packs", "sta")),
+                new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"), Path.Join("packs", "ffb")),
+            ],
+            centerOnPacks: false);
 
-            var layers = Assert.IsType<CombinedMapTileSource>(viewport.TileSource).Layers;
-            Assert.Null(layers[0].Boundary);
-            Assert.Equal(4, Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<IReadOnlyList<GeoPoint>>>(layers[1].Boundary)).Count);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
-    }
-
-    [Fact]
-    public void A_pack_with_vector_tiles_draws_them_unclipped_and_one_without_draws_its_raster_tiles_in_its_area()
-    {
-        var root = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
-        try
-        {
-            var ffb = Directory.CreateDirectory(Path.Join(root, "ffb")).FullName;
-            var sta = Directory.CreateDirectory(Path.Join(root, "sta")).FullName;
-            const string Area = """{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.4, 48.0], [11.4, 48.3], [11.0, 48.0]]]}}""";
-            File.WriteAllText(Path.Join(ffb, InstalledRegionPack.BoundaryFileName), Area);
-            File.WriteAllText(Path.Join(sta, InstalledRegionPack.BoundaryFileName), Area);
-            File.WriteAllText(Path.Join(ffb, InstalledRegionPack.VectorTilesFileName), "vector");
-            var viewport = new MapViewport();
-
-            viewport.ShowAll(
-                [
-                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"), sta),
-                    new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"), ffb),
-                ],
-                centerOnPacks: false);
-
-            var layers = Assert.IsType<CombinedMapTileSource>(viewport.TileSource).Layers;
-            Assert.IsType<PmTilesFileSource>(layers[0].Tiles);
-            Assert.Null(layers[0].Boundary);
-            Assert.IsType<MbTilesFileSource>(layers[1].Tiles);
-            Assert.NotNull(layers[1].Boundary);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        var layers = Assert.IsType<CombinedMapTileSource>(viewport.TileSource).Layers;
+        Assert.Equal(2, layers.Count);
+        Assert.All(layers, l => Assert.IsType<PmTilesFileSource>(l));
     }
 
     [Fact]

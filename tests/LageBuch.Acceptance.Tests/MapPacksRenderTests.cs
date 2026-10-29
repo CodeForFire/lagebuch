@@ -66,8 +66,8 @@ public sealed class MapPacksRenderTests : IDisposable
         FictionalRegionPack.Install(root);
         using var handler = new CatalogueHandler($$"""
             {"formatVersion": 2, "packs": [{"slug": "ffb", "name": "Landkreis Fürstenfeldbruck", "version": 1,
-              "downloadUrl": "https://example.org/ffb-v1.zip", "sizeBytes": 264978779, "sha256": "{{new string('b', 64)}}",
-              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 11, "maxZoom": 17,
+              "downloadUrl": "https://example.org/ffb-v1.zip", "sizeBytes": 52731904, "sha256": "{{new string('b', 64)}}",
+              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 0, "maxZoom": 15,
               "builtAt": "2026-11-03T20:15:49Z", "attribution": "{{FictionalRegionPack.Attribution}}"}]}
             """);
         using var http = new HttpClient(handler);
@@ -100,8 +100,8 @@ public sealed class MapPacksRenderTests : IDisposable
         FictionalRegionPack.Install(root);
         var packs = string.Join(",", Enumerable.Range(1, 8).Select(i => $$"""
             {"slug": "lk{{i}}", "name": "Landkreis Muster {{i}}", "version": 1,
-              "downloadUrl": "https://example.org/lk{{i}}-v1.zip", "sizeBytes": 264978779, "sha256": "{{new string('b', 64)}}",
-              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 11, "maxZoom": 17,
+              "downloadUrl": "https://example.org/lk{{i}}-v1.zip", "sizeBytes": 52731904, "sha256": "{{new string('b', 64)}}",
+              "bounds": {"west": 10.9527, "south": 48.0607, "east": 11.4532, "north": 48.3237}, "minZoom": 0, "maxZoom": 15,
               "builtAt": "2026-11-03T20:15:49Z", "attribution": "{{FictionalRegionPack.Attribution}}"}
             """));
         using var handler = new CatalogueHandler($$"""{"formatVersion": 2, "packs": [{{packs}}]}""");

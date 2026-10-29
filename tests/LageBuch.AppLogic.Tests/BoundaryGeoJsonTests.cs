@@ -45,10 +45,6 @@ public class BoundaryGeoJsonTests
         Assert.Null(BoundaryGeoJson.Parse(Encoding.UTF8.GetBytes($$$"""{"type": "Polygon", "coordinates": [{{{ring}}}]}""")));
     }
 
-    [Fact]
-    public void A_missing_boundary_file_reads_as_null() =>
-        Assert.Null(BoundaryGeoJson.Read(Path.Join(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "boundary.geojson")));
-
     private static IReadOnlyList<IReadOnlyList<LageBuch.Domain.ValueObjects.GeoPoint>> Parse(string json) =>
         BoundaryGeoJson.Parse(Encoding.UTF8.GetBytes(json)) ?? throw new InvalidOperationException("No area.");
 }

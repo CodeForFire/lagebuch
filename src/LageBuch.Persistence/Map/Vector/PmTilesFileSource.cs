@@ -13,12 +13,16 @@ namespace LageBuch.Persistence.Map.Vector;
 /// The archive is untrusted input like any pack file, so
 /// every offset and length is checked against the file and every directory and tile is capped
 /// before and after decompression. A damaged archive costs a blank tile, never the map.
-/// Opens the file per call, as <see cref="MbTilesFileSource"/> does, so it is never held locked;
-/// the parsed directories are kept, because an installed archive does not change.
+/// Opens the file per call rather than holding it, so it is never kept locked and a pack can be
+/// removed or updated while a map shows it; the parsed directories are kept, because an installed
+/// archive does not change.
 /// </remarks>
 public sealed class PmTilesFileSource : IMapTileSource
 {
     public const int HeaderLength = 127;
+
+    /// <summary>The deepest zoom a tile address is accepted for; nothing renders finer than this.</summary>
+    public const int MaxSupportedZoom = 22;
 
     /// <summary>Planetiler's leaf directories are a few hundred KB at most; the root is capped at 16 KB by the spec.</summary>
     public const int MaxDirectoryBytes = 4 * 1024 * 1024;
@@ -47,7 +51,7 @@ public sealed class PmTilesFileSource : IMapTileSource
 
     public byte[]? GetTile(int zoom, int x, int y)
     {
-        if (zoom is < 0 or > MbTilesFileSource.MaxSupportedZoom)
+        if (zoom is < 0 or > MaxSupportedZoom)
         {
             return null;
         }
@@ -61,7 +65,7 @@ public sealed class PmTilesFileSource : IMapTileSource
         return Read(file => ReadTile(file, TileId(zoom, x, y)));
     }
 
-    /// <summary>The header's bounds as a tile range at zoom 11, where the raster packs start too.</summary>
+    /// <summary>The header's bounds as a tile range at zoom 11, where a whole Landkreis fits on a screen.</summary>
     public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds()
     {
         if (Open() is not { } header)
@@ -322,7 +326,7 @@ public sealed class PmTilesFileSource : IMapTileSource
         var sectionsFit = Within(header.RootOffset, header.RootLength, header.FileLength)
             && Within(header.LeafOffset, header.LeafLength, header.FileLength)
             && Within(header.TileDataOffset, header.TileDataLength, header.FileLength);
-        var zoomsValid = header.MinZoom <= header.MaxZoom && header.MaxZoom <= MbTilesFileSource.MaxSupportedZoom;
+        var zoomsValid = header.MinZoom <= header.MaxZoom && header.MaxZoom <= MaxSupportedZoom;
         return sectionsFit && zoomsValid ? header : null;
     }
 

@@ -1,4 +1,3 @@
-using LageBuch.Persistence.Map;
 using LageBuch.Persistence.Map.Vector;
 using static LageBuch.Persistence.Tests.VectorTileFixtures;
 
@@ -67,9 +66,9 @@ public sealed class PmTilesFileSourceTests : IDisposable
     [Fact]
     public void The_deepest_supported_zoom_is_read()
     {
-        File.WriteAllBytes(ArchivePath, Archive([(MbTilesFileSource.MaxSupportedZoom, 5, 7, [0xD0])], maxZoom: MbTilesFileSource.MaxSupportedZoom));
+        File.WriteAllBytes(ArchivePath, Archive([(PmTilesFileSource.MaxSupportedZoom, 5, 7, [0xD0])], maxZoom: PmTilesFileSource.MaxSupportedZoom));
 
-        Assert.Equal(new byte[] { 0xD0 }, new PmTilesFileSource(ArchivePath).GetTile(MbTilesFileSource.MaxSupportedZoom, 5, 7));
+        Assert.Equal(new byte[] { 0xD0 }, new PmTilesFileSource(ArchivePath).GetTile(PmTilesFileSource.MaxSupportedZoom, 5, 7));
     }
 
     [Fact]
@@ -186,7 +185,7 @@ public sealed class PmTilesFileSourceTests : IDisposable
             { "spec version 2", Assemble(root, [], [7], version: 2) },
             { "raster tiles", Assemble(root, [], [7], tileType: 2) },
             { "min zoom above max", Assemble(root, [], [7], minZoom: 10, maxZoom: 9) },
-            { "zoom past 22", Assemble(root, [], [7], maxZoom: MbTilesFileSource.MaxSupportedZoom + 1) },
+            { "zoom past 22", Assemble(root, [], [7], maxZoom: PmTilesFileSource.MaxSupportedZoom + 1) },
             { "root past the end", Patched(16, 0xF0) },
             { "leaves past the end", Patched(48, 0xF0) },
             { "tile data past the end", Patched(64, 0xF0) },
