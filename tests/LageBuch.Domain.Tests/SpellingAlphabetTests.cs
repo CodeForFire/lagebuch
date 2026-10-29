@@ -96,7 +96,7 @@ public class SpellingAlphabetTests
     [Theory]
     [InlineData(SpellingAlphabetKind.Traditional, "null – eins – zwo – drei – vier – fünf – sechs – sieben – acht – neun")]
     [InlineData(SpellingAlphabetKind.Din5009, "null – eins – zwo – drei – vier – fünf – sechs – sieben – acht – neun")]
-    [InlineData(SpellingAlphabetKind.Nato, "Zero – One – Two – Three – Four – Five – Six – Seven – Eight – Niner")]
+    [InlineData(SpellingAlphabetKind.Nato, "Zero – One – Two – Tree – Four – Fife – Six – Seven – Eight – Niner")]
     public void Every_digit_is_said_as_its_number(SpellingAlphabetKind kind, string expected)
     {
         Assert.Equal(expected, Spell("0123456789", kind));
