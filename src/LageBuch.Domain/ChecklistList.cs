@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace LageBuch.Domain;
 
 /// <summary>
@@ -22,6 +24,12 @@ public sealed class ChecklistList
     public const int MaxItemCount = 200;
 
     private readonly List<ChecklistItem> _items = new();
+
+    /// <summary>
+    /// The key an Einsatz's rail overrides use for a Checkliste: its id in the invariant "D" form,
+    /// so a file written on one device reads the same on another.
+    /// </summary>
+    public static string NavKey(Guid id) => id.ToString("D", CultureInfo.InvariantCulture);
 
     private ChecklistList(Guid id, string title)
     {

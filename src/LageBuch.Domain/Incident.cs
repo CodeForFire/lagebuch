@@ -886,7 +886,7 @@ public sealed class Incident
 
         if (!_navOverrides.ContainsKey(key) && _navOverrides.Count >= MaxNavOverrides)
         {
-            throw new ArgumentException($"Mehr als {MaxNavOverrides} Navigationsüberschreibungen sind nicht möglich.", nameof(key));
+            throw new ArgumentException("Zu viele ausgeblendete Einträge.", nameof(key));
         }
 
         _navOverrides[key] = visible;
@@ -925,10 +925,10 @@ public sealed class Incident
         }
 
         var list = ChecklistList.FromSeed(seed);
-        var key = seed.Id.ToString("D");
+        var key = ChecklistList.NavKey(seed.Id);
         if (!_navOverrides.ContainsKey(key) && _navOverrides.Count >= MaxNavOverrides)
         {
-            throw new ArgumentException($"Mehr als {MaxNavOverrides} Navigationsüberschreibungen sind nicht möglich.", nameof(seed));
+            throw new ArgumentException("Zu viele ausgeblendete Einträge.", nameof(seed));
         }
 
         _checklists.Add(list);

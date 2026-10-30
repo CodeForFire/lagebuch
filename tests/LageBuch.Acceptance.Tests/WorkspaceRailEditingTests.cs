@@ -146,7 +146,7 @@ public class WorkspaceRailEditingTests
         var banner = Named<Border>(window, "NavEditErrorBanner");
         Assert.True(banner.IsEffectivelyVisible, "the refusal must be readable without opening anything");
         Assert.Equal(
-            $"Mehr als {Incident.MaxNavOverrides} Navigationsüberschreibungen sind nicht möglich.",
+            "Zu viele ausgeblendete Einträge.",
             Named<TextBlock>(banner, "NavEditErrorText").Text);
         Assert.Contains(ModuleLabels.Header(NavModules.Files), WorkspaceRenderHelper.RailHeaders(window));
 

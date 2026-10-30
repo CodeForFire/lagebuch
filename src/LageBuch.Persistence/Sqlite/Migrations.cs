@@ -253,7 +253,8 @@ public static class Migrations
             // Stryker restore all
         }
 
-        // Same: SchemaGuard.Reconcile adds the column identically on every open; see V26.
+        // Stryker disable all : V37 only adds a nullable column that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
         if (version < 37)
         {
             ApplyV37(cn, tx);

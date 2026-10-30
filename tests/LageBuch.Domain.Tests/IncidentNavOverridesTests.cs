@@ -78,7 +78,21 @@ public class IncidentNavOverridesTests
     {
         var (incident, _, _) = NewIncident();
 
-        Assert.Throws<ArgumentException>(() => incident.SetNavVisibility(new string('x', 65), true));
+        var ex = Assert.Throws<ArgumentException>(() => incident.SetNavVisibility(new string('x', 65), true));
+
+        Assert.StartsWith("Navigationsschlüssel muss 1 bis 64 Zeichen lang sein.", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(incident.NavOverrides);
+    }
+
+    [Fact]
+    public void Set_nav_visibility_accepts_a_key_of_exactly_the_maximum_length()
+    {
+        var (incident, _, _) = NewIncident();
+        var key = new string('x', Incident.MaxNavKeyLength);
+
+        incident.SetNavVisibility(key, false);
+
+        Assert.False(incident.NavOverrides[key]);
     }
 
     [Fact]
@@ -90,7 +104,10 @@ public class IncidentNavOverridesTests
             incident.SetNavVisibility($"k{i}", true);
         }
 
-        Assert.Throws<ArgumentException>(() => incident.SetNavVisibility("k64", true));
+        var ex = Assert.Throws<ArgumentException>(() => incident.SetNavVisibility("k64", true));
+
+        Assert.StartsWith("Zu viele ausgeblendete Einträge.", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("k64", incident.NavOverrides.Keys);
         incident.SetNavVisibility("k0", false);
         Assert.False(incident.NavOverrides["k0"]);
         Assert.Equal(64, incident.NavOverrides.Count);
@@ -108,7 +125,7 @@ public class IncidentNavOverridesTests
         Assert.Same(list, added);
         Assert.Equal(seed.Id, added.Id);
         Assert.Equal("Nachbereitung", added.Title);
-        Assert.True(incident.NavOverrides[seed.Id.ToString("D")]);
+        Assert.True(incident.NavOverrides[ChecklistList.NavKey(seed.Id)]);
         Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
         Assert.Equal("Checkliste „Nachbereitung“ hinzugefügt", incident.Journal[^1].Text);
     }
@@ -129,13 +146,27 @@ public class IncidentNavOverridesTests
     }
 
     [Fact]
+    public void Adding_a_checklist_with_one_null_item_text_among_valid_ones_is_refused()
+    {
+        var (incident, clock, op) = NewIncident();
+
+        var ex = Assert.Throws<ArgumentNullException>(() => incident.AddChecklist(
+            clock, op, new ChecklistSeed(Guid.NewGuid(), "T", [("a", true), (null!, false), ("c", true)])));
+
+        Assert.StartsWith("Ein Checklistenpunkt ohne Text ist nicht möglich.", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(incident.Checklists);
+    }
+
+    [Fact]
     public void Adding_a_checklist_already_in_the_einsatz_is_refused()
     {
         var (incident, clock, op) = NewIncident();
         var seed = Seed();
         incident.AddChecklist(clock, op, seed);
 
-        Assert.Throws<InvalidOperationException>(() => incident.AddChecklist(clock, op, seed));
+        var ex = Assert.Throws<InvalidOperationException>(() => incident.AddChecklist(clock, op, seed));
+
+        Assert.Equal("Diese Checkliste ist bereits im Einsatz.", ex.Message);
         Assert.Single(incident.Checklists);
     }
 
@@ -152,12 +183,81 @@ public class IncidentNavOverridesTests
     public void Adding_a_checklist_over_the_caps_throws()
     {
         var (incident, clock, op) = NewIncident();
+        var journal = incident.Journal.Count;
 
         Assert.Throws<ArgumentException>(() => incident.AddChecklist(clock, op, Seed(title: new string('t', 201))));
         Assert.Throws<ArgumentException>(() => incident.AddChecklist(clock, op, Seed(items: 201)));
         Assert.Throws<ArgumentException>(() => incident.AddChecklist(
             clock, op, new ChecklistSeed(Guid.NewGuid(), "Lang", [(new string('x', 1001), false)])));
         Assert.Empty(incident.Checklists);
+        Assert.Empty(incident.NavOverrides);
+        Assert.Equal(journal, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void A_checkliste_exactly_at_the_caps_is_accepted()
+    {
+        var (incident, clock, op) = NewIncident();
+        var items = Enumerable.Range(0, ChecklistList.MaxItemCount)
+            .Select(i => (i == 0 ? new string('x', ChecklistItem.MaxTextLength) : $"Punkt {i}", false))
+            .ToList();
+
+        incident.AddChecklist(clock, op, new ChecklistSeed(Guid.NewGuid(), new string('t', ChecklistList.MaxTitleLength), items));
+
+        var list = Assert.Single(incident.Checklists);
+        Assert.Equal(ChecklistList.MaxItemCount, list.Items.Count);
+        Assert.Equal(ChecklistItem.MaxTextLength, list.Items[0].Text.Length);
+    }
+
+    [Fact]
+    public void One_oversized_item_among_normal_ones_is_refused()
+    {
+        var (incident, clock, op) = NewIncident();
+
+        var ex = Assert.Throws<ArgumentException>(() => incident.AddChecklist(
+            clock,
+            op,
+            new ChecklistSeed(Guid.NewGuid(), "Lang", [("a", false), (new string('x', ChecklistItem.MaxTextLength + 1), false), ("c", true)])));
+
+        Assert.StartsWith("Checkliste überschreitet die zulässige Größe.", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(incident.Checklists);
+    }
+
+    [Fact]
+    public void Adding_a_checkliste_at_the_override_cap_throws_and_changes_nothing()
+    {
+        var (incident, clock, op) = NewIncident();
+        for (var i = 0; i < Incident.MaxNavOverrides; i++)
+        {
+            incident.SetNavVisibility($"k{i}", true);
+        }
+
+        var journal = incident.Journal.Count;
+
+        var ex = Assert.Throws<ArgumentException>(() => incident.AddChecklist(clock, op, Seed()));
+
+        Assert.StartsWith("Zu viele ausgeblendete Einträge.", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(incident.Checklists);
+        Assert.Equal(journal, incident.Journal.Count);
+        Assert.Equal(Incident.MaxNavOverrides, incident.NavOverrides.Count);
+    }
+
+    [Fact]
+    public void Adding_a_checkliste_whose_key_already_has_an_override_succeeds_at_the_cap()
+    {
+        var (incident, clock, op) = NewIncident();
+        var seed = Seed();
+        incident.SetNavVisibility(ChecklistList.NavKey(seed.Id), false);
+        for (var i = 1; i < Incident.MaxNavOverrides; i++)
+        {
+            incident.SetNavVisibility($"k{i}", true);
+        }
+
+        incident.AddChecklist(clock, op, seed);
+
+        Assert.Single(incident.Checklists);
+        Assert.True(incident.NavOverrides[ChecklistList.NavKey(seed.Id)]);
+        Assert.Equal(Incident.MaxNavOverrides, incident.NavOverrides.Count);
     }
 
     [Fact]
@@ -181,10 +281,14 @@ public class IncidentNavOverridesTests
 
         var incident = Rehydrated(overrides);
 
+        // The invalid keys are skipped, and the valid ones are taken in order until the cap: scba
+        // and k0..k62 make 64, so k63..k69 are dropped.
         Assert.False(incident.NavOverrides["scba"]);
         Assert.DoesNotContain(string.Empty, incident.NavOverrides.Keys);
         Assert.DoesNotContain(new string('x', 65), incident.NavOverrides.Keys);
-        Assert.True(incident.NavOverrides.Count <= 64);
+        Assert.Equal(Incident.MaxNavOverrides, incident.NavOverrides.Count);
+        Assert.Contains("k62", incident.NavOverrides.Keys);
+        Assert.All(Enumerable.Range(63, 7), i => Assert.DoesNotContain($"k{i}", incident.NavOverrides.Keys));
     }
 
     [Fact]

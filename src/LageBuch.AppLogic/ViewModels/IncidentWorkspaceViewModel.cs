@@ -794,7 +794,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [NotifyPropertyChangedFor(nameof(IsInputEnabled))]
     [NotifyPropertyChangedFor(nameof(ShowConnectedHost))]
     [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AddNavEntryCommand))]
     private bool _isConnected = true;
+
+    // A reconnecting client cannot send a rail edit either.
+    partial void OnIsConnectedChanged(bool value) => RefreshCanHide(NavLiveness.LiveModules(_session.Incident));
 
     /// <summary>"verbunden mit ‹host›" in a joined client's header (#464); null on a local incident.</summary>
     public string? ConnectedHostText => _remoteHost is null ? null : $"verbunden mit {_remoteHost}";
@@ -1058,6 +1062,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var reopenTab = LeadershipTabs is { } tabs ? tabs.SelectedTabIndex : LeadershipTabsViewModel.OrganisationTab;
 
         DisposeChildren();
+
+        // Every rebuild is a read-only flip or the first build; a refusal from before it no longer
+        // describes anything the Lagebuchführer can retry.
+        NavEditError = null;
 
         Etb = new EtbViewModel(
             _session,
@@ -1341,6 +1349,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         foreach (var item in NavItems)
         {
             item.CanHide = !IsReadOnly
+                && IsInputEnabled
                 && !string.Equals(item.RailKey, NavModules.Etb, StringComparison.Ordinal)
                 && !live.Contains(item.RailKey);
         }
@@ -1371,7 +1380,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
             foreach (var list in incident.Checklists)
             {
-                everything[IdKey(list.Id)] = true;
+                everything[ChecklistList.NavKey(list.Id)] = true;
             }
 
             foreach (var spec in NavigationLayout.Resolve(_masterData.Navigation, incident.Checklists, everything))
@@ -1454,7 +1463,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     {
         if (entry?.Template is { } template)
         {
-            var key = IdKey(template.Id);
+            var key = ChecklistList.NavKey(template.Id);
 
             // Offered before another device added the same Vorlage, or the list is hidden here: it
             // is already in the Einsatz, so it comes back on the rail and opens, with no refusal.
@@ -1489,7 +1498,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
     }
 
-    private bool CanEditRail => !IsReadOnly;
+    private bool CanEditRail => !IsReadOnly && IsInputEnabled;
 
     // The domain refuses a Vorlage already in the Einsatz, a closed Einsatz, and anything over its
     // caps; each of those is a sentence for the Lagebuchführer, never a crash mid-Einsatz.
@@ -1527,8 +1536,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             ? message[..cut]
             : message;
     }
-
-    private static string IdKey(Guid id) => id.ToString("D", CultureInfo.InvariantCulture);
 
     /// <summary>
     /// One of the Atemschutz header bars was tapped (#422): bring the Atemschutz tab forward. The

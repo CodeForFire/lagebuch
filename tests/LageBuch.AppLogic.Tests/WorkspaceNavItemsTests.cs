@@ -1,4 +1,3 @@
-using System.Globalization;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -218,7 +217,7 @@ public class WorkspaceNavItemsTests
     private static WorkspaceNavItemViewModel Entry(IncidentWorkspaceViewModel vm, string railKey) =>
         vm.NavItems.Single(i => string.Equals(i.RailKey, railKey, StringComparison.Ordinal));
 
-    private static string KeyOf(Guid listId) => listId.ToString("D", CultureInfo.InvariantCulture);
+    private static string KeyOf(Guid listId) => ChecklistList.NavKey(listId);
 
     [Fact]
     public void Hiding_an_entry_removes_it_from_the_rail_and_lists_it_as_hidden()
@@ -370,6 +369,41 @@ public class WorkspaceNavItemsTests
         Assert.Empty(vm.AddableChecklists);
         Assert.False(vm.HasAddableNavEntries);
         Assert.False(vm.AddNavEntryCommand.CanExecute(new AddableNavEntryViewModel("DATEIEN", NavModules.Files, null)));
+    }
+
+    [Fact]
+    public void A_reconnecting_client_offers_no_rail_edits_until_it_is_back()
+    {
+        var (vm, _) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        var files = Entry(vm, NavModules.Files);
+        var choice = Assert.Single(vm.AddableChecklists);
+        var raised = 0;
+        vm.AddNavEntryCommand.CanExecuteChanged += (_, _) => raised++;
+
+        vm.IsConnected = false;
+
+        Assert.False(files.CanHide);
+        Assert.False(vm.HideNavItemCommand.CanExecute(files));
+        Assert.False(vm.AddNavEntryCommand.CanExecute(choice));
+        Assert.True(raised > 0);
+
+        vm.IsConnected = true;
+
+        Assert.True(files.CanHide);
+        Assert.True(vm.AddNavEntryCommand.CanExecute(choice));
+    }
+
+    [Fact]
+    public void Closing_the_einsatz_clears_a_rail_refusal()
+    {
+        var (vm, _) = Editable();
+        vm.NavEditError = "Zu viele ausgeblendete Einträge.";
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm?.ConfirmCommand.Execute(null);
+
+        Assert.True(vm.IsReadOnly);
+        Assert.Null(vm.NavEditError);
     }
 
     [Fact]
@@ -549,10 +583,13 @@ public class WorkspaceNavItemsTests
     [Fact]
     public void Shortcut_hints_follow_the_rail_after_a_hide()
     {
-        var (vm, _) = Editable();
+        var (vm, session) = Editable();
+        var hidden = vm.NavItems[1].RailKey;
 
         vm.HideNavItemCommand.Execute(vm.NavItems[1]);
 
+        Assert.False(session.Incident.NavOverrides[hidden]);
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == hidden);
         for (var i = 0; i < vm.NavItems.Count; i++)
         {
             Assert.Equal(ShortcutRegistry.HintFor(i), vm.NavItems[i].ShortcutHint);

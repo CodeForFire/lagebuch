@@ -1,4 +1,3 @@
-using System.Globalization;
 using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
 
@@ -66,7 +65,7 @@ public static class NavigationLayout
                 }
 
                 var list = incidentLists.FirstOrDefault(l => l.Id == entry.ChecklistId!.Value);
-                if (list is not null && Visible(IdKey(list.Id), entry.IsVisible))
+                if (list is not null && Visible(ChecklistList.NavKey(list.Id), entry.IsVisible))
                 {
                     slots.Add(new Slot(NavModules.Checklist, new NavItemSpec(NavModules.Checklist, list)));
                 }
@@ -93,7 +92,7 @@ public static class NavigationLayout
         // including one created after it was closed, or deleted from Stammdaten since.
         foreach (var list in incidentLists.Where(l => !seenLists.Contains(l.Id)))
         {
-            if (Visible(IdKey(list.Id), true))
+            if (Visible(ChecklistList.NavKey(list.Id), true))
             {
                 slots.Add(new Slot(NavModules.Checklist, new NavItemSpec(NavModules.Checklist, list)));
             }
@@ -128,7 +127,7 @@ public static class NavigationLayout
     public static string KeyOf(NavItemSpec spec)
     {
         ArgumentNullException.ThrowIfNull(spec);
-        return spec.List is { } list ? IdKey(list.Id) : spec.ModuleKey;
+        return spec.List is { } list ? ChecklistList.NavKey(list.Id) : spec.ModuleKey;
     }
 
     /// <summary>
@@ -217,8 +216,6 @@ public static class NavigationLayout
     }
 
     private sealed record Slot(string Key, NavItemSpec? Spec);
-
-    private static string IdKey(Guid id) => id.ToString("D", CultureInfo.InvariantCulture);
 
     private static bool IsEtb(string key) => string.Equals(key, NavModules.Etb, StringComparison.Ordinal);
 

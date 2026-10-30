@@ -408,7 +408,20 @@ public class NavigationLayoutTests
         var keys = Keys(NavigationLayout.Resolve(
             layout, Array.Empty<ChecklistList>(), Overrides((NavModules.Scba, true))));
 
-        Assert.Equal(plain.IndexOf(NavModules.Scba), keys.IndexOf(NavModules.Scba));
+        Assert.Equal(plain, keys);
+    }
+
+    [Fact]
+    public void A_hidden_override_removes_a_module_the_stored_layout_predates()
+    {
+        var layout = new[] { Module(NavModules.Etb), Module(NavModules.Files) };
+        Assert.Contains(NavModules.Contacts, Keys(NavigationLayout.Resolve(layout, Array.Empty<ChecklistList>())));
+
+        var keys = Keys(NavigationLayout.Resolve(
+            layout, Array.Empty<ChecklistList>(), Overrides((NavModules.Contacts, false))));
+
+        Assert.DoesNotContain(NavModules.Contacts, keys);
+        Assert.Contains(NavModules.Files, keys);
     }
 
     [Fact]
@@ -417,7 +430,7 @@ public class NavigationLayoutTests
         var keys = Keys(NavigationLayout.Resolve(
             new[] { Module(NavModules.Etb), Checklist(Aufbau, visible: false) },
             new[] { List(Aufbau, "Aufbau") },
-            Overrides((Aufbau.ToString("D"), true))));
+            Overrides((ChecklistList.NavKey(Aufbau), true))));
 
         Assert.Contains("checklist:Aufbau", keys);
     }
@@ -428,7 +441,7 @@ public class NavigationLayoutTests
         var keys = Keys(NavigationLayout.Resolve(
             new[] { Module(NavModules.Etb) },
             new[] { List(Nachbereitung, "Nachbereitung") },
-            Overrides((Nachbereitung.ToString("D"), false))));
+            Overrides((ChecklistList.NavKey(Nachbereitung), false))));
 
         Assert.DoesNotContain("checklist:Nachbereitung", keys);
     }
@@ -465,7 +478,7 @@ public class NavigationLayoutTests
         var keys = Keys(NavigationLayout.Resolve(
             Array.Empty<NavEntry>(),
             lists,
-            Overrides(("nonsense", false), (Guid.NewGuid().ToString("D"), false))));
+            Overrides(("nonsense", false), (ChecklistList.NavKey(Guid.NewGuid()), false))));
 
         Assert.Equal(expected, keys);
     }
@@ -491,7 +504,7 @@ public class NavigationLayoutTests
     {
         Assert.Equal(NavModules.Scba, NavigationLayout.KeyOf(new NavItemSpec(NavModules.Scba, null)));
         Assert.Equal(
-            Aufbau.ToString("D"),
+            ChecklistList.NavKey(Aufbau),
             NavigationLayout.KeyOf(new NavItemSpec(NavModules.Checklist, List(Aufbau, "Aufbau"))));
     }
 }

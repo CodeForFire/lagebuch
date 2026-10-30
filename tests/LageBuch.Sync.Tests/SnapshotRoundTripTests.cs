@@ -217,6 +217,34 @@ public class SnapshotRoundTripTests
         Assert.Empty(r.NavOverrides);
     }
 
+    // A host's snapshot is wire input to the joined client: more keys than the cap, an overlong
+    // key and a blank one must come out bounded, not crash the client mid-Einsatz.
+    [Fact]
+    public void A_hostile_snapshot_with_too_many_or_bad_override_keys_is_bounded()
+    {
+        var incident = Incident.Start(new FixedClock(), new SessionOperator("Müller", "FFB 12/1"));
+        var hostile = new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            [new string('x', Incident.MaxNavKeyLength + 1)] = false,
+            [" "] = false,
+        };
+        for (var i = 0; i < 70; i++)
+        {
+            hostile[$"k{i}"] = false;
+        }
+
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident) with { NavOverrides = hostile });
+
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Equal(Incident.MaxNavOverrides, r.NavOverrides.Count);
+        Assert.All(r.NavOverrides.Keys, key =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(key));
+            Assert.InRange(key.Length, 1, Incident.MaxNavKeyLength);
+        });
+    }
+
     [Fact]
     public void Round_trip_preserves_abschnitte_placements_stufe_and_the_leadership_post()
     {
