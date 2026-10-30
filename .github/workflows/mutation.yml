@@ -98,7 +98,11 @@ jobs:
     name: mutate-diff (${{ matrix.project }})
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Stryker mutates every changed file whole and scores only the changed
+    # lines, so a PR adding a migration mutates all of Migrations.cs and
+    # IncidentRepository.cs: ~1,500 mutants against ~600 Persistence tests.
+    # That took 27 minutes on #798 and passed 30 on #820.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
