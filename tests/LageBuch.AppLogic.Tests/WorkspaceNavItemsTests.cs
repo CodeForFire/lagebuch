@@ -313,6 +313,29 @@ public class WorkspaceNavItemsTests
         Assert.DoesNotContain(vm.NavItems, i => i.RailKey == NavModules.Scba);
     }
 
+    // A rail whose entries do not change keeps its items: recreating them re-templates the tab
+    // strip and drops keyboard focus, as it did when the first Aufgabe made Aufgaben live.
+    [Fact]
+    public void A_liveness_change_that_leaves_the_rail_alone_keeps_its_items_and_selection()
+    {
+        var (vm, session) = Editable();
+        var items = vm.NavItems.ToList();
+        var tasks = Entry(vm, NavModules.Tasks);
+        vm.SelectedNavItem = tasks;
+
+        session.AddTask("Drehleiter anfordern", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        Assert.Equal(items.Count, vm.NavItems.Count);
+        for (var i = 0; i < items.Count; i++)
+        {
+            Assert.Same(items[i], vm.NavItems[i]);
+        }
+
+        Assert.Same(tasks, vm.SelectedNavItem);
+        Assert.False(tasks.CanHide);
+        Assert.False(vm.HideNavItemCommand.CanExecute(tasks));
+    }
+
     [Fact]
     public void Aufgaben_with_an_open_task_cannot_be_hidden()
     {

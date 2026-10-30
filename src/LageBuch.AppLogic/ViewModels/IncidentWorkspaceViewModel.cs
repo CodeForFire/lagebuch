@@ -55,9 +55,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // one owns a session.Changed subscription that has to be released on rebuild.
     // Keyed by list id, so a rail rebuild hands each surviving list its existing view model.
     private readonly Dictionary<Guid, ChecklistViewModel> _checklists = new();
-
-    // What the rail was last resolved from (see RailSignature).
-    private string? _railSignature;
     private bool _disposed;
 
     public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null)
@@ -664,8 +661,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             UpdateMostUrgentWarning();
         }
 
-        // A Trupp going in or an Aufgabe opening takes „Ausblenden“ away from its module.
-        if (ReferenceEquals(sender, Scba) || ReferenceEquals(sender, Tasks))
+        // A Trupp going in or coming out moves HasControlReminder, which is the Atemschutz half of
+        // NavLiveness. An Aufgabe opening has no such property on TasksViewModel; it always comes
+        // with a session change, which RefreshIncidentData already handles. Countdown ticks pass.
+        if (ReferenceEquals(sender, Scba) && e.PropertyName is null or nameof(ScbaViewModel.HasControlReminder))
         {
             RefreshCanHide(NavLiveness.LiveModules(_session.Incident));
         }
@@ -1211,10 +1210,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </remarks>
     private void RebuildRail()
     {
-        var incident = _session.Incident;
-        var live = NavLiveness.LiveModules(incident);
-        _railSignature = RailSignature(live);
+        var live = NavLiveness.LiveModules(_session.Incident);
+        RebuildRail(live, ResolveRail(live));
+    }
 
+    private void RebuildRail(IReadOnlySet<string> live, IReadOnlyList<NavItemSpec> specs)
+    {
         var reopenKey = SelectedNavItem?.RailKey;
         var reopenIndex = SelectedNavItem is { } open ? NavItems.IndexOf(open) : -1;
 
@@ -1242,15 +1243,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         NavItems.Clear();
 
         var kept = new Dictionary<Guid, ChecklistViewModel>();
-
-        // Live work overrides only this Einsatz's own „Ausblenden“ — work that arrived while the
-        // module was hidden here, e.g. from a peer. A module the Stammdaten layout switches off
-        // stays off with live work, as it always has: its header bars still show, with no tab.
-        var forced = live
-            .Where(key => incident.NavOverrides.TryGetValue(key, out var visible) && !visible)
-            .ToHashSet(StringComparer.Ordinal);
-
-        foreach (var spec in NavigationLayout.Resolve(_masterData.Navigation, incident.Checklists, incident.NavOverrides, forced))
+        foreach (var spec in specs)
         {
             var railKey = NavigationLayout.KeyOf(spec);
             if (spec.List is { } list)
@@ -1303,21 +1296,36 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         RebuildAddableNavEntries();
     }
 
-    // What RebuildRail resolved from; a session change that leaves it alone leaves the rail alone.
-    private string RailSignature(IReadOnlySet<string> live)
+    private IReadOnlyList<NavItemSpec> ResolveRail(IReadOnlySet<string> live)
     {
         var incident = _session.Incident;
-        return string.Join(',', incident.Checklists.Select(list => IdKey(list.Id)))
-            + "|" + string.Join(',', incident.NavOverrides.OrderBy(o => o.Key, StringComparer.Ordinal).Select(o => o.Key + (o.Value ? "+" : "-")))
-            + "|" + string.Join(',', live.Order(StringComparer.Ordinal));
+
+        // Live work overrides only this Einsatz's own „Ausblenden“ — work that arrived while the
+        // module was hidden here, e.g. from a peer. A module the Stammdaten layout switches off
+        // stays off with live work, as it always has: its header bars still show, with no tab.
+        var forced = live
+            .Where(key => incident.NavOverrides.TryGetValue(key, out var visible) && !visible)
+            .ToHashSet(StringComparer.Ordinal);
+        return NavigationLayout.Resolve(_masterData.Navigation, incident.Checklists, incident.NavOverrides, forced);
     }
 
+    /// <summary>
+    /// Rebuilds the rail only when its entries or their order changed. Recreating the items
+    /// re-templates the tab strip and drops keyboard focus, so a change that leaves the rail as it
+    /// is — the first Aufgabe making Aufgaben live — only refreshes „Ausblenden“ and the „+“.
+    /// </summary>
     private void RebuildRailIfChanged()
     {
-        if (!string.Equals(RailSignature(NavLiveness.LiveModules(_session.Incident)), _railSignature, StringComparison.Ordinal))
+        var live = NavLiveness.LiveModules(_session.Incident);
+        var specs = ResolveRail(live);
+        if (specs.Select(NavigationLayout.KeyOf).SequenceEqual(NavItems.Select(item => item.RailKey), StringComparer.Ordinal))
         {
-            RebuildRail();
+            RefreshCanHide(live);
+            RebuildAddableNavEntries();
+            return;
         }
+
+        RebuildRail(live, specs);
     }
 
     private void RefreshCanHide(IReadOnlySet<string> live)
@@ -1345,8 +1353,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     private void RebuildAddableNavEntries()
     {
-        HiddenNavEntries.Clear();
-        AddableChecklists.Clear();
+        var hidden = new List<AddableNavEntryViewModel>();
+        var addable = new List<AddableNavEntryViewModel>();
         if (!IsReadOnly)
         {
             var incident = _session.Incident;
@@ -1372,17 +1380,35 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                     var header = spec.List is { } list
                         ? WorkspaceNavItemViewModel.HeaderFor(list.Title)
                         : ModuleLabels.Header(spec.ModuleKey);
-                    HiddenNavEntries.Add(new AddableNavEntryViewModel(header, key, null));
+                    hidden.Add(new AddableNavEntryViewModel(header, key, null));
                 }
             }
 
             foreach (var template in _masterData.ChecklistTemplates.Where(t => !incident.Checklists.Any(l => l.Id == t.Id)))
             {
-                AddableChecklists.Add(new AddableNavEntryViewModel(WorkspaceNavItemViewModel.HeaderFor(template.Title), null, template));
+                addable.Add(new AddableNavEntryViewModel(WorkspaceNavItemViewModel.HeaderFor(template.Title), null, template));
             }
         }
 
+        // Called on every session change; an open „+“ flyout keeps its items unless they changed.
+        Replace(HiddenNavEntries, hidden);
+        Replace(AddableChecklists, addable);
+
         HasAddableNavEntries = HiddenNavEntries.Count > 0 || AddableChecklists.Count > 0;
+    }
+
+    private static void Replace(ObservableCollection<AddableNavEntryViewModel> target, List<AddableNavEntryViewModel> items)
+    {
+        if (target.SequenceEqual(items))
+        {
+            return;
+        }
+
+        target.Clear();
+        foreach (var item in items)
+        {
+            target.Add(item);
+        }
     }
 
     /// <summary>The „Ausgeblendet“ choices behind the rail's „+“.</summary>
