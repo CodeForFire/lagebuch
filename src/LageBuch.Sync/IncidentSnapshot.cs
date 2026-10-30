@@ -70,7 +70,8 @@ public sealed record IncidentSnapshot(
     string? ElStandort = null,
     string? ElRufname = null,
     string? ElTelefon = null,
-    string? ElFunkgruppe = null,
+    IReadOnlyList<string>? ElFunkgruppenTmo = null,
+    IReadOnlyList<string>? ElFunkgruppenDmo = null,
 
     // The Einsatzort on the Lagekarte, as plain numbers: a peer's values are checked on arrival
     // (GeoPoint.TryCreate), never trusted into a constructor that would throw mid-sync.
@@ -233,7 +234,8 @@ public sealed record InvolvedPartyDto(
 /// <summary>One Abschnitt (or Bereitstellung, partner Einsatzleitung) on the wire; mirrors <see cref="CommandNode"/>.</summary>
 public sealed record CommandNodeDto(
     Guid Id, CommandNodeKind Kind, string Name, Guid? ParentId, string? Auftrag, string? Standort,
-    string? Funkgruppe, string? Rufname, string? Telefon, DateTimeOffset? DissolvedAt);
+    string? Funkgruppe, string? Rufname, string? Telefon, DateTimeOffset? DissolvedAt,
+    IReadOnlyList<string>? FunkgruppenTmo = null, IReadOnlyList<string>? FunkgruppenDmo = null);
 
 public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,

@@ -5,6 +5,33 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              x:Class="LageBuch.App.Shared.Views.CommandNodeDialogView"
              x:DataType="vm:CommandNodeDialogViewModel">
+  <UserControl.Resources>
+    <!-- One TMO or DMO field: the Stammdaten's groups of its kind as suggestions, free text allowed,
+         and an x to take it away once there is more than one of its kind. Its field holds several
+         boxes, so each draws the suggestion chevron itself, as Classes="field suggest" draws it once
+         per field (Theme/Styles.axaml, #259): same glyph, inset and text padding. -->
+    <DataTemplate x:Key="FunkgruppeSlotTemplate" x:DataType="vm:FunkgruppeSlot">
+      <!-- A fixed column for the x, so a field without one is as wide as one with it. -->
+      <Grid ColumnDefinitions="*,32" ColumnSpacing="6">
+        <AutoCompleteBox Grid.Column="0" x:Name="FunkgruppeSlotBox" ItemsSource="{Binding Options}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                         Padding="11,7,32,7"
+                         AutomationProperties.Name="{Binding AccessibleName}"
+                         Text="{Binding Text}" PlaceholderText="{Binding Placeholder}" />
+        <PathIcon Grid.Column="0" Width="12" Height="12"
+                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                  Margin="0,0,10,0" IsHitTestVisible="False"
+                  Foreground="{DynamicResource ComboBoxDropDownGlyphForeground}"
+                  Data="M1939 486L2029 576L1024 1581L19 576L109 486L1024 1401L1939 486Z" />
+        <Button Grid.Column="1" x:Name="FunkgruppeSlotRemoveButton" Classes="icon-btn"
+                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding CanRemove}"
+                Command="{Binding RemoveCommand}"
+                ToolTip.Tip="Funkgruppe entfernen" AutomationProperties.Name="Funkgruppe entfernen">
+          <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+        </Button>
+      </Grid>
+    </DataTemplate>
+  </UserControl.Resources>
   <!-- The Einsatzdaten dialog's shell (MaxWidth, not Width; 16px scrim inset), with the form in a
        ScrollViewer: six fields do not fit a landscape phone. Initial focus is left to the first tab
        stop, which is NAME, or STANDORT when the Einsatzleitung's post has no name. -->
@@ -56,11 +83,45 @@
             </HeaderedContentControl>
             <!-- The Stammdaten's Funkgruppen as suggestions, not a closed set: a channel the list
                  lacks stays enterable, so this is an AutoCompleteBox, as STICHWORT is. -->
-            <HeaderedContentControl Classes="field suggest" Header="FUNKGRUPPE">
+            <HeaderedContentControl Classes="field suggest" Header="FUNKGRUPPE" IsVisible="{Binding ShowFunkgruppe}">
               <AutoCompleteBox x:Name="CommandNodeFunkgruppeBox" ItemsSource="{Binding FunkgruppeOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
                                AutomationProperties.Name="Funkgruppe"
                                Text="{Binding Funkgruppe}" PlaceholderText="z. B. TMO FW_MUSTER 1000" />
+            </HeaderedContentControl>
+            <!-- An Einsatzleitung, ours or a partner's, works on up to three TMO and three DMO
+                 Funkgruppen (#828). One field of each always shows; + adds one, × takes it away. -->
+            <HeaderedContentControl x:Name="CommandNodeTmoField" Classes="field" Header="FUNKGRUPPEN TMO"
+                                    IsVisible="{Binding ShowFunkgruppen}">
+              <StackPanel Spacing="6">
+                <ItemsControl x:Name="CommandNodeTmoSlots" ItemsSource="{Binding TmoSlots}"
+                              ItemTemplate="{StaticResource FunkgruppeSlotTemplate}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Spacing="6" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <Button x:Name="CommandNodeAddTmoButton" Classes="ghost" HorizontalAlignment="Left"
+                        Content="+ TMO" Command="{Binding AddTmoCommand}"
+                        AutomationProperties.Name="TMO-Funkgruppe hinzufügen" />
+              </StackPanel>
+            </HeaderedContentControl>
+            <HeaderedContentControl x:Name="CommandNodeDmoField" Classes="field" Header="FUNKGRUPPEN DMO"
+                                    IsVisible="{Binding ShowFunkgruppen}">
+              <StackPanel Spacing="6">
+                <ItemsControl x:Name="CommandNodeDmoSlots" ItemsSource="{Binding DmoSlots}"
+                              ItemTemplate="{StaticResource FunkgruppeSlotTemplate}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Spacing="6" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <Button x:Name="CommandNodeAddDmoButton" Classes="ghost" HorizontalAlignment="Left"
+                        Content="+ DMO" Command="{Binding AddDmoCommand}"
+                        AutomationProperties.Name="DMO-Funkgruppe hinzufügen" />
+              </StackPanel>
             </HeaderedContentControl>
             <Grid ColumnDefinitions="3*,2*" ColumnSpacing="12">
               <HeaderedContentControl Grid.Column="0" Classes="field" Header="RUFNAME">

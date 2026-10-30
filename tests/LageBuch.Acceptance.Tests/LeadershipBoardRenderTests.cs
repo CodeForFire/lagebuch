@@ -34,9 +34,15 @@ public class LeadershipBoardRenderTests
             Array.Empty<(string, bool)>());
 
     private static Guid AddNode(
-        LocalIncidentSession session, CommandNodeKind kind, string name, Guid? parent = null, string? auftrag = null, string? funkgruppe = null)
+        LocalIncidentSession session,
+        CommandNodeKind kind,
+        string name,
+        Guid? parent = null,
+        string? auftrag = null,
+        string? funkgruppe = null,
+        Funkgruppen? funkgruppen = null)
     {
-        session.AddCommandNode(kind, name, parent, auftrag: auftrag, funkgruppe: funkgruppe);
+        session.AddCommandNode(kind, name, parent, auftrag: auftrag, funkgruppe: funkgruppe, funkgruppen: funkgruppen);
         return session.Incident.CommandNodes[^1].Id;
     }
 
@@ -56,7 +62,7 @@ public class LeadershipBoardRenderTests
     // A Wohnhausbrand in Emmering as the sheet would carry it an hour in.
     private static void Fill(LocalIncidentSession session)
     {
-        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 40123", "TMO FW_EMMERING 1000");
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 40123", new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
         session.AssignRole("Einsatzleiter", "Max Mustermann", "Florian Emmering 1", slot: RoleSlot.Leiter);
         session.AssignRole("Melder", "Lukas Brandl", slot: RoleSlot.Melder);
         session.AssignRole("S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
@@ -77,7 +83,7 @@ public class LeadershipBoardRenderTests
         session.AssignRole("Abschnittsleiter", "Josef Bauer", "Florian Aich 2", nodeId: sued, slot: RoleSlot.Leiter);
         AddUnit(session, "FF Aich", "Florian Aich 40/1", 9, 4, 1, sued);
 
-        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst", funkgruppe: "TMO RD_FFB 1001");
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["RD_FFB 1001"], ["305_F"]));
         session.AssignRole("Einsatzleiter RD", "Sabine Schmid", "Rotkreuz Fürstenfeldbruck 1", nodeId: rd, slot: RoleSlot.Leiter);
         var polizei = AddNode(session, CommandNodeKind.Partner, "Polizei");
         session.AssignRole("Einsatzleiter Polizei", "Thomas Wagner", nodeId: polizei, slot: RoleSlot.Leiter);
@@ -215,6 +221,9 @@ public class LeadershipBoardRenderTests
         Assert.Equal("ILS", badge.GetVisualDescendants().OfType<TextBlock>().Single().Text);
         Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(view, "ElLeiterText").Text);
         Assert.Equal("Lukas Brandl", Named<TextBlock>(view, "ElMelderText").Text);
+        Assert.Equal("FW_EMMERING 1000", Named<TextBlock>(view, "ElTmo").Text);
+        Assert.Equal("307_F", Named<TextBlock>(view, "ElDmo").Text);
+        Assert.Equal(["RD_FFB 1001"], view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "NodeTmo" && t.IsEffectivelyVisible).Select(t => t.Text));
         Assert.False(Named<Grid>(view, "ElFurther").IsVisible);
         Assert.Equal("Stufe B", Named<TextBlock>(view, "StufeText").Text);
 
@@ -317,7 +326,7 @@ public class LeadershipBoardRenderTests
     {
         var board = Show(width: WorkspaceHostWidth, more: s =>
         {
-            s.AddCommandNode(CommandNodeKind.Partner, "THW", funkgruppe: "TMO THW_FFB 1002");
+            s.AddCommandNode(CommandNodeKind.Partner, "THW", funkgruppen: new Funkgruppen(["THW_FFB 1002"], null));
             s.AddCommandNode(CommandNodeKind.Partner, "Wasserwacht");
         });
         var chart = board.View.GetControl<StackPanel>("OrgChart");

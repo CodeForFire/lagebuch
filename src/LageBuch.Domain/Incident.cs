@@ -962,8 +962,9 @@ public sealed class Incident
     }
 
     /// <summary>
-    /// Corrects how the Einsatzleitung can be reached. Only a Funkgruppe change reaches the ETB;
-    /// Standort, Rufname and Telefon are working data and stay silent, like a node's.
+    /// Corrects how the Einsatzleitung can be reached. Only a Funkgruppen change reaches the ETB;
+    /// Standort, Rufname and Telefon are working data and stay silent, like a node's. Null
+    /// <paramref name="funkgruppen"/> means none.
     /// </summary>
     public LeadershipPost UpdateLeadershipPost(
         IClock clock,
@@ -971,20 +972,19 @@ public sealed class Incident
         string? standort,
         string? rufname,
         string? telefon,
-        string? funkgruppe)
+        Funkgruppen? funkgruppen)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var updated = new LeadershipPost(standort, rufname, telefon, funkgruppe).Normalized();
+        var updated = new LeadershipPost(standort, rufname, telefon, funkgruppen ?? Funkgruppen.Empty).Normalized();
         var previous = LeadershipPost;
         LeadershipPost = updated;
 
-        if (updated.Funkgruppe is not null
-            && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
+        if (!updated.Funkgruppen.IsEmpty && !updated.Funkgruppen.Equals(previous.Funkgruppen))
         {
-            AppendSystemEntry(clock, op, $"Funkgruppe Einsatzleitung: {updated.Funkgruppe}");
+            AppendSystemEntry(clock, op, FunkgruppenText("Einsatzleitung", updated.Funkgruppen));
         }
 
         return updated;
@@ -1027,7 +1027,8 @@ public sealed class Incident
         string? standort = null,
         string? funkgruppe = null,
         string? rufname = null,
-        string? telefon = null)
+        string? telefon = null,
+        Funkgruppen? funkgruppen = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -1045,9 +1046,9 @@ public sealed class Incident
         // runs before anything is added so a refused detail leaves the incident untouched.
         if (!string.IsNullOrWhiteSpace(auftrag) || !string.IsNullOrWhiteSpace(standort)
             || !string.IsNullOrWhiteSpace(funkgruppe) || !string.IsNullOrWhiteSpace(rufname)
-            || !string.IsNullOrWhiteSpace(telefon))
+            || !string.IsNullOrWhiteSpace(telefon) || funkgruppen is { IsEmpty: false })
         {
-            node = node.WithDetails(node.Name, auftrag, standort, funkgruppe, rufname, telefon);
+            node = node.WithDetails(node.Name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen);
         }
 
         CommandNode? parent = null;
@@ -1082,6 +1083,11 @@ public sealed class Incident
             AppendSystemEntry(clock, op, FunkgruppeText(node));
         }
 
+        if (!node.Funkgruppen.IsEmpty)
+        {
+            AppendSystemEntry(clock, op, FunkgruppenText(node.Name, node.Funkgruppen));
+        }
+
         return node;
     }
 
@@ -1090,6 +1096,8 @@ public sealed class Incident
         : $"Auftrag {node.Name}: {node.Auftrag}";
 
     private static string FunkgruppeText(CommandNode node) => $"Funkgruppe {node.Name}: {node.Funkgruppe}";
+
+    private static string FunkgruppenText(string owner, Funkgruppen funkgruppen) => $"Funkgruppen {owner}: {funkgruppen.Text}";
 
     /// <summary>
     /// Corrects a node's name and details. Rename, Auftrag and Funkgruppe changes reach the ETB;
@@ -1104,7 +1112,8 @@ public sealed class Incident
         string? standort,
         string? funkgruppe,
         string? rufname,
-        string? telefon)
+        string? telefon,
+        Funkgruppen? funkgruppen = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -1117,7 +1126,7 @@ public sealed class Incident
             throw new InvalidOperationException("Abschnitt ist aufgelöst.");
         }
 
-        var updated = previous.WithDetails(name, auftrag, standort, funkgruppe, rufname, telefon);
+        var updated = previous.WithDetails(name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen);
         EnsureNameFree(updated.Name, updated.ParentId, updated.Id);
         _commandNodes[index] = updated;
 
@@ -1144,6 +1153,11 @@ public sealed class Incident
             && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
         {
             AppendSystemEntry(clock, op, FunkgruppeText(updated));
+        }
+
+        if (!updated.Funkgruppen.IsEmpty && !updated.Funkgruppen.Equals(previous.Funkgruppen))
+        {
+            AppendSystemEntry(clock, op, FunkgruppenText(updated.Name, updated.Funkgruppen));
         }
 
         return updated;

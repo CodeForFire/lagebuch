@@ -27,7 +27,7 @@ public class FuehrungsorganisationSectionTests
         var incident = Fresh();
         El(incident);
         incident.SetFuehrungsstufe(Clock, Op, Fuehrungsstufe.B);
-        incident.UpdateLeadershipPost(Clock, Op, null, null, null, "TMO FW_EMMERING 1000");
+        incident.UpdateLeadershipPost(Clock, Op, null, null, null, new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
         incident.AssignRole(Clock, Op, "S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
 
         incident.AddCommandNode(Clock, Op, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz");
@@ -40,7 +40,8 @@ public class FuehrungsorganisationSectionTests
         var dach = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Dach", nord.Id);
         var sued = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", funkgruppe: "DMO 302_F");
         incident.AssignRole(Clock, Op, "Abschnittsleiter", "Josef Bauer", nodeId: sued.Id, slot: RoleSlot.Leiter);
-        var rettungsdienst = incident.AddCommandNode(Clock, Op, CommandNodeKind.Partner, "Rettungsdienst");
+        var rettungsdienst = incident.AddCommandNode(
+            Clock, Op, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["RD_FFB 3000"], null));
         incident.AssignRole(
             Clock, Op, "Einsatzleiter", "Sabine Schmid", callSign: "Rotkreuz Fürstenfeldbruck 1", nodeId: rettungsdienst.Id, slot: RoleSlot.Leiter);
         incident.AssignRole(Clock, Op, "Fachberater THW", "Peter Maier", slot: RoleSlot.Fachberater);
@@ -77,6 +78,8 @@ public class FuehrungsorganisationSectionTests
         PdfText.AssertInOrder(text, Heading, "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1)");
         Assert.DoesNotContain("Stufe", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Funkgruppe", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("TMO", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("DMO", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -175,7 +178,7 @@ public class FuehrungsorganisationSectionTests
         PdfText.AssertInOrder(
             text,
             Heading,
-            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Stufe B · Funkgruppe TMO FW_EMMERING 1000",
+            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Stufe B · TMO FW_EMMERING 1000 · DMO 307_F",
             "Führungsunterstützung: S2 Lage Erika Musterfrau",
             "Bereitstellung Marktplatz",
             "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppe: DMO 301_F – Stärke 0/0/9/9, AGT 0",
@@ -185,7 +188,7 @@ public class FuehrungsorganisationSectionTests
             "Einheiten: Florian Emmering 30/1",
             "Abschnitt 2 Süd – Leiter: Josef Bauer – Funkgruppe: DMO 302_F – Stärke 0/0/4/4, AGT 0",
             "Einheiten: Florian Aich 44/1",
-            "Einsatzleitung Rettungsdienst – Leiter: Sabine Schmid",
+            "Einsatzleitung Rettungsdienst – Leiter: Sabine Schmid – Funkgruppen: TMO RD_FFB 3000",
             "Fachberater: Fachberater THW (Peter Maier)",
             "Nicht zugeordnet: Florian Emmering 11/2",
             "Abschnitt (Freitext) Wache Süd: Zugführer Maria Musterfrau");

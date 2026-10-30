@@ -135,9 +135,9 @@ public static class FuehrungsorganisationSection
             line += $" · Stufe {FuehrungsstufeLabels.Of(stufe)}";
         }
 
-        if (!string.IsNullOrWhiteSpace(incident.LeadershipPost.Funkgruppe))
+        if (!incident.LeadershipPost.Funkgruppen.IsEmpty)
         {
-            line += $" · Funkgruppe {incident.LeadershipPost.Funkgruppe}";
+            line += $" · {incident.LeadershipPost.Funkgruppen.Text}";
         }
 
         return line;
@@ -168,6 +168,11 @@ public static class FuehrungsorganisationSection
         if (!string.IsNullOrWhiteSpace(node.Funkgruppe))
         {
             text += $" – Funkgruppe: {node.Funkgruppe}";
+        }
+
+        if (!node.Funkgruppen.IsEmpty)
+        {
+            text += $" – Funkgruppen: {node.Funkgruppen.Text}";
         }
 
         // What the EAL leads: an Abschnitt's sum takes in its Unterabschnitte, as on the board.

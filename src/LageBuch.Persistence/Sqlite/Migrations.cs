@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 37;
+    public const int CurrentVersion = 38;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -260,6 +260,11 @@ public static class Migrations
             ApplyV37(cn, tx);
 
             // Stryker restore all
+        }
+
+        if (version < 38)
+        {
+            ApplyV38(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1065,6 +1070,82 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "nav_overrides", "TEXT");
 
         // Stryker restore all
+    }
+
+    // An Einsatzleitung's TMO and DMO Funkgruppen (#828), our own and each partner's, as the JSON
+    // FunkgruppenJson writes. The single Funkgruppe they had moves in, its kind read from the "DMO "
+    // or "TMO " the Stammdaten suggestion began with (TMO when it says neither), and is cleared. The
+    // Abschnitte keep theirs. el_funkgruppe stays as a column nothing reads: SchemaGuard never drops.
+    private static void ApplyV38(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_funkgruppen", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "command_nodes", "funkgruppen", "TEXT");
+
+        // Stryker restore all
+        // A file older than V34, or a test's partial schema, has neither table to move from.
+        if (SchemaHelpers.ColumnExists(cn, tx, "incident_meta", "el_funkgruppe"))
+        {
+            MoveSingleFunkgruppe(
+                cn,
+                tx,
+                "SELECT id, el_funkgruppe FROM incident_meta WHERE el_funkgruppe IS NOT NULL;",
+                "UPDATE incident_meta SET el_funkgruppen = $g, el_funkgruppe = NULL WHERE id = $id;");
+        }
+
+        if (SchemaHelpers.ColumnExists(cn, tx, "command_nodes", "funkgruppe"))
+        {
+            MoveSingleFunkgruppe(
+                cn,
+                tx,
+                "SELECT id, funkgruppe FROM command_nodes WHERE kind = 'partner' AND funkgruppe IS NOT NULL;",
+                "UPDATE command_nodes SET funkgruppen = $g, funkgruppe = NULL WHERE id = $id;");
+        }
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: both statements are compile-time constants from ApplyV38; values use bound parameters.")]
+    private static void MoveSingleFunkgruppe(SqliteConnection cn, SqliteTransaction tx, string select, string update)
+    {
+        var rows = new List<(string Id, string Value)>();
+        using (var read = cn.CreateCommand())
+        {
+            read.Transaction = tx;
+            read.CommandText = select;
+            using var r = read.ExecuteReader();
+            while (r.Read())
+            {
+                rows.Add((r.GetString(0), r.GetString(1)));
+            }
+        }
+
+        foreach (var (id, value) in rows)
+        {
+            using var write = cn.CreateCommand();
+            write.Transaction = tx;
+            write.CommandText = update;
+            write.Parameters.AddWithValue("$g", (object?)FunkgruppenJson.Write(FunkgruppenFromSingle(value)) ?? DBNull.Value);
+            write.Parameters.AddWithValue("$id", id);
+            write.ExecuteNonQuery();
+        }
+    }
+
+    internal static Domain.Leadership.Funkgruppen FunkgruppenFromSingle(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length > Domain.Leadership.CommandNode.MaxTextLength)
+        {
+            return Domain.Leadership.Funkgruppen.Empty;
+        }
+
+        if (trimmed.StartsWith("DMO ", StringComparison.OrdinalIgnoreCase))
+        {
+            return new(null, [trimmed[4..].Trim()]);
+        }
+
+        return new([trimmed.StartsWith("TMO ", StringComparison.OrdinalIgnoreCase) ? trimmed[4..].Trim() : trimmed], null);
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

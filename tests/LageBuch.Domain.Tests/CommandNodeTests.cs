@@ -94,22 +94,54 @@ public class CommandNodeTests
     public void Rehydrate_keeps_every_field()
     {
         var id = Guid.NewGuid();
-        var node = CommandNode.Rehydrate(id, CommandNodeKind.Partner, "Polizei", null, "a", "b", "c", "d", "e", T0);
+        var node = CommandNode.Rehydrate(id, CommandNodeKind.Partner, "Polizei", null, "a", "b", "c", "d", "e", T0, new Funkgruppen(["f"], ["g"]));
 
         Assert.Equal(id, node.Id);
         Assert.Equal("Polizei", node.Name);
         Assert.Equal(("a", "b", "c", "d", "e"), (node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon));
         Assert.Equal(T0, node.DissolvedAt);
+        Assert.Equal(new Funkgruppen(["f"], ["g"]), node.Funkgruppen);
+        Assert.Equal(Funkgruppen.Empty, CommandNode.Rehydrate(id, CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, null).Funkgruppen);
     }
 
     [Fact]
     public void LeadershipPost_normalizes_and_enforces_caps()
     {
-        var post = new LeadershipPost(" Hof ", "  ", " 0171 ", null).Normalized();
+        var post = new LeadershipPost(" Hof ", "  ", " 0171 ", new Funkgruppen([" FW 1000 "], null)).Normalized();
 
-        Assert.Equal(new LeadershipPost("Hof", null, "0171", null), post);
-        Assert.Equal(new LeadershipPost(null, null, null, null), LeadershipPost.Empty);
-        Assert.Throws<ArgumentException>(() => new LeadershipPost(new string('x', 201), null, null, null).Normalized());
-        Assert.Throws<ArgumentException>(() => new LeadershipPost(null, null, new string('1', 51), null).Normalized());
+        Assert.Equal(new LeadershipPost("Hof", null, "0171", new Funkgruppen(["FW 1000"], null)), post);
+        Assert.Equal(new LeadershipPost(null, null, null, Funkgruppen.Empty), LeadershipPost.Empty);
+        Assert.Throws<ArgumentException>(() => new LeadershipPost(new string('x', 201), null, null, Funkgruppen.Empty).Normalized());
+        Assert.Throws<ArgumentException>(() => new LeadershipPost(null, null, new string('1', 51), Funkgruppen.Empty).Normalized());
+        Assert.Throws<ArgumentException>(
+            () => new LeadershipPost(null, null, null, new Funkgruppen(null, ["1", "2", "3", "4"])).Normalized());
+    }
+
+    [Fact]
+    public void A_partner_takes_funkgruppen_and_no_single_funkgruppe()
+    {
+        var partner = CommandNode.Create(CommandNodeKind.Partner, "Polizei", null);
+
+        var edited = partner.WithDetails("Polizei", null, null, null, null, null, new Funkgruppen([" POL 1 "], ["301_F"]));
+
+        Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), edited.Funkgruppen);
+        Assert.Null(edited.Funkgruppe);
+        var ex = Assert.Throws<ArgumentException>(() => partner.WithDetails("Polizei", null, null, "TMO POL 1", null, null));
+        Assert.StartsWith("Eine Einsatzleitung hat Funkgruppen TMO und DMO.", ex.Message, StringComparison.Ordinal);
+        var tooLong = Assert.Throws<ArgumentException>(
+            () => CommandNode.Create(CommandNodeKind.Abschnitt, "Nord", null).WithDetails("Nord", null, null, new string('x', 201), null, null));
+        Assert.StartsWith("Funkgruppe ist länger", tooLong.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Only_a_partner_takes_funkgruppen()
+    {
+        var abschnitt = CommandNode.Create(CommandNodeKind.Abschnitt, "Nord", null);
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => abschnitt.WithDetails("Nord", null, null, null, null, null, new Funkgruppen(["A"], null)));
+
+        Assert.StartsWith("Nur eine Einsatzleitung hat Funkgruppen TMO und DMO.", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(Funkgruppen.Empty, abschnitt.WithDetails("Nord", null, null, "DMO 301_F", null, null, Funkgruppen.Empty).Funkgruppen);
     }
 }

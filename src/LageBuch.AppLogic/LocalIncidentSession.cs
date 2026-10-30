@@ -165,13 +165,22 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? standort = null,
         string? funkgruppe = null,
         string? rufname = null,
-        string? telefon = null) =>
+        string? telefon = null,
+        Funkgruppen? funkgruppen = null) =>
         Mutate(() => Incident.AddCommandNode(
-            _clock, RequireOperator(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon));
+            _clock, RequireOperator(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen));
 
     public void UpdateCommandNode(
-        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
-        Mutate(() => Incident.UpdateCommandNode(_clock, RequireOperator(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon));
+        Guid nodeId,
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon,
+        Funkgruppen? funkgruppen = null) =>
+        Mutate(() => Incident.UpdateCommandNode(
+            _clock, RequireOperator(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen));
 
     public void DissolveCommandNode(Guid nodeId) =>
         Mutate(() => Incident.DissolveCommandNode(_clock, RequireOperator(), nodeId));
@@ -200,8 +209,8 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Mutate(() => Incident.SetFuehrungsstufe(_clock, RequireOperator(), stufe));
 
-    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe) =>
-        Mutate(() => Incident.UpdateLeadershipPost(_clock, RequireOperator(), standort, rufname, telefon, funkgruppe));
+    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen) =>
+        Mutate(() => Incident.UpdateLeadershipPost(_clock, RequireOperator(), standort, rufname, telefon, funkgruppen));
 
     public void AddForceUnit(
         string brigade,

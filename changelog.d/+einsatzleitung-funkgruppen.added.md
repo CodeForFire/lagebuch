@@ -1,0 +1,1 @@
+Our own Einsatzleitung and every partner Einsatzleitung on the Führungstafel now take up to three TMO and three DMO Funkgruppen, each suggested from the Stammdaten of its kind, and show them on the card, in the ETB and in the Bericht (#828).

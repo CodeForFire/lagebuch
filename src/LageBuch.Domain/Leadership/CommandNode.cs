@@ -33,7 +33,11 @@ public sealed record CommandNode
 
     public string? Standort { get; private init; }
 
+    /// <summary>The single Funkgruppe of an Abschnitt, Unterabschnitt or Bereitstellung; null for a partner.</summary>
     public string? Funkgruppe { get; private init; }
+
+    /// <summary>A partner Einsatzleitung's TMO and DMO Funkgruppen (#828); empty for every other kind.</summary>
+    public Funkgruppen Funkgruppen { get; private init; } = Funkgruppen.Empty;
 
     public string? Rufname { get; private init; }
 
@@ -71,7 +75,8 @@ public sealed record CommandNode
         string? funkgruppe,
         string? rufname,
         string? telefon,
-        DateTimeOffset? dissolvedAt)
+        DateTimeOffset? dissolvedAt,
+        Funkgruppen? funkgruppen = null)
         => new()
         {
             Id = id,
@@ -84,20 +89,46 @@ public sealed record CommandNode
             Rufname = rufname,
             Telefon = telefon,
             DissolvedAt = dissolvedAt,
+            Funkgruppen = funkgruppen ?? Funkgruppen.Empty,
         };
 
-    /// <summary>Returns a copy with corrected details, trimmed and capped the way <see cref="Create"/> does.</summary>
+    /// <summary>
+    /// Returns a copy with corrected details, trimmed and capped the way <see cref="Create"/> does. A
+    /// partner Einsatzleitung takes <paramref name="funkgruppen"/> and no single Funkgruppe, every
+    /// other kind the reverse; null <paramref name="funkgruppen"/> means none.
+    /// </summary>
     public CommandNode WithDetails(
-        string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon)
-        => this with
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon,
+        Funkgruppen? funkgruppen = null)
+    {
+        var single = Clean(funkgruppe, MaxTextLength, "Funkgruppe");
+        var groups = (funkgruppen ?? Funkgruppen.Empty).Normalized();
+        if (Kind == CommandNodeKind.Partner && single is not null)
+        {
+            throw new ArgumentException("Eine Einsatzleitung hat Funkgruppen TMO und DMO.", nameof(funkgruppe));
+        }
+
+        if (Kind != CommandNodeKind.Partner && !groups.IsEmpty)
+        {
+            throw new ArgumentException("Nur eine Einsatzleitung hat Funkgruppen TMO und DMO.", nameof(funkgruppen));
+        }
+
+        return this with
         {
             Name = CleanName(name),
             Auftrag = Clean(auftrag, MaxAuftragLength, "Auftrag"),
             Standort = Clean(standort, MaxTextLength, "Standort"),
-            Funkgruppe = Clean(funkgruppe, MaxTextLength, "Funkgruppe"),
+            Funkgruppe = single,
+            Funkgruppen = groups,
             Rufname = Clean(rufname, MaxTextLength, "Rufname"),
             Telefon = Clean(telefon, MaxPhoneLength, "Telefon"),
         };
+    }
 
     /// <summary>
     /// Returns a copy at its new level: under <paramref name="parentId"/> an Unterabschnitt, at the

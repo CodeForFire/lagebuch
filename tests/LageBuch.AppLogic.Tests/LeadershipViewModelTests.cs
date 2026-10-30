@@ -99,7 +99,8 @@ public class LeadershipViewModelTests
     public void A_full_sheet_shows_every_part_of_the_Fuehrungsorganisation()
     {
         var session = NewSession();
-        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 12345", "TMO FW_EMMERING 1000");
+        session.UpdateLeadershipPost(
+            "Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 12345", new Funkgruppen(["FW_EMMERING 1000", "FW_EMMERING 1001"], ["307_F"]));
         session.AssignRole("Einsatzleiter", "Max Mustermann", "Florian Emmering 1", slot: RoleSlot.Leiter);
         session.AssignRole("Führungsassistent", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
         var bereitstellung = AddNode(session, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz");
@@ -119,6 +120,7 @@ public class LeadershipViewModelTests
         AddUnit(session, "FF Aich", null, abschnitt);
         var dach = AddNode(session, CommandNodeKind.Unterabschnitt, "Dach", abschnitt);
         var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        session.UpdateCommandNode(rd, "Rettungsdienst", null, null, null, null, null, new Funkgruppen(["RD_FFB 3000"], null));
         session.AssignRole("Einsatzleiter RD", "Sabine Schmid", nodeId: rd, slot: RoleSlot.Leiter);
         session.AssignRole("Fachberater THW", "Thomas Weber", "Heros Fürstenfeldbruck 10/1", slot: RoleSlot.Fachberater);
         AddUnit(session, "FF Steinhöring", "Florian Steinhöring 40/1");
@@ -131,7 +133,8 @@ public class LeadershipViewModelTests
         Assert.Equal("Feuerwehrhaus Emmering", vm.El.Standort);
         Assert.Equal("Florian Emmering 1", vm.El.Rufname);
         Assert.Equal("08141 12345", vm.El.Telefon);
-        Assert.Equal("TMO FW_EMMERING 1000", vm.El.Funkgruppe);
+        Assert.Equal("FW_EMMERING 1000\nFW_EMMERING 1001", vm.El.Tmo);
+        Assert.Equal("307_F", vm.El.Dmo);
         Assert.NotNull(vm.El.Leiter);
         Assert.Equal("Einsatzleiter", vm.El.Leiter.Role);
         Assert.Equal("Max Mustermann · Florian Emmering 1", vm.El.Leiter.Text);
@@ -186,6 +189,8 @@ public class LeadershipViewModelTests
         Assert.True(vm.HasPartners);
         var partner = Assert.Single(vm.Partners);
         Assert.Equal("Rettungsdienst", partner.Name);
+        Assert.Equal("RD_FFB 3000", partner.Tmo);
+        Assert.Null(partner.Dmo);
         Assert.Equal("Einsatzleitung", partner.KindLabel);
         Assert.Equal("Sabine Schmid", partner.Leiter?.PersonName);
 

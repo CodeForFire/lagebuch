@@ -791,13 +791,121 @@ public class IncidentRoundTripTests : IDisposable
         var op = new SessionOperator("Muster");
         var incident = Incident.Start(clock, op, "Brand");
         incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
-        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", "TBZ 2");
+        var groups = new Funkgruppen(["FW_MUSTER 1000", "FW_MUSTER 1001"], ["301_F", "302_F", "Kanal „Süd“"]);
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", groups);
 
         IncidentRepository.Save(_path, incident);
         var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(Fuehrungsstufe.C, loaded.Fuehrungsstufe);
-        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0171 0000002", "TBZ 2"), loaded.LeadershipPost);
+        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0171 0000002", groups), loaded.LeadershipPost);
+    }
+
+    [Fact]
+    public void A_partners_funkgruppen_round_trip_and_an_abschnitt_keeps_its_one()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var partner = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Partner, "Polizei", funkgruppen: new Funkgruppen(["POL 1"], ["301_F"]));
+        var abschnitt = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppe: "DMO 302_F");
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var p = loaded.CommandNodes.Single(n => n.Id == partner.Id);
+        Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), p.Funkgruppen);
+        Assert.Null(p.Funkgruppe);
+        var a = loaded.CommandNodes.Single(n => n.Id == abschnitt.Id);
+        Assert.Equal("DMO 302_F", a.Funkgruppe);
+        Assert.Equal(Funkgruppen.Empty, a.Funkgruppen);
+    }
+
+    [Fact]
+    public void A_v37_files_single_funkgruppe_moves_to_its_kind_and_an_abschnitts_stays()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var partner = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei");
+        var thw = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "THW");
+        var abschnitt = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        IncidentRepository.Save(_path, incident);
+
+        // Roll the file back to the V37 shape, holding what V37 held: one free-text Funkgruppe each.
+        ExecRaw(
+            "UPDATE schema_version SET version = 37;" +
+            "ALTER TABLE incident_meta DROP COLUMN el_funkgruppen; ALTER TABLE command_nodes DROP COLUMN funkgruppen;" +
+            "UPDATE incident_meta SET el_funkgruppe = ' dmo 301_F ';" +
+            $"UPDATE command_nodes SET funkgruppe = 'TMO POL 1' WHERE id = '{partner.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'Kanal 5' WHERE id = '{thw.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'DMO 302_F' WHERE id = '{abschnitt.Id}';");
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(new Funkgruppen(null, ["301_F"]), loaded.LeadershipPost.Funkgruppen);
+        var p = loaded.CommandNodes.Single(n => n.Id == partner.Id);
+        Assert.Equal(new Funkgruppen(["POL 1"], null), p.Funkgruppen);
+        Assert.Null(p.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["Kanal 5"], null), loaded.CommandNodes.Single(n => n.Id == thw.Id).Funkgruppen);
+        var a = loaded.CommandNodes.Single(n => n.Id == abschnitt.Id);
+        Assert.Equal(("DMO 302_F", Funkgruppen.Empty), (a.Funkgruppe, a.Funkgruppen));
+    }
+
+    [Theory]
+    [InlineData(200, true)]
+    [InlineData(201, false)]
+    public void A_v37_single_funkgruppe_over_the_cap_is_dropped_not_moved(int length, bool kept)
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        IncidentRepository.Save(_path, Incident.Start(clock, op, "Brand"));
+        var value = new string('x', length);
+
+        ExecRaw(
+            "UPDATE schema_version SET version = 37;" +
+            "ALTER TABLE incident_meta DROP COLUMN el_funkgruppen; ALTER TABLE command_nodes DROP COLUMN funkgruppen;" +
+            $"UPDATE incident_meta SET el_funkgruppe = '{value}';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(kept ? new Funkgruppen([value], null) : Funkgruppen.Empty, loaded.LeadershipPost.Funkgruppen);
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("[\"A\"]")]
+    [InlineData("{\"tmo\":\"A\",\"dmo\":7}")]
+    public void Malformed_funkgruppen_read_as_none(string json)
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", null, null, new Funkgruppen(["A"], null));
+        IncidentRepository.Save(_path, incident);
+
+        ExecRaw($"UPDATE incident_meta SET el_funkgruppen = '{json}';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(Funkgruppen.Empty, loaded.LeadershipPost.Funkgruppen);
+        Assert.Equal("Feuerwehrhaus", loaded.LeadershipPost.Standort);
+    }
+
+    [Fact]
+    public void A_hostile_files_funkgruppen_are_capped_not_trusted()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        IncidentRepository.Save(_path, incident);
+
+        var tooLong = new string('x', 201);
+        ExecRaw(
+            "UPDATE incident_meta SET el_funkgruppen = " +
+            $"'{{\"tmo\":[\"A\",\"{tooLong}\",\"  \",\"A\",\"B\",\"C\",\"D\",3],\"dmo\":[\"E\"]}}';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(new Funkgruppen(["A", "B", "C"], ["E"]), loaded.LeadershipPost.Funkgruppen);
     }
 
     [Fact]
@@ -863,7 +971,7 @@ public class IncidentRoundTripTests : IDisposable
         incident.MoveForceUnit(clock, op, unit.Id, node.Id);
         incident.AssignRole(clock, op, "Abschnittsleiter", "Erika Beispiel", nodeId: node.Id, slot: RoleSlot.Leiter);
         incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.B);
-        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", "TBZ 2");
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", new Funkgruppen(["TBZ 2"], null));
         IncidentRepository.Save(_path, incident);
 
         // Roll the file back to the V33 shape: no V34 columns, no command_nodes table.
@@ -873,7 +981,7 @@ public class IncidentRoundTripTests : IDisposable
             "ALTER TABLE role_assignments DROP COLUMN node_id; ALTER TABLE role_assignments DROP COLUMN slot;" +
             "ALTER TABLE incident_meta DROP COLUMN fuehrungsstufe; ALTER TABLE incident_meta DROP COLUMN el_standort;" +
             "ALTER TABLE incident_meta DROP COLUMN el_rufname; ALTER TABLE incident_meta DROP COLUMN el_telefon;" +
-            "ALTER TABLE incident_meta DROP COLUMN el_funkgruppe;");
+            "ALTER TABLE incident_meta DROP COLUMN el_funkgruppe; ALTER TABLE incident_meta DROP COLUMN el_funkgruppen;");
 
         var loaded = IncidentRepository.Load(_path);
 

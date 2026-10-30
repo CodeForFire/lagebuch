@@ -487,12 +487,22 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? standort = null,
         string? funkgruppe = null,
         string? rufname = null,
-        string? telefon = null) =>
-        Send(new AddCommandNodeCommand(Op(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon));
+        string? telefon = null,
+        Funkgruppen? funkgruppen = null) =>
+        Send(new AddCommandNodeCommand(
+            Op(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo));
 
     public void UpdateCommandNode(
-        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
-        Send(new UpdateCommandNodeCommand(Op(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon));
+        Guid nodeId,
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon,
+        Funkgruppen? funkgruppen = null) =>
+        Send(new UpdateCommandNodeCommand(
+            Op(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo));
 
     public void DissolveCommandNode(Guid nodeId) =>
         Send(new DissolveCommandNodeCommand(Op(), nodeId));
@@ -529,8 +539,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Send(new SetFuehrungsstufeCommand(Op(), stufe));
 
-    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe) =>
-        Send(new UpdateLeadershipPostCommand(Op(), standort, rufname, telefon, funkgruppe));
+    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen) =>
+        Send(new UpdateLeadershipPostCommand(Op(), standort, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo));
 
     public void AddForceUnit(
         string brigade,

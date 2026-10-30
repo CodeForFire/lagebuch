@@ -1,5 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -145,7 +146,7 @@ public class CommandNodeDialogRenderTests
     public void The_post_dialog_hides_name_and_auftrag()
     {
         var session = Session();
-        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering", "08141 123456", "TMO FW_EMMERING 1000");
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering", "08141 123456", new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
         var (window, _) = Show(CommandNodeDialogViewModel.ForPost(session, MasterData()), 560, 560);
 
         Assert.DoesNotContain(
@@ -153,6 +154,45 @@ public class CommandNodeDialogRenderTests
             t => t.Name is "CommandNodeNameBox" or "CommandNodeAuftragBox" && t.IsEffectivelyVisible);
         Assert.Equal("Feuerwehrhaus Emmering", Find<TextBox>(window, "CommandNodeStandortBox").Text);
         window.AssertFocused(Find<TextBox>(window, "CommandNodeStandortBox"));
+    }
+
+    [AvaloniaFact]
+    public void The_post_dialog_shows_a_field_per_funkgruppe_and_adds_up_to_three_of_a_kind()
+    {
+        var session = Session();
+        session.UpdateLeadershipPost(
+            "Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 123456", new Funkgruppen(["FW_EMMERING 1000", "FW_AICH 1010"], ["301_F"]));
+        var (window, vm) = Show(CommandNodeDialogViewModel.ForPost(session, MasterData()), 560, 900);
+
+        Assert.DoesNotContain(
+            window.GetVisualDescendants().OfType<AutoCompleteBox>(),
+            b => b.Name == "CommandNodeFunkgruppeBox" && b.IsEffectivelyVisible);
+        var boxes = window.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "FunkgruppeSlotBox").ToList();
+        Assert.Equal(["FW_EMMERING 1000", "FW_AICH 1010", "301_F"], boxes.Select(b => b.Text));
+        Assert.Equal(["Funkgruppe TMO", "Funkgruppe TMO", "Funkgruppe DMO"], boxes.Select(AutomationProperties.GetName));
+        Assert.Equal(["FW_EMMERING 1000", "FW_AICH 1010"], boxes[0].ItemsSource!.Cast<string>());
+        Assert.Equal(["301_F"], boxes[2].ItemsSource!.Cast<string>());
+
+        // The one DMO field has no ×; each of two TMO fields has one.
+        var removes = window.GetVisualDescendants().OfType<Button>().Where(b => b.Name == "FunkgruppeSlotRemoveButton").ToList();
+        Assert.Equal([true, true, false], removes.Select(b => b.IsVisible));
+        Capture(window, "einsatzleitung-dialog-funkgruppen.png");
+
+        Find<Button>(window, "CommandNodeAddTmoButton").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(3, vm.TmoSlots.Count);
+        Assert.False(Find<Button>(window, "CommandNodeAddTmoButton").IsEffectivelyEnabled);
+        Assert.True(Find<Button>(window, "CommandNodeAddDmoButton").IsEffectivelyEnabled);
+    }
+
+    [AvaloniaFact]
+    public void An_abschnitt_dialog_keeps_the_single_funkgruppe_field()
+    {
+        var (window, _) = Show(Filled(Session()), 560, 760);
+
+        Assert.True(Find<AutoCompleteBox>(window, "CommandNodeFunkgruppeBox").IsEffectivelyVisible);
+        Assert.False(Find<HeaderedContentControl>(window, "CommandNodeTmoField").IsVisible);
+        Assert.False(Find<HeaderedContentControl>(window, "CommandNodeDmoField").IsVisible);
     }
 
     [AvaloniaFact]

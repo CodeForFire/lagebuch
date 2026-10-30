@@ -260,12 +260,14 @@ public class SnapshotRoundTripTests
         incident.MoveForceUnit(clock, op, unit.Id, sub.Id);
         var al = incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", nodeId: nord.Id, slot: RoleSlot.Leiter);
         incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
-        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0172", "TG 1");
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"]));
+        var polizei = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Partner, "Polizei", funkgruppen: new Funkgruppen(["POL 1", "POL 2"], ["303_F"]));
 
         var r = SnapshotMapper.FromSnapshot(
             SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
 
-        Assert.Equal(3, r.CommandNodes.Count);
+        Assert.Equal(4, r.CommandNodes.Count);
         var nordBack = r.FindCommandNode(nord.Id);
         Assert.NotNull(nordBack);
         Assert.Equal(CommandNodeKind.Abschnitt, nordBack.Kind);
@@ -281,7 +283,9 @@ public class SnapshotRoundTripTests
         Assert.Equal(nord.Id, roleBack.NodeId);
         Assert.Equal(RoleSlot.Leiter, roleBack.Slot);
         Assert.Equal(Fuehrungsstufe.C, r.Fuehrungsstufe);
-        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0172", "TG 1"), r.LeadershipPost);
+        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"])), r.LeadershipPost);
+        Assert.Equal(new Funkgruppen(["POL 1", "POL 2"], ["303_F"]), r.FindCommandNode(polizei.Id)?.Funkgruppen);
+        Assert.Equal(Funkgruppen.Empty, nordBack.Funkgruppen);
     }
 
     [Fact]
@@ -319,6 +323,27 @@ public class SnapshotRoundTripTests
         Assert.Null(r.FindCommandNode(withParent)?.ParentId);
         Assert.Equal(3, r.CommandNodes.Count);
         Assert.Equal("Nord", r.FindCommandNode(nord.Id)?.Name);
+    }
+
+    [Fact]
+    public void A_hostile_snapshots_funkgruppen_are_capped_not_trusted()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var polizei = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei");
+        var wire = SnapshotMapper.ToSnapshot(incident);
+        var hostile = wire with
+        {
+            ElFunkgruppenTmo = ["A", new string('x', 201), " ", "A", "B", "C", "D"],
+            ElFunkgruppenDmo = ["E"],
+            CommandNodes = [.. wire.CommandNodes!.Select(n => n with { FunkgruppenDmo = ["1", "2", "3", "4", "5"] })],
+        };
+
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(hostile)));
+
+        Assert.Equal(new Funkgruppen(["A", "B", "C"], ["E"]), r.LeadershipPost.Funkgruppen);
+        Assert.Equal(new Funkgruppen(null, ["1", "2", "3"]), r.FindCommandNode(polizei.Id)?.Funkgruppen);
     }
 
     [Fact]

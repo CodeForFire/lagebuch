@@ -95,10 +95,19 @@ public interface IIncidentSession
         string? standort = null,
         string? funkgruppe = null,
         string? rufname = null,
-        string? telefon = null);
+        string? telefon = null,
+        Funkgruppen? funkgruppen = null);
 
+    /// <summary>Corrects a node; <paramref name="funkgruppen"/> is a partner Einsatzleitung's, null for none.</summary>
     void UpdateCommandNode(
-        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon);
+        Guid nodeId,
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon,
+        Funkgruppen? funkgruppen = null);
 
     void DissolveCommandNode(Guid nodeId);
 
@@ -129,7 +138,8 @@ public interface IIncidentSession
     /// <summary>Adds a Checkliste from a Vorlage to the running Einsatz. See <c>Incident.AddChecklist</c>.</summary>
     void AddChecklist(ChecklistSeed seed);
 
-    void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe);
+    /// <summary>Corrects how the Einsatzleitung can be reached; null <paramref name="funkgruppen"/> means none.</summary>
+    void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen);
 
     void AddForceUnit(
         string brigade,

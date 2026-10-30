@@ -370,15 +370,18 @@
             <ItemsControl Grid.Column="1" ItemsSource="{Binding Further}" ItemTemplate="{StaticResource PersonRowTemplate}" />
           </Grid>
 
-          <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="2" ColumnSpacing="6">
+          <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="2" ColumnSpacing="6">
             <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="STANDORT" />
             <TextBlock Grid.Row="0" Grid.Column="1" Classes="field-value" Text="{Binding Standort, TargetNullValue='—'}" />
             <TextBlock Grid.Row="1" Grid.Column="0" Classes="field-label" Text="RUFNAME" />
             <TextBlock Grid.Row="1" Grid.Column="1" Classes="field-value" Text="{Binding Rufname, TargetNullValue='—'}" />
             <TextBlock Grid.Row="2" Grid.Column="0" Classes="field-label" Text="TELEFON" />
             <TextBlock Grid.Row="2" Grid.Column="1" Classes="field-value" Text="{Binding Telefon, TargetNullValue='—'}" />
-            <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="FUNKGRUPPE" />
-            <TextBlock Grid.Row="3" Grid.Column="1" Classes="field-value" Text="{Binding Funkgruppe, TargetNullValue='—'}" />
+            <!-- One Funkgruppe per line (#828): up to three of each kind. -->
+            <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Classes="field-value" x:Name="ElTmo" Text="{Binding Tmo, TargetNullValue='—'}" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Classes="field-value" x:Name="ElDmo" Text="{Binding Dmo, TargetNullValue='—'}" />
           </Grid>
 
           <!-- The Führungsstufe: a flyout of commands, the NodeChoicePicker idiom, closed on select. -->
@@ -417,7 +420,7 @@
           </StackPanel>
 
           <Button Classes="board-action" HorizontalAlignment="Left" Content="ERREICHBARKEIT BEARBEITEN"
-                  ToolTip.Tip="Standort, Rufname, Telefon und Funkgruppe bearbeiten"
+                  ToolTip.Tip="Standort, Rufname, Telefon und Funkgruppen bearbeiten"
                   Command="{Binding EditPostCommand}" />
         </StackPanel>
       </Border>
@@ -470,6 +473,17 @@
                     IsVisible="{Binding Funkgruppe, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBlock Grid.Column="0" Classes="field-label" Text="FUNKGRUPPE" />
                 <TextBlock Grid.Column="1" Classes="field-value" Text="{Binding Funkgruppe}" />
+              </Grid>
+              <!-- A partner Einsatzleitung's Funkgruppen (#828), one per line. -->
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                    IsVisible="{Binding Tmo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="1" Classes="field-value" x:Name="NodeTmo" Text="{Binding Tmo}" />
+              </Grid>
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                    IsVisible="{Binding Dmo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="1" Classes="field-value" x:Name="NodeDmo" Text="{Binding Dmo}" />
               </Grid>
               <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
                     IsVisible="{Binding Rufname, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
