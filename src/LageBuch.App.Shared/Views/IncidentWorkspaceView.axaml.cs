@@ -66,16 +66,11 @@ public partial class IncidentWorkspaceView : UserControl
     // Flyout does not dismiss it, and a choice is made in one tap. On a phone MEHR closes too, so
     // the entry just added is what the Lagebuchführer sees. Posted: Click is raised before the
     // button runs its command, and closing the popup first takes the command's binding with it.
-    // A refused edit keeps the flyout open: NavEditError is shown in it, and nowhere else.
+    // A refused edit closes it too: its reason stands in the header's NavEditErrorBanner.
     private void OnRailAddFlyoutOpened(object? sender, EventArgs e) => _openRailAddFlyout = sender as Flyout;
 
     private void OnRailChoiceClick(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() =>
     {
-        if (_vm?.NavEditError is not null)
-        {
-            return;
-        }
-
         _openRailAddFlyout?.Hide();
         _openRailAddFlyout = null;
         MoreModulesButton.Flyout?.Hide();

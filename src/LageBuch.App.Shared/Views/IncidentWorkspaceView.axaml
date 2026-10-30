@@ -9,7 +9,8 @@
   <UserControl.Resources>
     <!-- What the rail's „+“ offers, shared by the desktop flyout and the phone's MEHR sheet: the
          entries this Einsatz has hidden, and the Checklisten created in the Stammdaten after it
-         began. Ghost buttons in a Flyout, like MEHR. A choice closes the flyout it was made in. -->
+         began. Ghost buttons in a Flyout, like MEHR. A choice closes the flyout it was made in; a
+         refusal is shown in the header's NavEditErrorBanner, which a closed flyout cannot hide. -->
     <DataTemplate x:Key="RailAddChoices" x:DataType="vm:IncidentWorkspaceViewModel">
       <StackPanel Spacing="4" MinWidth="220">
         <TextBlock Text="AUSGEBLENDET" Classes="overline" IsVisible="{Binding HiddenNavEntries.Count}" />
@@ -43,10 +44,6 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <!-- Why the last edit did not take, in German, until the next one does. -->
-        <TextBlock x:Name="NavEditErrorText" Classes="secondary" TextWrapping="Wrap" MaxWidth="320"
-                   HorizontalAlignment="Left" Text="{Binding NavEditError}"
-                   IsVisible="{Binding NavEditError, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
     </DataTemplate>
   </UserControl.Resources>
@@ -435,6 +432,33 @@
               <StackPanel Grid.Column="2" Classes="meldung-actions">
                 <Button x:Name="DismissCommandRejectedButton" Content="VERSTANDEN"
                         Command="{Binding DismissCommandRejectedCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- A rail edit this device refused (Ausblenden, the „+“): the same row as a rejected
+               change, because a hide is made from a context menu that is gone by the time it fails,
+               and the „+“ may be hidden. Stays until acknowledged or the next edit succeeds. -->
+          <Border x:Name="NavEditErrorBanner" Classes="meldung due"
+                  IsVisible="{Binding NavEditError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon" Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                  <TextBlock Classes="meldung-label" Text="ABGELEHNT" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" x:Name="NavEditErrorText" Classes="meldung-text"
+                         Margin="14,10" TextWrapping="Wrap" TextTrimming="None"
+                         Text="{Binding NavEditError}" />
+              <StackPanel Grid.Column="2" Classes="meldung-actions">
+                <Button x:Name="DismissNavEditErrorButton" Content="VERSTANDEN"
+                        Command="{Binding DismissNavEditErrorCommand}" />
               </StackPanel>
             </Grid>
           </Border>

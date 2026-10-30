@@ -22,7 +22,9 @@ public class WorkspaceRailEditingTests
 {
     private static readonly Guid Hochwasser = new("44444444-4444-4444-4444-444444444444");
 
-    private static IncidentWorkspaceViewModel Workspace()
+    private static IncidentWorkspaceViewModel Workspace() => Editable().Vm;
+
+    private static (IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) Editable()
     {
         var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(
@@ -31,7 +33,7 @@ public class WorkspaceRailEditingTests
             new SessionOperator(AnonymizedExampleData.OperatorSurname),
             "/x.lagebuch",
             Array.Empty<ChecklistSeed>());
-        return new IncidentWorkspaceViewModel(
+        var vm = new IncidentWorkspaceViewModel(
             session,
             clock,
             new ManualTicker(),
@@ -45,6 +47,7 @@ public class WorkspaceRailEditingTests
             new FakeDialogs(),
             new NoopAlarmService(),
             new NoopIncidentHostController());
+        return (vm, session);
     }
 
     private static Window Show(IncidentWorkspaceViewModel vm, bool phone = false)
@@ -120,6 +123,37 @@ public class WorkspaceRailEditingTests
 
         Assert.DoesNotContain(files, WorkspaceRenderHelper.RailHeaders(window));
         Assert.Contains(vm.HiddenNavEntries, e => e.RailKey == NavModules.Files);
+    }
+
+    [AvaloniaFact]
+    public void A_refused_ausblenden_is_shown_in_the_header_not_in_a_closed_flyout()
+    {
+        var (vm, session) = Editable();
+        var window = Show(vm);
+
+        // The domain caps an Einsatz's overrides; at the cap, a new key is refused.
+        for (var i = 0; i < Incident.MaxNavOverrides; i++)
+        {
+            session.SetNavVisibility($"x{i}", true);
+        }
+
+        Dispatcher.UIThread.RunJobs();
+        var tab = RailTab(window, ModuleLabels.Header(NavModules.Files));
+        Press(tab, MouseButton.Right);
+        Press(HideItemOf(tab));
+
+        Assert.False(Named<Button>(window, "RailAddButton").Flyout!.IsOpen);
+        var banner = Named<Border>(window, "NavEditErrorBanner");
+        Assert.True(banner.IsEffectivelyVisible, "the refusal must be readable without opening anything");
+        Assert.Equal(
+            $"Mehr als {Incident.MaxNavOverrides} Navigationsüberschreibungen sind nicht möglich.",
+            Named<TextBlock>(banner, "NavEditErrorText").Text);
+        Assert.Contains(ModuleLabels.Header(NavModules.Files), WorkspaceRenderHelper.RailHeaders(window));
+
+        Press(Named<Button>(banner, "DismissNavEditErrorButton"));
+
+        Assert.False(banner.IsEffectivelyVisible);
+        Assert.Null(vm.NavEditError);
     }
 
     [AvaloniaFact]

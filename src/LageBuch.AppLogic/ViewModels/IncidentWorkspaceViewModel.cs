@@ -1428,6 +1428,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private string? _navEditError;
 
+    [RelayCommand]
+    private void DismissNavEditError() => NavEditError = null;
+
     /// <summary>„Ausblenden“: takes an entry off the rail for this Einsatz only.</summary>
     [RelayCommand(CanExecute = nameof(CanHideNavItem))]
     private void HideNavItem(WorkspaceNavItemViewModel? item)
