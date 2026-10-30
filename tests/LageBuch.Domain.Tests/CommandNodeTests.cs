@@ -126,7 +126,11 @@ public class CommandNodeTests
 
         Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), edited.Funkgruppen);
         Assert.Null(edited.Funkgruppe);
-        Assert.Throws<ArgumentException>(() => partner.WithDetails("Polizei", null, null, "TMO POL 1", null, null));
+        var ex = Assert.Throws<ArgumentException>(() => partner.WithDetails("Polizei", null, null, "TMO POL 1", null, null));
+        Assert.StartsWith("Eine Einsatzleitung hat Funkgruppen TMO und DMO.", ex.Message, StringComparison.Ordinal);
+        var tooLong = Assert.Throws<ArgumentException>(
+            () => CommandNode.Create(CommandNodeKind.Abschnitt, "Nord", null).WithDetails("Nord", null, null, new string('x', 201), null, null));
+        Assert.StartsWith("Funkgruppe ist länger", tooLong.Message, StringComparison.Ordinal);
     }
 
     [Fact]

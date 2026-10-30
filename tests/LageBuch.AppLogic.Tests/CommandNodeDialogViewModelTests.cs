@@ -706,4 +706,114 @@ public class CommandNodeDialogViewModelTests
 
         Assert.False(vm.SaveCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void Add_dmo_also_stops_at_three()
+    {
+        var vm = CommandNodeDialogViewModel.ForPost(NewSession(), MasterDataSet.Empty);
+
+        vm.AddDmoCommand.Execute(null);
+        Assert.True(vm.AddDmoCommand.CanExecute(null));
+        vm.AddDmoCommand.Execute(null);
+
+        Assert.Equal(3, vm.DmoSlots.Count);
+        Assert.False(vm.AddDmoCommand.CanExecute(null));
+        Assert.Single(vm.TmoSlots);
+    }
+
+    [Fact]
+    public void The_last_field_of_a_kind_stays_even_when_remove_is_forced()
+    {
+        var vm = CommandNodeDialogViewModel.ForPost(NewSession(), MasterDataSet.Empty);
+        var only = Assert.Single(vm.DmoSlots);
+
+        only.RemoveCommand.Execute(null);
+
+        Assert.Same(only, Assert.Single(vm.DmoSlots));
+    }
+
+    [Fact]
+    public void Adding_and_removing_a_field_tells_the_view_what_can_change()
+    {
+        var vm = CommandNodeDialogViewModel.ForPost(NewSession(), MasterDataSet.Empty);
+        var first = vm.TmoSlots[0];
+        var raised = new List<string>();
+        first.PropertyChanged += (_, e) => raised.Add($"slot:{e.PropertyName}");
+        first.RemoveCommand.CanExecuteChanged += (_, _) => raised.Add("slot:remove");
+        vm.AddTmoCommand.CanExecuteChanged += (_, _) => raised.Add("add-tmo");
+        vm.AddDmoCommand.CanExecuteChanged += (_, _) => raised.Add("add-dmo");
+
+        vm.AddTmoCommand.Execute(null);
+
+        Assert.Contains("slot:CanRemove", raised);
+        Assert.Contains("slot:remove", raised);
+        Assert.Contains("add-tmo", raised);
+        Assert.DoesNotContain("add-dmo", raised);
+
+        raised.Clear();
+        vm.TmoSlots[1].RemoveCommand.Execute(null);
+
+        Assert.Contains("slot:CanRemove", raised);
+        Assert.Contains("slot:remove", raised);
+        Assert.Contains("add-tmo", raised);
+        Assert.DoesNotContain("add-dmo", raised);
+
+        raised.Clear();
+        vm.AddDmoCommand.Execute(null);
+        vm.DmoSlots[1].RemoveCommand.Execute(null);
+
+        Assert.Equal(["add-dmo", "add-dmo"], raised);
+    }
+
+    [Fact]
+    public void Each_field_names_its_kind_and_shows_an_example_of_it()
+    {
+        var vm = CommandNodeDialogViewModel.ForPost(NewSession(), MasterDataSet.Empty);
+
+        Assert.Equal(("TMO", "Funkgruppe TMO", "z. B. FW_MUSTER 1000"), (vm.TmoSlots[0].Kind, vm.TmoSlots[0].AccessibleName, vm.TmoSlots[0].Placeholder));
+        Assert.Equal(("DMO", "Funkgruppe DMO", "z. B. 301_F"), (vm.DmoSlots[0].Kind, vm.DmoSlots[0].AccessibleName, vm.DmoSlots[0].Placeholder));
+    }
+
+    [Fact]
+    public void A_hidden_field_is_never_saved()
+    {
+        var session = NewSession();
+        var partner = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Partner, null, "Polizei");
+        partner.Funkgruppe = "TMO POL 1";
+        partner.SaveCommand.Execute(null);
+
+        var abschnitt = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Abschnitt, null, "Nord");
+        abschnitt.TmoSlots[0].Text = "FW_MUSTER 1000";
+        abschnitt.SaveCommand.Execute(null);
+
+        Assert.Null(partner.SaveError);
+        Assert.Null(abschnitt.SaveError);
+        var nodes = session.Incident.CommandNodes;
+        Assert.Equal((null, Funkgruppen.Empty), (nodes[0].Funkgruppe, nodes[0].Funkgruppen));
+        Assert.Equal((null, Funkgruppen.Empty), (nodes[1].Funkgruppe, nodes[1].Funkgruppen));
+    }
+
+    // A file from a foreign build may carry a partner with a single Funkgruppe or an Abschnitt with
+    // lists. Editing either must not write back the shape the domain refuses for its kind.
+    [Fact]
+    public void Editing_a_foreign_files_node_drops_the_funkgruppe_its_kind_does_not_have()
+    {
+        var partner = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Partner, "Polizei", null, null, null, "TMO POL 1", null, null, null);
+        var abschnitt = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, null, new Funkgruppen(["X"], null));
+        var session = Hostile([partner, abschnitt]);
+
+        var editPartner = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, partner.Id);
+        editPartner.Standort = "Kreuzung";
+        editPartner.SaveCommand.Execute(null);
+        var editAbschnitt = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, abschnitt.Id);
+        editAbschnitt.Standort = "Hof";
+        editAbschnitt.SaveCommand.Execute(null);
+
+        Assert.Null(editPartner.SaveError);
+        Assert.Null(editAbschnitt.SaveError);
+        Assert.Null(session.Incident.FindCommandNode(partner.Id)?.Funkgruppe);
+        Assert.Equal(Funkgruppen.Empty, session.Incident.FindCommandNode(abschnitt.Id)?.Funkgruppen);
+    }
 }

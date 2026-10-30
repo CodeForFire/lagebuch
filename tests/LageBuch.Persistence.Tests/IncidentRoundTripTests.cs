@@ -854,6 +854,25 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Theory]
+    [InlineData(200, true)]
+    [InlineData(201, false)]
+    public void A_v37_single_funkgruppe_over_the_cap_is_dropped_not_moved(int length, bool kept)
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        IncidentRepository.Save(_path, Incident.Start(clock, op, "Brand"));
+        var value = new string('x', length);
+
+        ExecRaw(
+            "UPDATE schema_version SET version = 37;" +
+            "ALTER TABLE incident_meta DROP COLUMN el_funkgruppen; ALTER TABLE command_nodes DROP COLUMN funkgruppen;" +
+            $"UPDATE incident_meta SET el_funkgruppe = '{value}';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(kept ? new Funkgruppen([value], null) : Funkgruppen.Empty, loaded.LeadershipPost.Funkgruppen);
+    }
+
+    [Theory]
     [InlineData("not json")]
     [InlineData("[\"A\"]")]
     [InlineData("{\"tmo\":\"A\",\"dmo\":7}")]
