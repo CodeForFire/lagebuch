@@ -938,6 +938,102 @@ public class CommandApplierTests
         Assert.Null(incident.Fuehrungsstufe);
     }
 
+    private static AddChecklistCommand AddChecklistOf(OperatorDto op, Guid id, int items) =>
+        new(op, id, "Lagemeldung", Enumerable.Range(0, items).Select(i => new ChecklistSeedItemDto($"Punkt {i}", i == 0)).ToList());
+
+    [Fact]
+    public void Set_nav_visibility_command_applies_to_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        ApplyOverWire(new SetNavVisibilityCommand(new OperatorDto("Maier", "FFB 2"), "lagekarte", false), incident, clock);
+
+        Assert.False(incident.NavOverrides["lagekarte"]);
+    }
+
+    [Fact]
+    public void Add_checklist_command_applies_to_the_host_and_logs_the_operator()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var id = Guid.NewGuid();
+
+        ApplyOverWire(AddChecklistOf(new OperatorDto("Maier", "FFB 2"), id, 3), incident, clock);
+
+        var list = Assert.Single(incident.Checklists, c => c.Id == id);
+        Assert.Equal("Lagemeldung", list.Title);
+        Assert.Equal(3, list.Items.Count);
+        Assert.True(list.Items[0].IsMandatory);
+        Assert.False(list.Items[1].IsMandatory);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Fact]
+    public void An_oversized_add_checklist_command_is_rejected()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var before = incident.Checklists.Count;
+        var journal = incident.Journal.Count;
+
+        Assert.Throws<ArgumentException>(
+            () => ApplyOverWire(AddChecklistOf(new OperatorDto("Maier", "FFB 2"), Guid.NewGuid(), 201), incident, clock));
+
+        Assert.Equal(before, incident.Checklists.Count);
+        Assert.Equal(journal, incident.Journal.Count);
+    }
+
+    [Theory]
+    [InlineData("\"title\":null,\"items\":[]")]
+    [InlineData("\"title\":\"T\",\"items\":null")]
+    [InlineData("\"title\":\"T\",\"items\":[{\"text\":null,\"isMandatory\":true}]")]
+    public void An_add_checklist_body_with_null_fields_is_rejected_cleanly(string fields)
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var before = incident.Checklists.Count;
+        var journal = incident.Journal.Count;
+        var json = "{\"$type\":\"addChecklist\",\"operator\":{\"name\":\"Maier\"},\"templateId\":\""
+            + Guid.NewGuid() + "\"," + fields + "}";
+
+        var command = SyncJson.Deserialize<SyncCommand>(json);
+
+        Assert.ThrowsAny<ArgumentException>(() => CommandApplier.Apply(command, incident, clock));
+        Assert.Equal(before, incident.Checklists.Count);
+        Assert.Equal(journal, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void An_add_checklist_body_with_a_null_item_is_rejected_with_its_reason()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var before = incident.Checklists.Count;
+        var json = "{\"$type\":\"addChecklist\",\"operator\":{\"name\":\"Maier\"},\"templateId\":\""
+            + Guid.NewGuid() + "\",\"title\":\"T\",\"items\":[{\"text\":\"a\",\"isMandatory\":true},null]}";
+
+        var command = SyncJson.Deserialize<SyncCommand>(json);
+
+        var ex = Assert.Throws<ArgumentException>(() => CommandApplier.Apply(command, incident, clock));
+        Assert.StartsWith("Ein Checklistenpunkt fehlt.", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(before, incident.Checklists.Count);
+    }
+
+    [Fact]
+    public void Adding_a_checklist_already_in_the_einsatz_is_refused()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var id = Guid.NewGuid();
+        var op = new OperatorDto("Maier", "FFB 2");
+        ApplyOverWire(AddChecklistOf(op, id, 2), incident, clock);
+
+        Assert.Throws<InvalidOperationException>(() => ApplyOverWire(AddChecklistOf(op, id, 2), incident, clock));
+
+        Assert.Single(incident.Checklists, c => c.Id == id);
+    }
+
     [Fact]
     public void AssignRole_over_the_wire_places_the_funktion_in_the_abschnitt()
     {

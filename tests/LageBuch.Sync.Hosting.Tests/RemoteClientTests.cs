@@ -137,6 +137,41 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task A_clients_hide_reaches_a_second_clients_nav_overrides()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        var bChange = NextChange(b);
+        a.SetNavVisibility("lagekarte", false);
+        await bChange;
+
+        Assert.False(b.Incident.NavOverrides["lagekarte"]);
+    }
+
+    [Fact]
+    public async Task A_clients_added_checklist_reaches_a_second_client()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        var id = Guid.NewGuid();
+        var bChange = NextChange(b);
+        a.AddChecklist(new ChecklistSeed(id, "Lagemeldung", [("Punkt", true)]));
+        await bChange;
+
+        Assert.Contains(b.Incident.Checklists, c => c.Id == id);
+    }
+
+    [Fact]
     public async Task AddFileAsync_uploads_and_the_other_client_sees_metadata_and_can_pull_bytes()
     {
         var clock = new FixedClock();

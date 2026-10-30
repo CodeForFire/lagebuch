@@ -75,7 +75,10 @@ public sealed record IncidentSnapshot(
     // The Einsatzort on the Lagekarte, as plain numbers: a peer's values are checked on arrival
     // (GeoPoint.TryCreate), never trusted into a constructor that would throw mid-sync.
     double? LocationLatitude = null,
-    double? LocationLongitude = null);
+    double? LocationLongitude = null,
+
+    // The Einsatz's rail overrides, keyed by nav entry; a snapshot without the key reads as none.
+    IReadOnlyDictionary<string, bool>? NavOverrides = null);
 
 public sealed record TimerDto(
     string Key,

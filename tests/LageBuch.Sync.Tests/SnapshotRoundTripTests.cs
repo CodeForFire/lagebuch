@@ -191,6 +191,61 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void Nav_overrides_round_trip_through_the_snapshot()
+    {
+        var clock = new FixedClock();
+        var incident = Incident.Start(clock, new SessionOperator("Müller", "FFB 12/1"));
+        incident.SetNavVisibility("lagekarte", false);
+        incident.SetNavVisibility("etb", true);
+
+        var r = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(2, r.NavOverrides.Count);
+        Assert.False(r.NavOverrides["lagekarte"]);
+        Assert.True(r.NavOverrides["etb"]);
+    }
+
+    [Fact]
+    public void A_snapshot_without_nav_overrides_reads_as_none()
+    {
+        var incident = Incident.Start(new FixedClock(), new SessionOperator("Müller", "FFB 12/1"));
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident) with { NavOverrides = null });
+
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Empty(r.NavOverrides);
+    }
+
+    // A host's snapshot is wire input to the joined client: more keys than the cap, an overlong
+    // key and a blank one must come out bounded, not crash the client mid-Einsatz.
+    [Fact]
+    public void A_hostile_snapshot_with_too_many_or_bad_override_keys_is_bounded()
+    {
+        var incident = Incident.Start(new FixedClock(), new SessionOperator("Müller", "FFB 12/1"));
+        var hostile = new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            [new string('x', Incident.MaxNavKeyLength + 1)] = false,
+            [" "] = false,
+        };
+        for (var i = 0; i < 70; i++)
+        {
+            hostile[$"k{i}"] = false;
+        }
+
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident) with { NavOverrides = hostile });
+
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Equal(Incident.MaxNavOverrides, r.NavOverrides.Count);
+        Assert.All(r.NavOverrides.Keys, key =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(key));
+            Assert.InRange(key.Length, 1, Incident.MaxNavKeyLength);
+        });
+    }
+
+    [Fact]
     public void Round_trip_preserves_abschnitte_placements_stufe_and_the_leadership_post()
     {
         var clock = new FixedClock();

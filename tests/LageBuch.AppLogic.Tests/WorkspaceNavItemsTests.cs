@@ -1,6 +1,9 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -182,5 +185,601 @@ public class WorkspaceNavItemsTests
         checklist.Items[0].IsDone = true;
 
         Assert.False(item.IsComplete);
+    }
+
+    // ===== Per-Einsatz rail edits: hide, show again, add a Checkliste from the Stammdaten. =====
+    private static readonly Guid Vorlage = new("44444444-4444-4444-4444-444444444444");
+
+    private static ChecklistTemplate Template(Guid id, string title) =>
+        new(id, title, new[] { new ChecklistTemplateItem("Punkt", true) });
+
+    private static (IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) Editable(
+        IReadOnlyList<ChecklistSeed>? seeds = null,
+        IReadOnlyList<ChecklistTemplate>? templates = null,
+        IReadOnlyList<NavEntry>? navigation = null)
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            seeds ?? Array.Empty<ChecklistSeed>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            MasterDataSet.Empty with
+            {
+                ChecklistTemplates = templates ?? Array.Empty<ChecklistTemplate>(),
+                Navigation = navigation ?? Array.Empty<NavEntry>(),
+            },
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+        return (vm, session);
+    }
+
+    private static WorkspaceNavItemViewModel Entry(IncidentWorkspaceViewModel vm, string railKey) =>
+        vm.NavItems.Single(i => string.Equals(i.RailKey, railKey, StringComparison.Ordinal));
+
+    private static string KeyOf(Guid listId) => ChecklistList.NavKey(listId);
+
+    [Fact]
+    public void Hiding_an_entry_removes_it_from_the_rail_and_lists_it_as_hidden()
+    {
+        var (vm, _) = Editable();
+
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == NavModules.Files);
+        var hidden = Assert.Single(vm.HiddenNavEntries);
+        Assert.Equal(NavModules.Files, hidden.RailKey);
+        Assert.Null(hidden.Template);
+        Assert.Equal(ModuleLabels.Header(NavModules.Files), hidden.Header);
+        Assert.True(vm.HasAddableNavEntries);
+    }
+
+    [Fact]
+    public void Hiding_the_open_entry_opens_its_neighbour()
+    {
+        var (vm, _) = Editable();
+        var keys = vm.NavItems.Select(i => i.RailKey).ToList();
+        var middle = keys.IndexOf(NavModules.Scba);
+        vm.SelectedNavItem = vm.NavItems[middle];
+
+        vm.HideNavItemCommand.Execute(vm.SelectedNavItem);
+
+        Assert.Equal(keys[middle + 1], vm.SelectedNavItem?.RailKey);
+        Assert.True(vm.SelectedNavItem?.IsSelected);
+
+        // The last entry has no next one, so the previous one opens.
+        var last = vm.NavItems[^1];
+        var beforeLast = vm.NavItems[^2].RailKey;
+        vm.SelectedNavItem = last;
+
+        vm.HideNavItemCommand.Execute(last);
+
+        Assert.Equal(beforeLast, vm.SelectedNavItem?.RailKey);
+    }
+
+    [Fact]
+    public void The_etb_cannot_be_hidden()
+    {
+        var (vm, _) = Editable();
+        var etb = Entry(vm, NavModules.Etb);
+
+        Assert.False(etb.CanHide);
+        Assert.False(vm.HideNavItemCommand.CanExecute(etb));
+        Assert.True(vm.HideNavItemCommand.CanExecute(Entry(vm, NavModules.Files)));
+    }
+
+    [Fact]
+    public void Atemschutz_with_an_active_trupp_cannot_be_hidden_until_the_trupp_is_back()
+    {
+        var (vm, session) = Editable();
+        Assert.True(Entry(vm, NavModules.Scba).CanHide);
+        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        var trupp = session.Incident.ScbaTrupps.Single().Id;
+
+        session.StartScbaTrupp(trupp);
+
+        Assert.False(Entry(vm, NavModules.Scba).CanHide);
+        Assert.False(vm.HideNavItemCommand.CanExecute(Entry(vm, NavModules.Scba)));
+
+        session.WithdrawScbaTrupp(trupp);
+
+        Assert.False(Entry(vm, NavModules.Scba).CanHide);
+
+        session.MarkScbaRemoved(trupp);
+
+        Assert.True(Entry(vm, NavModules.Scba).CanHide);
+        Assert.True(vm.HideNavItemCommand.CanExecute(Entry(vm, NavModules.Scba)));
+    }
+
+    // The safety net: work that arrives while this Einsatz has the module hidden (a peer's hide, an
+    // older file) brings it back until the work is done. A Stammdaten switch-off is left alone;
+    // IncidentWorkspaceViewModelTests pins that.
+    [Fact]
+    public void A_trupp_going_in_brings_back_an_atemschutz_hidden_in_this_einsatz_until_it_is_out()
+    {
+        var (vm, session) = Editable();
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Scba));
+        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        var trupp = session.Incident.ScbaTrupps.Single().Id;
+
+        session.StartScbaTrupp(trupp);
+
+        Assert.False(Entry(vm, NavModules.Scba).CanHide);
+
+        session.WithdrawScbaTrupp(trupp);
+        session.MarkScbaRemoved(trupp);
+
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == NavModules.Scba);
+    }
+
+    // A rail whose entries do not change keeps its items: recreating them re-templates the tab
+    // strip and drops keyboard focus, as it did when the first Aufgabe made Aufgaben live.
+    [Fact]
+    public void A_liveness_change_that_leaves_the_rail_alone_keeps_its_items_and_selection()
+    {
+        var (vm, session) = Editable();
+        var items = vm.NavItems.ToList();
+        var tasks = Entry(vm, NavModules.Tasks);
+        vm.SelectedNavItem = tasks;
+
+        session.AddTask("Drehleiter anfordern", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        Assert.Equal(items.Count, vm.NavItems.Count);
+        for (var i = 0; i < items.Count; i++)
+        {
+            Assert.Same(items[i], vm.NavItems[i]);
+        }
+
+        Assert.Same(tasks, vm.SelectedNavItem);
+        Assert.False(tasks.CanHide);
+        Assert.False(vm.HideNavItemCommand.CanExecute(tasks));
+    }
+
+    [Fact]
+    public void Aufgaben_with_an_open_task_cannot_be_hidden()
+    {
+        var (vm, session) = Editable();
+
+        session.AddTask("Drehleiter anfordern", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        Assert.False(Entry(vm, NavModules.Tasks).CanHide);
+        Assert.False(vm.HideNavItemCommand.CanExecute(Entry(vm, NavModules.Tasks)));
+    }
+
+    [Fact]
+    public void A_read_only_einsatz_offers_no_hiding_and_no_adding()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var editable = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<ChecklistSeed>());
+        editable.SetNavVisibility(NavModules.Files, false);
+        var readOnly = LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch");
+        var vm = new IncidentWorkspaceViewModel(
+            readOnly,
+            clock,
+            new FakeTicker(),
+            MasterDataSet.Empty with { ChecklistTemplates = new[] { Template(Vorlage, "Hochwasser") } },
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        Assert.All(vm.NavItems, i => Assert.False(i.CanHide));
+        Assert.All(vm.NavItems, i => Assert.False(vm.HideNavItemCommand.CanExecute(i)));
+        Assert.Empty(vm.HiddenNavEntries);
+        Assert.Empty(vm.AddableChecklists);
+        Assert.False(vm.HasAddableNavEntries);
+        Assert.False(vm.AddNavEntryCommand.CanExecute(new AddableNavEntryViewModel("DATEIEN", NavModules.Files, null)));
+    }
+
+    [Fact]
+    public void A_reconnecting_client_offers_no_rail_edits_until_it_is_back()
+    {
+        var (vm, _) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        var files = Entry(vm, NavModules.Files);
+        var choice = Assert.Single(vm.AddableChecklists);
+        var raised = 0;
+        vm.AddNavEntryCommand.CanExecuteChanged += (_, _) => raised++;
+
+        vm.IsConnected = false;
+
+        Assert.False(files.CanHide);
+        Assert.False(vm.HideNavItemCommand.CanExecute(files));
+        Assert.False(vm.AddNavEntryCommand.CanExecute(choice));
+        Assert.True(raised > 0);
+
+        vm.IsConnected = true;
+
+        Assert.True(files.CanHide);
+        Assert.True(vm.AddNavEntryCommand.CanExecute(choice));
+    }
+
+    [Fact]
+    public void Closing_the_einsatz_clears_a_rail_refusal()
+    {
+        var (vm, _) = Editable();
+        vm.NavEditError = "Zu viele ausgeblendete Einträge.";
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm?.ConfirmCommand.Execute(null);
+
+        Assert.True(vm.IsReadOnly);
+        Assert.Null(vm.NavEditError);
+    }
+
+    [Fact]
+    public void Adding_a_hidden_entry_shows_it_again()
+    {
+        var (vm, session) = Editable();
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.HiddenNavEntries));
+
+        Assert.Contains(vm.NavItems, i => i.RailKey == NavModules.Files);
+        Assert.Empty(vm.HiddenNavEntries);
+        Assert.False(vm.HasAddableNavEntries);
+        Assert.True(session.Incident.NavOverrides[NavModules.Files]);
+    }
+
+    [Fact]
+    public void Templates_already_in_the_einsatz_are_not_offered()
+    {
+        var (vm, _) = Editable(
+            new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) },
+            new[] { Template(Nachbereitung, "Nachbereitung"), Template(Vorlage, "Hochwasser") });
+
+        var offered = Assert.Single(vm.AddableChecklists);
+        Assert.Equal(Vorlage, offered.Template?.Id);
+        Assert.Null(offered.RailKey);
+        Assert.Equal("HOCHWASSER", offered.Header);
+    }
+
+    [Fact]
+    public void Adding_a_template_puts_a_new_checkliste_on_the_rail_and_opens_it()
+    {
+        var (vm, session) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.AddableChecklists));
+
+        var added = Entry(vm, KeyOf(Vorlage));
+        Assert.Equal("HOCHWASSER", added.Header);
+        Assert.Same(added, vm.SelectedNavItem);
+        Assert.Equal("Punkt", Assert.Single(Assert.IsType<ChecklistViewModel>(added.Content).Items).Text);
+        Assert.Empty(vm.AddableChecklists);
+        Assert.Contains(session.Incident.Checklists, l => l.Id == Vorlage);
+    }
+
+    [Fact]
+    public void Rebuilding_the_rail_keeps_the_module_view_models()
+    {
+        var (vm, _) = Editable(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+        var scba = vm.Scba;
+        var tasks = vm.Tasks;
+        var checklist = Entry(vm, KeyOf(Nachbereitung)).Content;
+
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+
+        Assert.Same(scba, vm.Scba);
+        Assert.Same(tasks, vm.Tasks);
+        Assert.Same(scba, Entry(vm, NavModules.Scba).Content);
+        Assert.Same(checklist, Entry(vm, KeyOf(Nachbereitung)).Content);
+    }
+
+    // A Checkliste that leaves the rail takes its session subscription with it (#167/#279).
+    [Fact]
+    public void A_hidden_checkliste_no_longer_reacts_to_changes()
+    {
+        var (vm, session) = Editable(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+        var checklist = (ChecklistViewModel)Entry(vm, KeyOf(Nachbereitung)).Content;
+
+        vm.HideNavItemCommand.Execute(Entry(vm, KeyOf(Nachbereitung)));
+        session.ToggleChecklistItem(session.Incident.Checklists.Single(l => l.Id == Nachbereitung).Items[0].Id);
+
+        Assert.False(checklist.AllMandatoryDone);
+    }
+
+    [Fact]
+    public void A_remote_hide_of_the_open_entry_opens_its_neighbour()
+    {
+        var (vm, session) = Editable();
+        var keys = vm.NavItems.Select(i => i.RailKey).ToList();
+        var files = keys.IndexOf(NavModules.Files);
+        vm.SelectedNavItem = vm.NavItems[files];
+
+        // A joined device's command, applied on the host the way CommandApplier does it.
+        session.Incident.SetNavVisibility(NavModules.Files, false);
+        session.SaveExternalChange();
+
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == NavModules.Files);
+        Assert.Equal(keys[files + 1], vm.SelectedNavItem?.RailKey);
+    }
+
+    [Fact]
+    public void A_refused_add_surfaces_as_a_status_not_a_crash()
+    {
+        var oversized = new ChecklistTemplate(
+            Vorlage,
+            "Hochwasser",
+            Enumerable.Range(0, ChecklistList.MaxItemCount + 1).Select(i => new ChecklistTemplateItem($"Punkt {i}", false)).ToList());
+        var (vm, session) = Editable(templates: new[] { oversized });
+        var open = vm.SelectedNavItem;
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.AddableChecklists));
+
+        Assert.Equal("Checkliste überschreitet die zulässige Größe.", vm.NavEditError);
+        Assert.Same(open, vm.SelectedNavItem);
+        Assert.DoesNotContain(session.Incident.Checklists, l => l.Id == Vorlage);
+
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+
+        Assert.Null(vm.NavEditError);
+    }
+
+    // The „+“ was offered before another device added the same Vorlage, or the list is hidden here:
+    // the Lagebuchführer wants that Checkliste, and it is already in the Einsatz, so it opens.
+    [Fact]
+    public void Adding_a_template_already_in_the_einsatz_opens_that_checkliste()
+    {
+        var (vm, session) = Editable(
+            new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) },
+            new[] { Template(Nachbereitung, "Nachbereitung") });
+        vm.HideNavItemCommand.Execute(Entry(vm, KeyOf(Nachbereitung)));
+        var stale = new AddableNavEntryViewModel("NACHBEREITUNG", null, Template(Nachbereitung, "Nachbereitung"));
+
+        vm.AddNavEntryCommand.Execute(stale);
+
+        Assert.Null(vm.NavEditError);
+        Assert.Same(Entry(vm, KeyOf(Nachbereitung)), vm.SelectedNavItem);
+        Assert.True(session.Incident.NavOverrides[KeyOf(Nachbereitung)]);
+        Assert.Single(session.Incident.Checklists, l => l.Id == Nachbereitung);
+
+        // Already on the rail: it only opens.
+        vm.SelectedNavItem = Entry(vm, NavModules.Etb);
+        vm.NavEditError = "Ein früherer Fehler.";
+        var journal = session.Incident.Journal.Count;
+
+        vm.AddNavEntryCommand.Execute(stale);
+
+        Assert.Null(vm.NavEditError);
+        Assert.Same(Entry(vm, KeyOf(Nachbereitung)), vm.SelectedNavItem);
+        Assert.Equal(journal, session.Incident.Journal.Count);
+    }
+
+    // Recreating the items re-templates the open module and drops keyboard focus, which a peer's
+    // rail edit must not do to whoever is typing here.
+    [Fact]
+    public void A_rail_change_keeps_the_surviving_items_and_the_selection()
+    {
+        var (vm, session) = Editable(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+        var tasks = Entry(vm, NavModules.Tasks);
+        vm.SelectedNavItem = tasks;
+        var survivors = vm.NavItems.Where(i => i.RailKey != NavModules.Files).ToList();
+
+        session.Incident.SetNavVisibility(NavModules.Files, false);
+        session.SaveExternalChange();
+
+        Assert.Equal(survivors.Count, vm.NavItems.Count);
+        for (var i = 0; i < survivors.Count; i++)
+        {
+            Assert.Same(survivors[i], vm.NavItems[i]);
+            Assert.Equal(ShortcutRegistry.HintFor(i), vm.NavItems[i].ShortcutHint);
+        }
+
+        Assert.Same(tasks, vm.SelectedNavItem);
+        Assert.True(tasks.IsSelected);
+
+        // Back again: the survivors stay, and the returning entry is a new item in its old slot.
+        session.Incident.SetNavVisibility(NavModules.Files, true);
+        session.SaveExternalChange();
+
+        Assert.All(survivors, s => Assert.Contains(s, vm.NavItems));
+        Assert.Equal(vm.PrimaryNavItems.Concat(vm.OverflowNavItems), vm.NavItems);
+        Assert.Same(tasks, vm.SelectedNavItem);
+        for (var i = 0; i < vm.NavItems.Count; i++)
+        {
+            Assert.Equal(ShortcutRegistry.HintFor(i), vm.NavItems[i].ShortcutHint);
+        }
+    }
+
+    [Fact]
+    public void Hiding_an_entry_above_the_open_one_keeps_the_open_one_open()
+    {
+        var (vm, _) = Editable();
+        var contacts = Entry(vm, NavModules.Contacts);
+        vm.SelectedNavItem = contacts;
+
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Tasks));
+
+        Assert.Same(contacts, vm.SelectedNavItem);
+        Assert.True(contacts.IsSelected);
+    }
+
+    [Fact]
+    public void A_hidden_checkliste_comes_back_through_ausgeblendet_and_still_works()
+    {
+        var (vm, session) = Editable(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+        var old = Entry(vm, KeyOf(Nachbereitung));
+        vm.HideNavItemCommand.Execute(old);
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.HiddenNavEntries, e => e.RailKey == KeyOf(Nachbereitung)));
+        var back = Entry(vm, KeyOf(Nachbereitung));
+        session.ToggleChecklistItem(session.Incident.Checklists.Single(l => l.Id == Nachbereitung).Items[0].Id);
+
+        Assert.True(back.IsComplete);
+
+        // The item that left the rail let go of its checklist.
+        Assert.NotSame(old, back);
+        Assert.False(old.IsComplete);
+    }
+
+    [Fact]
+    public void A_checkliste_the_layout_unticked_is_offered_under_ausgeblendet()
+    {
+        var (vm, _) = Editable(
+            new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) },
+            navigation: new[] { new NavEntry(NavModules.Etb, null, true), new NavEntry(NavModules.Checklist, Nachbereitung, false) });
+
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == KeyOf(Nachbereitung));
+        var hidden = Assert.Single(vm.HiddenNavEntries, e => e.RailKey == KeyOf(Nachbereitung));
+        Assert.Equal("NACHBEREITUNG", hidden.Header);
+        Assert.Null(hidden.Template);
+    }
+
+    [Fact]
+    public void A_narrow_workspace_keeps_its_modules_narrow_after_weiter_bearbeiten()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<ChecklistSeed>());
+        var vm = new IncidentWorkspaceViewModel(
+            LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch"),
+            clock,
+            new FakeTicker(),
+            MasterDataSet.Empty,
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+        vm.IsNarrow = true;
+
+        vm.ContinueEditingCommand.Execute(null);
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmPendingPrompt();
+
+        Assert.False(vm.IsReadOnly);
+        Assert.True(vm.EtbTabs.IsNarrow);
+    }
+
+    [Fact]
+    public void A_list_added_and_hidden_in_one_snapshot_moves_from_addable_to_hidden()
+    {
+        var (vm, session) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        Assert.Single(vm.AddableChecklists);
+
+        session.Incident.AddChecklist(new FixedClock(T0), new SessionOperator("Maier"), Seed(Vorlage, "Hochwasser", ("Punkt", true)));
+        session.Incident.SetNavVisibility(KeyOf(Vorlage), false);
+        session.SaveExternalChange();
+
+        Assert.Empty(vm.AddableChecklists);
+        Assert.Contains(vm.HiddenNavEntries, e => e.RailKey == KeyOf(Vorlage));
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == KeyOf(Vorlage));
+    }
+
+    [Fact]
+    public void An_unrelated_change_does_not_reset_the_plus_choices()
+    {
+        var (vm, session) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+        var hiddenChanges = 0;
+        var addableChanges = 0;
+        vm.HiddenNavEntries.CollectionChanged += (_, _) => hiddenChanges++;
+        vm.AddableChecklists.CollectionChanged += (_, _) => addableChanges++;
+
+        session.AddJournalEntry(EtbDirection.Incoming, "Lage unverändert");
+
+        Assert.Equal(0, hiddenChanges);
+        Assert.Equal(0, addableChanges);
+        Assert.Single(vm.HiddenNavEntries);
+    }
+
+    [Fact]
+    public void The_hide_command_refuses_no_entry()
+    {
+        var (vm, _) = Editable();
+
+        Assert.False(vm.HideNavItemCommand.CanExecute(null));
+    }
+
+    // A joined client sends the command and returns; the list lands with the host's broadcast.
+    [Fact]
+    public void Adding_a_template_on_a_joined_client_waits_for_the_broadcast()
+    {
+        var clock = new FixedClock(T0);
+        var local = LocalIncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<ChecklistSeed>());
+        var remote = new SnapshotRoundTrippingSession(local) { DefersRailEdits = true };
+        var vm = new IncidentWorkspaceViewModel(
+            remote,
+            clock,
+            new FakeTicker(),
+            MasterDataSet.Empty with { ChecklistTemplates = new[] { Template(Vorlage, "Hochwasser") } },
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+        var open = vm.SelectedNavItem;
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.AddableChecklists));
+
+        Assert.Null(vm.NavEditError);
+        Assert.Same(open, vm.SelectedNavItem);
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == KeyOf(Vorlage));
+
+        remote.DeliverRailEdits();
+
+        Assert.Contains(vm.NavItems, i => i.RailKey == KeyOf(Vorlage));
+        Assert.Empty(vm.AddableChecklists);
+    }
+
+    [Fact]
+    public void A_refused_hide_at_the_cap_shows_the_german_sentence_alone()
+    {
+        var (vm, session) = Editable();
+        for (var i = 0; i < Incident.MaxNavOverrides; i++)
+        {
+            session.SetNavVisibility($"x{i}", true);
+        }
+
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+
+        Assert.Equal("Zu viele ausgeblendete Einträge.", vm.NavEditError);
+        Assert.Contains(vm.NavItems, i => i.RailKey == NavModules.Files);
+    }
+
+    [Fact]
+    public void Adding_a_checkliste_updates_the_save_time_and_the_etb()
+    {
+        var (vm, _) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        vm.LastSavedAt = null;
+        vm.Etb.HideSystemEntries = false;
+        var before = vm.Etb.Entries.Count;
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.AddableChecklists));
+
+        Assert.Equal(T0, vm.LastSavedAt);
+        Assert.Equal(before + 1, vm.Etb.Entries.Count);
+        Assert.Contains(vm.Etb.Entries, e => e.Text == "Checkliste „Hochwasser“ hinzugefügt");
+    }
+
+    [Fact]
+    public void The_hide_command_hears_when_a_trupp_starts()
+    {
+        var (vm, session) = Editable();
+        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        var raised = 0;
+        vm.HideNavItemCommand.CanExecuteChanged += (_, _) => raised++;
+
+        session.StartScbaTrupp(session.Incident.ScbaTrupps.Single().Id);
+
+        Assert.True(raised > 0);
+    }
+
+    [Fact]
+    public void Shortcut_hints_follow_the_rail_after_a_hide()
+    {
+        var (vm, session) = Editable();
+        var hidden = vm.NavItems[1].RailKey;
+
+        vm.HideNavItemCommand.Execute(vm.NavItems[1]);
+
+        Assert.False(session.Incident.NavOverrides[hidden]);
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == hidden);
+        for (var i = 0; i < vm.NavItems.Count; i++)
+        {
+            Assert.Equal(ShortcutRegistry.HintFor(i), vm.NavItems[i].ShortcutHint);
+        }
     }
 }

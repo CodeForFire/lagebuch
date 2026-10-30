@@ -382,4 +382,129 @@ public class NavigationLayoutTests
         Assert.Same(aufbau, spec.List);
         Assert.Equal(NavModules.Checklist, spec.ModuleKey);
     }
+
+    private static Dictionary<string, bool> Overrides(params (string Key, bool Visible)[] pairs) =>
+        pairs.ToDictionary(p => p.Key, p => p.Visible, StringComparer.Ordinal);
+
+    [Fact]
+    public void A_hidden_override_removes_a_module_the_layout_shows()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            Array.Empty<NavEntry>(),
+            Array.Empty<ChecklistList>(),
+            Overrides((NavModules.Scba, false))));
+
+        Assert.DoesNotContain(NavModules.Scba, keys);
+    }
+
+    [Fact]
+    public void A_visible_override_shows_a_module_the_layout_switched_off_in_its_slot()
+    {
+        var plain = Keys(NavigationLayout.Resolve(Array.Empty<NavEntry>(), Array.Empty<ChecklistList>()));
+        var layout = NavLayout.Default
+            .Select(e => !e.IsChecklist && e.ModuleKey == NavModules.Scba ? Module(NavModules.Scba, false) : e)
+            .ToArray();
+
+        var keys = Keys(NavigationLayout.Resolve(
+            layout, Array.Empty<ChecklistList>(), Overrides((NavModules.Scba, true))));
+
+        Assert.Equal(plain, keys);
+    }
+
+    [Fact]
+    public void A_hidden_override_removes_a_module_the_stored_layout_predates()
+    {
+        var layout = new[] { Module(NavModules.Etb), Module(NavModules.Files) };
+        Assert.Contains(NavModules.Contacts, Keys(NavigationLayout.Resolve(layout, Array.Empty<ChecklistList>())));
+
+        var keys = Keys(NavigationLayout.Resolve(
+            layout, Array.Empty<ChecklistList>(), Overrides((NavModules.Contacts, false))));
+
+        Assert.DoesNotContain(NavModules.Contacts, keys);
+        Assert.Contains(NavModules.Files, keys);
+    }
+
+    [Fact]
+    public void A_visible_override_shows_a_checkliste_the_layout_unticked()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[] { Module(NavModules.Etb), Checklist(Aufbau, visible: false) },
+            new[] { List(Aufbau, "Aufbau") },
+            Overrides((ChecklistList.NavKey(Aufbau), true))));
+
+        Assert.Contains("checklist:Aufbau", keys);
+    }
+
+    [Fact]
+    public void A_hidden_override_removes_a_checkliste_the_layout_never_mentioned()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            new[] { Module(NavModules.Etb) },
+            new[] { List(Nachbereitung, "Nachbereitung") },
+            Overrides((ChecklistList.NavKey(Nachbereitung), false))));
+
+        Assert.DoesNotContain("checklist:Nachbereitung", keys);
+    }
+
+    [Fact]
+    public void The_etb_ignores_a_hidden_override()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            Array.Empty<NavEntry>(),
+            Array.Empty<ChecklistList>(),
+            Overrides((NavModules.Etb, false))));
+
+        Assert.Contains(NavModules.Etb, keys);
+    }
+
+    [Fact]
+    public void A_live_module_shows_despite_a_hidden_override()
+    {
+        var keys = Keys(NavigationLayout.Resolve(
+            Array.Empty<NavEntry>(),
+            Array.Empty<ChecklistList>(),
+            Overrides((NavModules.Scba, false)),
+            new HashSet<string>(StringComparer.Ordinal) { NavModules.Scba }));
+
+        Assert.Contains(NavModules.Scba, keys);
+    }
+
+    [Fact]
+    public void Unknown_override_keys_are_ignored()
+    {
+        var lists = new[] { List(Aufbau, "Aufbau") };
+        var expected = Keys(NavigationLayout.Resolve(Array.Empty<NavEntry>(), lists));
+
+        var keys = Keys(NavigationLayout.Resolve(
+            Array.Empty<NavEntry>(),
+            lists,
+            Overrides(("nonsense", false), (ChecklistList.NavKey(Guid.NewGuid()), false))));
+
+        Assert.Equal(expected, keys);
+    }
+
+    [Fact]
+    public void A_hidden_override_applies_to_a_closed_einsatz()
+    {
+        var clock = new FixedClock(DateTimeOffset.UnixEpoch);
+        var op = new SessionOperator("Host");
+        var incident = Incident.Start(clock, op, "Brand");
+        incident.SetNavVisibility(NavModules.Scba, false);
+        incident.Close(clock, op);
+
+        var keys = Keys(NavigationLayout.Resolve(
+            Array.Empty<NavEntry>(), incident.Checklists, incident.NavOverrides));
+
+        Assert.Equal(IncidentState.Closed, incident.State);
+        Assert.DoesNotContain(NavModules.Scba, keys);
+    }
+
+    [Fact]
+    public void KeyOf_is_the_module_key_or_the_checkliste_id()
+    {
+        Assert.Equal(NavModules.Scba, NavigationLayout.KeyOf(new NavItemSpec(NavModules.Scba, null)));
+        Assert.Equal(
+            ChecklistList.NavKey(Aufbau),
+            NavigationLayout.KeyOf(new NavItemSpec(NavModules.Checklist, List(Aufbau, "Aufbau"))));
+    }
 }

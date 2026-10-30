@@ -12,7 +12,8 @@ namespace LageBuch.AppLogic.Services;
 /// this file, and a file may hold a list saved long before the layout knew about it — and this is
 /// where that is reconciled. A pure function: no state, no IO, so the rules can be tested on their
 /// own, which matters because every one of them is a way an operator could lose sight of a list
-/// they filled in.
+/// they filled in. An Einsatz can also override the layout per entry (<see cref="Incident.NavOverrides"/>);
+/// the override wins over the layout's own flag, but never over the ETB or a module with live work.
 /// </remarks>
 public static class NavigationLayout
 {
@@ -21,12 +22,27 @@ public static class NavigationLayout
     /// </summary>
     /// <param name="layout">The Stammdaten layout. Empty means <see cref="NavLayout.Default"/>.</param>
     /// <param name="incidentLists">This Einsatz's Checklisten, in its own order.</param>
+    /// <param name="overrides">
+    /// This Einsatz's visibility overrides, keyed as <see cref="KeyOf"/> does; null or empty means
+    /// none. Keys that match no entry are ignored.
+    /// </param>
+    /// <param name="liveModules">
+    /// Modules with work in progress (<see cref="NavLiveness"/>); they are shown whatever the
+    /// layout and the overrides say. Null means none.
+    /// </param>
     public static IReadOnlyList<NavItemSpec> Resolve(
         IReadOnlyList<NavEntry> layout,
-        IReadOnlyList<ChecklistList> incidentLists)
+        IReadOnlyList<ChecklistList> incidentLists,
+        IReadOnlyDictionary<string, bool>? overrides = null,
+        IReadOnlySet<string>? liveModules = null)
     {
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(incidentLists);
+
+        bool Visible(string key, bool layoutVisible) =>
+            IsEtb(key)
+            || (liveModules?.Contains(key) ?? false)
+            || (overrides is not null && overrides.TryGetValue(key, out var overridden) ? overridden : layoutVisible);
 
         var effective = layout.Count == 0 ? NavLayout.Default : FoldLegacyFuehrung(layout);
 
@@ -49,7 +65,7 @@ public static class NavigationLayout
                 }
 
                 var list = incidentLists.FirstOrDefault(l => l.Id == entry.ChecklistId!.Value);
-                if (list is not null && entry.IsVisible)
+                if (list is not null && Visible(ChecklistList.NavKey(list.Id), entry.IsVisible))
                 {
                     slots.Add(new Slot(NavModules.Checklist, new NavItemSpec(NavModules.Checklist, list)));
                 }
@@ -63,12 +79,12 @@ public static class NavigationLayout
                 continue;
             }
 
-            // The ETB is the legal record and where every system entry lands, so its flag is
-            // ignored rather than trusted -- the editor disables the toggle, but a hand-edited
-            // JSON can still say false.
+            // The ETB is the legal record and where every system entry lands, so its flag (and any
+            // override) is ignored rather than trusted -- the editor disables the toggle, but a
+            // hand-edited JSON can still say false.
             slots.Add(new Slot(
                 entry.ModuleKey,
-                entry.IsVisible || IsEtb(entry.ModuleKey) ? new NavItemSpec(entry.ModuleKey, null) : null));
+                Visible(entry.ModuleKey, entry.IsVisible) ? new NavItemSpec(entry.ModuleKey, null) : null));
         }
 
         // Anything this Einsatz holds that the layout never mentioned goes at the end, in the
@@ -76,14 +92,20 @@ public static class NavigationLayout
         // including one created after it was closed, or deleted from Stammdaten since.
         foreach (var list in incidentLists.Where(l => !seenLists.Contains(l.Id)))
         {
-            slots.Add(new Slot(NavModules.Checklist, new NavItemSpec(NavModules.Checklist, list)));
+            if (Visible(ChecklistList.NavKey(list.Id), true))
+            {
+                slots.Add(new Slot(NavModules.Checklist, new NavItemSpec(NavModules.Checklist, list)));
+            }
         }
 
         // Same idea for a module this build has but the stored layout predates: without it, a
         // module added in a later release would stay invisible to everyone who ever saved a
         // layout. It lands after its predecessor in the default rail, not at the end.
         InsertMissingModules(
-            slots, s => s.Key, k => new Slot(k, new NavItemSpec(k, null)), seenModules);
+            slots,
+            s => s.Key,
+            k => new Slot(k, Visible(k, true) ? new NavItemSpec(k, null) : null),
+            seenModules);
 
         var result = slots.Select(s => s.Spec).OfType<NavItemSpec>().ToList();
 
@@ -96,6 +118,16 @@ public static class NavigationLayout
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// The key an Einsatz's overrides use for a rail entry: the module key, or the Checkliste's id
+    /// in the invariant "D" form.
+    /// </summary>
+    public static string KeyOf(NavItemSpec spec)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        return spec.List is { } list ? ChecklistList.NavKey(list.Id) : spec.ModuleKey;
     }
 
     /// <summary>

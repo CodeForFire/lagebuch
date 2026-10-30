@@ -159,15 +159,20 @@ public static class SyncProtocol
     /// 27: a client may send <c>editRoleAssignment</c>, which corrects a Funktion's person without a
     /// handover. A host at 26 does not know it, so the floor rises to 27.
     /// </para>
+    /// <para>
+    /// 28: per-Einsatz rail. A client may send <c>setNavVisibility</c> and <c>addChecklist</c>,
+    /// which a host at 27 does not know, so the floor rises to 28. The snapshot carries
+    /// <c>navOverrides</c>.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 27;
+    public const int ProtocolVersion = 28;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 27;
+    public const int MinimumProtocolVersion = 28;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

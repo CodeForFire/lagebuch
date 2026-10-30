@@ -6,6 +6,47 @@
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.IncidentWorkspaceView"
              x:DataType="vm:IncidentWorkspaceViewModel">
+  <UserControl.Resources>
+    <!-- What the rail's „+“ offers, shared by the desktop flyout and the phone's MEHR sheet: the
+         entries this Einsatz has hidden, and the Checklisten created in the Stammdaten after it
+         began. Ghost buttons in a Flyout, like MEHR. A choice closes the flyout it was made in; a
+         refusal is shown in the header's NavEditErrorBanner, which a closed flyout cannot hide. -->
+    <DataTemplate x:Key="RailAddChoices" x:DataType="vm:IncidentWorkspaceViewModel">
+      <StackPanel Spacing="4" MinWidth="220">
+        <TextBlock Text="AUSGEBLENDET" Classes="overline" IsVisible="{Binding HiddenNavEntries.Count}" />
+        <ItemsControl x:Name="HiddenNavList" ItemsSource="{Binding HiddenNavEntries}"
+                      IsVisible="{Binding HiddenNavEntries.Count}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AddableNavEntryViewModel">
+              <Button Classes="ghost" HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Left" Margin="0,1"
+                      Click="OnRailChoiceClick"
+                      Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).AddNavEntryCommand}"
+                      CommandParameter="{Binding}">
+                <TextBlock Text="{Binding Header}" />
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="CHECKLISTE HINZUFÜGEN" Classes="overline" Margin="0,4,0,0"
+                   IsVisible="{Binding AddableChecklists.Count}" />
+        <ItemsControl x:Name="AddableChecklistList" ItemsSource="{Binding AddableChecklists}"
+                      IsVisible="{Binding AddableChecklists.Count}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AddableNavEntryViewModel">
+              <Button Classes="ghost" HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Left" Margin="0,1"
+                      Click="OnRailChoiceClick"
+                      Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).AddNavEntryCommand}"
+                      CommandParameter="{Binding}">
+                <TextBlock Text="{Binding Header}" />
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.Resources>
   <!-- The phone layout of the workspace and of every module view hangs off the root's "narrow"
        class, bound to IsNarrow, which the code-behind sets from this view's width. Not a
        ContainerQuery: a query attaches to every element in its scope, not just to what its styles
@@ -41,6 +82,10 @@
            render test's WorkspaceRenderHelper.SelectTab working. PhoneNavBar drives it now.
            Only the rail's own TabItems: a module's own tabs (module-tabs) stay. -->
       <Style Selector="Panel#WorkspaceRoot.narrow TabControl#ModuleTabs > TabItem">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <!-- The rail's „+“ goes with its tabs; MEHR's MODUL HINZUFÜGEN takes its place. -->
+      <Style Selector="Panel#WorkspaceRoot.narrow TabControl#ModuleTabs /template/ Panel#RailAddHost">
         <Setter Property="IsVisible" Value="False" />
       </Style>
       <Style Selector="Panel#WorkspaceRoot.narrow Border#PhoneNavBar">
@@ -391,6 +436,33 @@
             </Grid>
           </Border>
 
+          <!-- A rail edit this device refused (Ausblenden, the „+“): the same row as a rejected
+               change, because a hide is made from a context menu that is gone by the time it fails,
+               and the „+“ may be hidden. Stays until acknowledged or the next edit succeeds. -->
+          <Border x:Name="NavEditErrorBanner" Classes="meldung due"
+                  IsVisible="{Binding NavEditError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon" Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                  <TextBlock Classes="meldung-label" Text="ABGELEHNT" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" x:Name="NavEditErrorText" Classes="meldung-text"
+                         Margin="14,10" TextWrapping="Wrap" TextTrimming="None"
+                         Text="{Binding NavEditError}" />
+              <StackPanel Grid.Column="2" Classes="meldung-actions">
+                <Button x:Name="DismissNavEditErrorButton" Content="VERSTANDEN"
+                        Command="{Binding DismissNavEditErrorCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
           <!-- Rückgängig (#543): ticking an Aufgabe off takes one stray Space, so the change is
                offered back for a few seconds, also on Ctrl+Z. A quiet row: nothing is wrong, it
                only says what just happened. -->
@@ -662,6 +734,14 @@
                         ToolTip.Tip="{Binding Header}"
                         Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).SelectNavItemCommand}"
                         CommandParameter="{Binding}">
+                  <!-- A long-press raises ContextRequested on touch: the rail's „Ausblenden“. -->
+                  <Button.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem x:Name="RailHideItem" Header="Ausblenden"
+                                Command="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).HideNavItemCommand}"
+                                CommandParameter="{Binding}" />
+                    </ContextMenu>
+                  </Button.ContextMenu>
                   <Panel>
                     <Border Classes="navcell-rule" />
                     <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -718,6 +798,13 @@
                                 AutomationProperties.Name="{Binding AccessibleName}"
                                 Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).SelectNavItemCommand}"
                                 CommandParameter="{Binding}">
+                          <Button.ContextMenu>
+                            <ContextMenu>
+                              <MenuItem x:Name="RailHideItem" Header="Ausblenden"
+                                        Command="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).HideNavItemCommand}"
+                                        CommandParameter="{Binding}" />
+                            </ContextMenu>
+                          </Button.ContextMenu>
                           <StackPanel Orientation="Horizontal" Spacing="10">
                             <PathIcon Width="15" Height="15" VerticalAlignment="Center"
                                       Data="{Binding ModuleKey, Converter={x:Static conv:ModuleIconConverter.Instance}}" />
@@ -731,6 +818,16 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
+                  <!-- The phone's „+“: the same choices the rail's flyout offers, under the same gate. -->
+                  <Button x:Name="MoreAddEntry" Classes="ghost" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left" Margin="0,1" Content="MODUL HINZUFÜGEN"
+                          IsVisible="{Binding HasAddableNavEntries}">
+                    <Button.Flyout>
+                      <Flyout Placement="TopEdgeAlignedRight" Opened="OnRailAddFlyoutOpened">
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource RailAddChoices}" />
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
                   <Border Height="1" Background="{StaticResource HairlineBrush}" Margin="0,4" />
                   <!-- The footer's actions, under the same gates they carry there. -->
                   <Button x:Name="MoreCloseButton" Classes="ghost" HorizontalAlignment="Stretch"
@@ -869,8 +966,72 @@
           <TabControl.Styles>
             <Style Selector="TabControl#ModuleTabs > TabItem" x:DataType="vm:WorkspaceNavItemViewModel">
               <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+              <!-- A right-click anywhere on the tab hides it for this Einsatz. On the TabItem, not
+                   in the header template, so the padding around the label answers too. A Template,
+                   so every tab gets its own menu instead of sharing one. Disabled where CanHide is
+                   false: the ETB, and a module that still holds live work. -->
+              <Setter Property="ContextMenu">
+                <Template>
+                  <ContextMenu>
+                    <MenuItem x:Name="RailHideItem" Header="Ausblenden"
+                              Command="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).HideNavItemCommand}"
+                              CommandParameter="{Binding}" />
+                  </ContextMenu>
+                </Template>
+              </Setter>
             </Style>
           </TabControl.Styles>
+          <!-- The stock rail template (Theme/Styles.axaml) with one addition: the „+“ sits under
+               the last tab, inside the scrolling strip, so it moves with the rail. Hidden on a
+               phone with the TabItems; MEHR offers the same choices there. -->
+          <TabControl.Template>
+            <ControlTemplate>
+              <Border BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}"
+                      CornerRadius="{TemplateBinding CornerRadius}"
+                      Background="{TemplateBinding Background}"
+                      HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
+                      VerticalAlignment="{TemplateBinding VerticalAlignment}">
+                <DockPanel>
+                  <ScrollViewer DockPanel.Dock="{TemplateBinding TabStripPlacement}"
+                                HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                      <ItemsPresenter Name="PART_ItemsPresenter"
+                                      ItemsPanel="{TemplateBinding ItemsPanel}" />
+                      <Panel x:Name="RailAddHost">
+                        <Button x:Name="RailAddButton" x:DataType="vm:IncidentWorkspaceViewModel"
+                                Classes="ghost" Width="172" MinHeight="50"
+                                HorizontalContentAlignment="Left" Padding="23,0,20,0"
+                                Content="+" FontSize="18"
+                                AutomationProperties.Name="Modul hinzufügen"
+                                ToolTip.Tip="Modul hinzufügen"
+                                IsVisible="{Binding HasAddableNavEntries}">
+                          <Button.Flyout>
+                            <Flyout Placement="RightEdgeAlignedTop" Opened="OnRailAddFlyoutOpened">
+                              <ContentControl x:Name="RailAddFlyout" Content="{Binding}"
+                                              ContentTemplate="{StaticResource RailAddChoices}" />
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
+                      </Panel>
+                    </StackPanel>
+                  </ScrollViewer>
+                  <Panel ClipToBounds="True">
+                    <ContentPresenter Name="PART_SelectedContentHost2"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      IsVisible="False" />
+                    <ContentPresenter Name="PART_SelectedContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                  </Panel>
+                </DockPanel>
+              </Border>
+            </ControlTemplate>
+          </TabControl.Template>
           <TabControl.ItemTemplate>
             <!-- The module's shortcut sits at the tab's right edge (#544); a Checkliste has none.
                  It reaches 12px into the tab's right padding: ATEMSCHUTZ and CO-MESSUNG leave the

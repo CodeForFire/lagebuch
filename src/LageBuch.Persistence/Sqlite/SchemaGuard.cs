@@ -114,6 +114,7 @@ internal static class SchemaGuard
         new("incident_meta", "el_funkgruppe", "TEXT", false, null),
         new("incident_meta", "location_lat", "REAL", false, null),
         new("incident_meta", "location_lon", "REAL", false, null),
+        new("incident_meta", "nav_overrides", "TEXT", false, null),
         new("incident_tasks", "completed_at", "TEXT", false, null),
         new("incident_tasks", "completed_by", "TEXT", false, null),
         new("incident_tasks", "source_entry_id", "TEXT", false, null),

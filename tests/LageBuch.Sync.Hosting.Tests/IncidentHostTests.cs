@@ -295,6 +295,32 @@ public class IncidentHostTests
     }
 
     [Fact]
+    public async Task Host_rejects_an_add_checklist_with_a_null_title_with_400_not_500()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        var port = await TestHost.StartOnFreePortAsync(host);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        var json = "{\"$type\":\"addChecklist\",\"operator\":{\"name\":\"Client\"},\"templateId\":\""
+            + Guid.NewGuid() + "\",\"title\":null,\"items\":[null]}";
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Host_rejects_a_command_against_a_closed_incident_with_400()
     {
         var clock = new FixedClock();

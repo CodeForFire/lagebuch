@@ -138,7 +138,8 @@ public static class SnapshotMapper
             ElTelefon: incident.LeadershipPost.Telefon,
             ElFunkgruppe: incident.LeadershipPost.Funkgruppe,
             LocationLatitude: incident.Location?.Latitude,
-            LocationLongitude: incident.Location?.Longitude);
+            LocationLongitude: incident.Location?.Longitude,
+            NavOverrides: incident.NavOverrides.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal));
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -252,7 +253,8 @@ public static class SnapshotMapper
                 n.Id, n.Kind, n.Name, n.ParentId, n.Auftrag, n.Standort, n.Funkgruppe, n.Rufname, n.Telefon, n.DissolvedAt)),
             snapshot.Fuehrungsstufe,
             new LeadershipPost(snapshot.ElStandort, snapshot.ElRufname, snapshot.ElTelefon, snapshot.ElFunkgruppe),
-            GeoPoint.TryCreate(snapshot.LocationLatitude, snapshot.LocationLongitude));
+            GeoPoint.TryCreate(snapshot.LocationLatitude, snapshot.LocationLongitude),
+            snapshot.NavOverrides);
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

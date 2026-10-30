@@ -53,7 +53,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     // The checklist view models currently in the rail. Held separately from NavItems because each
     // one owns a session.Changed subscription that has to be released on rebuild.
-    private readonly List<ChecklistViewModel> _checklists = new();
+    // Keyed by list id, so a rail rebuild hands each surviving list its existing view model.
+    private readonly Dictionary<Guid, ChecklistViewModel> _checklists = new();
     private bool _disposed;
 
     public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null)
@@ -186,6 +187,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [NotifyCanExecuteChangedFor(nameof(EditIncidentDataCommand))]
     [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
     [NotifyCanExecuteChangedFor(nameof(OpenSituationReportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AddNavEntryCommand))]
     [NotifyPropertyChangedFor(nameof(OperatorDisplay))]
     private bool _isReadOnly;
 
@@ -422,6 +424,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         IncidentNumberInput = incident.IncidentNumber?.Value ?? string.Empty;
         AddressDisplay = Formatting.Address(incident);
         OnPropertyChanged(nameof(OperatorDisplay));
+
+        // A list added, an entry hidden or shown, or a module going live, on this device or
+        // another one: the rail follows.
+        RebuildRailIfChanged();
     }
 
     /// <summary>Who documents on this device, shown in the header; null while read-only.</summary>
@@ -788,7 +794,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [NotifyPropertyChangedFor(nameof(IsInputEnabled))]
     [NotifyPropertyChangedFor(nameof(ShowConnectedHost))]
     [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AddNavEntryCommand))]
     private bool _isConnected = true;
+
+    // A reconnecting client cannot send a rail edit either.
+    partial void OnIsConnectedChanged(bool value) => RefreshCanHide(NavLiveness.LiveModules(_session.Incident));
 
     /// <summary>"verbunden mit ‹host›" in a joined client's header (#464); null on a local incident.</summary>
     public string? ConnectedHostText => _remoteHost is null ? null : $"verbunden mit {_remoteHost}";
@@ -987,7 +997,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         HasOverflowNavItems = false;
         OverflowHasStatusDot = false;
 
-        foreach (var checklist in _checklists)
+        foreach (var checklist in _checklists.Values)
         {
             checklist.Dispose();
         }
@@ -1052,6 +1062,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var reopenTab = LeadershipTabs is { } tabs ? tabs.SelectedTabIndex : LeadershipTabsViewModel.OrganisationTab;
 
         DisposeChildren();
+
+        // Every rebuild is a read-only flip or the first build; a refusal from before it no longer
+        // describes anything the Lagebuchführer can retry.
+        NavEditError = null;
 
         Etb = new EtbViewModel(
             _session,
@@ -1174,6 +1188,38 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </remarks>
     private void BuildNavItems()
     {
+        RebuildRail();
+
+        // The modules are freshly constructed by BuildChildren, so they start in the desktop
+        // layout. A ChecklistViewModel has no narrow layout of its own, so RebuildRail has
+        // nothing to push when it creates one.
+        PushNarrowToModules(IsNarrow);
+    }
+
+    /// <summary>
+    /// Re-resolves the rail from the Stammdaten layout, this Einsatz's Checklisten, its overrides
+    /// and the modules with live work, keeping every module view model and every surviving
+    /// <see cref="ChecklistViewModel"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NavItems"/> is updated in place: an entry still on the rail keeps its
+    /// <see cref="WorkspaceNavItemViewModel"/>, moved to its new position, and every entry gets the
+    /// shortcut hint of that position. The open entry stays open when it is still on the rail;
+    /// when it left, the entry that took its place opens — the next one, or the previous one when
+    /// it was last. A Checkliste that left the rail has its view model disposed, which releases its
+    /// session subscription.
+    /// </remarks>
+    private void RebuildRail()
+    {
+        var live = NavLiveness.LiveModules(_session.Incident);
+        RebuildRail(live, ResolveRail(live));
+    }
+
+    private void RebuildRail(IReadOnlySet<string> live, IReadOnlyList<NavItemSpec> specs)
+    {
+        var reopenKey = SelectedNavItem?.RailKey;
+        var reopenIndex = SelectedNavItem is { } open ? NavItems.IndexOf(open) : 0;
+
         var modules = new Dictionary<string, object>(StringComparer.Ordinal)
         {
             [NavModules.Etb] = EtbTabs,
@@ -1188,34 +1234,307 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Contacts] = Contacts,
         };
 
-        foreach (var spec in NavigationLayout.Resolve(_masterData.Navigation, _session.Incident.Checklists))
+        // An entry that stays on the rail keeps its item: replacing it would re-template the open
+        // module and drop the caret of whoever is typing, when the change came from another device.
+        var existing = NavItems.ToDictionary(item => item.RailKey, StringComparer.Ordinal);
+        var wanted = new List<WorkspaceNavItemViewModel>();
+        var kept = new Dictionary<Guid, ChecklistViewModel>();
+        foreach (var spec in specs)
         {
+            var railKey = NavigationLayout.KeyOf(spec);
             if (spec.List is { } list)
             {
-                var checklist = new ChecklistViewModel(_session, list, OnChanged);
-                _checklists.Add(checklist);
-                NavItems.Add(new WorkspaceNavItemViewModel(
-                    WorkspaceNavItemViewModel.HeaderFor(list.Title), checklist, checklist)
+                if (!_checklists.Remove(list.Id, out var checklist))
                 {
-                    ShortcutHint = ShortcutRegistry.HintFor(NavItems.Count),
-                });
+                    checklist = new ChecklistViewModel(_session, list, OnChanged);
+                }
+
+                kept[list.Id] = checklist;
+                wanted.Add(existing.Remove(railKey, out var listItem)
+                    ? listItem
+                    : new WorkspaceNavItemViewModel(WorkspaceNavItemViewModel.HeaderFor(list.Title), checklist, checklist, railKey: railKey));
                 continue;
             }
 
             if (modules.TryGetValue(spec.ModuleKey, out var content))
             {
-                NavItems.Add(new WorkspaceNavItemViewModel(
-                    ModuleLabels.Header(spec.ModuleKey), content, moduleKey: spec.ModuleKey)
-                {
-                    ShortcutHint = ShortcutRegistry.HintFor(NavItems.Count),
-                });
+                wanted.Add(existing.Remove(railKey, out var moduleItem)
+                    ? moduleItem
+                    : new WorkspaceNavItemViewModel(ModuleLabels.Header(spec.ModuleKey), content, moduleKey: spec.ModuleKey, railKey: railKey));
             }
         }
 
-        RebuildNavSplit();
+        // What is left in existing has left the rail; its item holds a subscription on its
+        // checklist, and RebuildNavSplit below releases the overflow's own.
+        foreach (var gone in existing.Values)
+        {
+            NavItems.Remove(gone);
+            gone.Dispose();
+        }
 
-        // The modules above are freshly constructed, so they start in the desktop layout.
-        PushNarrowToModules(IsNarrow);
+        for (var i = 0; i < wanted.Count; i++)
+        {
+            var item = wanted[i];
+            var at = NavItems.IndexOf(item);
+            if (at < 0)
+            {
+                NavItems.Insert(i, item);
+            }
+            else if (at != i)
+            {
+                NavItems.Move(at, i);
+            }
+
+            item.ShortcutHint = ShortcutRegistry.HintFor(i);
+        }
+
+        // What is left are the Checklisten that left the rail.
+        foreach (var gone in _checklists.Values)
+        {
+            gone.Dispose();
+        }
+
+        _checklists.Clear();
+        foreach (var (id, checklist) in kept)
+        {
+            _checklists.Add(id, checklist);
+        }
+
+        // The ETB is always on the rail, so there is always a neighbour to fall back on.
+        if (reopenKey is not null)
+        {
+            SelectedNavItem = NavItems.FirstOrDefault(item => string.Equals(item.RailKey, reopenKey, StringComparison.Ordinal))
+                ?? NavItems[Math.Clamp(reopenIndex, 0, NavItems.Count - 1)];
+        }
+
+        RebuildNavSplit();
+        RefreshCanHide(live);
+        RebuildAddableNavEntries();
+    }
+
+    private IReadOnlyList<NavItemSpec> ResolveRail(IReadOnlySet<string> live)
+    {
+        var incident = _session.Incident;
+
+        // Live work overrides only this Einsatz's own „Ausblenden“ — work that arrived while the
+        // module was hidden here, e.g. from a peer. A module the Stammdaten layout switches off
+        // stays off with live work, as it always has: its header bars still show, with no tab.
+        var forced = live
+            .Where(key => incident.NavOverrides.TryGetValue(key, out var visible) && !visible)
+            .ToHashSet(StringComparer.Ordinal);
+        return NavigationLayout.Resolve(_masterData.Navigation, incident.Checklists, incident.NavOverrides, forced);
+    }
+
+    /// <summary>
+    /// Rebuilds the rail only when its entries or their order changed, so a change that leaves the
+    /// rail as it is — the first Aufgabe making Aufgaben live — only refreshes „Ausblenden“ and the
+    /// „+“ and does not touch the tab strip at all.
+    /// </summary>
+    private void RebuildRailIfChanged()
+    {
+        var live = NavLiveness.LiveModules(_session.Incident);
+        var specs = ResolveRail(live);
+        if (specs.Select(NavigationLayout.KeyOf).SequenceEqual(NavItems.Select(item => item.RailKey), StringComparer.Ordinal))
+        {
+            RefreshCanHide(live);
+            RebuildAddableNavEntries();
+            return;
+        }
+
+        RebuildRail(live, specs);
+    }
+
+    private void RefreshCanHide(IReadOnlySet<string> live)
+    {
+        foreach (var item in NavItems)
+        {
+            item.CanHide = !IsReadOnly
+                && IsInputEnabled
+                && !string.Equals(item.RailKey, NavModules.Etb, StringComparison.Ordinal)
+                && !live.Contains(item.RailKey);
+        }
+
+        HideNavItemCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Fills the „+“ choices: every entry of this Einsatz the rail does not show, and today's
+    /// Stammdaten Checklisten (#337: read live) whose Vorlage the Einsatz does not hold yet. Both
+    /// stay empty in a read-only Einsatz.
+    /// </summary>
+    private void RebuildAddableNavEntries()
+    {
+        var hidden = new List<AddableNavEntryViewModel>();
+        var addable = new List<AddableNavEntryViewModel>();
+        if (!IsReadOnly)
+        {
+            var incident = _session.Incident;
+
+            // Everything the Einsatz could show, in rail order: the same resolution with every
+            // entry switched on. Whatever of that the rail lacks is hidden.
+            var everything = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var key in NavModules.All)
+            {
+                everything[key] = true;
+            }
+
+            foreach (var list in incident.Checklists)
+            {
+                everything[ChecklistList.NavKey(list.Id)] = true;
+            }
+
+            foreach (var spec in NavigationLayout.Resolve(_masterData.Navigation, incident.Checklists, everything))
+            {
+                var key = NavigationLayout.KeyOf(spec);
+                if (!NavItems.Any(item => string.Equals(item.RailKey, key, StringComparison.Ordinal)))
+                {
+                    var header = spec.List is { } list
+                        ? WorkspaceNavItemViewModel.HeaderFor(list.Title)
+                        : ModuleLabels.Header(spec.ModuleKey);
+                    hidden.Add(new AddableNavEntryViewModel(header, key, null));
+                }
+            }
+
+            foreach (var template in _masterData.ChecklistTemplates.Where(t => !incident.Checklists.Any(l => l.Id == t.Id)))
+            {
+                addable.Add(new AddableNavEntryViewModel(WorkspaceNavItemViewModel.HeaderFor(template.Title), null, template));
+            }
+        }
+
+        // Called on every session change; an open „+“ flyout keeps its items unless they changed.
+        Replace(HiddenNavEntries, hidden);
+        Replace(AddableChecklists, addable);
+
+        HasAddableNavEntries = HiddenNavEntries.Count > 0 || AddableChecklists.Count > 0;
+    }
+
+    private static void Replace(ObservableCollection<AddableNavEntryViewModel> target, List<AddableNavEntryViewModel> items)
+    {
+        if (target.SequenceEqual(items))
+        {
+            return;
+        }
+
+        target.Clear();
+        foreach (var item in items)
+        {
+            target.Add(item);
+        }
+    }
+
+    /// <summary>The „Ausgeblendet“ choices behind the rail's „+“.</summary>
+    public ObservableCollection<AddableNavEntryViewModel> HiddenNavEntries { get; } = new();
+
+    /// <summary>The „Checkliste hinzufügen“ choices behind the rail's „+“.</summary>
+    public ObservableCollection<AddableNavEntryViewModel> AddableChecklists { get; } = new();
+
+    /// <summary>Whether the „+“ has anything to offer; always false in a read-only Einsatz.</summary>
+    [ObservableProperty]
+    private bool _hasAddableNavEntries;
+
+    /// <summary>
+    /// Why the last rail edit on this device was refused, in German; cleared by the next one that
+    /// succeeds. A joined device's refusal by the host arrives as <see cref="CommandRejected"/>.
+    /// </summary>
+    [ObservableProperty]
+    private string? _navEditError;
+
+    [RelayCommand]
+    private void DismissNavEditError() => NavEditError = null;
+
+    /// <summary>„Ausblenden“: takes an entry off the rail for this Einsatz only.</summary>
+    [RelayCommand(CanExecute = nameof(CanHideNavItem))]
+    private void HideNavItem(WorkspaceNavItemViewModel? item)
+    {
+        if (item is { CanHide: true })
+        {
+            EditRail(() => _session.SetNavVisibility(item.RailKey, false));
+        }
+    }
+
+    private static bool CanHideNavItem(WorkspaceNavItemViewModel? item) => item?.CanHide ?? false;
+
+    /// <summary>
+    /// One of the „+“ choices: brings a hidden entry back, or copies a Stammdaten Checkliste into
+    /// this Einsatz and opens it.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanEditRail))]
+    private void AddNavEntry(AddableNavEntryViewModel? entry)
+    {
+        if (entry?.Template is { } template)
+        {
+            var key = ChecklistList.NavKey(template.Id);
+
+            // Offered before another device added the same Vorlage, or the list is hidden here: it
+            // is already in the Einsatz, so it comes back on the rail and opens, with no refusal.
+            if (_session.Incident.Checklists.Any(list => list.Id == template.Id))
+            {
+                if (!NavItems.Any(item => string.Equals(item.RailKey, key, StringComparison.Ordinal))
+                    && !EditRail(() => _session.SetNavVisibility(key, true)))
+                {
+                    return;
+                }
+
+                NavEditError = null;
+                ShowNavItem(NavItems.FirstOrDefault(item => string.Equals(item.RailKey, key, StringComparison.Ordinal)));
+                return;
+            }
+
+            var seed = new ChecklistSeed(
+                template.Id,
+                template.Title,
+                template.Items.Select(i => (i.Text, i.IsMandatory)).ToList());
+
+            // On a joined device the list arrives with the host's broadcast, after this returns;
+            // there is nothing to open yet, and the rail shows it when it lands.
+            if (EditRail(() => _session.AddChecklist(seed)))
+            {
+                ShowNavItem(NavItems.FirstOrDefault(item => string.Equals(item.RailKey, key, StringComparison.Ordinal)));
+            }
+        }
+        else if (entry?.RailKey is { } railKey)
+        {
+            EditRail(() => _session.SetNavVisibility(railKey, true));
+        }
+    }
+
+    private bool CanEditRail => !IsReadOnly && IsInputEnabled;
+
+    // The domain refuses a Vorlage already in the Einsatz, a closed Einsatz, and anything over its
+    // caps; each of those is a sentence for the Lagebuchführer, never a crash mid-Einsatz.
+    private bool EditRail(Action edit)
+    {
+        try
+        {
+            edit();
+        }
+        catch (InvalidOperationException ex)
+        {
+            NavEditError = ex.Message;
+            return false;
+        }
+        catch (ArgumentException ex)
+        {
+            NavEditError = MessageOf(ex);
+            return false;
+        }
+
+        // The session's Changed event has already brought the rail along: at once on this device,
+        // with the host's broadcast on a joined one.
+        NavEditError = null;
+        OnChanged();
+        return true;
+    }
+
+    // ArgumentException.Message appends " (Parameter 'x')" in English; the Lagebuchführer gets
+    // the domain's German sentence alone.
+    private static string MessageOf(ArgumentException ex)
+    {
+        var message = ex.Message;
+        var cut = message.LastIndexOf(" (", StringComparison.Ordinal);
+        return ex.ParamName is not null && cut > 0 && message.EndsWith($"'{ex.ParamName}')", StringComparison.Ordinal)
+            ? message[..cut]
+            : message;
     }
 
     /// <summary>

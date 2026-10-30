@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace LageBuch.Domain;
 
 /// <summary>
@@ -15,7 +17,20 @@ namespace LageBuch.Domain;
 /// </remarks>
 public sealed class ChecklistList
 {
+    /// <summary>The longest title <see cref="Incident.AddChecklist"/> accepts.</summary>
+    public const int MaxTitleLength = 200;
+
+    /// <summary>The most items <see cref="Incident.AddChecklist"/> accepts in one list.</summary>
+    public const int MaxItemCount = 200;
+
     private readonly List<ChecklistItem> _items = new();
+
+    /// <summary>
+    /// The key an Einsatz's rail overrides use for a Checkliste: its id in the invariant "D" form,
+    /// so a file written on one device reads the same on another.
+    /// </summary>
+    // Stryker disable once String : a Guid's empty format is "D", so "" formats the same key
+    public static string NavKey(Guid id) => id.ToString("D", CultureInfo.InvariantCulture);
 
     private ChecklistList(Guid id, string title)
     {

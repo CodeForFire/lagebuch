@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 36;
+    public const int CurrentVersion = 37;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -249,6 +249,15 @@ public static class Migrations
         if (version < 36)
         {
             ApplyV36(cn, tx);
+
+            // Stryker restore all
+        }
+
+        // Stryker disable all : V37 only adds a nullable column that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 37)
+        {
+            ApplyV37(cn, tx);
 
             // Stryker restore all
         }
@@ -1044,6 +1053,16 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "location_lon", "REAL");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "position_lat", "REAL");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "position_lon", "REAL");
+
+        // Stryker restore all
+    }
+
+    // Per-Einsatz rail overrides: a JSON object of rail key to shown/hidden, null for none. Additive
+    // and nullable: an older file's Einsatz reads back with the Stammdaten layout unchanged.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV37(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "nav_overrides", "TEXT");
 
         // Stryker restore all
     }

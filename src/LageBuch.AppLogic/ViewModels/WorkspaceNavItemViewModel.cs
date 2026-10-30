@@ -23,11 +23,12 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
 {
     private readonly ChecklistViewModel? _checklist;
 
-    public WorkspaceNavItemViewModel(string header, object content, ChecklistViewModel? checklist = null, string? moduleKey = null)
+    public WorkspaceNavItemViewModel(string header, object content, ChecklistViewModel? checklist = null, string? moduleKey = null, string? railKey = null)
     {
         Header = header;
         Content = content;
         ModuleKey = moduleKey ?? NavModules.Checklist;
+        RailKey = railKey ?? ModuleKey;
         _checklist = checklist;
         if (_checklist is not null)
         {
@@ -50,11 +51,27 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
     public string ModuleKey { get; }
 
     /// <summary>
+    /// The key this Einsatz's rail overrides use for the entry (<c>NavigationLayout.KeyOf</c>): the
+    /// module key, or the Checkliste's id. Unlike <see cref="ModuleKey"/> it tells two Checklisten
+    /// apart, so a rebuilt rail finds the entry that was open by it.
+    /// </summary>
+    public string RailKey { get; }
+
+    /// <summary>
+    /// Whether „Ausblenden“ is offered: never for the ETB, never in a read-only Einsatz, and not
+    /// while the module holds live work (an active Trupp, an open Aufgabe). Kept fresh by the
+    /// workspace, which is where all three are known.
+    /// </summary>
+    [ObservableProperty]
+    private bool _canHide;
+
+    /// <summary>
     /// The global shortcut that opens this entry, shown on its rail tab (#544): a keyboard user
     /// never hovers, so a tooltip would not tell them. It follows the entry's position on the rail;
     /// null past the tenth, which has no digit left.
     /// </summary>
-    public string? ShortcutHint { get; init; }
+    [ObservableProperty]
+    private string? _shortcutHint;
 
     /// <summary>
     /// Whether this is the entry currently open. The wide rail gets this from

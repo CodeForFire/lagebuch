@@ -1215,6 +1215,7 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 {
     private readonly LocalIncidentSession _inner;
     private readonly Func<Incident, Incident> _rewrite;
+    private readonly List<Action> _pendingRailEdits = new();
 
     // rewrite lets a test turn the received snapshot into a hostile one.
     public SnapshotRoundTrippingSession(LocalIncidentSession inner, Func<Incident, Incident>? rewrite = null)
@@ -1307,6 +1308,26 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public void PlaceForceUnit(Guid unitId, GeoPoint? position) => _inner.PlaceForceUnit(unitId, position);
 
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
+
+    /// <summary>
+    /// When set, a rail edit is only sent, the way a joined client's is: it lands when the test
+    /// calls <see cref="DeliverRailEdits"/>, as the host's broadcast would.
+    /// </summary>
+    public bool DefersRailEdits { get; set; }
+
+    public void DeliverRailEdits()
+    {
+        foreach (var edit in _pendingRailEdits)
+        {
+            edit();
+        }
+
+        _pendingRailEdits.Clear();
+    }
+
+    public void SetNavVisibility(string key, bool visible) => RailEdit(() => _inner.SetNavVisibility(key, visible));
+
+    public void AddChecklist(ChecklistSeed seed) => RailEdit(() => _inner.AddChecklist(seed));
 
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) => _inner.SetFuehrungsstufe(stufe);
 
@@ -1467,4 +1488,15 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers) =>
         _inner.RemoveDwellings(buildingId, floorOrdinal, apartmentNumbers);
+
+    private void RailEdit(Action edit)
+    {
+        if (DefersRailEdits)
+        {
+            _pendingRailEdits.Add(edit);
+            return;
+        }
+
+        edit();
+    }
 }
