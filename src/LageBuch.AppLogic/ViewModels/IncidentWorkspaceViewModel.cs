@@ -660,14 +660,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         {
             UpdateMostUrgentWarning();
         }
-
-        // A Trupp going in or coming out moves HasControlReminder, which is the Atemschutz half of
-        // NavLiveness. An Aufgabe opening has no such property on TasksViewModel; it always comes
-        // with a session change, which RefreshIncidentData already handles. Countdown ticks pass.
-        if (ReferenceEquals(sender, Scba) && e.PropertyName is null or nameof(ScbaViewModel.HasControlReminder))
-        {
-            RefreshCanHide(NavLiveness.LiveModules(_session.Incident));
-        }
     }
 
     /// <summary>
@@ -1217,7 +1209,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private void RebuildRail(IReadOnlySet<string> live, IReadOnlyList<NavItemSpec> specs)
     {
         var reopenKey = SelectedNavItem?.RailKey;
-        var reopenIndex = SelectedNavItem is { } open ? NavItems.IndexOf(open) : -1;
+        var reopenIndex = SelectedNavItem is { } open ? NavItems.IndexOf(open) : 0;
 
         var modules = new Dictionary<string, object>(StringComparer.Ordinal)
         {
@@ -1284,7 +1276,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             _checklists.Add(id, checklist);
         }
 
-        if (reopenKey is not null && NavItems.Count > 0)
+        // The ETB is always on the rail, so there is always a neighbour to fall back on.
+        if (reopenKey is not null)
         {
             SelectedNavItem = NavItems.FirstOrDefault(item => string.Equals(item.RailKey, reopenKey, StringComparison.Ordinal))
                 ?? NavItems[Math.Clamp(reopenIndex, 0, NavItems.Count - 1)];
@@ -1292,7 +1285,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         RebuildNavSplit();
         RefreshCanHide(live);
-        HideNavItemCommand.NotifyCanExecuteChanged();
         RebuildAddableNavEntries();
     }
 
@@ -1330,20 +1322,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private void RefreshCanHide(IReadOnlySet<string> live)
     {
-        var changed = false;
         foreach (var item in NavItems)
         {
-            var canHide = !IsReadOnly
+            item.CanHide = !IsReadOnly
                 && !string.Equals(item.RailKey, NavModules.Etb, StringComparison.Ordinal)
                 && !live.Contains(item.RailKey);
-            changed |= item.CanHide != canHide;
-            item.CanHide = canHide;
         }
 
-        if (changed)
-        {
-            HideNavItemCommand.NotifyCanExecuteChanged();
-        }
+        HideNavItemCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -1492,11 +1478,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             return false;
         }
 
+        // The session's Changed event has already brought the rail along: at once on this device,
+        // with the host's broadcast on a joined one.
         NavEditError = null;
-
-        // A local session has already rebuilt the rail from its Changed event; this covers a
-        // session that does not raise it synchronously.
-        RebuildRailIfChanged();
         OnChanged();
         return true;
     }
