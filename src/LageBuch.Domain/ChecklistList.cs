@@ -29,6 +29,7 @@ public sealed class ChecklistList
     /// The key an Einsatz's rail overrides use for a Checkliste: its id in the invariant "D" form,
     /// so a file written on one device reads the same on another.
     /// </summary>
+    // Stryker disable once String : a Guid's empty format is "D", so "" formats the same key
     public static string NavKey(Guid id) => id.ToString("D", CultureInfo.InvariantCulture);
 
     private ChecklistList(Guid id, string title)

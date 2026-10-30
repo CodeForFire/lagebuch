@@ -515,12 +515,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetNavVisibility(string key, bool visible) =>
         Send(new SetNavVisibilityCommand(Op(), key, visible));
 
+    // Stryker disable all : only Sync.Hosting.Tests drive RemoteIncidentSession; the one-line
+    // methods around this one are expression-bodied and offer no block or statement to remove.
     public void AddChecklist(ChecklistSeed seed)
     {
-        // Stryker disable once Statement : only Sync.Hosting.Tests drive RemoteIncidentSession
         ArgumentNullException.ThrowIfNull(seed);
         Send(new AddChecklistCommand(
             Op(), seed.Id, seed.Title, seed.Items.Select(i => new ChecklistSeedItemDto(i.Text, i.IsMandatory)).ToList()));
+
+        // Stryker restore all
     }
 
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
