@@ -128,7 +128,7 @@ public class MasterDataStoreTests : IDisposable
         {
             Vehicles = new[]
             {
-                new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true),
+                new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true, VehicleType: "ELW 1"),
                 new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
             },
         };

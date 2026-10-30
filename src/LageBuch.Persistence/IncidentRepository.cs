@@ -197,7 +197,7 @@ public sealed class IncidentRepository
             var f = incident.Forces[i];
             Run(
                 inserts,
-                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id, position_lat, position_lon) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc,$node,$lat,$lon);",
+                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id, position_lat, position_lon, vehicle_type, label_dx, label_dy) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc,$node,$lat,$lon,$vt,$ldx,$ldy);",
                 p =>
                 {
                     p("$id", f.Id.ToString());
@@ -213,6 +213,9 @@ public sealed class IncidentRepository
                     p("$node", (object?)f.NodeId?.ToString() ?? DBNull.Value);
                     p("$lat", (object?)f.Position?.Latitude ?? DBNull.Value);
                     p("$lon", (object?)f.Position?.Longitude ?? DBNull.Value);
+                    p("$vt", (object?)f.VehicleType ?? DBNull.Value);
+                    p("$ldx", (object?)f.LabelOffset?.Dx ?? DBNull.Value);
+                    p("$ldy", (object?)f.LabelOffset?.Dy ?? DBNull.Value);
                 });
 
             for (var j = 0; j < f.Edits.Count; j++)
@@ -736,7 +739,7 @@ public sealed class IncidentRepository
 
         var forces = ReadAll(
             cn,
-            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id, position_lat, position_lon FROM force_units ORDER BY ordinal;",
+            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count, node_id, position_lat, position_lon, vehicle_type, label_dx, label_dy FROM force_units ORDER BY ordinal;",
             r => Domain.ForceUnit.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -749,7 +752,9 @@ public sealed class IncidentRepository
                 strengthEditsByUnit.TryGetValue(Guid.Parse(r.GetString(0)), out var eds) ? eds : null,
                 r.GetInt32(8),
                 NullableGuid(r, 9),
-                Domain.ValueObjects.GeoPoint.TryCreate(NullableDouble(r, 10), NullableDouble(r, 11))));
+                Domain.ValueObjects.GeoPoint.TryCreate(NullableDouble(r, 10), NullableDouble(r, 11)),
+                Domain.VehicleTypes.FromStored(Str(r, 12)),
+                Domain.ValueObjects.LabelOffset.TryCreate(NullableDouble(r, 13), NullableDouble(r, 14))));
 
         var membersByTrupp = ReadAll(
             cn,

@@ -68,8 +68,14 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>Every unit of the Einsatz, by Funkrufname, each saying whether it is on the map.</summary>
     public ObservableCollection<LagekarteUnitRow> Units { get; } = new();
 
-    /// <summary>What the map draws over the tiles: the Einsatzort and each placed unit.</summary>
+    /// <summary>What the map draws over the tiles: the Einsatzort and each placed unit's pin.</summary>
     public ObservableCollection<LagekarteMarker> Markers { get; } = new();
+
+    /// <summary>
+    /// The taktische Zeichen of the placed units: the same markers as their pins, drawn beneath
+    /// them at each one's offset and tied back with a Verbindungsstrich (DV 102 §1.5).
+    /// </summary>
+    public ObservableCollection<LagekarteMarker> Signs { get; } = new();
 
     public bool IsReadOnly { get; }
 
@@ -249,6 +255,17 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
     }
 
+    /// <summary>A unit's sign dragged to a new place beside its pin. The pin, and so the unit, stays where it is.</summary>
+    public void MoveLabel(LagekarteMarker marker, LabelOffset offset)
+    {
+        ArgumentNullException.ThrowIfNull(marker);
+        ArgumentNullException.ThrowIfNull(offset);
+        if (CanEdit && marker.UnitId is { } id)
+        {
+            Run(() => _session.MoveForceUnitLabel(id, offset));
+        }
+    }
+
     /// <summary>Puts every mark back where the incident has it, after a drag that was abandoned.</summary>
     public void RestoreMarkers() => Refresh();
 
@@ -395,6 +412,15 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
     }
 
+    // The Fahrzeugtyp picked beside a unit: for a vehicle the Stammdaten did not know.
+    private void SetVehicleType(Guid unitId, string? vehicleType)
+    {
+        if (CanEdit)
+        {
+            Run(() => _session.SetForceUnitVehicleType(unitId, vehicleType));
+        }
+    }
+
     private bool Place(Guid? unitId, GeoPoint position)
     {
         return unitId is { } id
@@ -429,10 +455,11 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         Units.Clear();
         foreach (var unit in units)
         {
-            Units.Add(new LagekarteUnitRow(unit));
+            Units.Add(new LagekarteUnitRow(unit, SetVehicleType));
         }
 
         Markers.Clear();
+        Signs.Clear();
         if (incident.Location is { } location)
         {
             Markers.Add(LagekarteMarker.Einsatzort(location));
@@ -440,7 +467,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
         foreach (var unit in units.Where(u => u.Position is not null))
         {
-            Markers.Add(LagekarteMarker.For(unit));
+            var marker = LagekarteMarker.For(unit);
+            Markers.Add(marker);
+            Signs.Add(marker);
         }
 
         // A unit that left the Einsatz while it was picked cannot be placed any more.
@@ -572,31 +601,82 @@ public sealed class LagekarteAddressRow(AddressHit hit, string? packName)
 public sealed record LagekarteTarget(Guid? UnitId, string Label);
 
 /// <summary>A unit in the list beside the map.</summary>
-public sealed class LagekarteUnitRow(ForceUnit unit)
+public sealed class LagekarteUnitRow
 {
-    public Guid UnitId { get; } = unit.Id;
+    /// <summary>The picker's entry for a unit without a Fahrzeugtyp: the bare Kraftfahrzeug sign.</summary>
+    public const string NoVehicleType = "ohne Typ";
+
+    private readonly ForceUnit _unit;
+    private readonly Action<Guid, string?> _setVehicleType;
+
+    public LagekarteUnitRow(ForceUnit unit, Action<Guid, string?>? setVehicleType = null)
+    {
+        ArgumentNullException.ThrowIfNull(unit);
+        _unit = unit;
+        _setVehicleType = setVehicleType ?? ((_, _) => { });
+
+        // A type the catalogue lacks -- an old file, another Feuerwehr's Stammdaten -- is offered
+        // too, so the picker shows what is recorded instead of going blank.
+        var codes = VehicleTypes.All.Select(t => t.Code).ToList();
+        if (unit.VehicleType is { } recorded && VehicleTypes.Find(recorded) is null)
+        {
+            codes.Insert(0, recorded);
+        }
+
+        VehicleTypeOptions = [NoVehicleType, .. codes];
+    }
+
+    public Guid UnitId => _unit.Id;
 
     /// <summary>The Funkrufname, or the Feuerwehr for a unit without one.</summary>
-    public string Title { get; } = unit.CallSign ?? unit.Brigade;
+    public string Title => _unit.CallSign ?? _unit.Brigade;
 
-    public string Detail { get; } = unit.CallSign is null ? unit.Status ?? string.Empty : string.Join(" · ", new[] { unit.Brigade, unit.Status }.OfType<string>());
+    public string Detail => _unit.CallSign is null ? _unit.Status ?? string.Empty : string.Join(" · ", new[] { _unit.Brigade, _unit.Status }.OfType<string>());
 
-    public GeoPoint? Position { get; } = unit.Position;
+    public GeoPoint? Position => _unit.Position;
 
     public bool IsPlaced => Position is not null;
 
     public string PlaceLabel => IsPlaced ? "VERSETZEN" : "AUF KARTE";
+
+    /// <summary>The catalogue's Fahrzeugtypen, after the entry for none.</summary>
+    public IReadOnlyList<string> VehicleTypeOptions { get; }
+
+    public string VehicleTypeAutomationName => $"Fahrzeugtyp von {Title}";
+
+    /// <summary>
+    /// The Fahrzeugtyp the unit's sign shows, as the picker's entry. Picking another one records
+    /// it in the Einsatz; the list is built anew from the incident afterwards.
+    /// </summary>
+    public string SelectedVehicleType
+    {
+        get => _unit.VehicleType ?? NoVehicleType;
+        set
+        {
+            var type = value is null or NoVehicleType ? null : value;
+            if (!string.Equals(type, _unit.VehicleType, StringComparison.Ordinal))
+            {
+                _setVehicleType(_unit.Id, type);
+            }
+        }
+    }
 }
 
 /// <summary>A mark on the map: the Einsatzort, or a unit when <see cref="UnitId"/> is set.</summary>
 public sealed partial class LagekarteMarker : ObservableObject
 {
-    private LagekarteMarker(Guid? unitId, string title, string? subtitle, GeoPoint position)
+    /// <summary>Where a sign stands until it is moved: up and to the right, so it never covers its pin.</summary>
+    public static readonly LabelOffset DefaultLabelOffset = new(28, -44);
+
+    private LagekarteMarker(Guid? unitId, string title, string? subtitle, GeoPoint position, string? vehicleType = null, string? strength = null, LabelOffset? labelOffset = null)
     {
         UnitId = unitId;
         Title = title;
         Subtitle = subtitle;
+        VehicleType = vehicleType;
+        Strength = strength;
         _position = position;
+        _labelOffset = labelOffset ?? DefaultLabelOffset;
     }
 
     public Guid? UnitId { get; }
@@ -607,11 +687,23 @@ public sealed partial class LagekarteMarker : ObservableObject
 
     public string? Subtitle { get; }
 
+    /// <summary>The Kurzbezeichnung inside the sign (LF, DLK …); null draws the bare Kraftfahrzeug sign.</summary>
+    public string? VehicleType { get; }
+
+    /// <summary>The Stärke under the sign, ZF/GF/Mannschaft/Gesamt (DV 102 §1.6: "darunter: Stärke").</summary>
+    public string? Strength { get; }
+
     /// <summary>Where the marker is drawn. Moves under the hand while dragged, before anything is stored.</summary>
     [ObservableProperty]
     private GeoPoint _position;
 
-    public string AutomationName => IsEinsatzort ? "Einsatzort" : $"{Title} auf der Karte";
+    /// <summary>Where the sign stands from its pin, in screen pixels. Moves under the hand while dragged.</summary>
+    [ObservableProperty]
+    private LabelOffset _labelOffset;
+
+    public string AutomationName => IsEinsatzort ? "Einsatzort" : $"{Title}: Standort";
+
+    public string SignAutomationName => $"{Title}: taktisches Zeichen";
 
     public static LagekarteMarker Einsatzort(GeoPoint location) => new(null, "Einsatzort", null, location);
 
@@ -619,6 +711,6 @@ public sealed partial class LagekarteMarker : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(unit);
         var position = unit.Position ?? throw new ArgumentException("Die Einheit steht nicht auf der Karte.", nameof(unit));
-        return new(unit.Id, unit.CallSign ?? unit.Brigade, unit.Status, position);
+        return new(unit.Id, unit.CallSign ?? unit.Brigade, unit.Status, position, unit.VehicleType, unit.StrengthText, unit.LabelOffset);
     }
 }

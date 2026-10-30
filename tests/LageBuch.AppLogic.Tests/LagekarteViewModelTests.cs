@@ -55,7 +55,7 @@ public class LagekarteViewModelTests
         Assert.Equal(Amperbruecke, session.Incident.Forces.Single().Position);
         var marker = Assert.Single(vm.Markers);
         Assert.Equal("LF 10/1", marker.Title);
-        Assert.Equal("LF 10/1 auf der Karte", marker.AutomationName);
+        Assert.Equal("LF 10/1: Standort", marker.AutomationName);
         Assert.Equal("VERSETZEN", vm.Units.Single().PlaceLabel);
     }
 
@@ -125,6 +125,138 @@ public class LagekarteViewModelTests
         Assert.Empty(vm.Markers);
         Assert.Null(session.Incident.Location);
         Assert.Null(session.Incident.Forces.Single().Position);
+    }
+
+    [Fact]
+    public void A_placed_unit_gets_a_pin_and_a_sign_that_are_one_marker()
+    {
+        var (session, vm, _) = Open(units: ["LF 10/1"]);
+        session.SetForceUnitVehicleType(session.Incident.Forces[0].Id, "HLF");
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+
+        var pin = Assert.Single(vm.Markers);
+        Assert.Same(pin, Assert.Single(vm.Signs));
+        Assert.Equal("HLF", pin.VehicleType);
+        Assert.Equal("0/0/6/6", pin.Strength);
+        Assert.Equal(LagekarteMarker.DefaultLabelOffset, pin.LabelOffset);
+        Assert.Equal("LF 10/1: taktisches Zeichen", pin.SignAutomationName);
+    }
+
+    [Fact]
+    public void The_Einsatzort_has_a_pin_but_no_sign()
+    {
+        var (_, vm, _) = Open();
+        vm.PlaceEinsatzortCommand.Execute(null);
+        vm.MapTappedCommand.Execute(Marktplatz);
+
+        Assert.Single(vm.Markers);
+        Assert.Empty(vm.Signs);
+    }
+
+    [Fact]
+    public void Dragging_a_sign_moves_only_the_sign_and_keeps_the_unit_where_it_stands()
+    {
+        var (session, vm, changes) = Open(units: ["LF 10/1"]);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        var before = changes();
+
+        vm.MoveLabel(vm.Signs.Single(), new LabelOffset(-80, 30));
+
+        var unit = session.Incident.Forces.Single();
+        Assert.Equal(new LabelOffset(-80, 30), unit.LabelOffset);
+        Assert.Equal(Marktplatz, unit.Position);
+        Assert.Equal(new LabelOffset(-80, 30), vm.Signs.Single().LabelOffset);
+        Assert.Equal(before + 1, changes());
+    }
+
+    [Fact]
+    public void Dragging_the_pin_keeps_the_sign_s_offset()
+    {
+        var (session, vm, _) = Open(units: ["LF 10/1"]);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        vm.MoveLabel(vm.Signs.Single(), new LabelOffset(-80, 30));
+
+        vm.MoveMarker(vm.Markers.Single(), Amperbruecke);
+
+        Assert.Equal(new LabelOffset(-80, 30), session.Incident.Forces.Single().LabelOffset);
+        Assert.Equal(Amperbruecke, vm.Signs.Single().Position);
+    }
+
+    [Fact]
+    public void An_abandoned_sign_drag_puts_the_sign_back()
+    {
+        var (_, vm, _) = Open(units: ["LF 10/1"]);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+
+        vm.Signs.Single().LabelOffset = new LabelOffset(300, 300);
+        vm.RestoreMarkers();
+
+        Assert.Equal(LagekarteMarker.DefaultLabelOffset, vm.Signs.Single().LabelOffset);
+    }
+
+    [Fact]
+    public void A_closed_Einsatz_takes_no_sign_move_or_vehicle_type()
+    {
+        var (session, vm, _) = Open(units: ["LF 10/1"]);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        session.Close();
+        using var closed = new LagekarteViewModel(session, () => { });
+
+        closed.MoveLabel(closed.Signs.Single(), new LabelOffset(-80, 30));
+        closed.Units.Single().SelectedVehicleType = "DLK";
+
+        Assert.Null(session.Incident.Forces.Single().LabelOffset);
+        Assert.Null(session.Incident.Forces.Single().VehicleType);
+    }
+
+    [Fact]
+    public void Picking_a_vehicle_type_beside_a_unit_records_it()
+    {
+        var (session, vm, changes) = Open(units: ["LF 10/1"]);
+        var row = Assert.Single(vm.Units);
+        Assert.Equal(LagekarteUnitRow.NoVehicleType, row.SelectedVehicleType);
+        Assert.Equal(LagekarteUnitRow.NoVehicleType, row.VehicleTypeOptions[0]);
+        Assert.Equal("Fahrzeugtyp von LF 10/1", row.VehicleTypeAutomationName);
+
+        row.SelectedVehicleType = "DLK";
+
+        Assert.Equal("DLK", session.Incident.Forces.Single().VehicleType);
+        Assert.Equal("DLK", vm.Units.Single().SelectedVehicleType);
+        Assert.Equal(1, changes());
+
+        vm.Units.Single().SelectedVehicleType = LagekarteUnitRow.NoVehicleType;
+        Assert.Null(session.Incident.Forces.Single().VehicleType);
+    }
+
+    [Fact]
+    public void Picking_the_same_vehicle_type_again_records_nothing()
+    {
+        var (session, vm, changes) = Open(units: ["LF 10/1"]);
+        session.SetForceUnitVehicleType(session.Incident.Forces[0].Id, "DLK");
+        var entries = session.Incident.Journal.Count;
+
+        vm.Units.Single().SelectedVehicleType = "DLK";
+
+        Assert.Equal(entries, session.Incident.Journal.Count);
+        Assert.Equal(0, changes());
+    }
+
+    [Fact]
+    public void A_vehicle_type_the_catalogue_lacks_is_offered_so_the_picker_shows_it()
+    {
+        var (session, vm, _) = Open(units: ["LF 10/1"]);
+        session.SetForceUnitVehicleType(session.Incident.Forces[0].Id, "TLF 4000");
+
+        var row = vm.Units.Single();
+
+        Assert.Equal("TLF 4000", row.SelectedVehicleType);
+        Assert.Equal(["ohne Typ", "TLF 4000"], row.VehicleTypeOptions.Take(2));
+        Assert.Equal(VehicleTypes.All.Count + 2, row.VehicleTypeOptions.Count);
     }
 
     [Fact]

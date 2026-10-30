@@ -163,7 +163,7 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_vehicles (wache, call_sign, seats, has_zugfuehrer, is_own, phone, email) VALUES ($w,$c,$s,$z,$o,$p,$e);",
+                "INSERT INTO md_vehicles (wache, call_sign, seats, has_zugfuehrer, is_own, phone, email, vehicle_type) VALUES ($w,$c,$s,$z,$o,$p,$e,$t);",
                 p =>
                 {
                     p("$w", v.Wache);
@@ -173,6 +173,7 @@ public sealed class MasterDataStore
                     p("$o", v.IsOwn ? 1 : 0);
                     p("$p", (object?)v.Phone ?? DBNull.Value);
                     p("$e", (object?)v.Email ?? DBNull.Value);
+                    p("$t", (object?)v.VehicleType ?? DBNull.Value);
                 });
         }
 
@@ -342,7 +343,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL DEFAULT '', place TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
-            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT);
+            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT, vehicle_type TEXT);
             CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
@@ -467,6 +468,9 @@ public sealed class MasterDataStore
 
         // The same for the vehicle's E-Mail, which came after it: NULL is "no address".
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "email", "TEXT");
+
+        // And for the Fahrzeugtyp of the taktisches Zeichen: NULL is "kein Typ", the bare sign.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "vehicle_type", "TEXT");
 
         // Widen a pre-existing md_trupp_types that predates #398, when a Trupp-Typ was a bare name
         // and the crew size and Einsatzzeit were decided by comparing that name against a literal.
@@ -924,12 +928,12 @@ public sealed class MasterDataStore
     private static List<Vehicle> ReadVehicles(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT wache, call_sign, seats, has_zugfuehrer, is_own, phone, email FROM md_vehicles;";
+        cmd.CommandText = "SELECT wache, call_sign, seats, has_zugfuehrer, is_own, phone, email, vehicle_type FROM md_vehicles;";
         using var r = cmd.ExecuteReader();
         var list = new List<Vehicle>();
         while (r.Read())
         {
-            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0, r.GetInt32(4) != 0, Str(r, 5), Str(r, 6)));
+            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0, r.GetInt32(4) != 0, Str(r, 5), Str(r, 6), LageBuch.Domain.VehicleTypes.FromStored(Str(r, 7))));
         }
 
         return list;

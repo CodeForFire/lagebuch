@@ -434,12 +434,30 @@ public class MasterDataJsonTests
                 new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9, IsOwn: false),
                 new Vehicle("FFB Wache 1", "FFB 1/11/1", 4, Phone: "01 71 / 1 23 45 67"),
                 new Vehicle("FFB Wache 1", "FFB 1/12/1", 2, Email: "elw1@ff-musterstadt.example"),
+                new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "DLK"),
             },
         };
 
         var reparsed = Parse(MasterDataJson.Serialize(original));
 
         Assert.Equal(original.Vehicles, reparsed.Vehicles);
+    }
+
+    [Fact]
+    public void A_vehicle_without_a_type_or_with_a_blank_or_overlong_one_reads_as_untyped()
+    {
+        var set = Parse($$"""
+            {
+              "vehicles": [
+                { "wache": "Aich", "callSign": "Aich 42/1", "seats": 6 },
+                { "wache": "Aich", "callSign": "Aich 40/1", "seats": 9, "vehicleType": "  " },
+                { "wache": "Aich", "callSign": "Aich 11/1", "seats": 2, "vehicleType": "{{new string('X', LageBuch.Domain.VehicleTypes.MaxLength + 1)}}" },
+                { "wache": "Aich", "callSign": "Aich 30/1", "seats": 2, "vehicleType": " DLK " }
+              ]
+            }
+            """);
+
+        Assert.Equal(new string?[] { null, null, null, "DLK" }, set.Vehicles.Select(v => v.VehicleType));
     }
 
     /// <summary>A file written before vehicles had a phone number carries none: null, not "".</summary>

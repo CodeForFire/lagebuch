@@ -1,0 +1,1 @@
+Units on the Lagekarte are drawn as taktische Zeichen after DV 102, showing the Fahrzeugtyp from the Stammdaten with the Funkrufname and Stärke beside them; a pin marks exactly where each vehicle stands, and the sign can be dragged aside without moving the vehicle, tied back to its pin by a Verbindungsstrich.

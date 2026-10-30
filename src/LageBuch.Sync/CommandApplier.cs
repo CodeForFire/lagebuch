@@ -106,6 +106,12 @@ public static class CommandApplier
             case PlaceForceUnitCommand c:
                 incident.PlaceForceUnit(clock, Operator(c.Operator), c.UnitId, Position(c.Latitude, c.Longitude));
                 break;
+            case SetForceUnitVehicleTypeCommand c:
+                incident.SetForceUnitVehicleType(clock, Operator(c.Operator), c.UnitId, c.VehicleType);
+                break;
+            case MoveForceUnitLabelCommand c:
+                incident.MoveForceUnitLabel(clock, Operator(c.Operator), c.UnitId, Offset(c.Dx, c.Dy));
+                break;
             case SetFuehrungsstufeCommand c:
                 incident.SetFuehrungsstufe(clock, Operator(c.Operator), c.Stufe);
                 break;
@@ -133,7 +139,8 @@ public static class CommandApplier
                     c.Notes,
                     c.ScbaCount,
                     c.OfficerCount,
-                    c.ZugfuehrerCount);
+                    c.ZugfuehrerCount,
+                    c.VehicleType);
                 break;
             case UpdateForceUnitCommand c:
                 incident.UpdateForceUnit(clock, Operator(c.Operator), c.UnitId, c.Status, c.Notes);
@@ -324,4 +331,11 @@ public static class CommandApplier
             ? null
             : GeoPoint.TryCreate(latitude, longitude)
                 ?? throw new ArgumentException("Ungültige Koordinaten.", nameof(latitude));
+
+    // The same rule for a sign's offset: both null is the default place, anything else has to be in range.
+    private static LabelOffset? Offset(double? dx, double? dy) =>
+        dx is null && dy is null
+            ? null
+            : LabelOffset.TryCreate(dx, dy)
+                ?? throw new ArgumentException("Ungültiger Versatz.", nameof(dx));
 }

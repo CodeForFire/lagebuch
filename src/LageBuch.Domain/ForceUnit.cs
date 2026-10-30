@@ -26,7 +26,14 @@ public sealed record ForceUnit(
     Guid? NodeId = null,
 
     // Where the unit stands on the Lagekarte; null is "nicht auf der Karte". Same convention.
-    GeoPoint? Position = null)
+    GeoPoint? Position = null,
+
+    // The Fahrzeugtyp the taktisches Zeichen shows (LF, DLK …), copied from the Stammdaten vehicle
+    // when the unit is recorded; null draws the bare Kraftfahrzeug sign. Same convention.
+    string? VehicleType = null,
+
+    // How far the sign stands from its pin on the Lagekarte; null is the default place. Same convention.
+    LabelOffset? LabelOffset = null)
 {
     /// <summary>Mannschaft = Gesamtstärke abzüglich Zugführer und Führungskräfte.</summary>
     public int MannschaftCount => PersonnelCount - OfficerCount - ZugfuehrerCount;
@@ -45,7 +52,8 @@ public sealed record ForceUnit(
         string? notes = null,
         int scbaCount = 0,
         int officerCount = 0,
-        int zugfuehrerCount = 0)
+        int zugfuehrerCount = 0,
+        string? vehicleType = null)
     {
         if (string.IsNullOrWhiteSpace(brigade))
         {
@@ -86,7 +94,8 @@ public sealed record ForceUnit(
             string.IsNullOrWhiteSpace(status) ? null : status.Trim(),
             string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             officerCount,
-            zugfuehrerCount);
+            zugfuehrerCount,
+            VehicleType: VehicleTypes.Normalize(vehicleType));
     }
 
     /// <summary>
@@ -107,6 +116,12 @@ public sealed record ForceUnit(
     /// <summary>Returns a copy standing at <paramref name="position"/> on the Lagekarte, or off it when null.</summary>
     public ForceUnit WithPosition(GeoPoint? position) => this with { Position = position };
 
+    /// <summary>Returns a copy showing <paramref name="vehicleType"/> in its sign; see <see cref="VehicleTypes.Normalize"/>.</summary>
+    public ForceUnit WithVehicleType(string? vehicleType) => this with { VehicleType = VehicleTypes.Normalize(vehicleType) };
+
+    /// <summary>Returns a copy whose sign stands at <paramref name="offset"/> from its pin, or at the default place when null.</summary>
+    public ForceUnit WithLabelOffset(LabelOffset? offset) => this with { LabelOffset = offset };
+
     public IReadOnlyList<ForceUnitStrengthEdit> Edits { get; private init; } =
         Array.Empty<ForceUnitStrengthEdit>();
 
@@ -122,8 +137,10 @@ public sealed record ForceUnit(
         IEnumerable<ForceUnitStrengthEdit>? edits = null,
         int zugfuehrerCount = 0,
         Guid? nodeId = null,
-        GeoPoint? position = null)
-        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount, zugfuehrerCount, nodeId, position)
+        GeoPoint? position = null,
+        string? vehicleType = null,
+        LabelOffset? labelOffset = null)
+        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount, zugfuehrerCount, nodeId, position, vehicleType, labelOffset)
         {
             Edits = (edits ?? Enumerable.Empty<ForceUnitStrengthEdit>()).ToList(),
         };

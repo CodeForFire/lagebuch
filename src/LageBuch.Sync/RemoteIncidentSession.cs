@@ -519,6 +519,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void PlaceForceUnit(Guid unitId, GeoPoint? position) =>
         Send(new PlaceForceUnitCommand(Op(), unitId, position?.Latitude, position?.Longitude));
 
+    public void SetForceUnitVehicleType(Guid unitId, string? vehicleType) =>
+        Send(new SetForceUnitVehicleTypeCommand(Op(), unitId, vehicleType));
+
+    public void MoveForceUnitLabel(Guid unitId, LabelOffset? offset) =>
+        Send(new MoveForceUnitLabelCommand(Op(), unitId, offset?.Dx, offset?.Dy));
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Send(new PlaceRoleAssignmentCommand(Op(), assignmentId, nodeId, slot));
 
@@ -550,8 +556,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? notes = null,
         int scbaCount = 0,
         int officerCount = 0,
-        int zugfuehrerCount = 0) =>
-        Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount));
+        int zugfuehrerCount = 0,
+        string? vehicleType = null) =>
+        Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount, vehicleType));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
         Send(new UpdateForceUnitCommand(Op(), unitId, status, notes));

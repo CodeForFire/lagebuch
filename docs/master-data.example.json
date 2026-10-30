@@ -97,9 +97,9 @@
     { "shortcut": "spe", "text": "Bereich [X] absperren", "category": "Sicherung", "etb": true, "tasks": true }
   ],
   "vehicles": [
-    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false, "isOwn": true },
-    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true, "phone": "01 71 / 2 34 56 78", "email": "kdow@ff-musterstadt.example" },
-    { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false }
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false, "isOwn": true, "vehicleType": "HLF" },
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true, "phone": "01 71 / 2 34 56 78", "email": "kdow@ff-musterstadt.example", "vehicleType": "KdoW" },
+    { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false, "vehicleType": "LF" }
   ],
   "talkGroups": [
     { "name": "FW_MUSTER", "number": "1000", "kind": "tmo", "note": "Einsatzstelle" },

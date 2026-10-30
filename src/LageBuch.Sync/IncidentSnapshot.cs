@@ -135,7 +135,10 @@ public sealed record ForceUnitDto(
     int ZugfuehrerCount = 0,
     Guid? NodeId = null,
     double? PositionLatitude = null,
-    double? PositionLongitude = null);
+    double? PositionLongitude = null,
+    string? VehicleType = null,
+    double? LabelDx = null,
+    double? LabelDy = null);
 
 // Mirrors Domain.ForceUnitStrengthEdit: one prior Stärke retained on correction (#76), the
 // force-row sibling of EtbEntryEditDto.

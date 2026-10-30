@@ -806,13 +806,14 @@ public sealed class Incident
         string? notes = null,
         int scbaCount = 0,
         int officerCount = 0,
-        int zugfuehrerCount = 0)
+        int zugfuehrerCount = 0,
+        string? vehicleType = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount);
+        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount, vehicleType);
         _forces.Add(unit);
 
         // Optional clauses are omitted rather than printed empty, so a bare unit reads as
@@ -1349,7 +1350,8 @@ public sealed class Incident
             return previous;
         }
 
-        var updated = previous.WithPosition(position);
+        // Off the map, the sign's place goes with it: put back later, it starts from the default.
+        var updated = position is null ? previous.WithPosition(null).WithLabelOffset(null) : previous.WithPosition(position);
         _forces[index] = updated;
         if (previous.Position is null)
         {
@@ -1387,6 +1389,54 @@ public sealed class Incident
         CommandNodeKind.Partner => "Einsatzleitung",
         _ => "Abschnitt",
     };
+
+    /// <summary>
+    /// Sets the Fahrzeugtyp a unit's taktisches Zeichen shows, or clears it with null. For a unit
+    /// whose vehicle the Stammdaten did not know; the ETB records it, since it says what arrived.
+    /// </summary>
+    public ForceUnit SetForceUnitVehicleType(IClock clock, SessionOperator op, Guid unitId, string? vehicleType)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindForceUnitIndex(unitId);
+        var previous = _forces[index];
+        var updated = previous.WithVehicleType(vehicleType);
+        if (string.Equals(previous.VehicleType, updated.VehicleType, StringComparison.Ordinal))
+        {
+            return previous;
+        }
+
+        _forces[index] = updated;
+        var text = updated.VehicleType is { } type
+            ? $"{Label(updated)}: Fahrzeugtyp {type}"
+            : $"{Label(updated)}: Fahrzeugtyp entfernt";
+        AppendSystemEntry(clock, op, text, from: updated.CallSign);
+        return updated;
+    }
+
+    /// <summary>
+    /// Moves a unit's sign relative to its pin, or back to the default place with null. Only the
+    /// picture changes, so like dragging the pin it writes nothing to the ETB.
+    /// </summary>
+    public ForceUnit MoveForceUnitLabel(IClock clock, SessionOperator op, Guid unitId, LabelOffset? offset)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindForceUnitIndex(unitId);
+        var updated = _forces[index].WithLabelOffset(offset);
+        _forces[index] = updated;
+        return updated;
+    }
+
+    private int FindForceUnitIndex(Guid unitId)
+    {
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+    }
 
     private static string Label(ForceUnit unit) =>
         unit.CallSign is null ? unit.Brigade : $"{unit.Brigade} ({unit.CallSign})";
