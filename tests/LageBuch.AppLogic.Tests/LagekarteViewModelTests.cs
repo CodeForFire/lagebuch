@@ -521,6 +521,204 @@ public class LagekarteViewModelTests
         Assert.False(vm.CanSearchAddresses);
     }
 
+    [Fact]
+    public async Task A_saved_address_with_one_exact_hit_marks_the_Einsatzort_and_zooms_there()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12 with { HouseNumber = "12a", Position = Amperbruecke }, Hauptstrasse12];
+        var (session, _, _) = Open();
+        var changes = 0;
+        using var vm = new LagekarteViewModel(session, () => changes++, library);
+        session.SetAddress("Hauptstraße", null, "12", "82256", "Fürstenfeldbruck");
+        var entries = session.Incident.Journal.Count;
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(["ffb:Hauptstraße 12 Fürstenfeldbruck"], library.Searches);
+        Assert.Equal(Marktplatz, session.Incident.Location);
+        Assert.Equal(entries + 1, session.Incident.Journal.Count);
+        Assert.Equal(1, changes);
+        Assert.Empty(vm.AddressHits);
+        Assert.Equal(Marktplatz, vm.Map.Center);
+        Assert.Equal(LagekarteViewModel.EinsatzortZoom, vm.Map.Zoom);
+    }
+
+    [Fact]
+    public async Task A_changed_address_moves_the_Einsatzort_already_marked()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        var (session, _, _) = Open();
+        session.SetIncidentLocation(Amperbruecke);
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", null, null);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+        Assert.StartsWith("Einsatzort auf der Lagekarte verlegt", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_same_address_found_by_two_overlapping_packs_is_still_one_address()
+    {
+        var library = FfbLibrary();
+        library.Preinstall(FakeRegionPackLibrary.Pack("sta", "Landkreis Starnberg"));
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        library.Addresses["sta"] = [Hauptstrasse12];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", null, "Fürstenfeldbruck");
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+    }
+
+    [Fact]
+    public async Task A_saved_address_found_in_two_Orte_leaves_the_hits_to_pick_from()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12, Hauptstrasse12 with { Postcode = "82216", City = "Maisach", Position = Amperbruecke }];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", null, null);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Null(session.Incident.Location);
+        Assert.Equal(2, vm.AddressHits.Count);
+        Assert.Equal("Hauptstraße 12", vm.AddressQuery);
+    }
+
+    [Fact]
+    public async Task The_recorded_PLZ_and_Ort_pick_the_one_hit_that_fits()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12 with { Postcode = "82216", City = "Maisach", Position = Amperbruecke }, Hauptstrasse12];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", "82256", "Fürstenfeldbruck");
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+    }
+
+    [Fact]
+    public async Task The_recorded_PLZ_alone_picks_the_one_hit_that_fits()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12 with { Postcode = "82216", City = "Maisach", Position = Amperbruecke }, Hauptstrasse12];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", "82256", null);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+    }
+
+    [Fact]
+    public async Task A_recorded_Ort_matches_the_Ortsteil_OSM_tags()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12 with { City = "Maisach", Position = Amperbruecke }, Hauptstrasse12 with { Suburb = "Buchenau" }];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", null, "buchenau");
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+    }
+
+    [Fact]
+    public async Task A_hit_without_PLZ_or_Ort_contradicts_neither()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12 with { Postcode = string.Empty, City = string.Empty }];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", "82256", "Fürstenfeldbruck");
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+    }
+
+    [Fact]
+    public async Task One_address_tagged_twice_in_different_case_is_still_one_address()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12, Hauptstrasse12 with { HouseNumber = "12", City = "FÜRSTENFELDBRUCK", Position = Amperbruecke }];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "12", null, null);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Equal(Marktplatz, session.Incident.Location);
+    }
+
+    [Fact]
+    public async Task A_house_number_found_only_as_a_prefix_is_not_taken_for_the_address()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, "1", null, null);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Null(session.Incident.Location);
+        Assert.Single(vm.AddressHits);
+    }
+
+    [Fact]
+    public async Task A_saved_street_without_a_house_number_only_lists_the_hits()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        session.SetAddress("Hauptstraße", null, null, null, null);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Null(session.Incident.Location);
+        Assert.Single(vm.AddressHits);
+    }
+
+    [Fact]
+    public async Task Without_a_Kartenpaket_a_saved_address_marks_nothing()
+    {
+        var (session, vm, changes) = Open();
+        session.SetAddress("Hauptstraße", null, "12", null, null);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Null(session.Incident.Location);
+        Assert.Equal(0, changes());
+    }
+
+    [Fact]
+    public async Task A_closed_Einsatz_does_not_mark_the_Einsatzort_from_its_address()
+    {
+        var library = FfbLibrary();
+        library.Addresses["ffb"] = [Hauptstrasse12];
+        var (session, _, _) = Open();
+        session.SetAddress("Hauptstraße", null, "12", null, null);
+        session.Close();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+
+        await vm.LocateRecordedAddressAsync();
+
+        Assert.Null(session.Incident.Location);
+        Assert.Empty(library.Searches);
+    }
+
     private static FakeRegionPackLibrary FfbLibrary()
     {
         var library = new FakeRegionPackLibrary();

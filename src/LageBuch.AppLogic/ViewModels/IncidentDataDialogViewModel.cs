@@ -20,6 +20,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
+    private readonly Action? _onAddressSaved;
     private readonly IReadOnlyList<Street> _streets;
     private readonly IncidentNumberFormat? _incidentNumberFormat;
 
@@ -35,11 +36,13 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         IReadOnlyList<string>? keywordOptions = null,
         IReadOnlyList<string>? districts = null,
         IReadOnlyList<Street>? streets = null,
-        IncidentNumberFormat? incidentNumberFormat = null)
+        IncidentNumberFormat? incidentNumberFormat = null,
+        Action? onAddressSaved = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _onChanged = onChanged;
+        _onAddressSaved = onAddressSaved;
         _incidentNumberFormat = incidentNumberFormat;
         KeywordOptions = keywordOptions ?? [];
         _streets = streets ?? [];
@@ -180,6 +183,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         var number = NumberToSave;
 
         var changed = false;
+        var addressChanged = false;
         if (keyword != incident.Keyword)
         {
             _session.SetKeyword(keyword);
@@ -201,11 +205,18 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
                 Normalize(PostalCode),
                 Normalize(Place));
             changed = true;
+            addressChanged = true;
         }
 
         if (changed)
         {
             _onChanged();
+        }
+
+        // After the save, so whoever looks the address up reads the new one.
+        if (addressChanged)
+        {
+            _onAddressSaved?.Invoke();
         }
 
         Closed?.Invoke(this, EventArgs.Empty);

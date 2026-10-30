@@ -1,0 +1,1 @@
+Saving an address in the Einsatzdaten now marks the Einsatzort on the Karte and zooms there when the Kartenpaket knows exactly that address, and otherwise leaves the matching addresses in the KARTE search to pick from.
