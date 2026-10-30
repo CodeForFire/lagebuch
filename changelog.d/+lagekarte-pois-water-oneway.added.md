@@ -1,0 +1,1 @@
+From zoom 15 the Lagekarte names Feuerwachen, Krankenhäuser, Polizei, Schulen, Kitas, Pflegeheime, Rathäuser, Apotheken and Tankstellen beside a dot coloured by kind, names rivers and lakes, and from zoom 16 marks one-way streets with arrows.

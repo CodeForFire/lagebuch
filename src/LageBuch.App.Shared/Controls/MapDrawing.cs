@@ -112,7 +112,7 @@ public static class MapDrawing
         return result;
     }
 
-    // The text centred on `at`: level, or along its street turned with the map, the right way up.
+    // The text centred on `at`, or its pin on it: level, or along its street turned with the map, the right way up.
     private static Matrix Placement(MapLabel label, Point at, double rotation)
     {
         var angle = 0.0;
@@ -129,7 +129,8 @@ public static class MapDrawing
             }
         }
 
-        return Matrix.CreateTranslation(-label.TextSize.Width / 2, -label.TextSize.Height / 2) * Matrix.CreateRotation(angle) * Matrix.CreateTranslation(at.X, at.Y);
+        var pin = label.Pin ?? new Point(label.TextSize.Width / 2, label.TextSize.Height / 2);
+        return Matrix.CreateTranslation(-pin.X, -pin.Y) * Matrix.CreateRotation(angle) * Matrix.CreateTranslation(at.X, at.Y);
     }
 
     private static double Distance(Point a, Point b) => Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));

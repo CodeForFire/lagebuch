@@ -307,28 +307,49 @@
           </ToggleButton>
         </StackPanel>
 
-        <!-- What the water symbols mean, whenever they are on the map. Drawn like MapDrawing draws them. -->
+        <!-- What the water symbols and the POI dots mean, whenever they are on the map. Drawn like
+             MapDrawing and VectorTileRenderer draw them. -->
         <Border x:Name="WaterLegend" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8"
                 Background="#E6FFFFFF" CornerRadius="{StaticResource RadiusSm}" Padding="8,4"
-                IsVisible="{Binding ShowsWaterLegend}">
-          <WrapPanel>
-            <WrapPanel.Styles>
+                IsVisible="{Binding ShowsLegend}">
+          <StackPanel Spacing="2">
+            <StackPanel.Styles>
               <Style Selector="TextBlock">
                 <Setter Property="FontSize" Value="11" />
                 <Setter Property="Foreground" Value="#FF212121" />
                 <Setter Property="VerticalAlignment" Value="Center" />
                 <Setter Property="Margin" Value="4,0,10,0" />
               </Style>
-            </WrapPanel.Styles>
-            <Ellipse Width="11" Height="11" Fill="#FFD32F2F" Stroke="White" StrokeThickness="1.5" />
-            <TextBlock Text="Hydrant" />
-            <Ellipse Width="11" Height="11" Fill="White" Stroke="#FF1565C0" StrokeThickness="3" />
-            <TextBlock Text="Saugstelle" />
-            <Rectangle Width="11" Height="11" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" />
-            <TextBlock Text="Löschwasserbehälter" />
-            <Path Data="M 6,0 L 12,6 L 6,12 L 0,6 Z" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" VerticalAlignment="Center" />
-            <TextBlock Text="Löschteich" />
-          </WrapPanel>
+              <Style Selector="Ellipse.poi">
+                <Setter Property="Width" Value="8" />
+                <Setter Property="Height" Value="8" />
+                <Setter Property="Stroke" Value="White" />
+                <Setter Property="StrokeThickness" Value="1" />
+              </Style>
+            </StackPanel.Styles>
+            <WrapPanel x:Name="WaterPointKey" IsVisible="{Binding ShowsWaterLegend}">
+              <Ellipse Width="11" Height="11" Fill="#FFD32F2F" Stroke="White" StrokeThickness="1.5" />
+              <TextBlock Text="Hydrant" />
+              <Ellipse Width="11" Height="11" Fill="White" Stroke="#FF1565C0" StrokeThickness="3" />
+              <TextBlock Text="Saugstelle" />
+              <Rectangle Width="11" Height="11" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" />
+              <TextBlock Text="Löschwasserbehälter" />
+              <Path Data="M 6,0 L 12,6 L 6,12 L 0,6 Z" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" VerticalAlignment="Center" />
+              <TextBlock Text="Löschteich" />
+            </WrapPanel>
+            <WrapPanel x:Name="PoiKey" IsVisible="{Binding ShowsPoiLegend}">
+              <Ellipse Classes="poi" Fill="#FFE65100" />
+              <TextBlock Text="Feuerwehr" />
+              <Ellipse Classes="poi" Fill="#FF6A1B9A" />
+              <TextBlock Text="Krankenhaus · Polizei" />
+              <Ellipse Classes="poi" Fill="#FFAD1457" />
+              <TextBlock Text="Schule · Kita · Pflegeheim" />
+              <Ellipse Classes="poi" Fill="#FF455A64" />
+              <TextBlock Text="Rathaus · Apotheke" />
+              <Ellipse Classes="poi" Fill="#FF795548" />
+              <TextBlock Text="Tankstelle" />
+            </WrapPanel>
+          </StackPanel>
         </Border>
 
         <!-- ODbL: every map drawn from OSM data names its source. -->

@@ -96,6 +96,19 @@ public class MapLabelPlacementTests
         Assert.Equal(0, DirectionOf(placement), precision: 6);
     }
 
+    [AvaloniaTheory]
+    [InlineData(0)]
+    [InlineData(75)]
+    public void A_pinned_label_keeps_its_pin_on_its_spot_on_a_turned_map(double rotation)
+    {
+        // A Feuerwache's dot at the left end of its name.
+        var poi = new MapLabel("Feuerwehr", new StreamGeometry(), new Size(80, 14), default, null, 2, Brushes.Black, null, new Point(4, 7));
+
+        var (_, placement) = Assert.Single(MapDrawing.PlaceLabels([(poi, new Point(400, 250))], Screen, rotation));
+
+        Assert.Equal(new Point(400, 250), placement.Transform(new Point(4, 7)));
+    }
+
     // The way the text's baseline runs on screen, in degrees clockwise from east.
     private static double DirectionOf(Matrix placement)
     {

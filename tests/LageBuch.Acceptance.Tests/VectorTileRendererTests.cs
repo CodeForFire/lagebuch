@@ -96,6 +96,149 @@ public class VectorTileRendererTests
         Assert.True(labels.Single(l => l.Text == "Fürstenfeldbruck").Priority < labels.Single(l => l.Text == "Buchenau").Priority);
     }
 
+    [AvaloniaFact]
+    public void A_fire_station_is_named_beside_an_orange_dot_that_sits_on_it()
+    {
+        var tile = MvtTile.Decode(Poi("fire_station", "Feuerwehr Emmering", (2048, 2048)));
+
+        var label = Assert.Single(VectorTileRenderer.Labels(tile, zoom: 16, levels: 0, subX: 0, subY: 0));
+
+        Assert.Equal("Feuerwehr Emmering", label.Text);
+        Assert.Equal(new Point(128, 128), label.Anchor, new PointNear());
+        Assert.Equal(Color.FromRgb(0xE6, 0x51, 0x00), ((ISolidColorBrush)label.Ink).Color);
+        var pin = Assert.NotNull(label.Pin);
+        Assert.True(pin.X < 8, $"The dot is at {pin.X}, not before the name.");
+        Assert.True(label.Outline.FillContains(pin), "No dot is drawn at the pin.");
+    }
+
+    [AvaloniaFact]
+    public void Where_help_comes_from_outranks_a_street_and_a_school_gives_way_to_it()
+    {
+        var tile = MvtTile.Decode([
+            .. VectorTileFixtures.Tile(
+                "pois",
+                (VectorGeometryType.Point, [("kind", "fire_station"), ("name", "Feuerwehr Emmering")], [[(1000, 1000)]]),
+                (VectorGeometryType.Point, [("kind", "school"), ("name", "Grundschule Mitte")], [[(3000, 1000)]])),
+            .. Place("Fürstenfeldbruck", "locality", (3000, 3000)),
+            .. VectorTileFixtures.Tile("roads", (VectorGeometryType.LineString, [("kind", "minor_road"), ("kind_detail", "residential"), ("name", "Hauptstraße")], [[(0, 2048), (4096, 2048)]])),
+        ]);
+
+        var labels = VectorTileRenderer.Labels(tile, zoom: 16, levels: 0, subX: 0, subY: 0);
+
+        int Rank(string text) => labels.Single(l => l.Text == text).Priority;
+        Assert.True(Rank("Fürstenfeldbruck") < Rank("Feuerwehr Emmering"));
+        Assert.True(Rank("Feuerwehr Emmering") < Rank("Hauptstraße"));
+        Assert.True(Rank("Hauptstraße") < Rank("Grundschule Mitte"));
+    }
+
+    [AvaloniaFact]
+    public void A_social_facility_is_left_out_for_it_may_be_a_Tafel_as_well_as_an_Altenheim()
+    {
+        var tile = MvtTile.Decode(Poi("social_facility", "Brucker Tafel", (2048, 2048)));
+
+        Assert.Empty(VectorTileRenderer.Labels(tile, zoom: 17, levels: 0, subX: 0, subY: 0));
+    }
+
+    [AvaloniaFact]
+    public void An_unnamed_fire_station_is_called_Feuerwehr()
+    {
+        var tile = MvtTile.Decode(Poi("fire_station", null, (2048, 2048)));
+
+        Assert.Equal("Feuerwehr", Assert.Single(VectorTileRenderer.Labels(tile, zoom: 16, levels: 0, subX: 0, subY: 0)).Text);
+    }
+
+    [AvaloniaFact]
+    public void A_bench_is_not_a_poi_the_map_names()
+    {
+        var tile = MvtTile.Decode(Poi("bench", "Ruhebank", (2048, 2048)));
+
+        Assert.Empty(VectorTileRenderer.Labels(tile, zoom: 17, levels: 0, subX: 0, subY: 0));
+    }
+
+    [AvaloniaFact]
+    public void Further_out_than_zoom_15_no_poi_is_named()
+    {
+        var tile = MvtTile.Decode(Poi("hospital", "Klinikum Fürstenfeldbruck", (2048, 2048)));
+
+        Assert.Empty(VectorTileRenderer.Labels(tile, zoom: 14, levels: 0, subX: 0, subY: 0));
+        Assert.Single(VectorTileRenderer.Labels(tile, zoom: 15, levels: 0, subX: 0, subY: 0));
+    }
+
+    [AvaloniaFact]
+    public void A_river_is_named_along_its_line_in_water_blue()
+    {
+        var tile = MvtTile.Decode(VectorTileFixtures.Tile(
+            "water",
+            (VectorGeometryType.LineString, [("kind", "river"), ("name", "Amper")], [[(0, 1000), (4096, 3000)]])));
+
+        var label = Assert.Single(VectorTileRenderer.Labels(tile, zoom: 13, levels: 0, subX: 0, subY: 0));
+
+        Assert.Equal("Amper", label.Text);
+        Assert.Equal(Math.Atan2(2000, 4096), label.Angle ?? double.NaN, precision: 6);
+        Assert.Equal(Color.FromRgb(0x4D, 0x80, 0xB3), ((ISolidColorBrush)label.Ink).Color);
+    }
+
+    [AvaloniaFact]
+    public void A_stream_is_named_only_close_in()
+    {
+        var tile = MvtTile.Decode(VectorTileFixtures.Tile(
+            "water",
+            (VectorGeometryType.LineString, [("kind", "stream"), ("name", "Mühlbach")], [[(0, 2048), (4096, 2048)]])));
+
+        Assert.Empty(VectorTileRenderer.Labels(tile, zoom: 14, levels: 0, subX: 0, subY: 0));
+        Assert.Single(VectorTileRenderer.Labels(tile, zoom: 15, levels: 0, subX: 0, subY: 0));
+    }
+
+    [AvaloniaFact]
+    public void A_lake_is_named_level_from_the_zoom_its_label_point_asks_for()
+    {
+        var tile = MvtTile.Decode(VectorTileFixtures.Tile(
+            "water",
+            (VectorGeometryType.Point, [("kind", "lake"), ("name", "Pucher Meer"), ("min_zoom", "14")], [[(2048, 2048)]]),
+            (VectorGeometryType.Point, [("kind", "fountain"), ("name", "Marktbrunnen"), ("min_zoom", "0")], [[(1000, 1000)]])));
+
+        Assert.Empty(VectorTileRenderer.Labels(tile, zoom: 13, levels: 0, subX: 0, subY: 0));
+        var label = Assert.Single(VectorTileRenderer.Labels(tile, zoom: 14, levels: 0, subX: 0, subY: 0));
+        Assert.Equal("Pucher Meer", label.Text);
+        Assert.Null(label.Angle);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("yes", 16, true)]
+    [InlineData("yes", 15, false)]
+    [InlineData(null, 16, false)]
+    public void A_one_way_road_carries_arrows_from_zoom_16(string? oneway, int zoom, bool arrows)
+    {
+        using var bitmap = VectorTileRenderer.Render(MvtTile.Decode(Road(oneway)), zoom, levels: 0, subX: 0, subY: 0);
+
+        // The first arrow sits half a spacing in, at x 30, on the road's white fill.
+        Assert.Equal(arrows, PixelAt(bitmap, 30, 128).R < 0xC0);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("yes", true)]
+    [InlineData("-1", false)]
+    public void A_one_way_arrow_points_the_way_the_road_may_be_driven(string oneway, bool eastward)
+    {
+        using var bitmap = VectorTileRenderer.Render(MvtTile.Decode(Road(oneway)), zoom: 16, levels: 0, subX: 0, subY: 0);
+
+        // The arrow's broad end is west of its middle when it points east, east of it when west.
+        Assert.Equal(eastward, PixelAt(bitmap, 28, 129).R < 0xC0);
+        Assert.Equal(!eastward, PixelAt(bitmap, 32, 129).R < 0xC0);
+    }
+
+    // Earth under one residential road running east across the middle of the tile.
+    private static byte[] Road(string? oneway) =>
+    [
+        .. Layer("earth", "earth", WholeTile),
+        .. VectorTileFixtures.Tile(
+            "roads",
+            (VectorGeometryType.LineString, [("kind", "minor_road"), ("kind_detail", "residential"), .. oneway is null ? Array.Empty<(string, string)>() : [("oneway", oneway)]], [[(0, 2048), (4096, 2048)]])),
+    ];
+
+    private static byte[] Poi(string kind, string? name, (int X, int Y) at) =>
+        VectorTileFixtures.Tile("pois", (VectorGeometryType.Point, [("kind", kind), .. name is null ? Array.Empty<(string, string)>() : [("name", name)], ("min_zoom", "15")], [[at]]));
+
     private static byte[] Place(string name, string kind, (int X, int Y) at) =>
         VectorTileFixtures.Tile("places", (VectorGeometryType.Point, [("kind", kind), ("name", name), ("min_zoom", "0")], [[at]]));
 
