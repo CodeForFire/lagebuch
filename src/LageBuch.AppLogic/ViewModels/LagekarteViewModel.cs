@@ -536,6 +536,8 @@ public sealed class LagekarteAddressRow(AddressHit hit, string? packName)
     internal (string Street, string HouseNumber, string Postcode, string City) Key { get; } =
         (hit.Street.ToUpperInvariant(), hit.HouseNumber.ToUpperInvariant(), hit.Postcode, hit.City.ToUpperInvariant());
 
+    private bool HasNoPlace => _hit.City.Length == 0 && _hit.Suburb.Length == 0;
+
     /// <summary>
     /// This Straße and Hausnummer, and not elsewhere than the recorded PLZ and Ort. The search
     /// matches by prefix, so "Hauptstraße 1" also finds 12 and 1a; those are not the address.
@@ -544,8 +546,14 @@ public sealed class LagekarteAddressRow(AddressHit hit, string? packName)
     internal bool IsExactly(string street, string houseNumber, string? postalCode, string? place) =>
         Same(_hit.Street, street)
         && Same(_hit.HouseNumber, houseNumber)
-        && (postalCode is null || _hit.Postcode.Length == 0 || Same(_hit.Postcode, postalCode))
-        && (place is null || (_hit.City.Length == 0 && _hit.Suburb.Length == 0) || Same(_hit.City, place) || Same(_hit.Suburb, place));
+        && Fits(_hit.Postcode, postalCode)
+        && FitsPlace(place);
+
+    // The Ort may be what OSM tags as the city or as the Ortsteil.
+    private bool FitsPlace(string? place) =>
+        place is null || HasNoPlace || Same(_hit.City, place) || Same(_hit.Suburb, place);
+
+    private static bool Fits(string tagged, string? recorded) => recorded is null || tagged.Length == 0 || Same(tagged, recorded);
 
     private static bool Same(string a, string b) => string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
 }
