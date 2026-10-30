@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
-"""Score a Stryker run on the lines a branch changed, not on whole files.
+"""Mutate and score only the lines a branch changed, not whole files.
 
-Stryker can only narrow a run to files: `--since` and `--mutate` both pick
-files, and the score it reports covers every mutant in them. A one-line fix to
-a file with old survivors then fails the pull-request gate on debt the fix never
-touched (#638, #639, #666 and #667 all did). This script narrows the score to
-the lines themselves:
+Stryker's `--since` picks whole files, and the score it reports covers every
+mutant in them. A one-line fix to a file with old survivors then fails the
+pull-request gate on debt the fix never touched (#638, #639, #666 and #667 all
+did). Mutating whole files is also slow where a file is hot: a migration adds a
+line to SchemaGuard.cs, whose column table alone is 255 static mutants that
+each run the whole Persistence suite. This script narrows both the run and the
+score to the lines themselves:
 
-    files  --base REF --project-dir DIR
-        Print the .cs files under DIR that changed since the merge base of REF
-        and HEAD, working tree included, one per line, relative to DIR. The
-        Makefile turns them into Stryker `--mutate` patterns.
+    patterns  --base REF --project-dir DIR
+        Print a Stryker `--mutate` pattern for each .cs file under DIR that
+        gained lines since the merge base of REF and HEAD, working tree
+        included, one per line, relative to DIR: `Sqlite/SchemaGuard.cs{a..b}`.
+        Stryker reads `{a..b}` as a 0-based character span and mutates only
+        what lies wholly inside one, so a mutant reaching past the changed
+        lines -- removing a whole method around a one-line change -- is left
+        to the weekly full run.
 
     score  --report JSON --base REF --project-dir DIR --threshold N [--summary MD]
         Read Stryker's mutation-report.json, keep the mutants whose span
         overlaps a changed line, and score them the way Stryker does:
         (killed + timeout) / (killed + timeout + survived + no coverage).
-        Exit 1 below N. The survivors on changed lines are listed; the other
-        survivors in the touched files are listed as well, but only for
-        information: they never fail the run.
+        Exit 1 below N. The survivors are listed.
 
     --self-test
-        Check the diff parser and the scoring against canned input.
+        Check the diff parser, the spans and the scoring against canned input.
 
 Deleted lines have no mutants, so a hunk that only removes code changes no
 score. A run with no mutant on a changed line passes: there is nothing to judge.
@@ -50,7 +54,6 @@ class Score:
     detected: int = 0
     undetected: int = 0
     survivors: list[tuple[str, dict]] = field(default_factory=list)
-    other_survivors: list[tuple[str, dict]] = field(default_factory=list)
 
     @property
     def valid(self) -> int:
@@ -79,6 +82,24 @@ def changed_lines(diff: str) -> dict[str, list[tuple[int, int]]]:
     return ranges
 
 
+def spans(text: str, ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Turn inclusive 1-based line ranges into Stryker's character spans.
+
+    Roslyn counts UTF-16 code units and keeps a `\\r` as a character of its
+    line, so a line's length is measured the same way.
+    """
+    lines = text.split("\n")
+    starts = [0]
+    for line in lines:
+        starts.append(starts[-1] + len(line.encode("utf-16-le")) // 2 + 1)
+    result = []
+    for first, last in ranges:
+        last = min(last, len(lines))
+        if first <= last:
+            result.append((starts[first - 1], starts[last] - 1))
+    return result
+
+
 def score(report: dict, root: Path, ranges: dict[str, list[tuple[int, int]]]) -> Score:
     """Score the mutants whose span overlaps a changed line."""
     result = Score()
@@ -93,10 +114,7 @@ def score(report: dict, root: Path, ranges: dict[str, list[tuple[int, int]]]) ->
                 continue
             first = mutant["location"]["start"]["line"]
             last = mutant["location"]["end"]["line"]
-            on_change = any(first <= end and start <= last for start, end in ranges[relative])
-            if not on_change:
-                if status in UNDETECTED:
-                    result.other_survivors.append((relative, mutant))
+            if not any(first <= end and start <= last for start, end in ranges[relative]):
                 continue
             if status in DETECTED:
                 result.detected += 1
@@ -139,21 +157,17 @@ def render(result: Score, threshold: float) -> str:
     if result.survivors:
         lines += ["", "Surviving on changed lines — each needs a test, or a `// Stryker disable once` with a reason:", ""]
         lines += survivor_rows(result.survivors)
-    if result.other_survivors:
-        lines += [
-            "",
-            "<details><summary>Older survivors in the touched files "
-            f"({len(result.other_survivors)}, not counted)</summary>",
-            "",
-        ]
-        lines += survivor_rows(result.other_survivors)
-        lines += ["", "</details>"]
     return "\n".join(lines) + "\n"
 
 
-def cmd_files(args: argparse.Namespace) -> int:
-    for name in diff_since(args.base, args.project_dir, "--name-only", "--diff-filter=d").splitlines():
-        print(Path(name).relative_to(args.project_dir).as_posix())
+def cmd_patterns(args: argparse.Namespace) -> int:
+    root = Path(git("rev-parse", "--show-toplevel").strip())
+    ranges = changed_lines(diff_since(args.base, args.project_dir, "-U0"))
+    for name in sorted(ranges):
+        text = (root / name).read_text(encoding="utf-8-sig")
+        braces = "".join(f"{{{start}..{end}}}" for start, end in spans(text, ranges[name]))
+        if braces:
+            print(Path(name).relative_to(args.project_dir).as_posix() + braces)
     return 0
 
 
@@ -185,6 +199,13 @@ def self_test() -> int:
     ranges = changed_lines(diff)
     assert ranges == {"src/P/A.cs": [(11, 12), (22, 22)]}, ranges
 
+    # Line 2 starts after "ab\n"; "ä" is one unit, the emoji two, "\r" one.
+    text = "ab\nä😀c\r\nlast"
+    assert spans(text, [(1, 1)]) == [(0, 2)], spans(text, [(1, 1)])
+    assert spans(text, [(2, 2)]) == [(3, 8)], spans(text, [(2, 2)])
+    assert spans(text, [(2, 3)]) == [(3, 13)], spans(text, [(2, 3)])
+    assert spans(text, [(3, 9), (7, 9)]) == [(9, 13)], "a range past the end is clamped or dropped"
+
     def mutant(status: str, first: int, last: int | None = None) -> dict:
         return {
             "mutatorName": "Equality mutation",
@@ -202,14 +223,14 @@ def self_test() -> int:
             mutant("NoCoverage", 5, 30),   # a block spanning the change counts
             mutant("CompileError", 11),    # neither caught nor missed
             mutant("Ignored", 22),
-            mutant("Survived", 40),        # old debt: listed, not counted
+            mutant("Survived", 40),        # off the changed lines: not counted
         ]},
         "/repo/src/P/Untouched.cs": {"mutants": [mutant("Survived", 11)]},
     }}
     result = score(report, root, ranges)
     assert (result.detected, result.undetected) == (2, 2), result
     assert result.percent == 50.0, result.percent
-    assert [m["location"]["start"]["line"] for _, m in result.other_survivors] == [40]
+    assert sorted(m["location"]["start"]["line"] for _, m in result.survivors) == [5, 22]
     assert "fails the 80 %" in render(result, 80), render(result, 80)
     assert "passes the 50 %" in render(result, 50)
 
@@ -225,10 +246,10 @@ def main() -> int:
         return self_test()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
-    files = sub.add_parser("files", help="list the changed .cs files to mutate")
-    files.add_argument("--base", required=True)
-    files.add_argument("--project-dir", required=True)
-    files.set_defaults(run=cmd_files)
+    patterns = sub.add_parser("patterns", help="print a --mutate pattern for each changed .cs file")
+    patterns.add_argument("--base", required=True)
+    patterns.add_argument("--project-dir", required=True)
+    patterns.set_defaults(run=cmd_patterns)
     scorer = sub.add_parser("score", help="score the mutants on changed lines")
     scorer.add_argument("--report", required=True)
     scorer.add_argument("--base", required=True)

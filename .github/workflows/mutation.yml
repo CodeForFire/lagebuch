@@ -8,10 +8,9 @@ name: Mutation testing
 #   tests, and a ratchet: it fails when a project drops below the floor in its
 #   stryker-config.json (thresholds.break), which the PR gate cannot see,
 #   since it never counts code a PR leaves alone.
-# - mutate-diff: on a pull request, only the files it changes, scored on the
-#   lines it changes and failing below 80%. It judges new work, not the debt
-#   already in the weekly report; old survivors in a touched file are listed
-#   but never counted (scripts/mutation-diff-score.py).
+# - mutate-diff: on a pull request, only the lines it adds or changes, failing
+#   below 80%. It judges new work, not the debt already in the weekly report
+#   (scripts/mutation-diff-score.py).
 #
 # See CONTRIBUTING.md#mutation-testing.
 
@@ -98,10 +97,10 @@ jobs:
     name: mutate-diff (${{ matrix.project }})
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # Stryker mutates every changed file whole and scores only the changed
-    # lines, so a PR adding a migration mutates all of Migrations.cs and
-    # IncidentRepository.cs: ~1,500 mutants against ~600 Persistence tests.
-    # That took 27 minutes on #798 and passed 30 on #820.
+    # Until only the changed lines were mutated, a PR adding a migration
+    # mutated all of Migrations.cs and SchemaGuard.cs, whose column table is
+    # static and runs the whole Persistence suite per mutant: 27 minutes on
+    # #798, past 30 on #820. The headroom stays for a PR that rewrites a file.
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -161,7 +160,7 @@ jobs:
           fi
           if [ -f "$report" ]; then
             {
-              echo "<details><summary>Whole-file report (not gated)</summary>"
+              echo "<details><summary>Stryker report (not gated)</summary>"
               echo
               cat "$report"
               echo
