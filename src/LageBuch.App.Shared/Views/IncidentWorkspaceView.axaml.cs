@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.App.Shared.Views;
@@ -9,6 +11,7 @@ public partial class IncidentWorkspaceView : UserControl
 {
     private IncidentWorkspaceViewModel? _vm;
     private OperatorPromptViewModel? _prompt;
+    private Flyout? _openRailAddFlyout;
 
     public IncidentWorkspaceView()
     {
@@ -58,6 +61,25 @@ public partial class IncidentWorkspaceView : UserControl
             AttachPrompt();
         }
     }
+
+    // The rail's „+“ flyout, or on a phone the one MEHR's MODUL HINZUFÜGEN opens: a Button in a
+    // Flyout does not dismiss it, and a choice is made in one tap. On a phone MEHR closes too, so
+    // the entry just added is what the Lagebuchführer sees. Posted: Click is raised before the
+    // button runs its command, and closing the popup first takes the command's binding with it.
+    // A refused edit keeps the flyout open: NavEditError is shown in it, and nowhere else.
+    private void OnRailAddFlyoutOpened(object? sender, EventArgs e) => _openRailAddFlyout = sender as Flyout;
+
+    private void OnRailChoiceClick(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (_vm?.NavEditError is not null)
+        {
+            return;
+        }
+
+        _openRailAddFlyout?.Hide();
+        _openRailAddFlyout = null;
+        MoreModulesButton.Flyout?.Hide();
+    });
 
     // F9 on a due ILS Rückmeldung (#544): focus only, so the Rückmeldung takes a second key.
     private void OnReminderFocusRequested(object? sender, EventArgs e) =>
