@@ -462,18 +462,52 @@ public class WorkspaceNavItemsTests
     [Fact]
     public void A_refused_add_surfaces_as_a_status_not_a_crash()
     {
-        var (vm, _) = Editable(
-            new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) },
-            new[] { Template(Nachbereitung, "Nachbereitung") });
+        var oversized = new ChecklistTemplate(
+            Vorlage,
+            "Hochwasser",
+            Enumerable.Range(0, ChecklistList.MaxItemCount + 1).Select(i => new ChecklistTemplateItem($"Punkt {i}", false)).ToList());
+        var (vm, session) = Editable(templates: new[] { oversized });
+        var open = vm.SelectedNavItem;
 
-        // Offered before another device added the same Vorlage.
-        vm.AddNavEntryCommand.Execute(new AddableNavEntryViewModel("NACHBEREITUNG", null, Template(Nachbereitung, "Nachbereitung")));
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.AddableChecklists));
 
-        Assert.Equal("Diese Checkliste ist bereits im Einsatz.", vm.NavEditError);
+        Assert.Equal("Checkliste überschreitet die zulässige Größe.", vm.NavEditError);
+        Assert.Same(open, vm.SelectedNavItem);
+        Assert.DoesNotContain(session.Incident.Checklists, l => l.Id == Vorlage);
 
         vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
 
         Assert.Null(vm.NavEditError);
+    }
+
+    // The „+“ was offered before another device added the same Vorlage, or the list is hidden here:
+    // the Lagebuchführer wants that Checkliste, and it is already in the Einsatz, so it opens.
+    [Fact]
+    public void Adding_a_template_already_in_the_einsatz_opens_that_checkliste()
+    {
+        var (vm, session) = Editable(
+            new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) },
+            new[] { Template(Nachbereitung, "Nachbereitung") });
+        vm.HideNavItemCommand.Execute(Entry(vm, KeyOf(Nachbereitung)));
+        var stale = new AddableNavEntryViewModel("NACHBEREITUNG", null, Template(Nachbereitung, "Nachbereitung"));
+
+        vm.AddNavEntryCommand.Execute(stale);
+
+        Assert.Null(vm.NavEditError);
+        Assert.Same(Entry(vm, KeyOf(Nachbereitung)), vm.SelectedNavItem);
+        Assert.True(session.Incident.NavOverrides[KeyOf(Nachbereitung)]);
+        Assert.Single(session.Incident.Checklists, l => l.Id == Nachbereitung);
+
+        // Already on the rail: it only opens.
+        vm.SelectedNavItem = Entry(vm, NavModules.Etb);
+        vm.NavEditError = "Ein früherer Fehler.";
+        var journal = session.Incident.Journal.Count;
+
+        vm.AddNavEntryCommand.Execute(stale);
+
+        Assert.Null(vm.NavEditError);
+        Assert.Same(Entry(vm, KeyOf(Nachbereitung)), vm.SelectedNavItem);
+        Assert.Equal(journal, session.Incident.Journal.Count);
     }
 
     [Fact]

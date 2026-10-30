@@ -1438,6 +1438,23 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     {
         if (entry?.Template is { } template)
         {
+            var key = IdKey(template.Id);
+
+            // Offered before another device added the same Vorlage, or the list is hidden here: it
+            // is already in the Einsatz, so it comes back on the rail and opens, with no refusal.
+            if (_session.Incident.Checklists.Any(list => list.Id == template.Id))
+            {
+                if (!NavItems.Any(item => string.Equals(item.RailKey, key, StringComparison.Ordinal))
+                    && !EditRail(() => _session.SetNavVisibility(key, true)))
+                {
+                    return;
+                }
+
+                NavEditError = null;
+                ShowNavItem(NavItems.FirstOrDefault(item => string.Equals(item.RailKey, key, StringComparison.Ordinal)));
+                return;
+            }
+
             var seed = new ChecklistSeed(
                 template.Id,
                 template.Title,
@@ -1447,7 +1464,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             // there is nothing to open yet, and the rail shows it when it lands.
             if (EditRail(() => _session.AddChecklist(seed)))
             {
-                var key = IdKey(template.Id);
                 ShowNavItem(NavItems.FirstOrDefault(item => string.Equals(item.RailKey, key, StringComparison.Ordinal)));
             }
         }
