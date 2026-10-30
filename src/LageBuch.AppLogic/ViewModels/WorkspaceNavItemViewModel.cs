@@ -70,7 +70,8 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
     /// never hovers, so a tooltip would not tell them. It follows the entry's position on the rail;
     /// null past the tenth, which has no digit left.
     /// </summary>
-    public string? ShortcutHint { get; init; }
+    [ObservableProperty]
+    private string? _shortcutHint;
 
     /// <summary>
     /// Whether this is the entry currently open. The wide rail gets this from

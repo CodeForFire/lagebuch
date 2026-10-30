@@ -510,6 +510,42 @@ public class WorkspaceNavItemsTests
         Assert.Equal(journal, session.Incident.Journal.Count);
     }
 
+    // Recreating the items re-templates the open module and drops keyboard focus, which a peer's
+    // rail edit must not do to whoever is typing here.
+    [Fact]
+    public void A_rail_change_keeps_the_surviving_items_and_the_selection()
+    {
+        var (vm, session) = Editable(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+        var tasks = Entry(vm, NavModules.Tasks);
+        vm.SelectedNavItem = tasks;
+        var survivors = vm.NavItems.Where(i => i.RailKey != NavModules.Files).ToList();
+
+        session.Incident.SetNavVisibility(NavModules.Files, false);
+        session.SaveExternalChange();
+
+        Assert.Equal(survivors.Count, vm.NavItems.Count);
+        for (var i = 0; i < survivors.Count; i++)
+        {
+            Assert.Same(survivors[i], vm.NavItems[i]);
+            Assert.Equal(ShortcutRegistry.HintFor(i), vm.NavItems[i].ShortcutHint);
+        }
+
+        Assert.Same(tasks, vm.SelectedNavItem);
+        Assert.True(tasks.IsSelected);
+
+        // Back again: the survivors stay, and the returning entry is a new item in its old slot.
+        session.Incident.SetNavVisibility(NavModules.Files, true);
+        session.SaveExternalChange();
+
+        Assert.All(survivors, s => Assert.Contains(s, vm.NavItems));
+        Assert.Equal(vm.PrimaryNavItems.Concat(vm.OverflowNavItems), vm.NavItems);
+        Assert.Same(tasks, vm.SelectedNavItem);
+        for (var i = 0; i < vm.NavItems.Count; i++)
+        {
+            Assert.Equal(ShortcutRegistry.HintFor(i), vm.NavItems[i].ShortcutHint);
+        }
+    }
+
     [Fact]
     public void Shortcut_hints_follow_the_rail_after_a_hide()
     {

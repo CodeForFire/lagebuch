@@ -156,6 +156,28 @@ public class WorkspaceRailEditingTests
         Assert.Null(vm.NavEditError);
     }
 
+    // Another device hides an entry while the Lagebuchführer is typing here: the rail updates
+    // around the open module, and the caret stays where it was.
+    [AvaloniaFact]
+    public void A_remote_rail_change_keeps_focus_in_the_etb()
+    {
+        var (vm, session) = Editable();
+        var window = Show(vm);
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        var box = Named<TextBox>(window, "EtbTextBox");
+        box.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        window.AssertFocused(box);
+
+        // A joined device's command, applied on the host the way CommandApplier does it.
+        session.Incident.SetNavVisibility(NavModules.Files, false);
+        session.SaveExternalChange();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.DoesNotContain(ModuleLabels.Header(NavModules.Files), WorkspaceRenderHelper.RailHeaders(window));
+        window.AssertFocused(Named<TextBox>(window, "EtbTextBox"));
+    }
+
     [AvaloniaFact]
     public void The_etb_context_menu_item_is_disabled()
     {

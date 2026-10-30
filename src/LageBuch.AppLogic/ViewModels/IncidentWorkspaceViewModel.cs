@@ -1194,8 +1194,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// <see cref="ChecklistViewModel"/>.
     /// </summary>
     /// <remarks>
-    /// Only the cheap <see cref="WorkspaceNavItemViewModel"/>s are recreated, so each gets the
-    /// shortcut hint of its new position. The open entry stays open when it is still on the rail;
+    /// <see cref="NavItems"/> is updated in place: an entry still on the rail keeps its
+    /// <see cref="WorkspaceNavItemViewModel"/>, moved to its new position, and every entry gets the
+    /// shortcut hint of that position. The open entry stays open when it is still on the rail;
     /// when it left, the entry that took its place opens — the next one, or the previous one when
     /// it was last. A Checkliste that left the rail has its view model disposed, which releases its
     /// session subscription.
@@ -1225,15 +1226,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Contacts] = Contacts,
         };
 
-        // The outgoing items hold a subscription on their checklist; RebuildNavSplit below releases
-        // the overflow's own.
-        foreach (var item in NavItems)
-        {
-            item.Dispose();
-        }
-
-        NavItems.Clear();
-
+        // An entry that stays on the rail keeps its item: replacing it would re-template the open
+        // module and drop the caret of whoever is typing, when the change came from another device.
+        var existing = NavItems.ToDictionary(item => item.RailKey, StringComparer.Ordinal);
+        var wanted = new List<WorkspaceNavItemViewModel>();
         var kept = new Dictionary<Guid, ChecklistViewModel>();
         foreach (var spec in specs)
         {
@@ -1246,22 +1242,42 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 }
 
                 kept[list.Id] = checklist;
-                NavItems.Add(new WorkspaceNavItemViewModel(
-                    WorkspaceNavItemViewModel.HeaderFor(list.Title), checklist, checklist, railKey: railKey)
-                {
-                    ShortcutHint = ShortcutRegistry.HintFor(NavItems.Count),
-                });
+                wanted.Add(existing.Remove(railKey, out var listItem)
+                    ? listItem
+                    : new WorkspaceNavItemViewModel(WorkspaceNavItemViewModel.HeaderFor(list.Title), checklist, checklist, railKey: railKey));
                 continue;
             }
 
             if (modules.TryGetValue(spec.ModuleKey, out var content))
             {
-                NavItems.Add(new WorkspaceNavItemViewModel(
-                    ModuleLabels.Header(spec.ModuleKey), content, moduleKey: spec.ModuleKey, railKey: railKey)
-                {
-                    ShortcutHint = ShortcutRegistry.HintFor(NavItems.Count),
-                });
+                wanted.Add(existing.Remove(railKey, out var moduleItem)
+                    ? moduleItem
+                    : new WorkspaceNavItemViewModel(ModuleLabels.Header(spec.ModuleKey), content, moduleKey: spec.ModuleKey, railKey: railKey));
             }
+        }
+
+        // What is left in existing has left the rail; its item holds a subscription on its
+        // checklist, and RebuildNavSplit below releases the overflow's own.
+        foreach (var gone in existing.Values)
+        {
+            NavItems.Remove(gone);
+            gone.Dispose();
+        }
+
+        for (var i = 0; i < wanted.Count; i++)
+        {
+            var item = wanted[i];
+            var at = NavItems.IndexOf(item);
+            if (at < 0)
+            {
+                NavItems.Insert(i, item);
+            }
+            else if (at != i)
+            {
+                NavItems.Move(at, i);
+            }
+
+            item.ShortcutHint = ShortcutRegistry.HintFor(i);
         }
 
         // What is left are the Checklisten that left the rail.
@@ -1302,9 +1318,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     }
 
     /// <summary>
-    /// Rebuilds the rail only when its entries or their order changed. Recreating the items
-    /// re-templates the tab strip and drops keyboard focus, so a change that leaves the rail as it
-    /// is — the first Aufgabe making Aufgaben live — only refreshes „Ausblenden“ and the „+“.
+    /// Rebuilds the rail only when its entries or their order changed, so a change that leaves the
+    /// rail as it is — the first Aufgabe making Aufgaben live — only refreshes „Ausblenden“ and the
+    /// „+“ and does not touch the tab strip at all.
     /// </summary>
     private void RebuildRailIfChanged()
     {
