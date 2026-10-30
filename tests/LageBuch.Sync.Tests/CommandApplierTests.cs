@@ -987,7 +987,6 @@ public class CommandApplierTests
     [Theory]
     [InlineData("\"title\":null,\"items\":[]")]
     [InlineData("\"title\":\"T\",\"items\":null")]
-    [InlineData("\"title\":\"T\",\"items\":[null]")]
     [InlineData("\"title\":\"T\",\"items\":[{\"text\":null,\"isMandatory\":true}]")]
     public void An_add_checklist_body_with_null_fields_is_rejected_cleanly(string fields)
     {
@@ -1003,6 +1002,22 @@ public class CommandApplierTests
         Assert.ThrowsAny<ArgumentException>(() => CommandApplier.Apply(command, incident, clock));
         Assert.Equal(before, incident.Checklists.Count);
         Assert.Equal(journal, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void An_add_checklist_body_with_a_null_item_is_rejected_with_its_reason()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var before = incident.Checklists.Count;
+        var json = "{\"$type\":\"addChecklist\",\"operator\":{\"name\":\"Maier\"},\"templateId\":\""
+            + Guid.NewGuid() + "\",\"title\":\"T\",\"items\":[{\"text\":\"a\",\"isMandatory\":true},null]}";
+
+        var command = SyncJson.Deserialize<SyncCommand>(json);
+
+        var ex = Assert.Throws<ArgumentException>(() => CommandApplier.Apply(command, incident, clock));
+        Assert.StartsWith("Ein Checklistenpunkt fehlt.", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(before, incident.Checklists.Count);
     }
 
     [Fact]

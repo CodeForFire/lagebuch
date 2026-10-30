@@ -517,6 +517,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void AddChecklist(ChecklistSeed seed)
     {
+        // Stryker disable once Statement : only Sync.Hosting.Tests drive RemoteIncidentSession
         ArgumentNullException.ThrowIfNull(seed);
         Send(new AddChecklistCommand(
             Op(), seed.Id, seed.Title, seed.Items.Select(i => new ChecklistSeedItemDto(i.Text, i.IsMandatory)).ToList()));

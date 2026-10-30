@@ -2,6 +2,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
@@ -194,7 +195,8 @@ public class WorkspaceNavItemsTests
 
     private static (IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) Editable(
         IReadOnlyList<ChecklistSeed>? seeds = null,
-        IReadOnlyList<ChecklistTemplate>? templates = null)
+        IReadOnlyList<ChecklistTemplate>? templates = null,
+        IReadOnlyList<NavEntry>? navigation = null)
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(
@@ -207,7 +209,11 @@ public class WorkspaceNavItemsTests
             session,
             clock,
             new FakeTicker(),
-            MasterDataSet.Empty with { ChecklistTemplates = templates ?? Array.Empty<ChecklistTemplate>() },
+            MasterDataSet.Empty with
+            {
+                ChecklistTemplates = templates ?? Array.Empty<ChecklistTemplate>(),
+                Navigation = navigation ?? Array.Empty<NavEntry>(),
+            },
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
@@ -578,6 +584,187 @@ public class WorkspaceNavItemsTests
         {
             Assert.Equal(ShortcutRegistry.HintFor(i), vm.NavItems[i].ShortcutHint);
         }
+    }
+
+    [Fact]
+    public void Hiding_an_entry_above_the_open_one_keeps_the_open_one_open()
+    {
+        var (vm, _) = Editable();
+        var contacts = Entry(vm, NavModules.Contacts);
+        vm.SelectedNavItem = contacts;
+
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Tasks));
+
+        Assert.Same(contacts, vm.SelectedNavItem);
+        Assert.True(contacts.IsSelected);
+    }
+
+    [Fact]
+    public void A_hidden_checkliste_comes_back_through_ausgeblendet_and_still_works()
+    {
+        var (vm, session) = Editable(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+        var old = Entry(vm, KeyOf(Nachbereitung));
+        vm.HideNavItemCommand.Execute(old);
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.HiddenNavEntries, e => e.RailKey == KeyOf(Nachbereitung)));
+        var back = Entry(vm, KeyOf(Nachbereitung));
+        session.ToggleChecklistItem(session.Incident.Checklists.Single(l => l.Id == Nachbereitung).Items[0].Id);
+
+        Assert.True(back.IsComplete);
+
+        // The item that left the rail let go of its checklist.
+        Assert.NotSame(old, back);
+        Assert.False(old.IsComplete);
+    }
+
+    [Fact]
+    public void A_checkliste_the_layout_unticked_is_offered_under_ausgeblendet()
+    {
+        var (vm, _) = Editable(
+            new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) },
+            navigation: new[] { new NavEntry(NavModules.Etb, null, true), new NavEntry(NavModules.Checklist, Nachbereitung, false) });
+
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == KeyOf(Nachbereitung));
+        var hidden = Assert.Single(vm.HiddenNavEntries, e => e.RailKey == KeyOf(Nachbereitung));
+        Assert.Equal("NACHBEREITUNG", hidden.Header);
+        Assert.Null(hidden.Template);
+    }
+
+    [Fact]
+    public void A_narrow_workspace_keeps_its_modules_narrow_after_weiter_bearbeiten()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<ChecklistSeed>());
+        var vm = new IncidentWorkspaceViewModel(
+            LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch"),
+            clock,
+            new FakeTicker(),
+            MasterDataSet.Empty,
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+        vm.IsNarrow = true;
+
+        vm.ContinueEditingCommand.Execute(null);
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmPendingPrompt();
+
+        Assert.False(vm.IsReadOnly);
+        Assert.True(vm.EtbTabs.IsNarrow);
+    }
+
+    [Fact]
+    public void A_list_added_and_hidden_in_one_snapshot_moves_from_addable_to_hidden()
+    {
+        var (vm, session) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        Assert.Single(vm.AddableChecklists);
+
+        session.Incident.AddChecklist(new FixedClock(T0), new SessionOperator("Maier"), Seed(Vorlage, "Hochwasser", ("Punkt", true)));
+        session.Incident.SetNavVisibility(KeyOf(Vorlage), false);
+        session.SaveExternalChange();
+
+        Assert.Empty(vm.AddableChecklists);
+        Assert.Contains(vm.HiddenNavEntries, e => e.RailKey == KeyOf(Vorlage));
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == KeyOf(Vorlage));
+    }
+
+    [Fact]
+    public void An_unrelated_change_does_not_reset_the_plus_choices()
+    {
+        var (vm, session) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+        var hiddenChanges = 0;
+        var addableChanges = 0;
+        vm.HiddenNavEntries.CollectionChanged += (_, _) => hiddenChanges++;
+        vm.AddableChecklists.CollectionChanged += (_, _) => addableChanges++;
+
+        session.AddJournalEntry(EtbDirection.Incoming, "Lage unverändert");
+
+        Assert.Equal(0, hiddenChanges);
+        Assert.Equal(0, addableChanges);
+        Assert.Single(vm.HiddenNavEntries);
+    }
+
+    [Fact]
+    public void The_hide_command_refuses_no_entry()
+    {
+        var (vm, _) = Editable();
+
+        Assert.False(vm.HideNavItemCommand.CanExecute(null));
+    }
+
+    // A joined client sends the command and returns; the list lands with the host's broadcast.
+    [Fact]
+    public void Adding_a_template_on_a_joined_client_waits_for_the_broadcast()
+    {
+        var clock = new FixedClock(T0);
+        var local = LocalIncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<ChecklistSeed>());
+        var remote = new SnapshotRoundTrippingSession(local) { DefersRailEdits = true };
+        var vm = new IncidentWorkspaceViewModel(
+            remote,
+            clock,
+            new FakeTicker(),
+            MasterDataSet.Empty with { ChecklistTemplates = new[] { Template(Vorlage, "Hochwasser") } },
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+        var open = vm.SelectedNavItem;
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.AddableChecklists));
+
+        Assert.Null(vm.NavEditError);
+        Assert.Same(open, vm.SelectedNavItem);
+        Assert.DoesNotContain(vm.NavItems, i => i.RailKey == KeyOf(Vorlage));
+
+        remote.DeliverRailEdits();
+
+        Assert.Contains(vm.NavItems, i => i.RailKey == KeyOf(Vorlage));
+        Assert.Empty(vm.AddableChecklists);
+    }
+
+    [Fact]
+    public void A_refused_hide_at_the_cap_shows_the_german_sentence_alone()
+    {
+        var (vm, session) = Editable();
+        for (var i = 0; i < Incident.MaxNavOverrides; i++)
+        {
+            session.SetNavVisibility($"x{i}", true);
+        }
+
+        vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Files));
+
+        Assert.Equal("Zu viele ausgeblendete Einträge.", vm.NavEditError);
+        Assert.Contains(vm.NavItems, i => i.RailKey == NavModules.Files);
+    }
+
+    [Fact]
+    public void Adding_a_checkliste_updates_the_save_time_and_the_etb()
+    {
+        var (vm, _) = Editable(templates: new[] { Template(Vorlage, "Hochwasser") });
+        vm.LastSavedAt = null;
+        vm.Etb.HideSystemEntries = false;
+        var before = vm.Etb.Entries.Count;
+
+        vm.AddNavEntryCommand.Execute(Assert.Single(vm.AddableChecklists));
+
+        Assert.Equal(T0, vm.LastSavedAt);
+        Assert.Equal(before + 1, vm.Etb.Entries.Count);
+        Assert.Contains(vm.Etb.Entries, e => e.Text == "Checkliste „Hochwasser“ hinzugefügt");
+    }
+
+    [Fact]
+    public void The_hide_command_hears_when_a_trupp_starts()
+    {
+        var (vm, session) = Editable();
+        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        var raised = 0;
+        vm.HideNavItemCommand.CanExecuteChanged += (_, _) => raised++;
+
+        session.StartScbaTrupp(session.Incident.ScbaTrupps.Single().Id);
+
+        Assert.True(raised > 0);
     }
 
     [Fact]
