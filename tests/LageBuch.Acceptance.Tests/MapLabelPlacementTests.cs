@@ -51,6 +51,27 @@ public class MapLabelPlacementTests
         Assert.Equal(["Kottgeisering"], placed.Select(p => p.Label.Text));
     }
 
+    [AvaloniaFact]
+    public void A_name_under_a_hydrant_s_label_is_left_out()
+    {
+        var street = Label("Hauptstraße", new Size(80, 12), priority: 2);
+
+        var placed = MapDrawing.PlaceLabels([(street, new Point(140, 106))], Screen, reserved: [new Rect(150, 98, 40, 16)]);
+
+        Assert.Empty(placed);
+    }
+
+    [AvaloniaFact]
+    public void A_name_beside_a_hydrant_s_label_is_drawn()
+    {
+        var street = Label("Hauptstraße", new Size(80, 12), priority: 2);
+
+        // The street ends at x 180; the label starts clear of the gap kept around a name.
+        var placed = MapDrawing.PlaceLabels([(street, new Point(140, 106))], Screen, reserved: [new Rect(183, 98, 40, 16)]);
+
+        Assert.Single(placed);
+    }
+
     [AvaloniaTheory]
     [InlineData(0, 0)]
     [InlineData(170, -10)] // turned nearly upside down, the name is flipped to read left to right
