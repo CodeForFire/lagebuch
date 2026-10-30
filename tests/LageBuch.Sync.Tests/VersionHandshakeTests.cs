@@ -258,16 +258,16 @@ public class VersionHandshakeTests
     {
         // 27 adds editRoleAssignment, a command a client may send. A host at 26 has it nowhere in
         // its allowlist and would reject it, so a 26 and a 27 must not connect.
-        Assert.Equal(27, SyncProtocol.ProtocolVersion);
-        Assert.Equal(27, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 27, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 27, int.MaxValue);
     }
 
     [Fact]
-    public void The_per_Einsatz_rail_raises_the_protocol_and_the_floor_to_twenty_seven()
+    public void The_per_Einsatz_rail_raises_the_protocol_and_the_floor_to_twenty_eight()
     {
-        // 27 adds setNavVisibility and addChecklist, commands a client may send. A host at 26 has
-        // neither in its allowlist and would reject them, so a 26 and a 27 must not connect.
-        Assert.Equal(27, SyncProtocol.ProtocolVersion);
-        Assert.Equal(27, SyncProtocol.MinimumProtocolVersion);
+        // 28 adds setNavVisibility and addChecklist, commands a client may send. A host at 27 has
+        // neither in its allowlist and would reject them, so a 27 and a 28 must not connect.
+        Assert.Equal(28, SyncProtocol.ProtocolVersion);
+        Assert.Equal(28, SyncProtocol.MinimumProtocolVersion);
     }
 }
