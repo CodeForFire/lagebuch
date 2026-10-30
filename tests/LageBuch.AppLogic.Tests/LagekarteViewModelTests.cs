@@ -150,8 +150,28 @@ public class LagekarteViewModelTests
         vm.PlaceEinsatzortCommand.Execute(null);
         vm.MapTappedCommand.Execute(Marktplatz);
 
-        Assert.Single(vm.Markers);
+        Assert.Equal("Einsatzort", Assert.Single(vm.Markers).AutomationName);
         Assert.Empty(vm.Signs);
+    }
+
+    [Fact]
+    public void A_sign_not_yet_moved_stands_up_and_to_the_right_of_its_pin()
+    {
+        Assert.Equal(28, LagekarteMarker.DefaultLabelOffset.Dx, precision: 6);
+        Assert.Equal(-44, LagekarteMarker.DefaultLabelOffset.Dy, precision: 6);
+    }
+
+    [Fact]
+    public void A_unit_row_names_the_feuerwehr_and_status_under_the_funkrufname_or_only_the_status_without_one()
+    {
+        var withCallSign = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1", status: "Im Einsatz");
+        var withoutCallSign = ForceUnit.Create("FF Musterstadt", 9, status: "Im Einsatz");
+        var bare = ForceUnit.Create("FF Musterstadt", 9);
+
+        Assert.Equal("FF Musterstadt · Im Einsatz", new LagekarteUnitRow(withCallSign).Detail);
+        Assert.Equal("Im Einsatz", new LagekarteUnitRow(withoutCallSign).Detail);
+        Assert.Equal("FF Musterstadt", new LagekarteUnitRow(withoutCallSign).Title);
+        Assert.Equal(string.Empty, new LagekarteUnitRow(bare).Detail);
     }
 
     [Fact]

@@ -153,7 +153,8 @@ public class LagekarteSyncTests
         var unit = incident.AddForceUnit(clock, new SessionOperator("Host", "FFB 1"), "Aich", 9);
         incident.MoveForceUnitLabel(clock, new SessionOperator("Host", "FFB 1"), unit.Id, new LabelOffset(10, 10));
 
-        Assert.Throws<ArgumentException>(() => CommandApplier.Apply(new MoveForceUnitLabelCommand(Peer, unit.Id, dx, dy), incident, clock));
+        var refused = Assert.Throws<ArgumentException>(() => CommandApplier.Apply(new MoveForceUnitLabelCommand(Peer, unit.Id, dx, dy), incident, clock));
+        Assert.StartsWith("Ungültiger Versatz.", refused.Message, StringComparison.Ordinal);
 
         Assert.Equal(new LabelOffset(10, 10), incident.Forces.Single().LabelOffset);
     }

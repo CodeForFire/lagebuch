@@ -193,6 +193,50 @@ public class TacticalSignTests
         Assert.Null(VehicleTypes.Find(value));
 
     [Fact]
+    public void The_catalogue_names_the_feuerwehr_and_rettungsdienst_vehicles_in_their_usual_order()
+    {
+        Assert.Equal(
+            ["LF", "HLF", "TLF", "TSF", "DLK", "RW", "ELW 1", "ELW 2", "KdoW", "MTW", "GW-A", "GW-G", "GW-L", "SW", "WLF", "RTW", "NEF", "KTW"],
+            VehicleTypes.All.Select(t => t.Code));
+        Assert.Equal(
+            [
+                "Löschgruppenfahrzeug", "Hilfeleistungslöschgruppenfahrzeug", "Tanklöschfahrzeug", "Tragkraftspritzenfahrzeug",
+                "Drehleiter mit Korb", "Rüstwagen", "Einsatzleitwagen 1", "Einsatzleitwagen 2", "Kommandowagen",
+                "Mannschaftstransportwagen", "Gerätewagen Atemschutz", "Gerätewagen Gefahrgut", "Gerätewagen Logistik",
+                "Schlauchwagen", "Wechselladerfahrzeug", "Rettungswagen", "Notarzteinsatzfahrzeug", "Krankentransportwagen",
+            ],
+            VehicleTypes.All.Select(t => t.Name));
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("  ", null)]
+    [InlineData(" DLK ", "DLK")]
+    [InlineData("TLF 4000", "TLF 4000")]
+    public void A_stored_vehicle_type_reads_back_trimmed_and_blank_as_none(string? stored, string? expected) =>
+        Assert.Equal(expected, VehicleTypes.FromStored(stored));
+
+    [Fact]
+    public void A_stored_vehicle_type_over_the_cap_reads_back_as_none_instead_of_failing()
+    {
+        Assert.Null(VehicleTypes.FromStored(new string('X', VehicleTypes.MaxLength + 1)));
+        Assert.Null(VehicleTypes.FromStored($"  {new string('X', VehicleTypes.MaxLength + 1)}  "));
+        Assert.Equal(new string('X', VehicleTypes.MaxLength), VehicleTypes.FromStored($"  {new string('X', VehicleTypes.MaxLength)}  "));
+    }
+
+    [Fact]
+    public void The_refusals_say_what_was_wrong()
+    {
+        var (incident, clock, op) = NewIncident();
+        var unknown = Guid.NewGuid();
+
+        Assert.Equal($"Einheit {unknown} nicht gefunden.", Assert.Throws<KeyNotFoundException>(() => incident.MoveForceUnitLabel(clock, op, unknown, null)).Message);
+        Assert.StartsWith("Der Fahrzeugtyp darf höchstens 16 Zeichen lang sein.", Assert.Throws<ArgumentException>(() => VehicleTypes.Normalize(new string('X', 17))).Message, StringComparison.Ordinal);
+        Assert.StartsWith("The offset must be finite and within the cap.", Assert.Throws<ArgumentOutOfRangeException>(() => new LabelOffset(double.NaN, 0)).Message, StringComparison.Ordinal);
+        Assert.StartsWith("The offset must be finite and within the cap.", Assert.Throws<ArgumentOutOfRangeException>(() => new LabelOffset(0, double.NaN)).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Every_catalogue_code_fits_the_cap_and_is_unique()
     {
         Assert.All(VehicleTypes.All, t => Assert.InRange(t.Code.Length, 1, VehicleTypes.MaxLength));

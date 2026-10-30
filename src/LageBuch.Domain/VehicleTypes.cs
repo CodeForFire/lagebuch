@@ -36,10 +36,9 @@ public static class VehicleTypes
     /// <summary>The catalogue entry for <paramref name="value"/>, ignoring case and surrounding blanks; null when there is none.</summary>
     public static VehicleType? Find(string? value)
     {
+        // No code is blank, so a blank or null value finds nothing without a check of its own.
         var code = value?.Trim();
-        return string.IsNullOrEmpty(code)
-            ? null
-            : All.FirstOrDefault(t => string.Equals(t.Code, code, StringComparison.OrdinalIgnoreCase));
+        return All.FirstOrDefault(t => string.Equals(t.Code, code, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
