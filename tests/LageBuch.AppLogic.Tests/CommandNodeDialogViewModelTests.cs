@@ -58,7 +58,6 @@ public class CommandNodeDialogViewModelTests
     [Theory]
     [InlineData(CommandNodeKind.Abschnitt, "Abschnitt bearbeiten")]
     [InlineData(CommandNodeKind.Bereitstellung, "Bereitstellung bearbeiten")]
-    [InlineData(CommandNodeKind.Partner, "Einsatzleitung bearbeiten")]
     public void Edit_mode_names_the_dialog_for_the_kind_and_seeds_the_fields(CommandNodeKind kind, string title)
     {
         var session = NewSession();
@@ -81,7 +80,8 @@ public class CommandNodeDialogViewModelTests
     public void Post_mode_has_no_name_or_auftrag_and_seeds_the_post()
     {
         var session = NewSession();
-        session.UpdateLeadershipPost("Feuerwehrhaus", "Florian Emmering", "08141 123", "TMO FW_MUSTER 1000");
+        session.UpdateLeadershipPost(
+            "Feuerwehrhaus", "Florian Emmering", "08141 123", new Funkgruppen(["FW_MUSTER 1000", "FW_MUSTER 1001"], ["301_F"]));
 
         var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
 
@@ -89,10 +89,156 @@ public class CommandNodeDialogViewModelTests
         Assert.Equal("SPEICHERN", vm.PrimaryText);
         Assert.False(vm.ShowName);
         Assert.False(vm.ShowAuftrag);
+        Assert.True(vm.ShowFunkgruppen);
+        Assert.False(vm.ShowFunkgruppe);
         Assert.Equal("Feuerwehrhaus", vm.Standort);
         Assert.Equal("Florian Emmering", vm.Rufname);
         Assert.Equal("08141 123", vm.Telefon);
-        Assert.Equal("TMO FW_MUSTER 1000", vm.Funkgruppe);
+        Assert.Equal(["FW_MUSTER 1000", "FW_MUSTER 1001"], vm.TmoSlots.Select(s => s.Text));
+        Assert.Equal(["301_F"], vm.DmoSlots.Select(s => s.Text));
+        Assert.False(vm.HasChanges);
+    }
+
+    [Fact]
+    public void An_empty_post_offers_one_empty_tmo_and_one_empty_dmo_field_and_saves_empty()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
+
+        var tmo = Assert.Single(vm.TmoSlots);
+        var dmo = Assert.Single(vm.DmoSlots);
+        Assert.Null(tmo.Text);
+        Assert.Null(dmo.Text);
+        Assert.False(tmo.CanRemove);
+        Assert.False(tmo.RemoveCommand.CanExecute(null));
+
+        vm.Standort = "Feuerwehrhaus";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(Funkgruppen.Empty, session.Incident.LeadershipPost.Funkgruppen);
+        Assert.Equal("Feuerwehrhaus", session.Incident.LeadershipPost.Standort);
+    }
+
+    [Fact]
+    public void Add_stops_at_three_of_a_kind_and_remove_keeps_one()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
+
+        vm.AddTmoCommand.Execute(null);
+        vm.AddTmoCommand.Execute(null);
+
+        Assert.Equal(3, vm.TmoSlots.Count);
+        Assert.False(vm.AddTmoCommand.CanExecute(null));
+        Assert.True(vm.AddDmoCommand.CanExecute(null));
+        Assert.All(vm.TmoSlots, s => Assert.True(s.CanRemove));
+
+        vm.TmoSlots[1].RemoveCommand.Execute(null);
+        Assert.Equal(2, vm.TmoSlots.Count);
+        Assert.True(vm.AddTmoCommand.CanExecute(null));
+
+        vm.TmoSlots[0].RemoveCommand.Execute(null);
+        var last = Assert.Single(vm.TmoSlots);
+        Assert.False(last.CanRemove);
+        Assert.False(last.RemoveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Post_saves_each_kind_in_order_without_blanks_or_repeats()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
+        vm.AddTmoCommand.Execute(null);
+        vm.AddTmoCommand.Execute(null);
+        vm.TmoSlots[0].Text = " FW_MUSTER 1000 ";
+        vm.TmoSlots[1].Text = "  ";
+        vm.TmoSlots[2].Text = "FW_MUSTER 1000";
+        vm.DmoSlots[0].Text = "301_F";
+
+        Assert.True(vm.HasChanges);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(new Funkgruppen(["FW_MUSTER 1000"], ["301_F"]), session.Incident.LeadershipPost.Funkgruppen);
+    }
+
+    [Fact]
+    public void Each_kind_suggests_only_its_own_stammdaten_groups_without_the_kind()
+    {
+        var master = MasterDataSet.Empty with
+        {
+            TalkGroups =
+            [
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+                new TalkGroup("FW_NACHBAR", "2000", TalkGroupKind.Tmo),
+            ],
+        };
+
+        var vm = CommandNodeDialogViewModel.ForPost(NewSession(), master);
+
+        Assert.Equal(["FW_MUSTER 1000", "FW_NACHBAR 2000"], vm.TmoOptions);
+        Assert.Equal(["301_F"], vm.DmoOptions);
+        Assert.Same(vm.TmoOptions, Assert.Single(vm.TmoSlots).Options);
+        Assert.Same(vm.DmoOptions, Assert.Single(vm.DmoSlots).Options);
+        Assert.Equal("Funkgruppe DMO", vm.DmoSlots[0].AccessibleName);
+    }
+
+    [Fact]
+    public void A_group_typed_in_other_case_saves_in_the_catalogues_spelling_and_an_unknown_one_as_typed()
+    {
+        var master = MasterDataSet.Empty with { TalkGroups = [new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo)] };
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, master);
+        vm.AddTmoCommand.Execute(null);
+        vm.TmoSlots[0].Text = "fw_muster 1000";
+        vm.TmoSlots[1].Text = "Kanal Süd";
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(["FW_MUSTER 1000", "Kanal Süd"], session.Incident.LeadershipPost.Funkgruppen.Tmo);
+    }
+
+    [Fact]
+    public void A_partner_einsatzleitung_gets_the_tmo_and_dmo_fields_and_an_abschnitt_the_single_one()
+    {
+        var session = NewSession();
+
+        var partner = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Partner, null, "Polizei");
+        var abschnitt = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Abschnitt, null, "Nord");
+
+        Assert.True(partner.ShowFunkgruppen);
+        Assert.False(partner.ShowFunkgruppe);
+        Assert.False(abschnitt.ShowFunkgruppen);
+        Assert.True(abschnitt.ShowFunkgruppe);
+
+        partner.TmoSlots[0].Text = "POL 1";
+        partner.DmoSlots[0].Text = "301_F";
+        partner.SaveCommand.Execute(null);
+
+        var node = Assert.Single(session.Incident.CommandNodes);
+        Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), node.Funkgruppen);
+        Assert.Null(node.Funkgruppe);
+
+        var edit = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, node.Id);
+        Assert.Equal("Einsatzleitung bearbeiten", edit.Title);
+        Assert.Equal(["POL 1"], edit.TmoSlots.Select(s => s.Text));
+        edit.DmoSlots[0].Text = "302_F";
+        edit.SaveCommand.Execute(null);
+        Assert.Equal(new Funkgruppen(["POL 1"], ["302_F"]), session.Incident.CommandNodes.Single().Funkgruppen);
+    }
+
+    [Fact]
+    public void Changing_tmo_keeps_a_peers_dmo_edit()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost("Feuerwehrhaus", null, null, new Funkgruppen(["FW_MUSTER 1000"], ["301_F"]));
+        var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
+
+        session.UpdateLeadershipPost("Feuerwehrhaus", null, null, new Funkgruppen(["FW_MUSTER 1000"], ["301_F", "302_F"]));
+        vm.TmoSlots[0].Text = "FW_MUSTER 1001";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(new Funkgruppen(["FW_MUSTER 1001"], ["301_F", "302_F"]), session.Incident.LeadershipPost.Funkgruppen);
     }
 
     [Fact]
@@ -192,11 +338,12 @@ public class CommandNodeDialogViewModelTests
         again.Standort = "Feuerwehrhaus";
         again.Rufname = "Florian Emmering";
         again.Telefon = "08141 123";
-        again.Funkgruppe = "TMO X";
+        again.TmoSlots[0].Text = "X";
         again.SaveCommand.Execute(null);
 
         var post = session.Incident.LeadershipPost;
-        Assert.Equal(("Feuerwehrhaus", "Florian Emmering", "08141 123", "TMO X"), (post.Standort, post.Rufname, post.Telefon, post.Funkgruppe));
+        Assert.Equal(("Feuerwehrhaus", "Florian Emmering", "08141 123"), (post.Standort, post.Rufname, post.Telefon));
+        Assert.Equal(new Funkgruppen(["X"], null), post.Funkgruppen);
         Assert.Equal(1, changes[0]);
     }
 
@@ -472,14 +619,14 @@ public class CommandNodeDialogViewModelTests
         session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", null, null);
         var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
 
-        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 12345", "TMO FW_MUSTER 1000");
+        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 12345", new Funkgruppen(["FW_MUSTER 1000"], null));
         vm.Standort = "ELW am Marktplatz";
         vm.SaveCommand.Execute(null);
 
         var post = session.Incident.LeadershipPost;
         Assert.Equal(
-            ("ELW am Marktplatz", "Florian Emmering 1", "08141 12345", "TMO FW_MUSTER 1000"),
-            (post.Standort, post.Rufname, post.Telefon, post.Funkgruppe));
+            ("ELW am Marktplatz", "Florian Emmering 1", "08141 12345", new Funkgruppen(["FW_MUSTER 1000"], null)),
+            (post.Standort, post.Rufname, post.Telefon, post.Funkgruppen));
     }
 
     [Fact]

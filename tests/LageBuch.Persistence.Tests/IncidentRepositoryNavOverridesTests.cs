@@ -90,7 +90,7 @@ public sealed class IncidentRepositoryNavOverridesTests : IDisposable
 
         Assert.Empty(loaded.NavOverrides);
         Assert.Equal(DBNull.Value, Scalar("SELECT nav_overrides FROM incident_meta;"));
-        Assert.Equal(37L, Scalar("SELECT version FROM schema_version;"));
+        Assert.Equal((long)Migrations.CurrentVersion, Scalar("SELECT version FROM schema_version;"));
     }
 
     private static Incident NewIncident() =>

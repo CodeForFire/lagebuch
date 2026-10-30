@@ -164,15 +164,23 @@ public static class SyncProtocol
     /// which a host at 27 does not know, so the floor rises to 28. The snapshot carries
     /// <c>navOverrides</c>.
     /// </para>
+    /// <para>
+    /// 29: an Einsatzleitung's TMO and DMO Funkgruppen (#828). <c>updateLeadershipPost</c> carries
+    /// <c>funkgruppenTmo</c> and <c>funkgruppenDmo</c> in place of <c>funkgruppe</c>, and
+    /// <c>addCommandNode</c> and <c>updateCommandNode</c> carry them for a partner; the snapshot's
+    /// post and nodes the same. Each command carries the whole post or node, so a client at 28 editing
+    /// one would send no lists, which a host at 29 reads as "none" -- wiping what another device
+    /// entered, the <c>setAddress</c> case of 8. The floor rises to 29.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 28;
+    public const int ProtocolVersion = 29;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 28;
+    public const int MinimumProtocolVersion = 29;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

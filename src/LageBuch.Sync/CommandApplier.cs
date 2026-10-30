@@ -2,6 +2,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 
@@ -71,10 +72,21 @@ public static class CommandApplier
                     c.Standort,
                     c.Funkgruppe,
                     c.Rufname,
-                    c.Telefon);
+                    c.Telefon,
+                    new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo));
                 break;
             case UpdateCommandNodeCommand c:
-                incident.UpdateCommandNode(clock, Operator(c.Operator), c.NodeId, c.Name, c.Auftrag, c.Standort, c.Funkgruppe, c.Rufname, c.Telefon);
+                incident.UpdateCommandNode(
+                    clock,
+                    Operator(c.Operator),
+                    c.NodeId,
+                    c.Name,
+                    c.Auftrag,
+                    c.Standort,
+                    c.Funkgruppe,
+                    c.Rufname,
+                    c.Telefon,
+                    new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo));
                 break;
             case DissolveCommandNodeCommand c:
                 incident.DissolveCommandNode(clock, Operator(c.Operator), c.NodeId);
@@ -107,7 +119,8 @@ public static class CommandApplier
                     new ChecklistSeed(c.TemplateId, c.Title, ToSeedItems(c.Items)));
                 break;
             case UpdateLeadershipPostCommand c:
-                incident.UpdateLeadershipPost(clock, Operator(c.Operator), c.Standort, c.Rufname, c.Telefon, c.Funkgruppe);
+                incident.UpdateLeadershipPost(
+                    clock, Operator(c.Operator), c.Standort, c.Rufname, c.Telefon, new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo));
                 break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(

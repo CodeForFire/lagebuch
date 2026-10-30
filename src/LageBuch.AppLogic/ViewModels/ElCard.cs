@@ -40,7 +40,7 @@ public sealed partial class ElCard : ObservableObject
         StufeChoices = BuildStufeChoices(null);
     }
 
-    /// <summary>Opens the dialog for the Standort, Rufname, Telefon and Funkgruppe; cannot execute on a read-only Einsatz.</summary>
+    /// <summary>Opens the dialog for the Standort, Rufname, Telefon and Funkgruppen; cannot execute on a read-only Einsatz.</summary>
     public IRelayCommand EditPostCommand { get; }
 
     /// <summary>Sets the Einsatzleiter, handing over from a running one; off on a read-only Einsatz.</summary>
@@ -62,7 +62,10 @@ public sealed partial class ElCard : ObservableObject
     private string? _telefon;
 
     [ObservableProperty]
-    private string? _funkgruppe;
+    private string? _tmo;
+
+    [ObservableProperty]
+    private string? _dmo;
 
     /// <summary>The Einsatzleiter: a running Leiter with no node and no free-text Abschnitt.</summary>
     [ObservableProperty]
@@ -96,6 +99,9 @@ public sealed partial class ElCard : ObservableObject
     /// <summary>Stufe A to D, then "Keine"; replaced only on a real change (#408).</summary>
     public IReadOnlyList<StufeChoice> StufeChoices { get; private set; }
 
+    /// <summary>Funkgruppen of one kind as the card shows them, one per line; null when there are none.</summary>
+    internal static string? Lines(IReadOnlyList<string> groups) => groups.Count == 0 ? null : string.Join('\n', groups);
+
     /// <summary>Takes the Einsatzleitung row of the reporting line and the incident's post and Stufe.</summary>
     public void Update(ReportingEntry entry, LeadershipPost post, Fuehrungsstufe? stufe, FuehrungsstufeSuggestion suggestion)
     {
@@ -106,7 +112,8 @@ public sealed partial class ElCard : ObservableObject
         Standort = post.Standort;
         Rufname = post.Rufname;
         Telefon = post.Telefon;
-        Funkgruppe = post.Funkgruppe;
+        Tmo = Lines(post.Funkgruppen.Tmo);
+        Dmo = Lines(post.Funkgruppen.Dmo);
         Leiter = BoardPersonRow.Follow(Leiter, entry.Leiter);
         Melder = BoardPersonRow.Follow(Melder, entry.Melder);
         BoardPersonRow.Reconcile(Assistants, entry.Others, _onAssistant);

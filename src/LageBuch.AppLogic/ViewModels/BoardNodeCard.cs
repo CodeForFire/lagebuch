@@ -115,6 +115,14 @@ public sealed partial class BoardNodeCard : ObservableObject
     [ObservableProperty]
     private string? _funkgruppe;
 
+    /// <summary>A partner Einsatzleitung's TMO Funkgruppen, one per line; null when none.</summary>
+    [ObservableProperty]
+    private string? _tmo;
+
+    /// <summary>A partner Einsatzleitung's DMO Funkgruppen, one per line; null when none.</summary>
+    [ObservableProperty]
+    private string? _dmo;
+
     [ObservableProperty]
     private string? _standort;
 
@@ -199,6 +207,8 @@ public sealed partial class BoardNodeCard : ObservableObject
         Name = node.Name;
         Auftrag = node.Auftrag;
         Funkgruppe = node.Funkgruppe;
+        Tmo = ElCard.Lines(node.Funkgruppen.Tmo);
+        Dmo = ElCard.Lines(node.Funkgruppen.Dmo);
         Standort = node.Standort;
         Rufname = node.Rufname;
         Telefon = node.Telefon;

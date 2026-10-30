@@ -929,13 +929,47 @@ public class CommandApplierTests
         Assert.Equal(Fuehrungsstufe.C, incident.Fuehrungsstufe);
         Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
 
-        ApplyOverWire(new UpdateLeadershipPostCommand(client, "Feuerwehrhaus", "Florian EL", "0172", "TG 1"), incident, clock);
+        ApplyOverWire(new UpdateLeadershipPostCommand(client, "Feuerwehrhaus", "Florian EL", "0172", ["TG 1"], ["301_F"]), incident, clock);
         Assert.Equal("Feuerwehrhaus", incident.LeadershipPost.Standort);
-        Assert.Equal("TG 1", incident.LeadershipPost.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["TG 1"], ["301_F"]), incident.LeadershipPost.Funkgruppen);
         Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
 
         ApplyOverWire(new SetFuehrungsstufeCommand(client, null), incident, clock);
         Assert.Null(incident.Fuehrungsstufe);
+    }
+
+    [Fact]
+    public void A_post_with_a_fourth_tmo_over_the_wire_is_refused_and_changes_nothing()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var client = new OperatorDto("Maier", "FFB 2");
+
+        Assert.Throws<ArgumentException>(() => ApplyOverWire(
+            new UpdateLeadershipPostCommand(client, "Feuerwehrhaus", null, null, ["1", "2", "3", "4"], null), incident, clock));
+
+        Assert.Equal(LeadershipPost.Empty, incident.LeadershipPost);
+    }
+
+    [Fact]
+    public void A_partners_funkgruppen_over_the_wire_are_set_on_forming_and_on_correction()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var client = new OperatorDto("Maier", "FFB 2");
+
+        ApplyOverWire(
+            new AddCommandNodeCommand(client, CommandNodeKind.Partner, "Polizei", null, FunkgruppenTmo: ["POL 1"]), incident, clock);
+        var partner = Assert.Single(incident.CommandNodes);
+        Assert.Equal(new Funkgruppen(["POL 1"], null), partner.Funkgruppen);
+
+        ApplyOverWire(
+            new UpdateCommandNodeCommand(client, partner.Id, "Polizei", null, null, null, null, null, ["POL 1"], ["301_F"]), incident, clock);
+        Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), Assert.Single(incident.CommandNodes).Funkgruppen);
+
+        Assert.Throws<ArgumentException>(() => ApplyOverWire(
+            new AddCommandNodeCommand(client, CommandNodeKind.Abschnitt, "Nord", null, FunkgruppenDmo: ["302_F"]), incident, clock));
+        Assert.Single(incident.CommandNodes);
     }
 
     private static AddChecklistCommand AddChecklistOf(OperatorDto op, Guid id, int items) =>

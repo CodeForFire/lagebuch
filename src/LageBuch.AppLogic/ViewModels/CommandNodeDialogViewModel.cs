@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -10,7 +11,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// <summary>
 /// The Führung board's one form: forms a Bereitstellung, Abschnitt, Unterabschnitt or partner
 /// Einsatzleitung with all its details, edits an existing node, or edits the Einsatzleitung
-/// Feuerwehr's own post (Standort, Rufname, Telefon, Funkgruppe). Buffered until the primary button,
+/// Feuerwehr's own post (Standort, Rufname, Telefon, TMO and DMO Funkgruppen). Buffered until the primary button,
 /// with the Einsatzdaten dialog's contract: a discard question on ABBRECHEN after typing (#652) and
 /// <see cref="Closed"/> on every outcome so the host clears the overlay.
 /// </summary>
@@ -55,6 +56,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         Guid? parentId,
         Guid? nodeId,
         string name,
+        Funkgruppen funkgruppen,
         Action? onChanged)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -67,6 +69,12 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         _nodeId = nodeId;
         _name = name;
         FunkgruppeOptions = [.. masterData.TalkGroups.Select(g => g.Display)];
+
+        // The field already says TMO or DMO, so its suggestions leave the kind off: "FW_MUSTER 1000".
+        TmoOptions = GroupsOf(masterData, TalkGroupKind.Tmo);
+        DmoOptions = GroupsOf(masterData, TalkGroupKind.Dmo);
+        TmoSlots = Slots("TMO", funkgruppen.Tmo, TmoOptions);
+        DmoSlots = Slots("DMO", funkgruppen.Dmo, DmoOptions);
     }
 
     public event EventHandler? Closed;
@@ -79,6 +87,27 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
     /// <summary>The Funkgruppen of the Stammdaten, offered as suggestions and never enforced.</summary>
     public IReadOnlyList<string> FunkgruppeOptions { get; }
+
+    /// <summary>The Stammdaten's TMO Funkgruppen without their kind, offered on every TMO field.</summary>
+    public IReadOnlyList<string> TmoOptions { get; }
+
+    /// <summary>The Stammdaten's DMO Funkgruppen without their kind, offered on every DMO field.</summary>
+    public IReadOnlyList<string> DmoOptions { get; }
+
+    /// <summary>The TMO fields of an Einsatzleitung: at least one, at most <see cref="Funkgruppen.MaxPerKind"/>.</summary>
+    public ObservableCollection<FunkgruppeSlot> TmoSlots { get; }
+
+    /// <summary>The DMO fields of an Einsatzleitung: at least one, at most <see cref="Funkgruppen.MaxPerKind"/>.</summary>
+    public ObservableCollection<FunkgruppeSlot> DmoSlots { get; }
+
+    /// <summary>
+    /// True for an Einsatzleitung, ours or a partner's (#828): it works on TMO and DMO Funkgruppen. Every
+    /// other node has the one FUNKGRUPPE field.
+    /// </summary>
+    public bool ShowFunkgruppen => _mode == Mode.Post || _kind == CommandNodeKind.Partner;
+
+    /// <summary>The single FUNKGRUPPE field of an Abschnitt, Unterabschnitt or Bereitstellung.</summary>
+    public bool ShowFunkgruppe => !ShowFunkgruppen;
 
     public string Title { get; private init; } = string.Empty;
 
@@ -152,7 +181,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         Guid? parentId,
         string suggestedName,
         Action? onChanged = null) =>
-        new CommandNodeDialogViewModel(session, masterData, Mode.Create, kind, parentId, null, suggestedName ?? string.Empty, onChanged)
+        new CommandNodeDialogViewModel(
+            session, masterData, Mode.Create, kind, parentId, null, suggestedName ?? string.Empty, Funkgruppen.Empty, onChanged)
         {
             Title = kind switch
             {
@@ -176,7 +206,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(session);
         var node = session.Incident.CommandNodes.FirstOrDefault(n => n.Id == nodeId);
         var kind = node?.Kind ?? CommandNodeKind.Abschnitt;
-        return new CommandNodeDialogViewModel(session, masterData, Mode.Edit, kind, node?.ParentId, nodeId, node?.Name ?? string.Empty, onChanged)
+        return new CommandNodeDialogViewModel(
+            session, masterData, Mode.Edit, kind, node?.ParentId, nodeId, node?.Name ?? string.Empty, node?.Funkgruppen ?? Funkgruppen.Empty, onChanged)
         {
             Title = $"{CommandNodeKindLabels.Of(kind)} bearbeiten",
             Auftrag = node?.Auftrag,
@@ -193,11 +224,11 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(session);
         var post = session.Incident.LeadershipPost;
-        return new CommandNodeDialogViewModel(session, masterData, Mode.Post, CommandNodeKind.Abschnitt, null, null, string.Empty, onChanged)
+        return new CommandNodeDialogViewModel(
+            session, masterData, Mode.Post, CommandNodeKind.Abschnitt, null, null, string.Empty, post.Funkgruppen, onChanged)
         {
             Title = "Einsatzleitung Feuerwehr",
             Standort = post.Standort,
-            Funkgruppe = post.Funkgruppe,
             Rufname = post.Rufname,
             Telefon = post.Telefon,
         }.Seeded();
@@ -220,7 +251,85 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     private CommandNode? LiveNode =>
         _session.Incident.CommandNodes.FirstOrDefault(n => n.Id == _nodeId && n.IsLive);
 
-    private string? FunkgruppeToSave => Normalize(StammdatenCatalogue.Normalize(Funkgruppe, FunkgruppeOptions));
+    private string? FunkgruppeToSave =>
+        ShowFunkgruppe ? Normalize(StammdatenCatalogue.Normalize(Funkgruppe, FunkgruppeOptions)) : null;
+
+    private Funkgruppen FunkgruppenToSave =>
+        ShowFunkgruppen
+            ? InCatalogueSpelling(TmoSlots.Select(s => s.Text), DmoSlots.Select(s => s.Text))
+            : Funkgruppen.Empty;
+
+    private bool CanAddTmo => TmoSlots.Count < Funkgruppen.MaxPerKind;
+
+    private bool CanAddDmo => DmoSlots.Count < Funkgruppen.MaxPerKind;
+
+    /// <summary>"+ TMO": one more TMO field, up to <see cref="Funkgruppen.MaxPerKind"/>.</summary>
+    [RelayCommand(CanExecute = nameof(CanAddTmo))]
+    private void AddTmo() => AddSlot(TmoSlots, AddTmoCommand);
+
+    /// <summary>"+ DMO": one more DMO field, up to <see cref="Funkgruppen.MaxPerKind"/>.</summary>
+    [RelayCommand(CanExecute = nameof(CanAddDmo))]
+    private void AddDmo() => AddSlot(DmoSlots, AddDmoCommand);
+
+    private static IReadOnlyList<string> GroupsOf(MasterDataSet masterData, TalkGroupKind kind) =>
+        [.. masterData.TalkGroups
+            .Where(g => g.Kind == kind)
+            .Select(g => string.IsNullOrWhiteSpace(g.Number) ? g.Name : $"{g.Name} {g.Number}")];
+
+    // One field per recorded group, and an empty one when there are none: every Einsatzleitung
+    // offers at least one of each (#828), and saving it empty is still allowed.
+    private ObservableCollection<FunkgruppeSlot> Slots(string kind, IReadOnlyList<string> groups, IReadOnlyList<string> options)
+    {
+        var slots = new ObservableCollection<FunkgruppeSlot>();
+        foreach (var group in groups)
+        {
+            slots.Add(NewSlot(kind, group, options, slots));
+        }
+
+        if (slots.Count == 0)
+        {
+            slots.Add(NewSlot(kind, null, options, slots));
+        }
+
+        return slots;
+    }
+
+    private FunkgruppeSlot NewSlot(
+        string kind, string? text, IReadOnlyList<string> options, ObservableCollection<FunkgruppeSlot> slots) =>
+        new(kind, text, options, s => RemoveSlot(slots, s), () => slots.Count > 1);
+
+    private void AddSlot(ObservableCollection<FunkgruppeSlot> slots, IRelayCommand add)
+    {
+        var first = slots[0];
+        slots.Add(NewSlot(first.Kind, null, first.Options, slots));
+        Refresh(slots, add);
+    }
+
+    private void RemoveSlot(ObservableCollection<FunkgruppeSlot> slots, FunkgruppeSlot slot)
+    {
+        if (slots.Count > 1)
+        {
+            slots.Remove(slot);
+        }
+
+        Refresh(slots, ReferenceEquals(slots, TmoSlots) ? AddTmoCommand : AddDmoCommand);
+    }
+
+    private static void Refresh(ObservableCollection<FunkgruppeSlot> slots, IRelayCommand add)
+    {
+        foreach (var s in slots)
+        {
+            s.Refresh();
+        }
+
+        add.NotifyCanExecuteChanged();
+    }
+
+    // Each entry in the catalogue's own spelling, as the single field is; blanks and repeats drop out.
+    private Funkgruppen InCatalogueSpelling(IEnumerable<string?> tmo, IEnumerable<string?> dmo) =>
+        Funkgruppen.FromRecord(
+            tmo.Select(t => StammdatenCatalogue.Normalize(t, TmoOptions)),
+            dmo.Select(d => StammdatenCatalogue.Normalize(d, DmoOptions)));
 
     partial void OnNameChanged(string value) => NameError = ValidateName();
 
@@ -244,7 +353,14 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     }
 
     private Fields Current() =>
-        new(Name?.Trim() ?? string.Empty, Normalize(Auftrag), Normalize(Standort), FunkgruppeToSave, Normalize(Rufname), Normalize(Telefon));
+        new(
+            Name?.Trim() ?? string.Empty,
+            Normalize(Auftrag),
+            Normalize(Standort),
+            FunkgruppeToSave,
+            Normalize(Rufname),
+            Normalize(Telefon),
+            FunkgruppenToSave);
 
     private CommandNodeDialogViewModel Seeded()
     {
@@ -372,7 +488,15 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                 }
 
                 _session.AddCommandNode(
-                    _kind, typed.Name, _parentId, typed.Auftrag, typed.Standort, typed.Funkgruppe, typed.Rufname, typed.Telefon);
+                    _kind,
+                    typed.Name,
+                    _parentId,
+                    typed.Auftrag,
+                    typed.Standort,
+                    typed.Funkgruppe,
+                    typed.Rufname,
+                    typed.Telefon,
+                    typed.Funkgruppen);
                 _onChanged?.Invoke();
                 return true;
             case Mode.Edit:
@@ -384,8 +508,11 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
                 if (typed != _seeded)
                 {
-                    var save = Merge(typed, Seen(node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon));
-                    _session.UpdateCommandNode(node.Id, save.Name, save.Auftrag, save.Standort, save.Funkgruppe, save.Rufname, save.Telefon);
+                    var save = Merge(
+                        typed,
+                        Seen(node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon, node.Funkgruppen));
+                    _session.UpdateCommandNode(
+                        node.Id, save.Name, save.Auftrag, save.Standort, save.Funkgruppe, save.Rufname, save.Telefon, save.Funkgruppen);
                     _onChanged?.Invoke();
                 }
 
@@ -402,8 +529,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                 if (HasChanges)
                 {
                     var post = _session.Incident.LeadershipPost;
-                    var save = Merge(typed, Seen(string.Empty, null, post.Standort, post.Funkgruppe, post.Rufname, post.Telefon));
-                    _session.UpdateLeadershipPost(save.Standort, save.Rufname, save.Telefon, save.Funkgruppe);
+                    var save = Merge(typed, Seen(string.Empty, null, post.Standort, null, post.Rufname, post.Telefon, post.Funkgruppen));
+                    _session.UpdateLeadershipPost(save.Standort, save.Rufname, save.Telefon, save.Funkgruppen);
                     _onChanged?.Invoke();
                 }
 
@@ -412,28 +539,42 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     }
 
     // The live record in the form this dialog seeds and saves its fields, so it lines up with _seeded.
-    private Fields Seen(string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
+    private Fields Seen(
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon,
+        Funkgruppen funkgruppen) =>
         new(
             name.Trim(),
             Normalize(auftrag),
             Normalize(standort),
-            Normalize(StammdatenCatalogue.Normalize(funkgruppe, FunkgruppeOptions)),
+            ShowFunkgruppe ? Normalize(StammdatenCatalogue.Normalize(funkgruppe, FunkgruppeOptions)) : null,
             Normalize(rufname),
-            Normalize(telefon));
+            Normalize(telefon),
+            ShowFunkgruppen ? InCatalogueSpelling(funkgruppen.Tmo, funkgruppen.Dmo) : Funkgruppen.Empty);
 
     // A save writes every field, so one the Lagebuchführer left alone takes the live value: a peer
     // may have changed it meanwhile, and renaming the node must not put back the Auftrag the dialog
-    // opened with. A field typed here wins, peer or not.
+    // opened with. A field typed here wins, peer or not. TMO and DMO are one field each.
     private Fields Merge(Fields typed, Fields live) => new(
         Pick(typed.Name, _seeded.Name, live.Name),
         Pick(typed.Auftrag, _seeded.Auftrag, live.Auftrag),
         Pick(typed.Standort, _seeded.Standort, live.Standort),
         Pick(typed.Funkgruppe, _seeded.Funkgruppe, live.Funkgruppe),
         Pick(typed.Rufname, _seeded.Rufname, live.Rufname),
-        Pick(typed.Telefon, _seeded.Telefon, live.Telefon));
+        Pick(typed.Telefon, _seeded.Telefon, live.Telefon),
+        new Funkgruppen(
+            Pick(typed.Funkgruppen.Tmo, _seeded.Funkgruppen.Tmo, live.Funkgruppen.Tmo),
+            Pick(typed.Funkgruppen.Dmo, _seeded.Funkgruppen.Dmo, live.Funkgruppen.Dmo)));
 
     private static T Pick<T>(T typed, T seeded, T live) =>
         EqualityComparer<T>.Default.Equals(typed, seeded) ? live : typed;
+
+    private static IReadOnlyList<string> Pick(IReadOnlyList<string> typed, IReadOnlyList<string> seeded, IReadOnlyList<string> live) =>
+        typed.SequenceEqual(seeded, StringComparer.Ordinal) ? live : typed;
 
     // An Unterabschnitt needs its Abschnitt still standing; a peer may have dissolved it meanwhile.
     private bool ParentIsGone() =>
@@ -467,5 +608,11 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private readonly record struct Fields(
-        string Name, string? Auftrag, string? Standort, string? Funkgruppe, string? Rufname, string? Telefon);
+        string Name,
+        string? Auftrag,
+        string? Standort,
+        string? Funkgruppe,
+        string? Rufname,
+        string? Telefon,
+        Funkgruppen Funkgruppen);
 }

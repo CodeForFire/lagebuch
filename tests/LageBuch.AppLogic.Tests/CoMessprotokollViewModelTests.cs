@@ -1290,12 +1290,20 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         string? standort = null,
         string? funkgruppe = null,
         string? rufname = null,
-        string? telefon = null) =>
-        _inner.AddCommandNode(kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon);
+        string? telefon = null,
+        Funkgruppen? funkgruppen = null) =>
+        _inner.AddCommandNode(kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen);
 
     public void UpdateCommandNode(
-        Guid nodeId, string name, string? auftrag, string? standort, string? funkgruppe, string? rufname, string? telefon) =>
-        _inner.UpdateCommandNode(nodeId, name, auftrag, standort, funkgruppe, rufname, telefon);
+        Guid nodeId,
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon,
+        Funkgruppen? funkgruppen = null) =>
+        _inner.UpdateCommandNode(nodeId, name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen);
 
     public void DissolveCommandNode(Guid nodeId) => _inner.DissolveCommandNode(nodeId);
 
@@ -1331,8 +1339,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) => _inner.SetFuehrungsstufe(stufe);
 
-    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, string? funkgruppe) =>
-        _inner.UpdateLeadershipPost(standort, rufname, telefon, funkgruppe);
+    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen) =>
+        _inner.UpdateLeadershipPost(standort, rufname, telefon, funkgruppen);
 
     public void AddForceUnit(
         string brigade,

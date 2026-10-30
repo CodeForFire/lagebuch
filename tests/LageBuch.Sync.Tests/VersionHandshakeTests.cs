@@ -267,7 +267,16 @@ public class VersionHandshakeTests
     {
         // 28 adds setNavVisibility and addChecklist, commands a client may send. A host at 27 has
         // neither in its allowlist and would reject them, so a 27 and a 28 must not connect.
-        Assert.Equal(28, SyncProtocol.ProtocolVersion);
-        Assert.Equal(28, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 28, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 28, int.MaxValue);
+    }
+
+    [Fact]
+    public void Einsatzleitung_funkgruppen_raise_the_protocol_and_the_floor_to_twenty_nine()
+    {
+        // 29 replaces updateLeadershipPost's funkgruppe with two lists. A client at 28 editing the
+        // post would send neither, which a host at 29 reads as "none", so a 28 and a 29 must not connect.
+        Assert.Equal(29, SyncProtocol.ProtocolVersion);
+        Assert.Equal(29, SyncProtocol.MinimumProtocolVersion);
     }
 }
