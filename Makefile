@@ -106,10 +106,11 @@ test-all: ## Run tests over the full solution (needs JDK <= 21)
 MUTATE_PROJECTS := Domain Sync Documents Persistence AppLogic Osm
 
 # SINCE=<committish> is the pull request gate in .github/workflows/mutation.yml
-# (SINCE=origin/main): it mutates only the .cs files changed since the merge
-# base, working tree included, then scores only the mutants on changed lines
-# and fails below BREAK. Stryker's own --since is not used: it scores whole
-# files, and inside a git worktree it finds no changes at all.
+# (SINCE=origin/main): it mutates only the lines of .cs files changed since the
+# merge base, working tree included, passed to --mutate as character spans,
+# then scores those mutants and fails below BREAK. Stryker's own --since is not
+# used: it mutates and scores whole files, and inside a git worktree it finds no
+# changes at all.
 #
 # Without SINCE, the whole project is mutated and fails below the floor in its
 # stryker-config.json (thresholds.break). That floor guards the weekly run; the
@@ -128,10 +129,10 @@ mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|
 	  (cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker --output $(MUTATE_OUT)) || exit $$?; \
 	  echo "Report: $(MUTATE_OUT)/reports/mutation-report.html"; \
 	else \
-	  files=$$($(MUTATE_SCORE) files --base "$(SINCE)" --project-dir src/LageBuch.$(PROJECT)) || exit 2; \
-	  if [ -z "$$files" ]; then \
-	    echo "No .cs file in LageBuch.$(PROJECT) changed since $(SINCE) -- nothing to mutate."; exit 0; fi; \
-	  set --; for f in $$files; do set -- "$$@" --mutate "**/$$f"; done; \
+	  patterns=$$($(MUTATE_SCORE) patterns --base "$(SINCE)" --project-dir src/LageBuch.$(PROJECT)) || exit 2; \
+	  if [ -z "$$patterns" ]; then \
+	    echo "No line in LageBuch.$(PROJECT) added or changed since $(SINCE) -- nothing to mutate."; exit 0; fi; \
+	  set --; for p in $$patterns; do set -- "$$@" --mutate "**/$$p"; done; \
 	  (cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker --output $(MUTATE_OUT) --break-at 0 "$$@") || exit $$?; \
 	  echo "Report: $(MUTATE_OUT)/reports/mutation-report.html"; \
 	  $(MUTATE_SCORE) score --report $(MUTATE_OUT)/reports/mutation-report.json --base "$(SINCE)" \

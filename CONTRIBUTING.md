@@ -156,12 +156,13 @@ Stryker refuses a `break` above `low`, so set `low` to the same number; both
 
 A pull request is gated, but only on the lines it changes. For each of Domain,
 Documents, Persistence, AppLogic and Osm whose `.cs` files the PR touches,
-`mutate-diff` mutates those files, keeps the mutants on lines the PR added or
-changed, and fails when fewer than 80% of them are caught. The job summary
-lists each survivor on a changed line with its file and line number. Older
-survivors elsewhere in the touched files are listed under a collapsed heading
-and never counted: kill them when you are there anyway, but they cannot block
-an unrelated fix. A PR whose changed lines hold no mutant passes.
+`mutate-diff` mutates only the lines the PR added or changed, and fails when
+fewer than 80% of those mutants are caught. The job summary lists each survivor
+with its file and line number. Old survivors elsewhere in a touched file are
+neither run nor counted, so they cannot block an unrelated fix; neither is a
+mutant that reaches past the changed lines, such as removing the whole method
+around them — the weekly run covers both. A PR whose changed lines hold no
+mutant passes.
 Sync is exempt: most of its code is exercised only by Sync.Hosting.Tests,
 which Stryker does not run, so a changed Sync file would score near zero
 however well it is tested. Reproduce the gate locally with:
