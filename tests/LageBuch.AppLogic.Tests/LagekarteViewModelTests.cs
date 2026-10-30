@@ -356,6 +356,62 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
+    public void The_poi_key_shows_from_the_zoom_the_map_names_pois()
+    {
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, FfbLibrary());
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, PoiLayer.MinZoom - 1));
+        Assert.False(vm.ShowsPoiLegend);
+        Assert.False(vm.ShowsLegend);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, PoiLayer.MinZoom));
+
+        Assert.True(vm.ShowsPoiLegend);
+        Assert.True(vm.ShowsLegend);
+        Assert.Contains(nameof(LagekarteViewModel.ShowsPoiLegend), changes);
+        Assert.Contains(nameof(LagekarteViewModel.ShowsLegend), changes);
+    }
+
+    [Fact]
+    public void Without_a_pack_there_are_no_pois_to_explain()
+    {
+        var library = new FakeRegionPackLibrary();
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Assert.False(vm.ShowsPoiLegend);
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        library.Preinstall(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"));
+        vm.ReloadPacks();
+
+        Assert.Equal(17, vm.Map.Zoom);
+        Assert.True(vm.ShowsPoiLegend);
+        Assert.Contains(nameof(LagekarteViewModel.ShowsPoiLegend), changes);
+    }
+
+    [Fact]
+    public void Turning_the_water_points_off_leaves_the_poi_key()
+    {
+        var library = FfbLibrary();
+        library.WaterPoints["ffb"] = [new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100")];
+        var (session, _, _) = Open();
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        vm.ShowWaterPoints = false;
+
+        Assert.False(vm.ShowsWaterLegend);
+        Assert.True(vm.ShowsLegend);
+        Assert.Contains(nameof(LagekarteViewModel.ShowsLegend), changes);
+    }
+
+    [Fact]
     public void Water_points_that_cannot_be_read_are_reported_and_the_map_stays()
     {
         var library = FfbLibrary();

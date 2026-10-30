@@ -52,9 +52,11 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         _session.Changed += Refresh;
         Map.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MapViewport.Zoom))
+            if (e.PropertyName is nameof(MapViewport.Zoom) or nameof(MapViewport.TileSource))
             {
                 OnPropertyChanged(nameof(ShowsWaterLegend));
+                OnPropertyChanged(nameof(ShowsPoiLegend));
+                OnPropertyChanged(nameof(ShowsLegend));
             }
         };
     }
@@ -104,6 +106,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     [NotifyPropertyChangedFor(nameof(HasWaterPoints))]
     [NotifyPropertyChangedFor(nameof(WaterPointsNote))]
     [NotifyPropertyChangedFor(nameof(ShowsWaterLegend))]
+    [NotifyPropertyChangedFor(nameof(ShowsLegend))]
     private IReadOnlyList<WaterPoint>? _waterPoints;
 
     /// <summary>The HYDRANTEN switch. Belongs to this screen, not to the Einsatz: nothing is stored.</summary>
@@ -111,6 +114,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     [NotifyPropertyChangedFor(nameof(VisibleWaterPoints))]
     [NotifyPropertyChangedFor(nameof(WaterPointsNote))]
     [NotifyPropertyChangedFor(nameof(ShowsWaterLegend))]
+    [NotifyPropertyChangedFor(nameof(ShowsLegend))]
     private bool _showWaterPoints = true;
 
     /// <summary>The water point whose card is open: tapped on the map while nothing was picked to place.</summary>
@@ -122,6 +126,12 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
     /// <summary>The symbols' key, whenever symbols are on the map.</summary>
     public bool ShowsWaterLegend => VisibleWaterPoints is { Count: > 0 } && Map.Zoom >= WaterPointLayer.MinZoom;
+
+    /// <summary>The POI colours' key, from the zoom the map names Feuerwachen, Schulen and the like.</summary>
+    public bool ShowsPoiLegend => Map.TileSource is not null && Map.Zoom >= PoiLayer.MinZoom;
+
+    /// <summary>Whether the key shows at all: for the water symbols, the POI colours, or both.</summary>
+    public bool ShowsLegend => ShowsWaterLegend || ShowsPoiLegend;
 
     partial void OnShowWaterPointsChanged(bool value)
     {

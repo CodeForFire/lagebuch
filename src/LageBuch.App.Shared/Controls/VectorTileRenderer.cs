@@ -26,8 +26,19 @@ public static class VectorTileRenderer
     // Placed in this order; a later label that would overlap an earlier one is left out.
     private const int TownPriority = 0;
     private const int DistrictPriority = 1;
-    private const int StreetPriority = 2;
-    private const int HouseNumberPriority = 3;
+    private const int HelpPriority = 2;
+    private const int StreetPriority = 3;
+    private const int PoiPriority = 4;
+    private const int WaterPriority = 5;
+    private const int HouseNumberPriority = 6;
+
+    // The dot a POI's name is written beside, and the space between the two.
+    private const double PoiDotRadius = 4;
+    private const double PoiDotGap = 3;
+
+    // One-way arrows: how far apart along the road, and their length.
+    private const double OneWaySpacing = 60;
+    private const double OneWayArrowLength = 6;
 
     private static readonly CultureInfo LabelCulture = CultureInfo.GetCultureInfo("de-DE");
 
@@ -39,6 +50,36 @@ public static class VectorTileRenderer
     private static readonly IImmutableBrush LabelInk = Solid(0x33, 0x33, 0x33);
     private static readonly IImmutableBrush HouseNumberInk = Solid(0x66, 0x66, 0x66);
     private static readonly IPen Halo = new ImmutablePen(Solid(0xFF, 0xFF, 0xFF), 3, lineJoin: PenLineJoin.Round);
+    private static readonly IImmutableBrush WaterLabelInk = Solid(0x4D, 0x80, 0xB3);
+    private static readonly IImmutableBrush OneWayInk = Solid(0x6E, 0x6E, 0x6E);
+
+    // The POIs an Einsatz cares about, coloured by what they mean for it: the Feuerwehr's own
+    // houses, help, many people who need help to get out, public offices, a hazard. Clear of the
+    // hydrant red and the open-water blue of the water points drawn over the map. The name is
+    // what an unnamed one is called; the legend in LagekarteView shows the same colours. Where help
+    // comes from outranks a street's name, the rest give way to it, so a town's streets stay named.
+    // OSM's amenity=social_facility is left out: it puts Altenheime with Tafeln and Beratungsstellen,
+    // and the tiles carry nothing to tell them apart.
+    private static readonly IImmutableBrush FireStationInk = Solid(0xE6, 0x51, 0x00);
+    private static readonly IImmutableBrush HelpInk = Solid(0x6A, 0x1B, 0x9A);
+    private static readonly IImmutableBrush PeopleInk = Solid(0xAD, 0x14, 0x57);
+    private static readonly IImmutableBrush OfficeInk = Solid(0x45, 0x5A, 0x64);
+    private static readonly IImmutableBrush FuelInk = Solid(0x79, 0x55, 0x48);
+
+    private static readonly Dictionary<string, (IImmutableBrush Ink, string Unnamed, int Priority)> Pois = new(StringComparer.Ordinal)
+    {
+        ["fire_station"] = (FireStationInk, "Feuerwehr", HelpPriority),
+        ["hospital"] = (HelpInk, "Krankenhaus", HelpPriority),
+        ["clinic"] = (HelpInk, "Klinik", HelpPriority),
+        ["police"] = (HelpInk, "Polizei", HelpPriority),
+        ["school"] = (PeopleInk, "Schule", PoiPriority),
+        ["kindergarten"] = (PeopleInk, "Kita", PoiPriority),
+        ["childcare"] = (PeopleInk, "Kita", PoiPriority),
+        ["nursing_home"] = (PeopleInk, "Pflegeheim", PoiPriority),
+        ["townhall"] = (OfficeInk, "Rathaus", PoiPriority),
+        ["pharmacy"] = (OfficeInk, "Apotheke", PoiPriority),
+        ["fuel"] = (FuelInk, "Tankstelle", PoiPriority),
+    };
 
     private static readonly Dictionary<string, IImmutableBrush> Landuse = new(StringComparer.Ordinal)
     {
@@ -168,8 +209,9 @@ public static class VectorTileRenderer
 
     /// <summary>
     /// The names on the tile <see cref="Render"/> draws with the same arguments, in its pixels:
-    /// places, street names from zoom 15 and house numbers from zoom 17. A label may reach past
-    /// the tile's edge; the map draws it whole.
+    /// places, rivers and lakes, and from <see cref="PoiLayer.MinZoom"/> the POIs an Einsatz
+    /// cares about, each beside a dot in its colour; street names from zoom 15 and house numbers
+    /// from zoom 17. A label may reach past the tile's edge; the map draws it whole.
     /// </summary>
     public static IReadOnlyList<MapLabel> Labels(IReadOnlyList<VectorLayer> layers, int zoom, int levels, int subX, int subY)
     {
@@ -182,9 +224,19 @@ public static class VectorTileRenderer
             PlaceNames(labels, places, zoom, Projection(places.Extent, levels, subX, subY));
         }
 
+        if (Layer("pois") is { } pois && zoom >= PoiLayer.MinZoom)
+        {
+            PoiNames(labels, pois, Projection(pois.Extent, levels, subX, subY));
+        }
+
         if (Layer("roads") is { } roads && zoom >= 15)
         {
             RoadNames(labels, roads, zoom, Projection(roads.Extent, levels, subX, subY));
+        }
+
+        if (Layer("water") is { } water)
+        {
+            WaterNames(labels, water, zoom, Projection(water.Extent, levels, subX, subY));
         }
 
         if (Layer("buildings") is { } buildings && zoom >= 17)
@@ -225,30 +277,142 @@ public static class VectorTileRenderer
             var width = Math.Max(style.WidthAt15 * widthScale, 1.0);
             context.DrawGeometry(null, new ImmutablePen(style.Fill, width, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), geometry);
         }
+
+        if (zoom >= 16)
+        {
+            context.DrawGeometry(OneWayInk, null, OneWayArrows(lines.Where(f => Roads.ContainsKey(f.Get("kind_detail") ?? string.Empty)), project));
+        }
     }
 
-    // A road's name on its longest segment, turned so it never reads upside down.
+    // Arrowheads along every one-way road, pointing the way it may be driven: OSM's oneway=-1
+    // runs against the way's direction.
+    private static StreamGeometry OneWayArrows(IEnumerable<VectorFeature> roads, Func<(int X, int Y), Point> project)
+    {
+        var geometry = new StreamGeometry();
+        using (var g = geometry.Open())
+        {
+            foreach (var road in roads)
+            {
+                var direction = road.Get("oneway") switch
+                {
+                    "yes" or "true" or "1" => 1,
+                    "-1" => -1,
+                    _ => 0,
+                };
+                if (direction == 0)
+                {
+                    continue;
+                }
+
+                foreach (var line in road.Parts)
+                {
+                    // The first arrow half a spacing in, so a short road still gets one.
+                    var next = OneWaySpacing / 2;
+                    var travelled = 0.0;
+                    for (var i = 1; i < line.Count; i++)
+                    {
+                        var (a, b) = (project(line[i - 1]), project(line[i]));
+                        var length = Distance(a, b);
+                        for (; next <= travelled + length; next += OneWaySpacing)
+                        {
+                            var along = (b - a) / length;
+                            Arrowhead(g, a + (along * (next - travelled)), along * direction);
+                        }
+
+                        travelled += length;
+                    }
+                }
+            }
+        }
+
+        return geometry;
+    }
+
+    private static void Arrowhead(StreamGeometryContext g, Point at, Vector along)
+    {
+        var across = new Vector(-along.Y, along.X);
+        var half = OneWayArrowLength / 2;
+        g.BeginFigure(at + (along * half), isFilled: true);
+        g.LineTo(at - (along * half) + (across * half));
+        g.LineTo(at - (along * half) - (across * half));
+        g.EndFigure(true);
+    }
+
     private static void RoadNames(List<MapLabel> labels, VectorLayer roads, int zoom, Func<(int X, int Y), Point> project)
     {
         var fontSize = zoom >= 17 ? 12.0 : 10.0;
         foreach (var feature in roads.Features)
         {
-            if (feature.Type != VectorGeometryType.LineString || feature.Get("name") is not { Length: > 0 } name || !Roads.ContainsKey(feature.Get("kind_detail") ?? string.Empty))
+            if (feature.Type == VectorGeometryType.LineString && feature.Get("name") is { Length: > 0 } name && Roads.ContainsKey(feature.Get("kind_detail") ?? string.Empty))
             {
-                continue;
+                NameAlong(labels, feature, name, new LabelStyle(fontSize, LabelInk, StreetPriority), project);
             }
-
-            if (LongestSegment(feature, project) is not var (a, b) || Distance(a, b) < name.Length * fontSize * 0.55)
-            {
-                continue;
-            }
-
-            // The map turns the name the right way up, for however the map itself is turned.
-            var angle = Math.Atan2(b.Y - a.Y, b.X - a.X);
-            var middle = new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
-            labels.Add(Label(name, fontSize, LabelInk, Halo, StreetPriority, angle, middle));
         }
     }
+
+    // A river's or a canal's name along it, a stream's only close in; a lake's on its label point.
+    private static void WaterNames(List<MapLabel> labels, VectorLayer water, int zoom, Func<(int X, int Y), Point> project)
+    {
+        var style = new LabelStyle(11, WaterLabelInk, WaterPriority, FontStyle.Italic);
+        foreach (var feature in water.Features)
+        {
+            if (feature.Get("name") is not { Length: > 0 } name)
+            {
+                continue;
+            }
+
+            var kind = feature.Get("kind");
+            if (feature.Type == VectorGeometryType.LineString)
+            {
+                if ((kind is "river" or "canal" && zoom >= 13) || (kind is "stream" && zoom >= 15))
+                {
+                    NameAlong(labels, feature, name, style, project);
+                }
+            }
+            else if (feature.Type == VectorGeometryType.Point && kind is "water" or "lake" or "pond" or "reservoir"
+                && feature.Parts is [[var point, ..], ..] && project(point) is var at && OnTile(at) && zoom >= ShownFrom(feature))
+            {
+                labels.Add(Label(name, style, null, at));
+            }
+        }
+    }
+
+    // The Einsatz's POIs that lie on this tile, each named beside a dot in its colour. The dot
+    // sits on the spot, so the map pins it there however the map is turned.
+    private static void PoiNames(List<MapLabel> labels, VectorLayer pois, Func<(int X, int Y), Point> project)
+    {
+        foreach (var feature in pois.Features)
+        {
+            if (feature.Type != VectorGeometryType.Point || !Pois.TryGetValue(feature.Get("kind") ?? string.Empty, out var poi) || feature.Parts is not [[var point, ..], ..])
+            {
+                continue;
+            }
+
+            var at = project(point);
+            if (OnTile(at))
+            {
+                var name = feature.Get("name") is { Length: > 0 } named ? named : poi.Unnamed;
+                labels.Add(Label(name, new LabelStyle(11, poi.Ink, poi.Priority, Dot: true), null, at));
+            }
+        }
+    }
+
+    // A line's name on its longest segment on this tile, if it fits there; the map turns it so it
+    // never reads upside down, for however the map itself is turned.
+    private static void NameAlong(List<MapLabel> labels, VectorFeature line, string name, LabelStyle style, Func<(int X, int Y), Point> project)
+    {
+        if (LongestSegment(line, project) is not var (a, b) || Distance(a, b) < name.Length * style.Size * 0.55)
+        {
+            return;
+        }
+
+        var angle = Math.Atan2(b.Y - a.Y, b.X - a.X);
+        labels.Add(Label(name, style, angle, new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2)));
+    }
+
+    // The zoom from which the schema says a point is worth a label: a hamlet is not at zoom 12.
+    private static double ShownFrom(VectorFeature feature) =>
+        double.TryParse(feature.Get("min_zoom"), NumberStyles.Float, CultureInfo.InvariantCulture, out var minZoom) ? minZoom : 0;
 
     private static void HouseNumbers(List<MapLabel> labels, VectorLayer buildings, Func<(int X, int Y), Point> project)
     {
@@ -265,7 +429,7 @@ public static class VectorTileRenderer
                 continue;
             }
 
-            labels.Add(Label(number, 9, HouseNumberInk, null, HouseNumberPriority, null, center));
+            labels.Add(Label(number, new LabelStyle(9, HouseNumberInk, HouseNumberPriority, Halo: false), null, center));
         }
     }
 
@@ -285,15 +449,13 @@ public static class VectorTileRenderer
                 _ => (0.0, 0),
             };
 
-            // The schema says from which zoom a place is worth a label: a hamlet is not at zoom 12.
-            var shownFrom = double.TryParse(feature.Get("min_zoom"), NumberStyles.Float, CultureInfo.InvariantCulture, out var minZoom) ? minZoom : 0;
             var at = project(feature.Parts[0][0]);
-            if (size <= 0 || zoom < shownFrom || !OnTile(at))
+            if (size <= 0 || zoom < ShownFrom(feature) || !OnTile(at))
             {
                 continue;
             }
 
-            labels.Add(Label(name, size, LabelInk, Halo, priority, null, at));
+            labels.Add(Label(name, new LabelStyle(size, LabelInk, priority), null, at));
         }
     }
 
@@ -301,13 +463,34 @@ public static class VectorTileRenderer
     // label for a point there belongs to the neighbouring tile, or it would be drawn twice.
     private static bool OnTile(Point at) => at.X is >= 0 and < Size && at.Y is >= 0 and < Size;
 
-    // The text to be centred on `at`, along a street running at `angle`, or level when null.
-    private static MapLabel Label(string text, double size, IImmutableBrush ink, IPen? halo, int priority, double? angle, Point at)
+    // The text to be centred on `at`, along a street running at `angle`, or level when null. With
+    // a dot, the text follows the dot and the dot sits on `at`.
+    private static MapLabel Label(string text, LabelStyle style, double? angle, Point at)
     {
-        var formatted = new FormattedText(text, LabelCulture, FlowDirection.LeftToRight, Typeface.Default, size, ink);
-        var outline = formatted.BuildGeometry(default) ?? new StreamGeometry();
-        return new MapLabel(text, outline, new Size(formatted.Width, formatted.Height), at, angle, priority, ink, halo);
+        var typeface = new Typeface(FontFamily.Default, style.FontStyle);
+        var formatted = new FormattedText(text, LabelCulture, FlowDirection.LeftToRight, typeface, style.Size, style.Ink);
+        var halo = style.Halo ? Halo : null;
+        if (!style.Dot)
+        {
+            var outline = formatted.BuildGeometry(default) ?? new StreamGeometry();
+            return new MapLabel(text, outline, new Size(formatted.Width, formatted.Height), at, angle, style.Priority, style.Ink, halo);
+        }
+
+        var dot = new Point(PoiDotRadius, formatted.Height / 2);
+        var indent = (2 * PoiDotRadius) + PoiDotGap;
+        var withDot = new GeometryGroup { FillRule = FillRule.NonZero };
+        withDot.Children.Add(new EllipseGeometry(new Rect(dot.X - PoiDotRadius, dot.Y - PoiDotRadius, 2 * PoiDotRadius, 2 * PoiDotRadius)));
+        if (formatted.BuildGeometry(new Point(indent, 0)) is { } glyphs)
+        {
+            withDot.Children.Add(glyphs);
+        }
+
+        return new MapLabel(text, withDot, new Size(indent + formatted.Width, formatted.Height), at, angle, style.Priority, style.Ink, halo, dot);
     }
+
+    // How a kind of name is written: its size, ink and rank in the collision, italic for water,
+    // with the white halo unless it is a house number, and a dot before a POI's.
+    private sealed record LabelStyle(double Size, IImmutableBrush Ink, int Priority, FontStyle FontStyle = FontStyle.Normal, bool Halo = true, bool Dot = false);
 
     // Tile coordinates of the source tile to pixels of the target tile.
     private static Func<(int X, int Y), Point> Projection(int extent, int levels, int subX, int subY)

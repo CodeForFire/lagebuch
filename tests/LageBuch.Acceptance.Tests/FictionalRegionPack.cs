@@ -9,8 +9,8 @@ namespace LageBuch.Acceptance.Tests;
 
 /// <summary>
 /// A made-up Kartenpaket around Fürstenfeldbruck, installed the way <see cref="RegionPackLibrary"/>
-/// leaves one: vector tiles at zoom 12 with made-up streets, houses and a Musterbach around the
-/// Marktplatz, a few hydrants and a Saugstelle there, and the addresses of a "Musterstraße" in
+/// leaves one: vector tiles at zoom 12 with made-up streets, houses, a Feuerwache, a school, a
+/// Kita and a Musterbach around the Marktplatz, a few hydrants and a Saugstelle there, and the addresses of a "Musterstraße" in
 /// "Musterstadt". No OSM data, so nothing in a screenshot or a fixture is a real map, hydrant or
 /// address.
 /// </summary>
@@ -112,8 +112,16 @@ internal static class FictionalRegionPack
                 Road("residential", "Musterstraße", (48.1785, 11.2490), (48.1785, 11.2620)),
                 Road("primary", "Hauptstraße", (48.1835, 11.2555), (48.1735, 11.2555)),
                 Road("secondary", "Bahnhofstraße", (48.1815, 11.2495), (48.1755, 11.2615)),
-                Road("footway", "Mühlweg", (48.1800, 11.2575), (48.1772, 11.2590))),
+                Road("footway", "Mühlweg", (48.1800, 11.2575), (48.1772, 11.2590)),
+                (line, [("kind_detail", "residential"), ("name", "Kirchgasse"), ("oneway", "yes")], [[At(48.1806, 11.2510), At(48.1766, 11.2510)]])),
             .. VectorTileFixtures.Tile("places", (VectorGeometryType.Point, [("kind", "locality"), ("name", "Musterstadt")], [[At(48.1800, 11.2530)]])),
+            .. VectorTileFixtures.Tile(
+                "pois",
+                (VectorGeometryType.Point, [("kind", "fire_station"), ("name", "Feuerwehr Musterstadt")], [[At(48.1797, 11.2566)]]),
+                (VectorGeometryType.Point, [("kind", "school"), ("name", "Grundschule Musterstadt")], [[At(48.1806, 11.2570)]]),
+                (VectorGeometryType.Point, [("kind", "kindergarten"), ("name", "Kita Sonnenschein")], [[At(48.1765, 11.2525)]]),
+                (VectorGeometryType.Point, [("kind", "pharmacy"), ("name", "Marien-Apotheke")], [[At(48.1791, 11.2541)]]),
+                (VectorGeometryType.Point, [("kind", "bench")], [[At(48.1790, 11.2580)]])),
         ];
     }
 }
