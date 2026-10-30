@@ -24,8 +24,8 @@ public sealed partial class AddressIndex
     public const int MaxQueryLength = 100;
 
     // Hits kept after the street and place are compared word by word. The cap counts hits, not
-    // rows read: the SQL prefix only narrows by the street's first letters, and a short one such
-    // as "Am" matches thousands of other streets that sort before the one asked for.
+    // rows read: the SQL pattern only narrows by the first letters of a word in the street, and a
+    // short one such as "Am" matches thousands of other streets that sort before the one asked for.
     private const int CandidateLimit = 2000;
 
     private readonly string _path;
@@ -39,7 +39,9 @@ public sealed partial class AddressIndex
     /// <summary>
     /// The addresses matching <paramref name="query"/>, best first, at most <paramref name="limit"/>:
     /// the exact house number before "12a" for "12", an address in the named place before one OSM
-    /// gives no place at all, and otherwise by street and number.
+    /// gives no place at all, and otherwise a street named as typed before one holding the query as
+    /// a later word, then by street and number. The street is found by any of its words, so
+    /// "Druden" finds "Am Drudenbogen".
     /// Empty when nothing matches, the query names no street, or the file is no address table.
     /// </summary>
     public IReadOnlyList<AddressHit> Search(string query, int limit = 20, CancellationToken cancellationToken = default)
@@ -52,7 +54,10 @@ public sealed partial class AddressIndex
         }
 
         // The SQL prefix is the street before its "-straße" ending, so "Allinger Straße" still finds
-        // "Allinger Str."; the full comparison follows in Matches.
+        // "Allinger Str."; the full comparison follows in Matches. A word may start the street or
+        // follow a space or hyphen, which no index can narrow: a pack's table is read through, and
+        // the streets starting with the query come first, so the candidate cap never drops one.
+        street = street.Replace('-', ' ');
         var stem = StreetEnding().Replace(street, string.Empty);
         if (stem.Length < 2)
         {
@@ -68,10 +73,13 @@ public sealed partial class AddressIndex
             using var cmd = cn.CreateCommand();
             cmd.CommandText =
                 "SELECT street, housenumber, postcode, city, suburb, lat, lon FROM addresses " +
-                "WHERE (street LIKE $street ESCAPE '\\' OR street LIKE $otherCase ESCAPE '\\') AND housenumber LIKE $number ESCAPE '\\' " +
-                "ORDER BY street, length(housenumber), housenumber;";
+                "WHERE (' ' || replace(street, '-', ' ') LIKE $word ESCAPE '\\' OR ' ' || replace(street, '-', ' ') LIKE $otherCaseWord ESCAPE '\\') " +
+                "AND housenumber LIKE $number ESCAPE '\\' " +
+                "ORDER BY (replace(street, '-', ' ') LIKE $street ESCAPE '\\' OR replace(street, '-', ' ') LIKE $otherCase ESCAPE '\\') DESC, street, length(housenumber), housenumber;";
             cmd.Parameters.AddWithValue("$street", EscapeLike(prefix) + "%");
             cmd.Parameters.AddWithValue("$otherCase", EscapeLike(otherCase) + "%");
+            cmd.Parameters.AddWithValue("$word", "% " + EscapeLike(prefix) + "%");
+            cmd.Parameters.AddWithValue("$otherCaseWord", "% " + EscapeLike(otherCase) + "%");
             cmd.Parameters.AddWithValue("$number", EscapeLike(houseNumber ?? string.Empty) + "%");
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -95,7 +103,7 @@ public sealed partial class AddressIndex
             return [];
         }
 
-        // OrderBy is stable, so within a rank the SQL's street-and-number order stays.
+        // OrderBy is stable, so within a rank the SQL's order stays.
         return hits.OrderBy(h => h.Rank).Take(limit).Select(h => h.Hit).ToList();
     }
 
@@ -131,14 +139,18 @@ public sealed partial class AddressIndex
         return true;
     }
 
+    // The street matches from the start of any of its words: "Am Drudenbogen" and
+    // "Adalbert-Stifter-Straße" read " am drudenbogen" and " adalbert stifter str".
     // An address OSM tags with no place at all is not ruled out by the place words: unknown is no
     // mismatch, and its hit shows no Ort, so the Lagebuchführer sees what was matched.
     private static bool Matches(AddressHit hit, string street, IReadOnlyList<string> place) =>
-        Normalize(hit.Street).StartsWith(street, StringComparison.Ordinal)
+        Words(hit.Street).Contains(" " + street, StringComparison.Ordinal)
         && (hit is { City: "", Suburb: "", Postcode: "" } || place.All(word =>
             Normalize(hit.City).StartsWith(word, StringComparison.Ordinal)
             || Normalize(hit.Suburb).StartsWith(word, StringComparison.Ordinal)
             || hit.Postcode.StartsWith(word, StringComparison.Ordinal)));
+
+    private static string Words(string street) => " " + Normalize(street).Replace('-', ' ');
 
     // The columns are declared, but a hostile file can hold anything in them: a cell of the wrong
     // type costs that row.

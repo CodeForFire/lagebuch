@@ -119,6 +119,78 @@ public sealed class AddressIndexTests : IDisposable
         Assert.Equal("Mühlweg", Assert.Single(Search("MÜHLWEG 4")).Street);
     }
 
+    [Theory]
+    [InlineData("druden")]
+    [InlineData("Druden 3")]
+    [InlineData("drudenbogen 3")]
+    [InlineData("am druden")]
+    public void A_street_is_found_by_a_later_word_of_its_name(string query)
+    {
+        Create(("Am Drudenbogen", "3", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Equal("Am Drudenbogen", Assert.Single(Search(query)).Street);
+    }
+
+    [Theory]
+    [InlineData("Stifter 7")]
+    [InlineData("Adalbert-Stifter 7")]
+    [InlineData("adalbert stifter straße 7")]
+    public void A_street_is_found_by_a_word_after_a_hyphen_and_by_its_whole_name(string query)
+    {
+        Create(("Adalbert-Stifter-Straße", "7", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Equal("Adalbert-Stifter-Straße", Assert.Single(Search(query)).Street);
+    }
+
+    // "Am Bogen" sorts before "Bogenweg", so only the SQL's order puts the street named as typed first.
+    [Fact]
+    public void A_street_starting_with_the_query_comes_before_one_containing_it_later()
+    {
+        Create(("Am Bogen", "1", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24), ("Bogenweg", "1", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Equal(["Bogenweg", "Am Bogen"], Search("Bogen 1").Select(h => h.Street));
+    }
+
+    [Theory]
+    [InlineData("Ölberg 2")]
+    [InlineData("ölberg 2")]
+    public void A_later_word_starting_with_an_umlaut_is_found_in_any_case(string query)
+    {
+        Create(("Am Ölberg", "2", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Equal("Am Ölberg", Assert.Single(Search(query)).Street);
+    }
+
+    // The SQL narrows only up to the first umlaut, so "mühl" reaches the word comparison for
+    // "Moosmühlweg" by its "M".
+    [Theory]
+    [InlineData("bogen 3")]
+    [InlineData("mühl 3")]
+    public void A_word_inside_another_word_is_no_match(string query)
+    {
+        Create(("Am Drudenbogen", "3", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24), ("Moosmühlweg", "3", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Empty(Search(query));
+    }
+
+    // Thousands of "Am Allee" rows hold "Allee" as a later word, sort first and are stored first.
+    [Fact]
+    public void A_street_starting_with_the_query_is_found_behind_more_later_word_matches_than_the_cap()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(AddressPath))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2100) " +
+                "INSERT INTO addresses SELECT 'Am Allee', '1', '82140', 'Olching', '', 48.2, 11.3, 'node/2' FROM n;";
+            cmd.ExecuteNonQuery();
+        }
+
+        Create(("Alleeweg", "1", "82256", "Fürstenfeldbruck", string.Empty, 48.18, 11.24));
+
+        Assert.Equal("Alleeweg", new AddressIndex(AddressPath).Search("Allee 1", limit: 1)[0].Street);
+    }
+
     [Fact]
     public void A_cancelled_search_stops_instead_of_reading_on()
     {
