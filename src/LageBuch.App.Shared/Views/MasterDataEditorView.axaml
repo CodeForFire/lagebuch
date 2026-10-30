@@ -785,13 +785,17 @@
                        "Auto" would size to this Grid's own (empty) content instead of the row
                        template's buttons, leaving the header and row Grids to disagree on width
                        and dragging SITZPLÄTZE/ZF/EIGEN out of alignment with their columns. -->
-                  <Grid x:Name="VehiclesHeader" DockPanel.Dock="Top" ColumnDefinitions="*,*,110,*,*,150,70,70,32" Margin="0,0,0,6">
-                    <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
+                  <Grid x:Name="VehiclesHeader" DockPanel.Dock="Top" ColumnDefinitions="*,*,100,*,*,150,70,70,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                    <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
                     <TextBlock Grid.Column="2" Text="TYP" Classes="overline" FontSize="10"
-                               ToolTip.Tip="Fahrzeugtyp für das taktische Zeichen auf der Lagekarte" />
-                    <TextBlock Grid.Column="3" Text="TELEFON" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="4" Text="E-MAIL" Classes="overline" FontSize="10" />
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" ToolTip.Tip="Fahrzeugtyp für das taktische Zeichen auf der Lagekarte" />
+                    <TextBlock Grid.Column="3" Text="TELEFON" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                    <TextBlock Grid.Column="4" Text="E-MAIL" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
                     <TextBlock Grid.Column="5" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="6" Text="ZF" Classes="overline" FontSize="10"
                                ToolTip.Tip="Zugführerfahrzeug" />
@@ -813,7 +817,7 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
                           <Panel>
-                            <Grid Classes="vehicle-wide" ColumnDefinitions="*,*,110,*,*,150,70,70,32" Margin="0,0,0,6">
+                            <Grid Classes="vehicle-wide" ColumnDefinitions="*,*,100,*,*,150,70,70,32" Margin="0,0,0,6">
                               <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                    aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
                               <Grid Grid.Column="0" Margin="0,0,6,0">
