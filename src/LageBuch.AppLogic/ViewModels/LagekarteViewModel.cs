@@ -315,6 +315,42 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         Map.ChangeViewCommand.Execute(new MapViewChange(row.Position, Math.Max(Map.Zoom, EinsatzortZoom)));
     }
 
+    /// <summary>
+    /// The Einsatzdaten's address, just saved on this device: searched as if typed, and marked as
+    /// the Einsatzort when exactly one address is that Straße and Hausnummer. Anything less
+    /// certain stays a list of hits to pick from. Called by the device that saved it only, so an
+    /// address edited elsewhere does not make every device move the Einsatzort.
+    /// </summary>
+    public async Task LocateRecordedAddressAsync()
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        // A pack downloaded since the KARTE tab was last open counts too.
+        ReloadPacks();
+        var incident = _session.Incident;
+        AddressQuery = RecordedAddress(incident);
+        await SearchAddressAsync();
+        if (incident.Street is not { } street || incident.HouseNumber is not { } number)
+        {
+            return;
+        }
+
+        // Neighbouring packs overlap, and OSM may tag one address twice: the same address found
+        // twice is still one.
+        var exact = AddressHits
+            .Where(h => h.IsExactly(street, number, incident.PostalCode, incident.Place))
+            .DistinctBy(h => h.Key)
+            .Take(2)
+            .ToList();
+        if (exact.Count == 1)
+        {
+            ChooseAddress(exact[0]);
+        }
+    }
+
     private void ClearAddressHits()
     {
         AddressHits.Clear();
@@ -482,6 +518,8 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 /// <summary>An address found in a Kartenpaket, as the search list shows it.</summary>
 public sealed class LagekarteAddressRow(AddressHit hit, string? packName)
 {
+    private readonly AddressHit _hit = hit;
+
     public GeoPoint Position { get; } = hit.Position;
 
     /// <summary>"Hauptstraße 12a".</summary>
@@ -493,6 +531,23 @@ public sealed class LagekarteAddressRow(AddressHit hit, string? packName)
         new[] { Formatting.Address(null, hit.Suburb == hit.City ? null : hit.Suburb, null, hit.Postcode, hit.City), packName }.OfType<string>());
 
     public string AutomationName => Detail.Length == 0 ? Title : $"{Title}, {Detail}";
+
+    /// <summary>The address itself, whichever pack found it and wherever OSM put it.</summary>
+    internal (string Street, string HouseNumber, string Postcode, string City) Key { get; } =
+        (hit.Street.ToUpperInvariant(), hit.HouseNumber.ToUpperInvariant(), hit.Postcode, hit.City.ToUpperInvariant());
+
+    /// <summary>
+    /// This Straße and Hausnummer, and not elsewhere than the recorded PLZ and Ort. The search
+    /// matches by prefix, so "Hauptstraße 1" also finds 12 and 1a; those are not the address.
+    /// An untagged PLZ or Ort contradicts nothing.
+    /// </summary>
+    internal bool IsExactly(string street, string houseNumber, string? postalCode, string? place) =>
+        Same(_hit.Street, street)
+        && Same(_hit.HouseNumber, houseNumber)
+        && (postalCode is null || _hit.Postcode.Length == 0 || Same(_hit.Postcode, postalCode))
+        && (place is null || (_hit.City.Length == 0 && _hit.Suburb.Length == 0) || Same(_hit.City, place) || Same(_hit.Suburb, place));
+
+    private static bool Same(string a, string b) => string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>What a tap on the map is about to place: a unit, or the Einsatzort when <see cref="UnitId"/> is null.</summary>

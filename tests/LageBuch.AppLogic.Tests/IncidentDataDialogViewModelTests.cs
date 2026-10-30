@@ -190,6 +190,22 @@ public class IncidentDataDialogViewModelTests
         Assert.Equal(1, changes);
     }
 
+    [Fact]
+    public void Save_reports_the_address_only_when_it_changed()
+    {
+        var session = NewSession(new FakeStore(), keyword: "B3P");
+        var saved = new List<string?>();
+        var keywordOnly = new IncidentDataDialogViewModel(session, () => { }, onAddressSaved: () => saved.Add(session.Incident.Street));
+        keywordOnly.Keyword = "B4";
+        keywordOnly.SaveCommand.Execute(null);
+
+        var address = new IncidentDataDialogViewModel(session, () => { }, onAddressSaved: () => saved.Add(session.Incident.Street));
+        address.Street = "Hauptstraße";
+        address.SaveCommand.Execute(null);
+
+        Assert.Equal(["Hauptstraße"], saved);
+    }
+
     // #652: typed Einsatzdaten are not thrown away on a stray Esc; ABBRECHEN asks first.
     [Fact]
     public void Cancel_with_typed_fields_asks_before_closing()

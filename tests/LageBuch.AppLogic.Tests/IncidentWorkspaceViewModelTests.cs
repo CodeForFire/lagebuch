@@ -866,7 +866,8 @@ public class IncidentWorkspaceViewModelTests
         out FakeStore store,
         string? keyword = null,
         Domain.ValueObjects.IncidentNumber? number = null,
-        MasterDataSet? masterData = null)
+        MasterDataSet? masterData = null,
+        FakeRegionPackLibrary? mapPacks = null)
     {
         store = new FakeStore();
         var clock = new FixedClock(T0);
@@ -886,7 +887,27 @@ public class IncidentWorkspaceViewModelTests
             masterData ?? Md(),
             new FakeDialogs(),
             new FakeAlarmService(),
-            new NoopIncidentHostController());
+            new NoopIncidentHostController(),
+            mapPacks: mapPacks);
+    }
+
+    [Fact]
+    public void Saving_an_address_in_the_dialog_marks_the_Einsatzort_on_the_Karte()
+    {
+        var marktplatz = new Domain.ValueObjects.GeoPoint(48.1785, 11.2555);
+        var mapPacks = new FakeRegionPackLibrary();
+        mapPacks.Preinstall(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"));
+        mapPacks.Addresses["ffb"] = [new("Hauptstraße", "12", "82256", "Fürstenfeldbruck", string.Empty, marktplatz)];
+        var vm = WorkspaceWith(out _, mapPacks: mapPacks);
+
+        vm.EditIncidentDataCommand.Execute(null);
+        var dialog = vm.PendingIncidentDataDialog!;
+        dialog.Street = "Hauptstraße";
+        dialog.HouseNumber = "12";
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Equal(marktplatz, vm.Lagekarte.Map.Center);
+        Assert.True(vm.Lagekarte.HasEinsatzort);
     }
 
     [Fact]
