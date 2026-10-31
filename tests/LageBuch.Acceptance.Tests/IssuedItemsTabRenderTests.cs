@@ -196,6 +196,28 @@ public class IssuedItemsTabRenderTests
         CaptureWithPopup(window, popup, "ausgabe-geraete-suggestions.png");
     }
 
+    // The one Weste Presse is out, so GERÄT stops suggesting it; the HRT has one left and the
+    // Mobilteil 1 came back, so both are still offered (#838).
+    [AvaloniaFact]
+    public void Geraet_no_longer_suggests_one_with_none_left()
+    {
+        var (window, _, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "AUSGABE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var box = Named<AutoCompleteBox>(content, "NewDeviceBox");
+
+        box.Focus();
+        box.Text = string.Empty;
+        box.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var popup = box.GetVisualDescendants().OfType<Popup>().Single();
+        var list = popup.Child!.GetVisualDescendants().OfType<ListBox>().Single();
+        Assert.Equal(Devices.Select(d => d.Name).Where(n => n != "Weste Presse"), list.Items.Cast<string>());
+
+        CaptureWithPopup(window, popup, "ausgabe-geraete-none-left.png");
+    }
+
     private static void CaptureWithPopup(Window window, Popup popup, string name)
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
