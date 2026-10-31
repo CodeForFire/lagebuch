@@ -163,6 +163,7 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     private readonly Action _onChanged;
     private readonly Action<string, string, Action> _requestConfirm;
     private readonly IReadOnlyList<Device> _devices;
+    private readonly List<string> _deviceNames;
 
     // Quiet until the first press: a tab that opens already scolding teaches nothing.
     private bool _errorsShown;
@@ -171,7 +172,8 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     /// <param name="onChanged">Called after each accepted change, as every module does.</param>
     /// <param name="devices">
     /// The Stammdaten's Geräte, offered as suggestions, never a closed set. Each one's Anzahl is
-    /// checked against what is still out before another is handed out.
+    /// checked against what is still out: a Gerät with none left is no longer suggested, and one
+    /// typed anyway is asked about before it is handed out.
     /// </param>
     /// <param name="requestConfirm">
     /// Asks the host to confirm a removal, or an Ausgabe of a Gerät with none left, before running it,
@@ -190,7 +192,7 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
         _onChanged = onChanged;
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         _devices = devices ?? [];
-        DeviceOptions = _devices.Select(d => d.Name).ToList();
+        _deviceNames = _devices.Select(d => d.Name).ToList();
         IsReadOnly = session.IsReadOnly;
         Items = new ObservableCollection<IssuedItemRow>(BuildRows());
         _session.Changed += Refresh;
@@ -200,8 +202,13 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
 
     public bool IsReadOnly { get; }
 
-    /// <summary>The Stammdaten's Geräte, for the GERÄT suggestions.</summary>
-    public IReadOnlyList<string> DeviceOptions { get; }
+    /// <summary>
+    /// The Stammdaten's Geräte for the GERÄT suggestions, leaving out every one whose counted Anzahl
+    /// is all ausgegeben until one comes back (#838). A Gerät the Stammdaten do not count is always
+    /// offered.
+    /// </summary>
+    public IReadOnlyList<string> DeviceOptions =>
+        _deviceNames.Where(name => StockOf(name) is not var (issued, count) || issued < count).ToList();
 
     /// <summary>What is still out first, then what came back; each group in issue order.</summary>
     public ObservableCollection<IssuedItemRow> Items { get; }
@@ -351,7 +358,9 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
 
         // A typed "mobilteil 1 " records as the Stammdaten's "Mobilteil 1"; anything the list
         // lacks is kept as typed.
-        var device = StammdatenCatalogue.Normalize(NewDevice, DeviceOptions) ?? NewDevice;
+        // Against every Gerät, not just the ones still offered, so an exhausted one typed by hand
+        // still counts toward its Anzahl.
+        var device = StammdatenCatalogue.Normalize(NewDevice, _deviceNames) ?? NewDevice;
         var issuedTo = NewIssuedTo;
         if (StockOf(device) is var (issued, count) && issued >= count)
         {
@@ -417,6 +426,7 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
         OnPropertyChanged(nameof(HasItemsOut));
         OnPropertyChanged(nameof(NewDeviceStock));
         OnPropertyChanged(nameof(IsNewDeviceExhausted));
+        OnPropertyChanged(nameof(DeviceOptions));
     }
 
     private List<IssuedItemRow> BuildRows() =>

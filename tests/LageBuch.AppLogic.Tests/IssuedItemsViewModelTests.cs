@@ -335,6 +335,49 @@ public class IssuedItemsViewModelTests
         Assert.False(vm.IsNewDeviceExhausted);
     }
 
+    // A Gerät whose every counted one is out is no longer offered, and comes back with a ZURÜCK (#838).
+    [Fact]
+    public void The_suggestions_leave_out_a_geraet_whose_every_one_is_ausgegeben()
+    {
+        var session = NewSession();
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices);
+
+        session.IssueItem("Weste EAL", "Erika Beispiel", null, null, null);
+        Assert.Contains("Weste EAL", vm.DeviceOptions);
+
+        // Another spelling of the same Gerät is the same Weste.
+        session.IssueItem("weste eal", "Max Beispiel", null, null, null);
+        Assert.Equal(["Mobilteil 1", "AED", "Sonstiges"], vm.DeviceOptions);
+    }
+
+    [Fact]
+    public void A_returned_geraet_is_offered_again()
+    {
+        var session = NewSession();
+        session.IssueItem("AED", "Erika Beispiel", null, null, null);
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices);
+        Assert.DoesNotContain("AED", vm.DeviceOptions);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.Items[0].ReturnCommand.Execute(null);
+
+        Assert.Contains(nameof(IssuedItemsViewModel.DeviceOptions), changed);
+        Assert.Equal(["Mobilteil 1", "AED", "Weste EAL", "Sonstiges"], vm.DeviceOptions);
+    }
+
+    [Fact]
+    public void A_geraet_nobody_counted_stays_in_the_suggestions()
+    {
+        var session = NewSession();
+        session.IssueItem("Sonstiges", "Erika Beispiel", null, null, null);
+        session.IssueItem("Sonstiges", "Max Beispiel", null, null, null);
+
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices);
+
+        Assert.Contains("Sonstiges", vm.DeviceOptions);
+    }
+
     [Fact]
     public void Handing_out_a_geraet_with_none_left_asks_first_and_cancelling_keeps_the_form()
     {
