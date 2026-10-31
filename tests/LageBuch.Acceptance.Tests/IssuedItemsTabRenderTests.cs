@@ -129,6 +129,40 @@ public class IssuedItemsTabRenderTests
         Capture(window, "ausgabe-stock-hint.png");
     }
 
+    // A Gerät is one line on the ELW screen (#839): six stacked fields per card let only three or
+    // four entries fit, which is the wrong way round at the end of an Einsatz.
+    [AvaloniaFact]
+    public void An_ausgabe_row_takes_one_line_on_a_wide_window()
+    {
+        var (window, _, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "AUSGABE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var list = Named<ItemsControl>(content, "IssuedItemsList");
+
+        var rows = list.GetRealizedContainers().ToList();
+        Assert.Equal(3, rows.Count);
+        Assert.All(rows, row => Assert.True(row.Bounds.Height <= 56.0, $"row is {row.Bounds.Height}px high"));
+    }
+
+    // The 1280px window with the rail beside it is the narrowest desktop the table has to fit.
+    [AvaloniaFact]
+    public void The_ausgabe_table_fits_1280_with_the_rail()
+    {
+        var (window, _, _) = ShowWorkspace(1280, 800);
+        WorkspaceRenderHelper.SelectTab(window, "AUSGABE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var panel = Named<Border>(content, "IssuedItemsPanel");
+
+        Assert.True(panel.IsEffectivelyVisible);
+        foreach (var button in panel.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible))
+        {
+            var right = button.TranslatePoint(new Point(button.Bounds.Width, 0), panel)!.Value.X;
+            Assert.True(right <= panel.Bounds.Width + 1.0, $"{button.Name} ends at {right}, panel is {panel.Bounds.Width}");
+        }
+
+        Capture(window, "ausgabe-tab-1280.png");
+    }
+
     [AvaloniaFact]
     public void An_empty_ausgabe_tab_says_so()
     {
@@ -228,6 +262,10 @@ public class IssuedItemsTabRenderTests
 
         Assert.True(vm.IssuedItems.IsNarrow);
         Assert.False(vm.IssuedItems.ShowComposer);
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        Assert.True(Named<Border>(content, "IssuedItemsCardPanel").IsEffectivelyVisible);
+        Assert.False(Named<Border>(content, "IssuedItemsPanel").IsEffectivelyVisible);
+        Assert.Equal(2, content.GetVisualDescendants().OfType<Button>().Count(b => b.Name == "ReturnButton" && b.IsEffectivelyVisible));
         Capture(window, "ausgabe-tab-phone.png");
     }
 
