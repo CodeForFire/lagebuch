@@ -1111,7 +1111,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, Lagekarte, reopenTab);
 
-        IssuedItems = new IssuedItemsViewModel(_session, OnChanged, _masterData.Devices, RequestConfirm);
+        IssuedItems = new IssuedItemsViewModel(
+            _session, OnChanged, _masterData.Devices, RequestConfirm, ContactEntry.Roster(_masterData.Personnel, _masterData.Vehicles));
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;

@@ -596,6 +596,149 @@ public class IssuedItemsViewModelTests
         Assert.Equal(new[] { false, true }, outcomes);
     }
 
+    private static readonly IReadOnlyList<ContactEntry> Roster = ContactEntry.Roster(
+        [
+            new Person("Beispiel", "Max", "Gerätewart", null, "0171 0000002"),
+            new Person("Muster", "Erika", null, null, null),
+        ],
+        [
+            new Vehicle("FF Musterstadt", "Florian Musterstadt 11/1", 4, Phone: "0171 0000003"),
+            new Vehicle("FF Musterstadt", "Florian Musterstadt 40/1", 9),
+        ]);
+
+    // #837: the Einsatz's own Beteiligte first, then everyone the Kontakte tab lists, each name once.
+    [Fact]
+    public void Issued_to_options_list_beteiligte_then_kontakte_without_duplicates()
+    {
+        var session = NewSession();
+        session.AddInvolvedParty("Erika Beispiel", "0171 0000001", null);
+        session.AddInvolvedParty("muster, erika", null, null);
+
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices, contacts: Roster);
+
+        Assert.Equal(
+            new[] { "Erika Beispiel", "muster, erika", "Beispiel, Max", "Florian Musterstadt 11/1" },
+            vm.IssuedToOptions);
+    }
+
+    [Fact]
+    public void A_beteiligter_added_later_is_offered_without_reopening()
+    {
+        var session = NewSession();
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices, contacts: Roster);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        session.AddInvolvedParty("POK Mustermann", null, null);
+
+        Assert.Equal("POK Mustermann", vm.IssuedToOptions[0]);
+        Assert.Contains(nameof(IssuedItemsViewModel.IssuedToOptions), changed);
+    }
+
+    [Fact]
+    public void An_ausgabe_leaves_the_issued_to_suggestions_in_place()
+    {
+        var session = NewSession();
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices, contacts: Roster);
+        var before = vm.IssuedToOptions;
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        session.IssueItem("AED", "Beispiel, Max", null, null, null);
+
+        Assert.Same(before, vm.IssuedToOptions);
+        Assert.DoesNotContain(nameof(IssuedItemsViewModel.IssuedToOptions), changed);
+    }
+
+    [Theory]
+    [InlineData("Beispiel, Max", "0171 0000002")]
+    [InlineData(" florian musterstadt 11/1 ", "0171 0000003")]
+    [InlineData("Erika Beispiel", "0171 0000001")]
+    public void Picking_a_known_name_fills_an_empty_phone(string picked, string phone)
+    {
+        var session = NewSession();
+        session.AddInvolvedParty("Erika Beispiel", "0171 0000001", null);
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices, contacts: Roster);
+
+        vm.NewIssuedTo = picked;
+
+        Assert.Equal(phone, vm.NewIssuedToPhone);
+    }
+
+    [Fact]
+    public void Picking_a_known_name_never_overwrites_a_typed_phone()
+    {
+        using var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices, contacts: Roster)
+        {
+            NewIssuedToPhone = "0171 0000009",
+        };
+
+        vm.NewIssuedTo = "Beispiel, Max";
+
+        Assert.Equal("0171 0000009", vm.NewIssuedToPhone);
+    }
+
+    [Fact]
+    public void Changing_the_name_away_clears_the_phone_it_filled()
+    {
+        using var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices, contacts: Roster);
+        vm.NewIssuedTo = "Beispiel, Max";
+
+        vm.NewIssuedTo = "Beispiel, Ma";
+
+        Assert.Null(vm.NewIssuedToPhone);
+    }
+
+    [Fact]
+    public void A_phone_corrected_after_the_pick_stays_when_the_name_changes()
+    {
+        using var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices, contacts: Roster);
+        vm.NewIssuedTo = "Beispiel, Max";
+        vm.NewIssuedToPhone = "0171 0000009";
+
+        vm.NewIssuedTo = "Max Beispiel";
+
+        Assert.Equal("0171 0000009", vm.NewIssuedToPhone);
+    }
+
+    [Fact]
+    public void A_name_nobody_recorded_is_issued_as_typed_without_a_phone()
+    {
+        var session = NewSession();
+        using var vm = new IssuedItemsViewModel(session, () => { }, Devices, contacts: Roster)
+        {
+            NewDevice = "AED",
+            NewIssuedTo = "Nachbar Hausnummer 3",
+        };
+
+        vm.AddCommand.Execute(null);
+
+        var item = Assert.Single(session.Incident.IssuedItems);
+        Assert.Equal("Nachbar Hausnummer 3", item.IssuedTo);
+        Assert.Null(item.IssuedToPhone);
+    }
+
+    [Fact]
+    public void After_an_ausgabe_the_next_pick_fills_the_phone_again()
+    {
+        using var vm = new IssuedItemsViewModel(NewSession(), () => { }, Devices, contacts: Roster)
+        {
+            NewDevice = "AED",
+            NewIssuedTo = "Beispiel, Max",
+        };
+        vm.AddCommand.Execute(null);
+
+        vm.NewIssuedTo = "Florian Musterstadt 11/1";
+
+        Assert.Equal("0171 0000003", vm.NewIssuedToPhone);
+    }
+
+    [Fact]
+    public void Without_contacts_or_beteiligte_there_are_no_issued_to_suggestions()
+    {
+        Assert.Empty(new IssuedItemsViewModel(NewSession(), () => { }).IssuedToOptions);
+    }
+
     [Fact]
     public void Dispose_stops_listening_to_the_session()
     {

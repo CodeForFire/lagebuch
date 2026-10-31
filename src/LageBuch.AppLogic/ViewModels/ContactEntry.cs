@@ -26,6 +26,18 @@ public sealed record ContactEntry(
     /// <inheritdoc cref="Person.HasEmail"/>
     public bool HasEmail => !string.IsNullOrWhiteSpace(Email);
 
+    /// <summary>
+    /// Everybody the Kontakte tab lists: the people first, then, in Stammdaten order, every vehicle
+    /// with a number or an address. A vehicle with neither is nobody to reach.
+    /// </summary>
+    public static IReadOnlyList<ContactEntry> Roster(IReadOnlyList<Person> people, IReadOnlyList<Vehicle>? vehicles)
+    {
+        ArgumentNullException.ThrowIfNull(people);
+        return people.Select(FromPerson)
+            .Concat((vehicles ?? Array.Empty<Vehicle>()).Where(v => v.HasPhone || v.HasEmail).Select(FromVehicle))
+            .ToArray();
+    }
+
     public static ContactEntry FromPerson(Person person)
     {
         ArgumentNullException.ThrowIfNull(person);
