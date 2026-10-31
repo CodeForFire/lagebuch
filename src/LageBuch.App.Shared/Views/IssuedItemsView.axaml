@@ -18,7 +18,7 @@
     <Style Selector="AutoCompleteBox#NewDeviceBox">
       <Setter Property="Width" Value="200" />
     </Style>
-    <Style Selector="TextBox#NewIssuedToBox">
+    <Style Selector="AutoCompleteBox#NewIssuedToBox">
       <Setter Property="Width" Value="200" />
     </Style>
     <Style Selector="TextBox#NewPhoneBox">
@@ -76,7 +76,7 @@
     <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#NewDeviceBox">
       <Setter Property="Width" Value="NaN" />
     </Style>
-    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewIssuedToBox">
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#NewIssuedToBox">
       <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewPhoneBox">
@@ -152,12 +152,16 @@
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                Text="{Binding NewDevice}" />
             </HeaderedContentControl>
-            <HeaderedContentControl Classes="field required" Header="AUSGEGEBEN AN"
+            <!-- The Beteiligte and the Kontakte as suggestions (#837); somebody on neither list is
+                 typed in as before. -->
+            <HeaderedContentControl Classes="field suggest required" Header="AUSGEGEBEN AN"
                                     Classes.invalid="{Binding IsNewIssuedToMissing}">
-              <TextBox x:Name="NewIssuedToBox"
-                       MaxLength="{x:Static vm:IssuedItemsViewModel.MaxIssuedToLength}"
-                       PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
-                       Text="{Binding NewIssuedTo}" />
+              <AutoCompleteBox x:Name="NewIssuedToBox"
+                               MaxLength="{x:Static vm:IssuedItemsViewModel.MaxIssuedToLength}"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
+                               ItemsSource="{Binding IssuedToOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               Text="{Binding NewIssuedTo}" />
             </HeaderedContentControl>
             <!-- Plain text, as in the Beteiligte: a number is read out or typed into a phone. -->
             <HeaderedContentControl Classes="field" Header="TELEFON">

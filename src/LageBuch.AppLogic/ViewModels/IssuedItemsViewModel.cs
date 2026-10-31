@@ -164,9 +164,17 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     private readonly Action<string, string, Action> _requestConfirm;
     private readonly IReadOnlyList<Device> _devices;
     private readonly List<string> _deviceNames;
+    private readonly IReadOnlyList<ContactEntry> _contacts;
 
     // Quiet until the first press: a tab that opens already scolding teaches nothing.
     private bool _errorsShown;
+
+    // Each suggested name's phone number, keyed on the trimmed name, ignoring case.
+    private Dictionary<string, string?> _issuedToPhones = new(StringComparer.OrdinalIgnoreCase);
+
+    // The number a pick put into TELEFON, so that a different name takes it out again; null once
+    // the Lagebuchführer typed a number of their own.
+    private string? _autoFilledPhone;
 
     /// <param name="session">The incident session every change goes through.</param>
     /// <param name="onChanged">Called after each accepted change, as every module does.</param>
@@ -180,11 +188,16 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     /// as <see cref="InvolvedPartiesViewModel"/> does. Defaults to running it immediately, so tests
     /// that do not care need not supply one.
     /// </param>
+    /// <param name="contacts">
+    /// Everybody the Kontakte tab lists, offered after the Beteiligte as AUSGEGEBEN AN suggestions
+    /// (#837), never a closed set.
+    /// </param>
     public IssuedItemsViewModel(
         IIncidentSession session,
         Action onChanged,
         IReadOnlyList<Device>? devices = null,
-        Action<string, string, Action>? requestConfirm = null)
+        Action<string, string, Action>? requestConfirm = null,
+        IReadOnlyList<ContactEntry>? contacts = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -193,7 +206,9 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         _devices = devices ?? [];
         _deviceNames = _devices.Select(d => d.Name).ToList();
+        _contacts = contacts ?? [];
         IsReadOnly = session.IsReadOnly;
+        IssuedToOptions = BuildIssuedToOptions();
         Items = new ObservableCollection<IssuedItemRow>(BuildRows());
         _session.Changed += Refresh;
     }
@@ -209,6 +224,13 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     /// </summary>
     public IReadOnlyList<string> DeviceOptions =>
         _deviceNames.Where(name => StockOf(name) is not var (issued, count) || issued < count).ToList();
+
+    /// <summary>
+    /// The AUSGEGEBEN AN suggestions: this Einsatz's Beteiligte first, then the Kontakte, each name
+    /// once. Rebuilt on every change, so a Beteiligter recorded meanwhile — here or by a joined
+    /// device — is offered at once.
+    /// </summary>
+    public IReadOnlyList<string> IssuedToOptions { get; private set; }
 
     /// <summary>What is still out first, then what came back; each group in issue order.</summary>
     public ObservableCollection<IssuedItemRow> Items { get; }
@@ -260,6 +282,26 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewItemError))]
     private string? _newRemark;
+
+    // A known name brings its number into an empty TELEFON (#837); a number typed by hand is never
+    // overwritten. Moving on to another name takes back only a number the pick put there.
+    partial void OnNewIssuedToChanged(string? value)
+    {
+        if (_autoFilledPhone is not null && string.Equals(NewIssuedToPhone, _autoFilledPhone, StringComparison.Ordinal))
+        {
+            NewIssuedToPhone = null;
+        }
+
+        _autoFilledPhone = null;
+        if (string.IsNullOrWhiteSpace(NewIssuedToPhone)
+            && value is not null
+            && _issuedToPhones.TryGetValue(value.Trim(), out var phone)
+            && !string.IsNullOrWhiteSpace(phone))
+        {
+            NewIssuedToPhone = phone;
+            _autoFilledPhone = phone;
+        }
+    }
 
     /// <summary>
     /// How many of the typed Gerät are still in the ELW: "2 von 3 frei", or "Kein Gerät frei: 3 von 3
@@ -422,11 +464,46 @@ public sealed partial class IssuedItemsViewModel : ObservableObject, INarrowAwar
             Items.Add(row);
         }
 
+        // Replaced only when it really changed: a new list under an open suggestion box would
+        // refilter what is being typed on every Ausgabe or ZURÜCK, here or on a joined device.
+        var options = BuildIssuedToOptions();
+        if (!options.SequenceEqual(IssuedToOptions, StringComparer.Ordinal))
+        {
+            IssuedToOptions = options;
+            OnPropertyChanged(nameof(IssuedToOptions));
+        }
+
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(HasItemsOut));
         OnPropertyChanged(nameof(NewDeviceStock));
         OnPropertyChanged(nameof(IsNewDeviceExhausted));
         OnPropertyChanged(nameof(DeviceOptions));
+    }
+
+    // A name that is there twice is offered once, under its first spelling; its number is the
+    // first one either list knows.
+    private List<string> BuildIssuedToOptions()
+    {
+        var options = new List<string>();
+        var phones = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var people = _session.Incident.InvolvedParties.Select(p => (p.Name, p.Phone))
+            .Concat(_contacts.Select(c => (c.Name, c.Phone)))
+            .Where(p => !string.IsNullOrWhiteSpace(p.Name));
+        foreach (var (name, phone) in people)
+        {
+            var key = name.Trim();
+            if (phones.TryGetValue(key, out var known))
+            {
+                phones[key] = string.IsNullOrWhiteSpace(known) ? phone : known;
+                continue;
+            }
+
+            phones.Add(key, phone);
+            options.Add(name);
+        }
+
+        _issuedToPhones = phones;
+        return options;
     }
 
     private List<IssuedItemRow> BuildRows() =>

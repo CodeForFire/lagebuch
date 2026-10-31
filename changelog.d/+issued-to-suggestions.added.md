@@ -1,0 +1,1 @@
+The Ausgabeliste's AUSGEGEBEN AN field suggests the Einsatz's Beteiligte and everyone in Kontakte as you type, filling in their phone number when TELEFON is still empty, while any other name can still be typed in freely (#837).
