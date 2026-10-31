@@ -139,7 +139,7 @@ public class LagekarteViewModelTests
         Assert.Same(pin, Assert.Single(vm.Signs));
         Assert.Equal("HLF", pin.VehicleType);
         Assert.Equal("0/0/6/6", pin.Strength);
-        Assert.Equal(LagekarteMarker.DefaultLabelOffset, pin.LabelOffset);
+        Assert.Null(pin.LabelOffset); // the map finds it a free place until it is dragged
         Assert.Equal("LF 10/1: taktisches Zeichen", pin.SignAutomationName);
     }
 
@@ -155,10 +155,15 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
-    public void A_sign_not_yet_moved_stands_up_and_to_the_right_of_its_pin()
+    public void The_pins_the_signs_keep_clear_of_are_every_mark_on_the_map()
     {
-        Assert.Equal(28, LagekarteMarker.DefaultLabelOffset.Dx, precision: 6);
-        Assert.Equal(-44, LagekarteMarker.DefaultLabelOffset.Dy, precision: 6);
+        var (_, vm, _) = Open(units: ["LF 10/1"]);
+        vm.PlaceEinsatzortCommand.Execute(null);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Amperbruecke);
+
+        Assert.Equal([Marktplatz, Amperbruecke], vm.PinPositions);
     }
 
     [Fact]
@@ -215,7 +220,7 @@ public class LagekarteViewModelTests
         vm.Signs.Single().LabelOffset = new LabelOffset(300, 300);
         vm.RestoreMarkers();
 
-        Assert.Equal(LagekarteMarker.DefaultLabelOffset, vm.Signs.Single().LabelOffset);
+        Assert.Null(vm.Signs.Single().LabelOffset);
     }
 
     [Fact]

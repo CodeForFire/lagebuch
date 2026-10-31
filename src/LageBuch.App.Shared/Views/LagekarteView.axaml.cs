@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using LageBuch.App.Shared.Controls;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
 
@@ -18,7 +19,7 @@ public partial class LagekarteView : UserControl
 
     // The sign under the hand while it is dragged, and where it stood from its pin at the press.
     private LagekarteMarker? _draggedSign;
-    private LabelOffset _offsetAtPress = LagekarteMarker.DefaultLabelOffset;
+    private LabelOffset _offsetAtPress = new(0, 0);
 
     public LagekarteView() => InitializeComponent();
 
@@ -106,8 +107,9 @@ public partial class LagekarteView : UserControl
             return;
         }
 
+        // A sign the map placed has no offset of its own yet: the drag starts from where it is drawn.
         _draggedSign = marker;
-        _offsetAtPress = marker.LabelOffset;
+        _offsetAtPress = marker.LabelOffset ?? MapMarkerPanel.GetResolvedOffset(control) ?? new LabelOffset(0, 0);
         _pressedAt = e.GetPosition(Map);
         _moved = false;
         e.Pointer.Capture(control);
@@ -145,9 +147,9 @@ public partial class LagekarteView : UserControl
         _draggedSign = null;
         e.Pointer.Capture(null);
         e.Handled = true;
-        if (_moved)
+        if (_moved && marker.LabelOffset is { } offset)
         {
-            vm.MoveLabel(marker, marker.LabelOffset);
+            vm.MoveLabel(marker, offset);
         }
         else if (Map.ScreenToGeo(e.GetPosition(Map)) is { } position && vm.MapTappedCommand.CanExecute(position))
         {

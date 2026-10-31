@@ -286,7 +286,7 @@ public sealed class LagekarteRenderTests : IDisposable
         Assert.Equal("HLF", sign.VehicleType);
         Assert.Equal("Florian Musterstadt 40/1", sign.Title);
         Assert.Equal("0/1/8/9", sign.Strength);
-        Assert.Equal(new LabelOffset(-120, 40), sign.LabelOffset);
+        Assert.Equal(new LabelOffset(-120, 40), MapMarkerPanel.GetResolvedOffset(sign));
         Assert.Equal("Florian Musterstadt 40/1: taktisches Zeichen", Avalonia.Automation.AutomationProperties.GetName(sign));
         Assert.Equal("Florian Musterstadt 40/1: Standort", Avalonia.Automation.AutomationProperties.GetName(pin.GetVisualDescendants().OfType<Panel>().First()));
     }
@@ -301,6 +301,8 @@ public sealed class LagekarteRenderTests : IDisposable
         Dispatcher.UIThread.RunJobs();
 
         var sign = view.GetVisualDescendants().OfType<TacticalSignControl>().Single();
+        var placedAt = MapMarkerPanel.GetResolvedOffset(sign);
+        Assert.NotNull(placedAt);
         var start = sign.TranslatePoint(TacticalSignControl.SymbolCenter, window)!.Value;
         window.MouseDown(start, MouseButton.Left);
         window.MouseMove(new Point(start.X - 40, start.Y + 10), RawInputModifiers.LeftMouseButton);
@@ -310,8 +312,8 @@ public sealed class LagekarteRenderTests : IDisposable
         var unit = session.Incident.Forces.Single(u => u.Id == unitId);
         Assert.Equal(Marktplatz, unit.Position);
         Assert.NotNull(unit.LabelOffset);
-        Assert.Equal(LagekarteMarker.DefaultLabelOffset.Dx - 80, unit.LabelOffset.Dx, precision: 6);
-        Assert.Equal(LagekarteMarker.DefaultLabelOffset.Dy + 20, unit.LabelOffset.Dy, precision: 6);
+        Assert.Equal(placedAt.Dx - 80, unit.LabelOffset.Dx, precision: 6);
+        Assert.Equal(placedAt.Dy + 20, unit.LabelOffset.Dy, precision: 6);
         Assert.Equal(Marktplatz, vm.Map.Center);
     }
 
@@ -335,6 +337,67 @@ public sealed class LagekarteRenderTests : IDisposable
         // The PR screenshot.
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(Shots(), "fuehrung-karte-taktische-zeichen.png"));
+    }
+
+    [AvaloniaFact]
+    public void Units_placed_close_together_get_signs_that_cover_neither_each_other_nor_any_pin()
+    {
+        var (window, view, vm, session) = Show();
+        session.AddForceUnit("FF Musterstadt", 6, "Florian Musterstadt 19/1", "Im Einsatz", vehicleType: "MTW");
+        session.SetIncidentLocation(Marktplatz);
+        var forces = session.Incident.Forces;
+
+        // A few metres apart, as vehicles stand along one street: every sign wants the same spot.
+        session.PlaceForceUnit(forces[0].Id, new GeoPoint(48.17865, 11.25530));
+        session.PlaceForceUnit(forces[1].Id, new GeoPoint(48.17870, 11.25545));
+        session.PlaceForceUnit(forces[2].Id, new GeoPoint(48.17862, 11.25560));
+        session.PlaceForceUnit(forces[3].Id, new GeoPoint(48.17856, 11.25540));
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var signs = view.GetVisualDescendants().OfType<TacticalSignControl>()
+            .Select(s => new Rect(s.TranslatePoint(default, map)!.Value, s.Bounds.Size))
+            .ToList();
+        var pins = Pins(view).Children
+            .Select(c => MapDrawing.ToScreen(Marktplatz, 17, map.Bounds.Size, MapMarkerPanel.GetPosition(c)!, 0))
+            .ToList();
+
+        Assert.Equal(4, signs.Count);
+        Assert.Equal(5, pins.Count);
+        for (var i = 0; i < signs.Count; i++)
+        {
+            for (var j = i + 1; j < signs.Count; j++)
+            {
+                Assert.False(signs[i].Intersects(signs[j]), $"signs {i} {signs[i]} and {j} {signs[j]} overlap");
+            }
+
+            Assert.All(pins, p => Assert.False(signs[i].Inflate(4).Contains(p), $"sign {i} {signs[i]} covers the pin at {p}"));
+        }
+
+        // Each strich runs from its pin to its sign's middle; no two may cross, or which sign
+        // belongs to which pin is a guess.
+        var striche = view.GetVisualDescendants().OfType<TacticalSignControl>()
+            .Select(s => (Pin: Subtract(s.TranslatePoint(TacticalSignControl.SymbolCenter, map)!.Value, MapMarkerPanel.GetResolvedOffset(s)!), Sign: s.TranslatePoint(TacticalSignControl.SymbolCenter, map)!.Value))
+            .ToList();
+        for (var i = 0; i < striche.Count; i++)
+        {
+            for (var j = i + 1; j < striche.Count; j++)
+            {
+                Assert.False(Cross(striche[i].Pin, striche[i].Sign, striche[j].Pin, striche[j].Sign), $"striche {i} and {j} cross");
+            }
+        }
+
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-zeichen-dicht.png"));
+    }
+
+    private static Point Subtract(Point p, LabelOffset offset) => new(p.X - offset.Dx, p.Y - offset.Dy);
+
+    private static bool Cross(Point a, Point b, Point c, Point d)
+    {
+        static double Turn(Point p, Point q, Point r) => ((q.X - p.X) * (r.Y - p.Y)) - ((q.Y - p.Y) * (r.X - p.X));
+        return Turn(c, d, a) * Turn(c, d, b) < 0 && Turn(a, b, c) * Turn(a, b, d) < 0;
     }
 
     private static MapMarkerPanel Pins(LagekarteView view) =>

@@ -172,13 +172,15 @@
                             ViewChangedCommand="{Binding Map.ChangeViewCommand}"
                             TappedCommand="{Binding MapTappedCommand}" />
 
-        <!-- The taktische Zeichen, beneath the pins: each stands at its offset from its pin and is
-             tied back to it by the panel's Verbindungsstrich (DV 102 §1.5). Dragging one moves
-             only the sign; the unit stays where its pin is. -->
+        <!-- The taktische Zeichen, beneath the pins: each stands at its offset from its pin and draws
+             its Verbindungsstrich back to it (DV 102 §1.5). A sign never dragged gets a free place
+             from the panel, clear of the other signs and of every pin. Dragging one moves only the
+             sign; the unit stays where its pin is. -->
         <ItemsControl x:Name="Signs" ItemsSource="{Binding Signs}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate x:DataType="vm:LagekarteViewModel">
-              <c:MapMarkerPanel Center="{Binding Map.Center}" Zoom="{Binding Map.Zoom}" Rotation="{Binding Map.Rotation}" />
+              <c:MapMarkerPanel Center="{Binding Map.Center}" Zoom="{Binding Map.Zoom}" Rotation="{Binding Map.Rotation}"
+                                KeepClear="{Binding PinPositions}" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.Styles>
@@ -193,7 +195,6 @@
               <c:TacticalSignControl AutomationProperties.Name="{Binding SignAutomationName}"
                                      VehicleType="{Binding VehicleType}" Title="{Binding Title}"
                                      Strength="{Binding Strength}" Status="{Binding Subtitle}"
-                                     LabelOffset="{Binding LabelOffset}"
                                      PointerPressed="OnSignPressed" PointerMoved="OnSignMoved"
                                      PointerReleased="OnSignReleased" PointerCaptureLost="OnSignCaptureLost" />
             </DataTemplate>

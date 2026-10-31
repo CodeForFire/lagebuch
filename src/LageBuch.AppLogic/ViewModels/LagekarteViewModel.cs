@@ -71,6 +71,10 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>What the map draws over the tiles: the Einsatzort and each placed unit's pin.</summary>
     public ObservableCollection<LagekarteMarker> Markers { get; } = new();
 
+    /// <summary>Where every pin stands, the Einsatzort's included: what a sign placed by the map keeps clear of.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<GeoPoint> _pinPositions = [];
+
     /// <summary>
     /// The taktische Zeichen of the placed units: the same markers as their pins, drawn beneath
     /// them at each one's offset and tied back with a Verbindungsstrich (DV 102 §1.5).
@@ -472,6 +476,8 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             Signs.Add(marker);
         }
 
+        PinPositions = Markers.Select(m => m.Position).ToList();
+
         // A unit that left the Einsatz while it was picked cannot be placed any more.
         if (Placing is { UnitId: { } picked } && units.All(u => u.Id != picked))
         {
@@ -665,9 +671,6 @@ public sealed class LagekarteUnitRow
 /// <summary>A mark on the map: the Einsatzort, or a unit when <see cref="UnitId"/> is set.</summary>
 public sealed partial class LagekarteMarker : ObservableObject
 {
-    /// <summary>Where a sign stands until it is moved: up and to the right, so it never covers its pin.</summary>
-    public static readonly LabelOffset DefaultLabelOffset = new(28, -44);
-
     private LagekarteMarker(Guid? unitId, string title, string? subtitle, GeoPoint position, string? vehicleType = null, string? strength = null, LabelOffset? labelOffset = null)
     {
         UnitId = unitId;
@@ -676,7 +679,7 @@ public sealed partial class LagekarteMarker : ObservableObject
         VehicleType = vehicleType;
         Strength = strength;
         _position = position;
-        _labelOffset = labelOffset ?? DefaultLabelOffset;
+        _labelOffset = labelOffset;
     }
 
     public Guid? UnitId { get; }
@@ -697,9 +700,13 @@ public sealed partial class LagekarteMarker : ObservableObject
     [ObservableProperty]
     private GeoPoint _position;
 
-    /// <summary>Where the sign stands from its pin, in screen pixels. Moves under the hand while dragged.</summary>
+    /// <summary>
+    /// Where the sign stands from its pin, in screen pixels, once it has been dragged there; it
+    /// moves under the hand while dragged. Null until then: the map finds the sign a free place
+    /// beside its pin, clear of the other signs and pins, at whatever zoom it shows.
+    /// </summary>
     [ObservableProperty]
-    private LabelOffset _labelOffset;
+    private LabelOffset? _labelOffset;
 
     public string AutomationName => IsEinsatzort ? "Einsatzort" : $"{Title}: Standort";
 

@@ -3,7 +3,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.App.Shared.Controls;
 
@@ -14,7 +13,7 @@ namespace LageBuch.App.Shared.Controls;
 /// loaded from SVG, after the CC0 set of jonas-koeritz/Taktische-Zeichen, so it needs no package
 /// and draws the same on a phone. The sign's body sits at the top left, and from
 /// <see cref="SymbolCenter"/> it draws the Verbindungsstrich back to the unit's pin, which stands
-/// <see cref="LabelOffset"/> away (§1.5: a sign moved aside "mit Verbindungsstrichen zur jeweiligen
+/// <see cref="MapMarkerPanel.ResolvedOffsetProperty"/> away (§1.5: a sign moved aside "mit Verbindungsstrichen zur jeweiligen
 /// Örtlichkeit"). The strich leaves the control's bounds on purpose; only the sign takes the pointer.
 /// </summary>
 public sealed class TacticalSignControl : Control
@@ -35,10 +34,6 @@ public sealed class TacticalSignControl : Control
 
     public static readonly StyledProperty<string?> StatusProperty =
         AvaloniaProperty.Register<TacticalSignControl, string?>(nameof(Status));
-
-    /// <summary>How far the sign stands from its pin; null draws no Verbindungsstrich.</summary>
-    public static readonly StyledProperty<LabelOffset?> LabelOffsetProperty =
-        AvaloniaProperty.Register<TacticalSignControl, LabelOffset?>(nameof(LabelOffset));
 
     private const double WheelRadius = 2.4;
     private const double SymbolHeight = BodyHeight + 7;
@@ -65,7 +60,7 @@ public sealed class TacticalSignControl : Control
     static TacticalSignControl()
     {
         AffectsMeasure<TacticalSignControl>(VehicleTypeProperty, TitleProperty, StrengthProperty, StatusProperty);
-        AffectsRender<TacticalSignControl>(VehicleTypeProperty, TitleProperty, StrengthProperty, StatusProperty, LabelOffsetProperty);
+        AffectsRender<TacticalSignControl>(VehicleTypeProperty, TitleProperty, StrengthProperty, StatusProperty, MapMarkerPanel.ResolvedOffsetProperty);
     }
 
     /// <summary>The body's middle: where the sign is anchored to its offset from the pin.</summary>
@@ -96,12 +91,6 @@ public sealed class TacticalSignControl : Control
         set => SetValue(StatusProperty, value);
     }
 
-    public LabelOffset? LabelOffset
-    {
-        get => GetValue(LabelOffsetProperty);
-        set => SetValue(LabelOffsetProperty, value);
-    }
-
     protected override Size MeasureOverride(Size availableSize) => Layout().Size;
 
     public override void Render(DrawingContext context)
@@ -111,7 +100,7 @@ public sealed class TacticalSignControl : Control
         var layout = Layout();
 
         // First, so the body covers the strich's end: it runs from the sign's middle to the pin.
-        if (LabelOffset is { } offset)
+        if (MapMarkerPanel.GetResolvedOffset(this) is { } offset)
         {
             var pin = new Point(SymbolCenter.X - offset.Dx, SymbolCenter.Y - offset.Dy);
             context.DrawLine(StrichHalo, SymbolCenter, pin);
