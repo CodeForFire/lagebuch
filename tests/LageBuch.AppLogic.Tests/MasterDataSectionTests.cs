@@ -221,7 +221,7 @@ public class MasterDataSectionTests
     public void VehicleRow_HasZugfuehrer_change_flags_a_change()
     {
         var changes = 0;
-        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
         row.HasZugfuehrer = true;
 
@@ -233,7 +233,7 @@ public class MasterDataSectionTests
     public void VehicleRow_IsOwn_change_flags_a_change()
     {
         var changes = 0;
-        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
         row.IsOwn = false;
 
@@ -245,7 +245,7 @@ public class MasterDataSectionTests
     public void VehicleRow_Phone_change_flags_a_change()
     {
         var changes = 0;
-        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
         row.Phone = "01 71 / 1 23 45 67";
 
@@ -274,7 +274,7 @@ public class MasterDataSectionTests
     public void VehicleRow_Email_change_flags_a_change()
     {
         var changes = 0;
-        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
         row.Email = "elw1@ff-musterstadt.example";
 
@@ -297,6 +297,52 @@ public class MasterDataSectionTests
         Assert.Equal(
             new[] { new Vehicle("Wache 1", "ELW 1", 4, Email: "elw1@ff-musterstadt.example"), new Vehicle("Wache 1", "LF 1", 9) },
             s.ToValues());
+    }
+
+    [Fact]
+    public void VehicleRow_VehicleType_change_flags_a_change()
+    {
+        var changes = 0;
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, null, null, null, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+
+        row.VehicleType = "ELW 1";
+
+        Assert.Equal(1, changes);
+        Assert.Contains("ELW 1", VehicleRow.VehicleTypeOptions);
+    }
+
+    [Fact]
+    public void Vehicles_ToValues_spells_a_known_type_as_the_catalogue_does_and_keeps_an_unknown_one()
+    {
+        var s = new VehiclesSection(
+            "Fahrzeuge",
+            new[] { new Vehicle("Wache 1", "LF 1", 9), new Vehicle("Wache 1", "LF 2", 9), new Vehicle("Wache 1", "LF 3", 9), new Vehicle("Wache 1", "LF 4", 9) },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            () => { });
+
+        s.Rows[0].VehicleType = " hlf ";
+        s.Rows[1].VehicleType = "TLF 4000";
+        s.Rows[2].VehicleType = "  ";
+        s.Rows[3].VehicleType = new string('X', LageBuch.Domain.VehicleTypes.MaxLength + 4);
+
+        Assert.Equal(
+            new string?[] { "HLF", "TLF 4000", null, new string('X', LageBuch.Domain.VehicleTypes.MaxLength) },
+            s.ToValues().Select(v => v.VehicleType));
+    }
+
+    [Fact]
+    public void A_row_with_only_a_vehicle_type_is_not_blank_and_asks_before_it_goes()
+    {
+        string? asked = null;
+        var s = new VehiclesSection("Fahrzeuge", Array.Empty<Vehicle>(), Array.Empty<string>(), Array.Empty<string>(), () => { }, (text, _) => asked = text);
+        s.AddCommand.Execute(null);
+        s.Rows[0].VehicleType = "DLK";
+
+        s.RemoveCommand.Execute(s.Rows[0]);
+
+        Assert.NotNull(asked);
+        Assert.Single(s.Rows);
     }
 
     [Fact]

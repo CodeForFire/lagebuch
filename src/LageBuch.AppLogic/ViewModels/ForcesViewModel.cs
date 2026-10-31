@@ -750,7 +750,8 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
             NewNotes,
             NewScbaCount ?? 0,
             NewOfficerCount ?? 0,
-            NewZugfuehrerCount ?? 0); // Changed → RefreshForces
+            NewZugfuehrerCount ?? 0,
+            SelectedVehicle?.VehicleType); // Changed → RefreshForces; the Fahrzeugtyp is copied, never looked up again (#337)
 
         // FEUERWEHR is sticky (#540): several vehicles of one Feuerwehr usually arrive together, so
         // it stays, and the view selects it on the way past. The vehicle goes -- it is taken now --

@@ -197,6 +197,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void PlaceForceUnit(Guid unitId, GeoPoint? position) =>
         Mutate(() => Incident.PlaceForceUnit(_clock, RequireOperator(), unitId, position));
 
+    public void SetForceUnitVehicleType(Guid unitId, string? vehicleType) =>
+        Mutate(() => Incident.SetForceUnitVehicleType(_clock, RequireOperator(), unitId, vehicleType));
+
+    public void MoveForceUnitLabel(Guid unitId, LabelOffset? offset) =>
+        Mutate(() => Incident.MoveForceUnitLabel(_clock, RequireOperator(), unitId, offset));
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Mutate(() => Incident.PlaceRoleAssignment(_clock, RequireOperator(), assignmentId, nodeId, slot));
 
@@ -220,8 +226,9 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? notes = null,
         int scbaCount = 0,
         int officerCount = 0,
-        int zugfuehrerCount = 0) =>
-        Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount));
+        int zugfuehrerCount = 0,
+        string? vehicleType = null) =>
+        Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount, vehicleType));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
         Mutate(() => Incident.UpdateForceUnit(_clock, RequireOperator(), unitId, status, notes));

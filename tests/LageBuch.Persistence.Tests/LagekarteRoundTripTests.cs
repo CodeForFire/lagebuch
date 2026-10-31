@@ -64,6 +64,50 @@ public sealed class LagekarteRoundTripTests : IDisposable
         Assert.Equal(2, loaded.Forces.Count);
     }
 
+    [Fact]
+    public void A_unit_s_vehicle_type_and_label_offset_survive_save_and_load()
+    {
+        var (incident, unitId) = PlacedIncident();
+        var clock = new FixedTestClock();
+        var op = new SessionOperator("Muster", "FFB 12/1");
+        incident.SetForceUnitVehicleType(clock, op, unitId, "HLF");
+        incident.MoveForceUnitLabel(clock, op, unitId, new LabelOffset(42.5, -61));
+
+        IncidentRepository.Save(Path_, incident);
+        var loaded = IncidentRepository.Load(Path_).Forces.Single(u => u.Id == unitId);
+
+        Assert.Equal("HLF", loaded.VehicleType);
+        Assert.Equal(new LabelOffset(42.5, -61), loaded.LabelOffset);
+    }
+
+    [Theory]
+    [InlineData("'links'", "4")]
+    [InlineData("1e9", "4")]
+    [InlineData("4", "NULL")]
+    public void A_label_offset_a_hostile_file_stores_out_of_range_reads_as_the_default_place(string dx, string dy)
+    {
+        var (incident, _) = PlacedIncident();
+        IncidentRepository.Save(Path_, incident);
+        Tamper($"UPDATE force_units SET label_dx = {dx}, label_dy = {dy};");
+
+        var loaded = IncidentRepository.Load(Path_);
+
+        Assert.All(loaded.Forces, u => Assert.Null(u.LabelOffset));
+    }
+
+    [Fact]
+    public void An_overlong_vehicle_type_a_hostile_file_stores_costs_the_sign_its_text_not_the_Einsatz()
+    {
+        var (incident, _) = PlacedIncident();
+        IncidentRepository.Save(Path_, incident);
+        Tamper($"UPDATE force_units SET vehicle_type = '{new string('X', VehicleTypes.MaxLength + 1)}';");
+
+        var loaded = IncidentRepository.Load(Path_);
+
+        Assert.All(loaded.Forces, u => Assert.Null(u.VehicleType));
+        Assert.Equal(2, loaded.Forces.Count);
+    }
+
     private static (Incident Incident, Guid UnitId) PlacedIncident()
     {
         var clock = new FixedTestClock();

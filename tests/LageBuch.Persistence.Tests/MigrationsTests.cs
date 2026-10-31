@@ -521,4 +521,36 @@ public class MigrationsTests : IDisposable
             Assert.True(r.IsDBNull(0) && r.IsDBNull(1));
         }
     }
+
+    [Fact]
+    public void V38_database_upgrades_to_v39_and_its_units_carry_no_sign_details()
+    {
+        // A V38 file: today's schema minus the taktische-Zeichen columns, with a unit on the map.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE force_units DROP COLUMN vehicle_type;
+                ALTER TABLE force_units DROP COLUMN label_dx;
+                ALTER TABLE force_units DROP COLUMN label_dy;
+                INSERT INTO force_units (id, ordinal, brigade, personnel_count, position_lat, position_lon) VALUES ('u', 0, 'Aich', 6, 48.1785, 11.2555);
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (38);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(39, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT vehicle_type, label_dx, label_dy, position_lat FROM force_units WHERE id = 'u';";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.True(r.IsDBNull(0) && r.IsDBNull(1) && r.IsDBNull(2));
+        Assert.Equal(48.1785, r.GetDouble(3), precision: 6);
+    }
 }

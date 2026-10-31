@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -30,18 +31,18 @@ public sealed partial class VehiclesSection : EditorSection
         _wacheOptions = wacheOptions;
         _callSignOptions = callSignOptions;
         Rows = new ObservableCollection<VehicleRow>(
-            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer, v.IsOwn, v.Phone, v.Email)));
+            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer, v.IsOwn, v.Phone, v.Email, v.VehicleType)));
     }
 
     public ObservableCollection<VehicleRow> Rows { get; }
 
-    private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer, bool isOwn, string? phone, string? email) =>
-        new(wache, callSign, seats, hasZugfuehrer, isOwn, phone, email, _wacheOptions, _callSignOptions, _onChanged);
+    private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer, bool isOwn, string? phone, string? email, string? vehicleType) =>
+        new(wache, callSign, seats, hasZugfuehrer, isOwn, phone, email, vehicleType, _wacheOptions, _callSignOptions, _onChanged);
 
     [RelayCommand]
     private void Add()
     {
-        var row = NewRow(string.Empty, string.Empty, 0, false, isOwn: true, phone: null, email: null);
+        var row = NewRow(string.Empty, string.Empty, 0, false, isOwn: true, phone: null, email: null, vehicleType: null);
         Rows.Add(row);
         _onChanged();
         OnRowAdded(row);
@@ -55,7 +56,7 @@ public sealed partial class VehiclesSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign, row.Phone, row.Email), () =>
+        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign, row.Phone, row.Email, row.VehicleType), () =>
         {
             if (Rows.Remove(row))
             {
@@ -66,7 +67,7 @@ public sealed partial class VehiclesSection : EditorSection
 
     /// <summary>
     /// Rows with a non-blank Wache and Funkrufname; trimmed, seats as entered, a blank
-    /// Fahrzeugtelefon or E-Mail stored as none.
+    /// Fahrzeugtelefon, E-Mail or Fahrzeugtyp stored as none, and a Fahrzeugtyp cut to its cap.
     /// </summary>
     public IReadOnlyList<Vehicle> ToValues()
     {
@@ -79,7 +80,15 @@ public sealed partial class VehiclesSection : EditorSection
             {
                 var phone = string.IsNullOrWhiteSpace(row.Phone) ? null : row.Phone.Trim();
                 var email = string.IsNullOrWhiteSpace(row.Email) ? null : row.Email.Trim();
-                result.Add(new Vehicle(wache, callSign, row.Seats, row.HasZugfuehrer, row.IsOwn, phone, email));
+                var type = string.IsNullOrWhiteSpace(row.VehicleType) ? null : row.VehicleType.Trim();
+                if (type is { Length: > VehicleTypes.MaxLength })
+                {
+                    type = type[..VehicleTypes.MaxLength].TrimEnd();
+                }
+
+                // A typed "hlf" is stored as the catalogue spells it, so the sign reads the same everywhere.
+                type = VehicleTypes.Find(type)?.Code ?? type;
+                result.Add(new Vehicle(wache, callSign, row.Seats, row.HasZugfuehrer, row.IsOwn, phone, email, type));
             }
         }
 

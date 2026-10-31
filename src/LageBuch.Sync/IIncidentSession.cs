@@ -126,6 +126,12 @@ public interface IIncidentSession
     /// <summary>Puts a unit on the Lagekarte; null takes it off. See <c>Incident.PlaceForceUnit</c>.</summary>
     void PlaceForceUnit(Guid unitId, GeoPoint? position);
 
+    /// <summary>Sets the Fahrzeugtyp a unit's taktisches Zeichen shows; null clears it. See <c>Incident.SetForceUnitVehicleType</c>.</summary>
+    void SetForceUnitVehicleType(Guid unitId, string? vehicleType);
+
+    /// <summary>Moves a unit's sign relative to its pin; null puts it back at the default place. See <c>Incident.MoveForceUnitLabel</c>.</summary>
+    void MoveForceUnitLabel(Guid unitId, LabelOffset? offset);
+
     /// <summary>Places a running Funktion in a node and board slot; a null <paramref name="nodeId"/> is the Einsatzleitung.</summary>
     void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot);
 
@@ -149,7 +155,8 @@ public interface IIncidentSession
         string? notes = null,
         int scbaCount = 0,
         int officerCount = 0,
-        int zugfuehrerCount = 0);
+        int zugfuehrerCount = 0,
+        string? vehicleType = null);
 
     void UpdateForceUnit(Guid unitId, string? status, string? notes);
 

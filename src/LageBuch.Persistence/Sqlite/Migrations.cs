@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 38;
+    public const int CurrentVersion = 39;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -265,6 +265,15 @@ public static class Migrations
         if (version < 38)
         {
             ApplyV38(cn, tx);
+        }
+
+        // Stryker disable all : V39 only adds nullable columns that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 39)
+        {
+            ApplyV39(cn, tx);
+
+            // Stryker restore all
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1068,6 +1077,19 @@ public static class Migrations
     private static void ApplyV37(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "nav_overrides", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The taktisches Zeichen of a unit on the Lagekarte: its Fahrzeugtyp, and how far its sign was
+    // moved from the pin. Additive and nullable: an older file's units read back with the bare
+    // Kraftfahrzeug sign at its default place, which is all they ever had.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV39(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "vehicle_type", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "label_dx", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "label_dy", "REAL");
 
         // Stryker restore all
     }

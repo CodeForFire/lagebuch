@@ -466,7 +466,9 @@ public sealed record Person(
 /// opposite of HasZugfuehrer's default -- a missing flag must not turn a whole fleet foreign.
 /// Phone is the Fahrzeugtelefon and Email the vehicle's mailbox (an ELW's, a Wache's), both
 /// optional and trailing for the same reason; a vehicle that has either is listed in the Kontakte
-/// tab next to the roster.
+/// tab next to the roster. VehicleType is the Fahrzeugtyp (LF, DLK, ELW 1 …) that picks the
+/// taktisches Zeichen on the Lagekarte; it is copied into the incident when the vehicle is picked,
+/// and null draws the bare Kraftfahrzeug sign.
 /// </summary>
 public sealed record Vehicle(
     string Wache,
@@ -475,7 +477,8 @@ public sealed record Vehicle(
     bool HasZugfuehrer = false,
     bool IsOwn = true,
     string? Phone = null,
-    string? Email = null)
+    string? Email = null,
+    string? VehicleType = null)
 {
     /// <inheritdoc cref="Person.HasPhone"/>
     public bool HasPhone => !string.IsNullOrWhiteSpace(Phone);
@@ -1089,7 +1092,8 @@ public static class MasterDataJson
                         x.TryGetProperty("hasZugfuehrer", out var hz) && hz.ValueKind == JsonValueKind.True,
                         IsOwn(x),
                         Opt(x, "phone"),
-                        Opt(x, "email")))
+                        Opt(x, "email"),
+                        LageBuch.Domain.VehicleTypes.FromStored(Opt(x, "vehicleType"))))
                     .ToList()
                 : Array.Empty<Vehicle>();
 
@@ -1520,7 +1524,7 @@ public static class MasterDataJson
             checklists = ChecklistsForExport(set),
             navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url, group = l.Group }),
-            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone, email = v.Email }),
+            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone, email = v.Email, vehicleType = v.VehicleType }),
             talkGroups = set.TalkGroups.Select(t => new
             {
                 name = t.Name,

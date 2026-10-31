@@ -28,6 +28,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(MoveForceUnitCommand), "moveForceUnit")]
 [JsonDerivedType(typeof(SetIncidentLocationCommand), "setIncidentLocation")]
 [JsonDerivedType(typeof(PlaceForceUnitCommand), "placeForceUnit")]
+[JsonDerivedType(typeof(SetForceUnitVehicleTypeCommand), "setForceUnitVehicleType")]
+[JsonDerivedType(typeof(MoveForceUnitLabelCommand), "moveForceUnitLabel")]
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
 [JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
 [JsonDerivedType(typeof(SetNavVisibilityCommand), "setNavVisibility")]
@@ -152,6 +154,12 @@ public sealed record SetIncidentLocationCommand(OperatorDto Operator, double? La
 /// <summary>Puts a unit on the Lagekarte; both coordinates null takes it off.</summary>
 public sealed record PlaceForceUnitCommand(OperatorDto Operator, Guid UnitId, double? Latitude, double? Longitude) : SyncCommand;
 
+// Protocol 30: the taktisches Zeichen. A null VehicleType clears it; both offsets null put the
+// sign back at its default place.
+public sealed record SetForceUnitVehicleTypeCommand(OperatorDto Operator, Guid UnitId, string? VehicleType) : SyncCommand;
+
+public sealed record MoveForceUnitLabelCommand(OperatorDto Operator, Guid UnitId, double? Dx, double? Dy) : SyncCommand;
+
 /// <summary>Places a running Funktion in a node and board slot; a null NodeId is the Einsatzleitung.</summary>
 public sealed record PlaceRoleAssignmentCommand(OperatorDto Operator, Guid AssignmentId, Guid? NodeId, RoleSlot Slot) : SyncCommand;
 
@@ -177,7 +185,7 @@ public sealed record UpdateLeadershipPostCommand(
 public sealed record AddForceUnitCommand(
     OperatorDto Operator, string Brigade, int PersonnelCount,
     string? CallSign, string? Status, string? Notes, int ScbaCount, int OfficerCount = 0,
-    int ZugfuehrerCount = 0) : SyncCommand;
+    int ZugfuehrerCount = 0, string? VehicleType = null) : SyncCommand;
 
 public sealed record UpdateForceUnitCommand(
     OperatorDto Operator, Guid UnitId, string? Status, string? Notes) : SyncCommand;

@@ -517,6 +517,49 @@ public class ForcesViewModelTests
     }
 
     [Fact]
+    public void A_picked_vehicle_s_fahrzeugtyp_is_copied_into_the_unit()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => { });
+
+        vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "DLK");
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Equal("DLK", Assert.Single(session.Incident.Forces).VehicleType);
+    }
+
+    [Fact]
+    public void A_unit_typed_in_by_hand_has_no_fahrzeugtyp()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => { })
+        {
+            NewBrigade = "FF Nachbarort",
+            NewCallSign = "Florian Nachbarort 40/1",
+            NewOfficerCount = 1,
+            NewMannschaftCount = 8,
+        };
+
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Null(Assert.Single(session.Incident.Forces).VehicleType);
+    }
+
+    [Fact]
     public void Gf_and_mann_are_stored_as_total_with_officer_count()
     {
         var clock = new FixedClock(T0);

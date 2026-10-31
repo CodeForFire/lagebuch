@@ -182,6 +182,15 @@ public class MasterDataEditorRenderTests
         Assert.Contains(
             wide[0].GetVisualDescendants().OfType<TextBox>(),
             t => t.IsEffectivelyVisible && AutomationProperties.GetName(t) == "E-Mail");
+        Assert.Contains(
+            wide[0].GetVisualDescendants().OfType<AutoCompleteBox>(),
+            t => t.IsEffectivelyVisible && AutomationProperties.GetName(t) == "Fahrzeugtyp");
+
+        // The PR screenshot.
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "master-data-editor-fahrzeuge.png"));
     }
 
     // The ETB's checkbox being disabled is a promise the UI makes, not just a view-model flag:

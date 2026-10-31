@@ -1315,6 +1315,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void PlaceForceUnit(Guid unitId, GeoPoint? position) => _inner.PlaceForceUnit(unitId, position);
 
+    public void SetForceUnitVehicleType(Guid unitId, string? vehicleType) => _inner.SetForceUnitVehicleType(unitId, vehicleType);
+
+    public void MoveForceUnitLabel(Guid unitId, LabelOffset? offset) => _inner.MoveForceUnitLabel(unitId, offset);
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
 
     /// <summary>
@@ -1350,8 +1354,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         string? notes = null,
         int scbaCount = 0,
         int officerCount = 0,
-        int zugfuehrerCount = 0) =>
-        _inner.AddForceUnit(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount);
+        int zugfuehrerCount = 0,
+        string? vehicleType = null) =>
+        _inner.AddForceUnit(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount, vehicleType);
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) => _inner.UpdateForceUnit(unitId, status, notes);
 

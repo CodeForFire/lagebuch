@@ -276,7 +276,16 @@ public class VersionHandshakeTests
     {
         // 29 replaces updateLeadershipPost's funkgruppe with two lists. A client at 28 editing the
         // post would send neither, which a host at 29 reads as "none", so a 28 and a 29 must not connect.
-        Assert.Equal(29, SyncProtocol.ProtocolVersion);
-        Assert.Equal(29, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 29, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 29, int.MaxValue);
+    }
+
+    [Fact]
+    public void Taktische_zeichen_raise_the_protocol_and_the_floor_to_thirty()
+    {
+        // 30 adds setForceUnitVehicleType and moveForceUnitLabel, commands a client may send. A
+        // host at 29 has neither in its allowlist and would reject them, so a 29 and a 30 must not connect.
+        Assert.Equal(30, SyncProtocol.ProtocolVersion);
+        Assert.Equal(30, SyncProtocol.MinimumProtocolVersion);
     }
 }

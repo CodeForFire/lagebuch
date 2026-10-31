@@ -23,13 +23,24 @@
       <Setter Property="MaxHeight" Value="260" />
       <Setter Property="Margin" Value="0,12,0,0" />
     </Style>
-    <!-- Marks sit on a light map, so they carry their own dark plate rather than the page's colours. -->
-    <Style Selector="Border.unit-mark">
-      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
-      <Setter Property="BorderThickness" Value="2" />
-      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
-      <Setter Property="Padding" Value="6,2" />
+    <!-- A unit's pin: the exact spot it stands on. Small to see past, with a finger-sized grip
+         around it (the transparent Panel), so a tablet can still drag it. -->
+    <Style Selector="Panel.unit-pin">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Cursor" Value="SizeAll" />
+    </Style>
+    <Style Selector="Panel.unit-pin > Ellipse">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Fill" Value="Black" />
+      <Setter Property="Stroke" Value="White" />
+      <Setter Property="StrokeThickness" Value="2" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="c|TacticalSignControl">
       <Setter Property="Cursor" Value="SizeAll" />
     </Style>
     <Style Selector="Border.einsatzort-mark">
@@ -108,8 +119,15 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:LagekarteUnitRow">
                 <!-- The name gets the whole width: a Funkrufname cut to "Florian Musterst…" names no one. -->
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,10">
                   <TextBlock Grid.ColumnSpan="4" Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <!-- The Fahrzeugtyp its taktisches Zeichen shows, for a vehicle the Stammdaten did not
+                       name one for. Picking writes it to the Einsatz at once. -->
+                  <ComboBox Grid.Row="2" Grid.ColumnSpan="4" Margin="0,4,0,0" MinWidth="110"
+                            AutomationProperties.Name="{Binding VehicleTypeAutomationName}"
+                            ToolTip.Tip="Fahrzeugtyp für das taktische Zeichen"
+                            ItemsSource="{Binding VehicleTypeOptions}" SelectedItem="{Binding SelectedVehicleType}"
+                            IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}" />
                   <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Detail}" FontSize="12" VerticalAlignment="Center"
                              Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                   <!-- ReflectionBinding: the commands live on the ItemsControl's DataContext,
@@ -154,6 +172,35 @@
                             ViewChangedCommand="{Binding Map.ChangeViewCommand}"
                             TappedCommand="{Binding MapTappedCommand}" />
 
+        <!-- The taktische Zeichen, beneath the pins: each stands at its offset from its pin and draws
+             its Verbindungsstrich back to it (DV 102 §1.5). A sign never dragged gets a free place
+             from the panel, clear of the other signs and of every pin. Dragging one moves only the
+             sign; the unit stays where its pin is. -->
+        <ItemsControl x:Name="Signs" ItemsSource="{Binding Signs}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate x:DataType="vm:LagekarteViewModel">
+              <c:MapMarkerPanel Center="{Binding Map.Center}" Zoom="{Binding Map.Zoom}" Rotation="{Binding Map.Rotation}"
+                                KeepClear="{Binding PinPositions}" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.Styles>
+            <Style Selector="ItemsControl#Signs > ContentPresenter" x:DataType="vm:LagekarteMarker">
+              <Setter Property="c:MapMarkerPanel.Position" Value="{Binding Position}" />
+              <Setter Property="c:MapMarkerPanel.LabelOffset" Value="{Binding LabelOffset}" />
+              <Setter Property="c:MapMarkerPanel.Anchor" Value="{x:Static c:TacticalSignControl.SymbolCenter}" />
+            </Style>
+          </ItemsControl.Styles>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LagekarteMarker">
+              <c:TacticalSignControl AutomationProperties.Name="{Binding SignAutomationName}"
+                                     VehicleType="{Binding VehicleType}" Title="{Binding Title}"
+                                     Strength="{Binding Strength}" Status="{Binding Subtitle}"
+                                     PointerPressed="OnSignPressed" PointerMoved="OnSignMoved"
+                                     PointerReleased="OnSignReleased" PointerCaptureLost="OnSignCaptureLost" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <ItemsControl x:Name="Marks" ItemsSource="{Binding Markers}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate x:DataType="vm:LagekarteViewModel">
@@ -173,13 +220,9 @@
                 <Border Classes="einsatzort-mark" IsVisible="{Binding IsEinsatzort}">
                   <TextBlock Text="E" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <Border Classes="unit-mark" IsVisible="{Binding !IsEinsatzort}">
-                  <StackPanel>
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" />
-                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
-                               IsVisible="{Binding Subtitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  </StackPanel>
-                </Border>
+                <Panel Classes="unit-pin" IsVisible="{Binding !IsEinsatzort}">
+                  <Ellipse />
+                </Panel>
               </Panel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
