@@ -1,0 +1,1 @@
+Fields in an abgeschlossen Einsatz and in a sent Lagemeldung are read-only instead of disabled, so their text can be selected and copied in Beteiligte, Ausgabe, Dateien, Funktionen, Kräfte and the Lagemeldung (#836).

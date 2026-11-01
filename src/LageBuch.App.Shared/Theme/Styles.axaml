@@ -476,6 +476,23 @@
   <Style Selector="TextBox /template/ TextBlock#PART_Watermark, TextBox /template/ TextBlock#PART_FloatingWatermark">
     <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
   </Style>
+  <!-- A field that cannot be changed — an abgeschlossen Einsatz, a sent Lagemeldung — is read-only,
+       never disabled: a disabled field cannot be selected, so its text could not be copied (#836).
+       It drops the dark input well so it does not invite typing, and keeps its hairline and the
+       focus edge, so a keyboard user still sees where a selection would go. -->
+  <Style Selector="TextBox[IsReadOnly=True] /template/ Border#PART_BorderElement,
+                   TextBox[IsReadOnly=True]:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+  </Style>
+  <Style Selector="TextBox[IsReadOnly=True]:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
+  </Style>
+  <!-- An example of what to type means nothing where nothing can be typed. -->
+  <Style Selector="TextBox[IsReadOnly=True] /template/ TextBlock#PART_Placeholder">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
 
   <!-- ComboBox -->
   <Style Selector="ComboBox">

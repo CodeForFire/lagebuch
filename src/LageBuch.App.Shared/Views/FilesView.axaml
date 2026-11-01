@@ -128,7 +128,7 @@
                 <TextBox Grid.Column="0" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                          PlaceholderText="{x:Static md:AnonymizedExampleData.FileNamePlaceholder}"
                          BorderThickness="0" Background="Transparent" Padding="0"
-                         VerticalAlignment="Center" IsEnabled="{Binding !IsReadOnly}" />
+                         VerticalAlignment="Center" IsReadOnly="{Binding IsReadOnly}" />
                 <TextBlock Grid.Column="1" Classes="mono file-meta-column" Text="{Binding SizeDisplay}" Margin="10,0"
                            VerticalAlignment="Center" />
                 <TextBlock Grid.Column="2" Classes="mono file-meta-column" Text="{Binding AddedAtDisplay}" Margin="10,0"

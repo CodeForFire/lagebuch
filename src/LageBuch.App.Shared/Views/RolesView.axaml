@@ -299,7 +299,7 @@
                 <TextBox Margin="6,4"
                          PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                          Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                         IsEnabled="{Binding !IsReadOnly}" />
+                         IsReadOnly="{Binding IsReadOnly}" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
@@ -357,7 +357,7 @@
                              IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   <TextBox PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                            Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                           IsEnabled="{Binding !IsReadOnly}" />
+                           IsReadOnly="{Binding IsReadOnly}" />
                   <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <TextBlock Text="VON" Classes="overline" FontSize="9" VerticalAlignment="Center" />
