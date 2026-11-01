@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.Domain;
@@ -148,6 +149,9 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
     private readonly Action _onChanged;
     private readonly Action<string, string, Action> _requestConfirm;
 
+    // Each row beside the text the search looks through, rebuilt with the rows on every change.
+    private readonly List<(InvolvedPartyRow Row, string Haystack)> _entries = [];
+
     // Quiet until the first press: a tab that opens already scolding teaches nothing.
     private bool _errorsShown;
 
@@ -168,7 +172,9 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
         _onChanged = onChanged;
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         IsReadOnly = session.IsReadOnly;
-        Parties = new ObservableCollection<InvolvedPartyRow>(session.Incident.InvolvedParties.Select(ToRow));
+        Parties = [];
+        VisibleParties = [];
+        Refresh();
         _session.Changed += Refresh;
     }
 
@@ -176,7 +182,35 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
 
     public bool IsReadOnly { get; }
 
+    /// <summary>Every Beteiligte/r of the Einsatz, in the order they were taken in.</summary>
     public ObservableCollection<InvolvedPartyRow> Parties { get; }
+
+    /// <summary>
+    /// The subset of <see cref="Parties"/> matching <see cref="FilterText"/>, and what the view
+    /// renders (#831). <see cref="Parties"/> stays the full set so "Noch keine Beteiligten erfasst"
+    /// stays distinguishable from "nothing matched what you typed", as in
+    /// <see cref="ContactsViewModel"/>.
+    /// </summary>
+    public ObservableCollection<InvolvedPartyRow> VisibleParties { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFiltered))]
+    [NotifyPropertyChangedFor(nameof(NoMatchesMessage))]
+    [NotifyPropertyChangedFor(nameof(MatchCountText))]
+    private string _filterText = string.Empty;
+
+    public bool IsFiltered => !string.IsNullOrWhiteSpace(FilterText);
+
+    public string NoMatchesMessage => $"Keine Beteiligten passen zu „{FilterText.Trim()}“.";
+
+    /// <summary>"2 von 35": how far the search narrowed the list, shown while one is typed.</summary>
+    public string MatchCountText =>
+        string.Create(CultureInfo.InvariantCulture, $"{VisibleParties.Count} von {Parties.Count}");
+
+    partial void OnFilterTextChanged(string value) => ApplyFilter();
+
+    [RelayCommand]
+    private void ClearFilter() => FilterText = string.Empty;
 
     /// <summary>The caps the view hands to each TextBox's MaxLength, so typing stops where the
     /// domain would refuse.</summary>
@@ -299,13 +333,62 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
     }
 
     // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
+    // The search stays as typed, so a synced entry that matches it appears in the filtered list.
     private void Refresh()
     {
         Parties.Clear();
+        _entries.Clear();
         foreach (var party in _session.Incident.InvolvedParties)
         {
-            Parties.Add(ToRow(party));
+            var row = ToRow(party);
+            Parties.Add(row);
+            _entries.Add((row, HaystackFor(party, _session.Incident.DwellingLocationOf(party))));
         }
+
+        ApplyFilter();
+    }
+
+    /// <summary>
+    /// Everything about one Beteiligte/r worth searching, joined into a single string.
+    /// </summary>
+    /// <remarks>
+    /// Joined with a newline so a term never matches across a field boundary, and the number is
+    /// added again with its separators stripped so the digits as dialled find "0171 / 123 45 67" —
+    /// both for the reasons <see cref="ContactsViewModel"/> gives.
+    /// </remarks>
+    private static string HaystackFor(InvolvedParty party, string? dwellingLocation)
+    {
+        var fields = new List<string?> { party.Name, party.Phone, party.Notes, party.Whereabouts, dwellingLocation };
+        var digits = new string((party.Phone ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+        if (digits.Length > 0)
+        {
+            fields.Add(digits);
+        }
+
+        return string.Join('\n', fields.Where(s => !string.IsNullOrWhiteSpace(s)));
+    }
+
+    /// <summary>
+    /// Keeps a row only when <em>every</em> whitespace-separated term of the search appears in its
+    /// fields, ordinal and case-insensitive like the Kontakte search. An empty search leaves no
+    /// terms, so every row shows.
+    /// </summary>
+    private void ApplyFilter()
+    {
+        var terms = FilterText.Split(
+            (char[]?)null,
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        VisibleParties.Clear();
+        foreach (var (row, haystack) in _entries)
+        {
+            if (terms.All(t => haystack.Contains(t, StringComparison.OrdinalIgnoreCase)))
+            {
+                VisibleParties.Add(row);
+            }
+        }
+
+        OnPropertyChanged(nameof(MatchCountText));
     }
 
     private InvolvedPartyRow ToRow(InvolvedParty party) =>

@@ -327,4 +327,132 @@ public class InvolvedPartiesViewModelTests
 
         Assert.Empty(vm.Parties);
     }
+
+    // #831: a long list of Beteiligte is searched, not scrolled.
+    private static (LocalIncidentSession Session, InvolvedPartiesViewModel Vm) WithThreeParties()
+    {
+        var session = NewSession();
+        session.AddInvolvedParty("Erika Beispiel", "0171 / 123 45 67", "Eigentümerin, gehbehindert");
+        session.AddInvolvedParty("POK Mustermann", "08141 612-0", "Polizei vor Ort");
+        session.AddInvolvedParty("Max Beispiel", null, null);
+        session.SetInvolvedPartyWhereabouts(session.Incident.InvolvedParties[2].Id, "bei Nachbarin Frau Meier");
+        return (session, new InvolvedPartiesViewModel(session, () => { }));
+    }
+
+    [Fact]
+    public void Without_a_search_every_party_is_visible()
+    {
+        var (_, vm) = WithThreeParties();
+
+        Assert.False(vm.IsFiltered);
+        Assert.Equal(["Erika Beispiel", "POK Mustermann", "Max Beispiel"], vm.VisibleParties.Select(r => r.Name));
+    }
+
+    [Fact]
+    public void Filter_keeps_only_parties_matching_every_term()
+    {
+        var (_, vm) = WithThreeParties();
+
+        vm.FilterText = "beispiel gehbehindert";
+
+        Assert.True(vm.IsFiltered);
+        Assert.Equal("Erika Beispiel", Assert.Single(vm.VisibleParties).Name);
+        Assert.Equal(3, vm.Parties.Count);
+    }
+
+    [Fact]
+    public void Filter_ignores_case()
+    {
+        var (_, vm) = WithThreeParties();
+
+        vm.FilterText = "POLIZEI";
+
+        Assert.Equal("POK Mustermann", Assert.Single(vm.VisibleParties).Name);
+    }
+
+    [Fact]
+    public void Filter_matches_phone_digits_typed_without_separators()
+    {
+        var (_, vm) = WithThreeParties();
+
+        vm.FilterText = "01711234567";
+
+        Assert.Equal("Erika Beispiel", Assert.Single(vm.VisibleParties).Name);
+    }
+
+    [Fact]
+    public void Filter_matches_the_aufenthaltsort()
+    {
+        var (_, vm) = WithThreeParties();
+
+        vm.FilterText = "nachbarin";
+
+        Assert.Equal("Max Beispiel", Assert.Single(vm.VisibleParties).Name);
+    }
+
+    [Fact]
+    public void Filter_matches_the_wohnung()
+    {
+        var session = NewSession();
+        session.AddCoBuilding("Hauptstr. 12", 1, 2);
+        session.AddInvolvedParty("Erika Beispiel", null, null);
+        session.AddInvolvedParty("Max Beispiel", null, null);
+        var dwelling = session.Incident.Dwellings.Single(d => d.FloorOrdinal == 1 && d.ApartmentNumber == 2);
+        session.SetInvolvedPartyDwelling(session.Incident.InvolvedParties[1].Id, dwelling.Id);
+        using var vm = new InvolvedPartiesViewModel(session, () => { });
+
+        vm.FilterText = "1. OG";
+
+        Assert.Equal("Max Beispiel", Assert.Single(vm.VisibleParties).Name);
+    }
+
+    // Erika's Notiz ends in "gehbehindert" and her Telefon starts with "0171": a term spanning
+    // the two must not find her.
+    [Fact]
+    public void A_term_never_matches_across_two_fields()
+    {
+        var (_, vm) = WithThreeParties();
+
+        vm.FilterText = "gehbehindert0171";
+
+        Assert.Empty(vm.VisibleParties);
+    }
+
+    [Fact]
+    public void The_filter_survives_a_change_and_takes_in_a_new_match()
+    {
+        var (session, vm) = WithThreeParties();
+        vm.FilterText = "beispiel";
+
+        session.AddInvolvedParty("Hans Beispiel", null, null);
+        session.AddInvolvedParty("Feuerwehr Nachbarort", null, null);
+
+        Assert.Equal(["Erika Beispiel", "Max Beispiel", "Hans Beispiel"], vm.VisibleParties.Select(r => r.Name));
+        Assert.Equal("3 von 5", vm.MatchCountText);
+    }
+
+    [Fact]
+    public void Match_count_and_no_match_message_describe_the_search()
+    {
+        var (_, vm) = WithThreeParties();
+
+        vm.FilterText = "beispiel";
+        Assert.Equal("2 von 3", vm.MatchCountText);
+
+        vm.FilterText = " Feuerwehr ";
+        Assert.Empty(vm.VisibleParties);
+        Assert.Equal("Keine Beteiligten passen zu „Feuerwehr“.", vm.NoMatchesMessage);
+    }
+
+    [Fact]
+    public void Clear_filter_shows_every_party_again()
+    {
+        var (_, vm) = WithThreeParties();
+        vm.FilterText = "polizei";
+
+        vm.ClearFilterCommand.Execute(null);
+
+        Assert.False(vm.IsFiltered);
+        Assert.Equal(3, vm.VisibleParties.Count);
+    }
 }

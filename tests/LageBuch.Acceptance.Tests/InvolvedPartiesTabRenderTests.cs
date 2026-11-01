@@ -1,7 +1,9 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -107,5 +109,65 @@ public class InvolvedPartiesTabRenderTests
 
         Assert.True(vm.InvolvedParties.IsNarrow);
         Capture(window, "beteiligte-tab-phone.png");
+    }
+
+    // #831: typing in the search narrows the cards, and Escape brings them all back.
+    [AvaloniaFact]
+    public void Typing_in_the_search_box_narrows_the_list()
+    {
+        var (window, _, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "BETEILIGTE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var search = Named<TextBox>(content, "InvolvedPartySearchBox");
+        var list = Named<ItemsControl>(content, "InvolvedPartiesList");
+
+        search.Focus();
+        window.KeyTextInput("polizei");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, list.ItemCount);
+        Assert.Equal("1 von 3", Named<TextBlock>(content, "InvolvedPartyMatchCountText").Text);
+
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(3, list.ItemCount);
+    }
+
+    [AvaloniaFact]
+    public void A_search_that_finds_nobody_says_so_inside_the_list()
+    {
+        var (window, vm, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "BETEILIGTE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+
+        vm.InvolvedParties.FilterText = "Feuerwehr";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Named<TextBlock>(content, "NoMatchesText").IsEffectivelyVisible);
+        Assert.False(Named<TextBlock>(content, "EmptyText").IsEffectivelyVisible);
+        Assert.True(Named<Border>(content, "InvolvedPartiesPanel").IsEffectivelyVisible);
+    }
+
+    // #831: a wide card puts two fields to a line, so more Beteiligte fit on screen; a phone
+    // stacks them again.
+    [AvaloniaTheory]
+    [InlineData(1280, 800, true)]
+    [InlineData(412, 915, false)]
+    public void Name_and_telefon_share_a_line_only_on_a_wide_window(double width, double height, bool sameLine)
+    {
+        var (window, _, _) = ShowWorkspace(width, height);
+        WorkspaceRenderHelper.SelectTab(window, "BETEILIGTE");
+        var card = WorkspaceRenderHelper.SelectedTabContent(window).GetVisualDescendants()
+            .OfType<Border>().First(b => b.Classes.Contains("row-card"));
+        var boxes = card.GetVisualDescendants().OfType<TextBox>().ToList();
+        var name = boxes.First(b => AutomationProperties.GetName(b) == "Name");
+        var phone = boxes.First(b => AutomationProperties.GetName(b) == "Telefon");
+
+        var nameTop = name.TranslatePoint(default, window)!.Value.Y;
+        var phoneTop = phone.TranslatePoint(default, window)!.Value.Y;
+
+        Assert.Equal(sameLine, Math.Abs(nameTop - phoneTop) <= 1.0);
+        Assert.True(phone.IsEffectivelyVisible);
     }
 }

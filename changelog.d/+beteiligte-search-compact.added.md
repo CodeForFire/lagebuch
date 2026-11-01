@@ -1,0 +1,1 @@
+The Beteiligte tab gains a search field that filters the list by name, phone number, Notiz, Aufenthaltsort or Wohnung as you type, and each entry now puts two fields to a line so nearly twice as many Beteiligte fit on screen (#831).
