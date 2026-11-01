@@ -834,7 +834,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
                 ActionError = null;
                 try
                 {
-                    _session.MoveForceUnit(f.Id, nodeId);
+                    UnitPlacement.Move(_session, StatusOptions, f.Id, nodeId);
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
                 {

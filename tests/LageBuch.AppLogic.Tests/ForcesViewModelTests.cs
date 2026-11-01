@@ -1097,6 +1097,19 @@ public class ForcesViewModelTests
     }
 
     [Fact]
+    public void Selecting_an_Abschnitt_sets_the_status_to_im_einsatz()
+    {
+        var (vm, session, _) = NewVmWithUnits();
+        var row = vm.Forces[0];
+        var nord = session.Incident.CommandNodes.Single();
+
+        row.NodeChoices.Single(c => c.NodeId == nord.Id).SelectCommand.Execute(null);
+
+        Assert.Equal("Im Einsatz", session.Incident.Forces.Single(f => f.Id == row.Id).Status);
+        Assert.Equal("Im Einsatz", row.Status);
+    }
+
+    [Fact]
     public void Selecting_the_current_entry_does_nothing()
     {
         var (vm, session, changes) = NewVmWithUnits();

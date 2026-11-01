@@ -37,6 +37,19 @@ public class LeadershipBoardCommandTests
     }
 
     [Fact]
+    public void Moving_a_unit_into_a_bereitstellungsraum_sets_its_kraefte_status()
+    {
+        var session = NewSession();
+        var br = AddNode(session, CommandNodeKind.Bereitstellung, "BR Nord");
+        var unit = AddUnit(session, "FF Emmering", "Florian Emmering 40/1");
+        using var vm = NewVm(session, masterData: MasterDataSet.Empty with { UnitStatus = ["Alarmiert", "Bereitstellungsraum"] });
+
+        Assert.True(vm.MoveUnit(unit, br));
+
+        Assert.Equal("Bereitstellungsraum", session.Incident.Forces.Single().Status);
+    }
+
+    [Fact]
     public void A_unit_cannot_be_moved_on_a_read_only_incident()
     {
         Guid nord = default;

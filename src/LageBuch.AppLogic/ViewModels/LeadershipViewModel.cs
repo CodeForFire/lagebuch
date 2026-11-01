@@ -337,7 +337,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             return false;
         }
 
-        return Run(() => _session.MoveForceUnit(unitId, nodeId));
+        return Run(() => UnitPlacement.Move(_session, _masterData.UnitStatus, unitId, nodeId));
     }
 
     /// <summary>A drag of <paramref name="unitId"/> began; ignored on a read-only Einsatz.</summary>
