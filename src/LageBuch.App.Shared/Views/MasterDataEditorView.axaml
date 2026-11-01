@@ -1280,8 +1280,8 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                       <TextBlock Width="180" Text="EINDEUTIGKEIT" Classes="overline" FontSize="10"
                                  ToolTip.Tip="Wie oft die Funktion besetzt werden darf" />
-                      <TextBlock Width="200" Margin="6,0,0,0" Text="AUF DER FÜHRUNGSTAFEL" Classes="overline" FontSize="10"
-                                 ToolTip.Tip="Welchen Platz auf der Führungstafel die Funktion einnimmt" />
+                      <TextBlock Width="200" Margin="6,0,0,0" Text="FÜHRUNGS-ORGANISATION" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Welchen Platz die Funktion in der Führungs-Organisation einnimmt" />
                     </StackPanel>
                   </Grid>
                   <ScrollViewer>
@@ -1311,11 +1311,11 @@
                               </StackPanel>
                               <!-- Same shape as the Eindeutigkeit picker: options carry the label. -->
                               <StackPanel Classes="slot-cell" Width="200">
-                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="AUF DER FÜHRUNGSTAFEL" />
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="FÜHRUNGS-ORGANISATION" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SlotOptions}"
                                           SelectedValue="{Binding Slot}"
                                           SelectedValueBinding="{Binding Value}"
-                                          AutomationProperties.Name="Auf der Führungstafel">
+                                          AutomationProperties.Name="Führungs-Organisation">
                                   <ComboBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SlotOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
                                   </ComboBox.ItemTemplate>

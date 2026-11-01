@@ -51,7 +51,7 @@ public sealed partial class RolesSection : EditorSection
     {
         RoleSlot.Leiter => "Leiter",
         RoleSlot.Melder => "Melder",
-        RoleSlot.Fuehrungsassistent => "Führungsassistent",
+        RoleSlot.Fuehrungsassistent => "Führungsunterstützung",
         RoleSlot.Fachberater => "Fachberater",
         _ => "—",
     };

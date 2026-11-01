@@ -102,7 +102,9 @@ deleting a group here never changes a past Einsatz.
 
 A role may carry an optional `slot` — `leiter`, `melder`, `fuehrungsassistent` or
 `fachberater` — the post on the Führungstafel its holder fills. A missing or unknown
-slot means none.
+slot means none. The editor shows the slot in the **Führungs-Organisation** column and
+calls `fuehrungsassistent` "Führungsunterstützung", the name the FÜHRUNG board uses; the
+key itself is unchanged.
 
 ## Kontakte: die Notiz ist das Suchfeld
 
