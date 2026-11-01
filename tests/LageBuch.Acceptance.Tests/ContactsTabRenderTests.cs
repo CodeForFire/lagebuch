@@ -1,9 +1,13 @@
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -86,6 +90,34 @@ public class ContactsTabRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, name));
+    }
+
+    // #836: nothing in KONTAKTE could be copied. The name, Funkrufname and Notiz are selectable now,
+    // and the number, which is the call button's own text, is copied from the button's menu.
+    [AvaloniaFact]
+    public async Task A_contact_s_text_can_be_selected_and_its_number_copied()
+    {
+        var (window, vm) = ShowWorkspace(MasterData());
+        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var first = content.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("row-card") && b.IsEffectivelyVisible);
+        foreach (var name in new[] { "ContactName", "ContactCaption", "ContactCallSign", "ContactNote" })
+        {
+            Assert.IsType<SelectableTextBlock>(first.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == name));
+        }
+
+        var call = first.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("contact-call"));
+        await window.Clipboard!.SetTextAsync("vorher");
+        var point = call.TranslatePoint(new Point(4, 4), window) ?? throw new InvalidOperationException("The call button is not in the window.");
+        window.MouseDown(point, MouseButton.Right, RawInputModifiers.None);
+        window.MouseUp(point, MouseButton.Right, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        var menu = Assert.IsType<ContextMenu>(call.ContextMenu);
+        Assert.True(menu.IsOpen, "Expected a right-click on the number to open its copy menu.");
+        menu.Items.OfType<MenuItem>().Single().RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(vm.Contacts.VisibleContacts[0].PhoneDisplay, await window.Clipboard!.TryGetTextAsync());
     }
 
     [AvaloniaFact]

@@ -29,10 +29,19 @@
   <!-- =========================================================
        GLOBAL TEXT
        ========================================================= -->
-  <Style Selector="TextBlock">
+  <!-- SelectableTextBlock is named beside TextBlock here and in the classes below: a type selector
+       does not match a subclass, and a value made selectable so it can be copied (#836) has to
+       look the same as before. -->
+  <Style Selector="TextBlock, SelectableTextBlock">
     <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     <Setter Property="FontSize" Value="14" />
+  </Style>
+  <!-- Selectable text is for the mouse and a finger: it is no Tab stop, or every value on a card
+       would stand between the Lagebuchführer and the next field or button. -->
+  <Style Selector="SelectableTextBlock">
+    <Setter Property="SelectionBrush" Value="#40FF3D2E" />
+    <Setter Property="IsTabStop" Value="False" />
   </Style>
 
   <!-- Display / heading -->
@@ -52,7 +61,7 @@
     <Setter Property="LetterSpacing" Value="2.5" />
   </Style>
 
-  <Style Selector="TextBlock.secondary">
+  <Style Selector="TextBlock.secondary, SelectableTextBlock.secondary">
     <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
   </Style>
 
@@ -67,7 +76,7 @@
   </Style>
 
   <!-- Tactical monospace: timestamps, call-signs, numbers -->
-  <Style Selector="TextBlock.mono">
+  <Style Selector="TextBlock.mono, SelectableTextBlock.mono">
     <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />

@@ -4,6 +4,8 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -217,6 +219,45 @@ public class LeadershipBoardRenderTests
     {
         target.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, transfer, target, new Point(4, 4), KeyModifiers.None));
         Dispatcher.UIThread.RunJobs();
+    }
+
+    // #836: nothing on the board could be copied, not even a Funkrufname or a Standort. Every value
+    // on a card is selectable now; the labels beside them are not.
+    [AvaloniaFact]
+    public async Task The_board_s_values_can_be_selected_and_copied()
+    {
+        var board = Show();
+        var values = board.View.GetVisualDescendants().OfType<TextBlock>()
+            .Where(t => t.Classes.Contains("field-value") || t.Classes.Contains("card-name") || t.Classes.Contains("unit-title"))
+            .ToList();
+        Assert.NotEmpty(values);
+        Assert.All(values, t => Assert.IsType<SelectableTextBlock>(t));
+        Assert.DoesNotContain(
+            board.View.GetVisualDescendants().OfType<SelectableTextBlock>(),
+            t => t.Classes.Contains("field-label"));
+
+        var leiter = Assert.IsType<SelectableTextBlock>(Named<TextBlock>(board.View, "ElLeiterText"));
+        await board.Window.Clipboard!.SetTextAsync("vorher");
+        leiter.Focus();
+        leiter.SelectAll();
+        board.Window.Press(PhysicalKey.C, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Max Mustermann · Florian Emmering 1", await board.Window.Clipboard!.TryGetTextAsync());
+    }
+
+    // A value turned selectable keeps the look its TextBlock had: the theme's TextBlock styles name
+    // their type, and a type selector does not match a subclass.
+    [AvaloniaFact]
+    public void A_selectable_value_keeps_the_body_font_and_size()
+    {
+        var board = Show();
+
+        var leiter = Named<TextBlock>(board.View, "ElLeiterText");
+
+        Assert.Equal(Application.Current!.FindResource("BodyFont"), leiter.FontFamily);
+        Assert.Equal(14, leiter.FontSize, precision: 0);
+        Assert.Equal(TextWrapping.Wrap, leiter.TextWrapping);
     }
 
     [AvaloniaFact]

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.ViewModels;
@@ -71,6 +72,22 @@ public class CoMessprotokollMessreiheTests
         Assert.True(view.GetControl<StackPanel>("MessreihePanel").IsVisible);
         Assert.Equal(2, view.GetControl<ItemsControl>("MessreiheList").ItemCount);
         Capture(window, "co-messreihe-nachher.png");
+    }
+
+    // #836: nothing in CO-MESSUNG could be copied. The Messreihe's time, value and Trupp are
+    // selectable now, as are the Haus and its summary line above the matrix.
+    [AvaloniaFact]
+    public void The_messreihe_and_the_haus_line_are_selectable()
+    {
+        var (_, view, vm, session, _) = Show();
+        session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 250);
+        OpenEg(vm);
+
+        var row = view.GetControl<ItemsControl>("MessreiheList").GetVisualDescendants().OfType<TextBlock>().ToList();
+        Assert.Equal(3, row.Count);
+        Assert.All(row, t => Assert.IsType<SelectableTextBlock>(t));
+        Assert.IsType<SelectableTextBlock>(view.GetControl<TextBlock>("CoBuildingName"));
+        Assert.IsType<SelectableTextBlock>(view.GetControl<TextBlock>("CoSummaryLine"));
     }
 
     [AvaloniaFact]

@@ -273,7 +273,9 @@
                     <Flyout Placement="BottomEdgeAlignedRight">
                       <StackPanel x:Name="ShareAddressPanel" Spacing="8" MinWidth="220">
                         <TextBlock Text="ERREICHBAR UNTER" Classes="overline" />
-                        <SelectableTextBlock x:Name="ShareAddressValue" Classes="body"
+                        <!-- Tab stops, unlike selectable text elsewhere: they are all this flyout holds, and focus
+                             lands on the first when it opens (#538). -->
+                        <SelectableTextBlock x:Name="ShareAddressValue" Classes="body" IsTabStop="True"
                                              FontFamily="{StaticResource MonoFont}"
                                              Text="{Binding ShareAddress}" />
                         <TextBlock Classes="secondary" TextWrapping="Wrap" MaxWidth="320" HorizontalAlignment="Left"
@@ -281,7 +283,7 @@
                         <!-- The Kennung a joining device shows when this host's key is not the one it
                              trusted: the Lagebuchführer there compares it with this line. -->
                         <TextBlock Text="KENNUNG" Classes="overline" Margin="0,4,0,0" />
-                        <SelectableTextBlock x:Name="ShareKennungValue" Classes="body"
+                        <SelectableTextBlock x:Name="ShareKennungValue" Classes="body" IsTabStop="True"
                                              FontFamily="{StaticResource MonoFont}"
                                              Text="{Binding ShareKennung}" />
                       </StackPanel>
