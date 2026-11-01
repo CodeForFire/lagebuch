@@ -1,0 +1,1 @@
+Placing a Fahrzeug in a Bereitstellungsraum sets its Kräfte status to Bereitstellungsraum, and placing it in an Abschnitt sets it to Im Einsatz, whether it is placed in Organisation or from the Kräfte list (#827).
