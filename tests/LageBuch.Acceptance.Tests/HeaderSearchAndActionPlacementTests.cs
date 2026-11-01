@@ -149,18 +149,33 @@ public class HeaderSearchAndActionPlacementTests
         AssertSearchFollowsTitle(window, "ContactsTitle", "ContactSearchBox");
     }
 
-    // The phone keeps its own rules: Kontakte drops the title, Links keeps it, and both boxes
-    // stay inside a 412dp screen.
+    // #831: the box only shows once there is somebody to find.
+    [AvaloniaFact]
+    public void Beteiligte_search_follows_the_title_on_the_header_line()
+    {
+        var (window, _, session) = ShowWorkspace();
+        session.AddInvolvedParty("Beispiel, Erika", null, null);
+        WorkspaceRenderHelper.SelectTab(window, "BETEILIGTE");
+        Capture(window, "beteiligte-wide.png");
+
+        AssertSearchFollowsTitle(window, "InvolvedPartiesTitle", "InvolvedPartySearchBox");
+    }
+
+    // The phone keeps its own rules: Kontakte and Beteiligte drop the title, Links keeps it, and
+    // every box stays inside a 412dp screen.
     [AvaloniaTheory]
     [InlineData("LINKS", "LinkSearchBox")]
     [InlineData("KONTAKTE", "ContactSearchBox")]
+    [InlineData("BETEILIGTE", "InvolvedPartySearchBox")]
     public void Search_box_stays_on_screen_on_a_phone(string tab, string boxName)
     {
-        var (window, _, _) = ShowWorkspace(412, 915);
+        var (window, _, session) = ShowWorkspace(412, 915);
+        session.AddInvolvedParty("Beispiel, Erika", null, null);
         WorkspaceRenderHelper.SelectTab(window, tab);
         Capture(window, $"{boxName}-phone.png");
 
         var box = Named<TextBox>(window, boxName);
+        Assert.True(box.IsEffectivelyVisible, $"{boxName} is not on screen.");
         Assert.True(Left(box, window) >= 0, $"{boxName} starts off the left edge.");
         Assert.True(Right(box, window) <= 412, $"{boxName} runs {Right(box, window) - 412:F0}px past the right edge.");
     }

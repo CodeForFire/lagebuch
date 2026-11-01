@@ -44,6 +44,77 @@
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
     </Style>
+
+    <Style Selector="TextBox#InvolvedPartySearchBox">
+      <Setter Property="Margin" Value="16,0,0,0" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#InvolvedPartySearchBox">
+      <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <!-- The card's fields, two to a line on a wide window (#831): NAME beside TELEFON,
+         AUFENTHALTSORT beside WOHNUNG, the NOTIZ across the whole card below. On a phone they
+         stack one per line. Positions are Style setters, never attributes, so the narrow styles
+         can move them. -->
+    <Style Selector="Grid.party-field">
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="Grid.party-name">
+      <Setter Property="Grid.Row" Value="0" />
+      <Setter Property="Grid.Column" Value="0" />
+    </Style>
+    <Style Selector="Grid.party-phone">
+      <Setter Property="Grid.Row" Value="0" />
+      <Setter Property="Grid.Column" Value="1" />
+      <Setter Property="Margin" Value="16,0,0,6" />
+    </Style>
+    <Style Selector="Grid.party-whereabouts">
+      <Setter Property="Grid.Row" Value="1" />
+      <Setter Property="Grid.Column" Value="0" />
+    </Style>
+    <Style Selector="Grid.party-dwelling">
+      <Setter Property="Grid.Row" Value="1" />
+      <Setter Property="Grid.Column" Value="1" />
+      <Setter Property="Margin" Value="16,0,0,6" />
+    </Style>
+    <Style Selector="Grid.party-notes">
+      <Setter Property="Grid.Row" Value="2" />
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style Selector="TextBlock.party-error">
+      <Setter Property="Grid.Row" Value="3" />
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="Margin" Value="0,6,0,0" />
+    </Style>
+
+    <Style Selector="Panel#WorkspaceRoot.narrow Grid.party-phone">
+      <Setter Property="Grid.Row" Value="1" />
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Grid.party-name">
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Grid.party-whereabouts">
+      <Setter Property="Grid.Row" Value="2" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Grid.party-dwelling">
+      <Setter Property="Grid.Row" Value="3" />
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Grid.party-notes">
+      <Setter Property="Grid.Row" Value="4" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock.party-error">
+      <Setter Property="Grid.Row" Value="5" />
+    </Style>
   </UserControl.Styles>
 
   <!-- Tab follows the screen, top to bottom (#695). The DockPanel needs its bottom-docked
@@ -51,11 +122,45 @@
        the dock before the list above it. Each child is its own tab group, ranked by TabIndex in
        the order it appears on screen. -->
   <DockPanel KeyboardNavigation.TabNavigation="Local">
-    <TextBlock DockPanel.Dock="Top" x:Name="InvolvedPartiesTitle" Text="BETEILIGTE" Classes="overline"
-               Margin="0,0,0,14" />
+    <!-- Title and search on one line, as on Kontakte (#262, #831). The search is reached by Tab
+         or a click; opening the tab still puts the caret in the form's NAME, because taking a
+         Beteiligte/n in is the tab's main job. -->
+    <Grid KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" DockPanel.Dock="Top"
+          Margin="0,0,0,14">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" MaxWidth="576" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Grid.Column="0" x:Name="InvolvedPartiesTitle" Text="BETEILIGTE" Classes="overline"
+                 VerticalAlignment="Center" />
+      <TextBox Grid.Column="1" x:Name="InvolvedPartySearchBox" MinWidth="130" VerticalAlignment="Center"
+               Text="{Binding FilterText}"
+               PlaceholderText="Name, Telefon, Notiz oder Aufenthaltsort"
+               AutomationProperties.Name="Beteiligte durchsuchen"
+               IsVisible="{Binding Parties.Count}">
+        <TextBox.InnerLeftContent>
+          <PathIcon Width="14" Height="14" Margin="10,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"
+                    Data="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+        </TextBox.InnerLeftContent>
+        <TextBox.InnerRightContent>
+          <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsFiltered}">
+            <TextBlock x:Name="InvolvedPartyMatchCountText" Classes="mono" FontSize="12" VerticalAlignment="Center"
+                       Text="{Binding MatchCountText}" />
+            <Button x:Name="ClearInvolvedPartySearchButton" Classes="icon-btn" ToolTip.Tip="Suche zurücksetzen"
+                    AutomationProperties.Name="Suche zurücksetzen"
+                    Command="{Binding ClearFilterCommand}">
+              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </Button>
+          </StackPanel>
+        </TextBox.InnerRightContent>
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
+    </Grid>
 
     <!-- The phone's way in to the form, at the bottom edge where the thumb already is. -->
-    <Button KeyboardNavigation.TabIndex="2" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+    <Button KeyboardNavigation.TabIndex="3" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
             Margin="0,12,0,0" HorizontalAlignment="Stretch"
             Height="{StaticResource ControlHeightTouch}"
             Content="+ BETEILIGTE/N AUFNEHMEN"
@@ -63,7 +168,7 @@
             Command="{Binding OpenComposerCommand}" />
 
     <!-- Input dock. Enter submits from every field; focus then goes back to NAME (#540). -->
-    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="2" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             IsVisible="{Binding ShowComposer}"
             b:EntryForm.SubmitCommand="{Binding AddCommand}"
             b:EntryForm.FirstField="{Binding #NewNameBox}"
@@ -120,115 +225,149 @@
                Foreground="{StaticResource TextMutedBrush}"
                IsVisible="{Binding !Parties.Count}" />
 
-    <!-- One card per person on every width: an address book is read entry by entry, and the same
-         stacked card works on a 412dp phone. Stretch, never a centred MaxWidth column, so the
-         list cannot change width while it scrolls. -->
-    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" x:Name="InvolvedPartiesPanel"
+    <!-- One card per person on every width: an address book is read entry by entry. Stretch,
+         never a centred MaxWidth column, so the list cannot change width while it scrolls. -->
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="InvolvedPartiesPanel"
             Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True"
             IsVisible="{Binding Parties.Count}">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <ItemsControl x:Name="InvolvedPartiesList" ItemsSource="{Binding Parties}" Margin="8"
-                      Grid.IsSharedSizeScope="True">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:InvolvedPartyRow">
-              <Border Classes="row-card">
-                <Grid ColumnDefinitions="*,Auto">
-                  <!-- Each field pushes on LostFocus: the row rebuilds after every accepted write,
-                       so a per-keystroke push would rewrite the Einsatzdatei on every character
-                       and throw focus out of the box (#33, same as ForcesView's Bemerkung). -->
-                  <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
-                      <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="NAME" Classes="overline" FontSize="10"
-                               VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <TextBox Grid.Row="0" Grid.Column="1" FontWeight="SemiBold"
-                             AutomationProperties.Name="Name"
-                             MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNameLength}"
-                             Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                             IsEnabled="{Binding !IsReadOnly}" />
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="TELEFON" Classes="overline" FontSize="10"
-                               VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <TextBox Grid.Row="1" Grid.Column="1" Classes="mono"
-                             AutomationProperties.Name="Telefon"
-                             MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxPhoneLength}"
-                             Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                             IsEnabled="{Binding !IsReadOnly}" />
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="NOTIZ" Classes="overline" FontSize="10"
-                               VerticalAlignment="Top" Margin="0,8,12,0" />
-                    <TextBox Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True"
-                             AutomationProperties.Name="Notiz"
-                             MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNotesLength}"
-                             Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                             IsEnabled="{Binding !IsReadOnly}" />
-                    <!-- #702: the CO-Messung's Wohnung this person was found in. A Button and a
-                         Flyout, not a ComboBox, for the reason ScbaView's Sicherheitstrupp picker
-                         gives. Only shown once there is a Wohnung to pick or a link to show. -->
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="WOHNUNG" Classes="overline" FontSize="10"
-                               VerticalAlignment="Center" Margin="0,0,12,0"
-                               IsVisible="{Binding HasDwellingPicker}" />
-                    <Button Grid.Row="3" Grid.Column="1" x:Name="DwellingButton"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Content="{Binding DwellingButtonText}"
-                            IsVisible="{Binding HasDwellingPicker}"
-                            IsEnabled="{Binding !IsReadOnly}"
-                            AutomationProperties.Name="Wohnung wählen">
-                      <Button.Flyout>
-                        <Flyout Placement="BottomEdgeAlignedLeft">
-                          <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding DwellingChoices}" MinWidth="240">
-                              <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:DwellingChoice">
-                                  <Button Classes="ghost" HorizontalAlignment="Stretch"
-                                          HorizontalContentAlignment="Left" Padding="8,5"
-                                          Command="{Binding SelectCommand}">
-                                    <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
-                                      <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
-                                      <TextBlock Grid.Column="1" Text="{Binding Display}" />
-                                    </Grid>
-                                  </Button>
-                                </DataTemplate>
-                              </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                          </ScrollViewer>
-                        </Flyout>
-                      </Button.Flyout>
-                    </Button>
-                    <!-- Where this person is now, after the evacuation, with the time it was last
-                         changed: the first thing asked when someone comes looking for them. -->
-                    <TextBlock Grid.Row="4" Grid.Column="0" Text="AUFENTHALTSORT" Classes="overline" FontSize="10"
-                               VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <Grid Grid.Row="4" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                      <TextBox Grid.Column="0" x:Name="WhereaboutsBox"
-                               AutomationProperties.Name="Aufenthaltsort"
-                               PlaceholderText="{x:Static md:AnonymizedExampleData.WhereaboutsPlaceholder}"
-                               MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxWhereaboutsLength}"
-                               Text="{Binding Whereabouts, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                               IsEnabled="{Binding !IsReadOnly}" />
-                      <TextBlock Grid.Column="1" x:Name="WhereaboutsStand" Classes="mono" FontSize="11"
-                                 VerticalAlignment="Center"
-                                 Foreground="{StaticResource TextMutedBrush}"
-                                 Text="{Binding WhereaboutsStand}"
-                                 IsVisible="{Binding WhereaboutsStand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <Panel Margin="8">
+          <!-- Distinct from EmptyText: there are Beteiligte, the search just found none. Inside the
+               panel so the frame doesn't collapse mid-keystroke, as on Kontakte. -->
+          <TextBlock x:Name="NoMatchesText" Text="{Binding NoMatchesMessage}" Margin="6"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     IsVisible="{Binding !VisibleParties.Count}" />
+          <ItemsControl x:Name="InvolvedPartiesList" ItemsSource="{Binding VisibleParties}"
+                        Grid.IsSharedSizeScope="True">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:InvolvedPartyRow">
+                <Border Classes="row-card">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <!-- Each field pushes on LostFocus: the row rebuilds after every accepted write,
+                         so a per-keystroke push would rewrite the Einsatzdatei on every character
+                         and throw focus out of the box (#33, same as ForcesView's Bemerkung).
+                         Each field is a label-and-box cell the styles above place; every label
+                         column shares one size group, so the boxes line up across cards, and still
+                         do when a phone stacks the right-hand cells under the left-hand ones. -->
+                    <Grid Grid.Column="0" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                      <Grid Classes="party-field party-name">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBox Grid.Column="1" FontWeight="SemiBold"
+                                 AutomationProperties.Name="Name"
+                                 MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNameLength}"
+                                 Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsEnabled="{Binding !IsReadOnly}" />
+                      </Grid>
+                      <Grid Classes="party-field party-phone">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="TELEFON" Classes="overline" FontSize="10"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBox Grid.Column="1" Classes="mono"
+                                 AutomationProperties.Name="Telefon"
+                                 MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxPhoneLength}"
+                                 Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsEnabled="{Binding !IsReadOnly}" />
+                      </Grid>
+                      <!-- Where this person is now, after the evacuation, with the time it was last
+                           changed: the first thing asked when someone comes looking for them. -->
+                      <Grid Classes="party-field party-whereabouts">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="AUFENTHALTSORT" Classes="overline" FontSize="10"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBox Grid.Column="1" x:Name="WhereaboutsBox"
+                                 AutomationProperties.Name="Aufenthaltsort"
+                                 PlaceholderText="{x:Static md:AnonymizedExampleData.WhereaboutsPlaceholder}"
+                                 MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxWhereaboutsLength}"
+                                 Text="{Binding Whereabouts, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsEnabled="{Binding !IsReadOnly}" />
+                        <TextBlock Grid.Column="2" x:Name="WhereaboutsStand" Classes="mono" FontSize="11"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Text="{Binding WhereaboutsStand}"
+                                   IsVisible="{Binding WhereaboutsStand, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      </Grid>
+                      <!-- #702: the CO-Messung's Wohnung this person was found in. A Button and a
+                           Flyout, not a ComboBox, for the reason ScbaView's Sicherheitstrupp picker
+                           gives. Only shown once there is a Wohnung to pick or a link to show. -->
+                      <Grid Classes="party-field party-dwelling" IsVisible="{Binding HasDwellingPicker}">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="WOHNUNG" Classes="overline" FontSize="10"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <Button Grid.Column="1" x:Name="DwellingButton"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Content="{Binding DwellingButtonText}"
+                                IsEnabled="{Binding !IsReadOnly}"
+                                AutomationProperties.Name="Wohnung wählen">
+                          <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedLeft">
+                              <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding DwellingChoices}" MinWidth="240">
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DwellingChoice">
+                                      <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Left" Padding="8,5"
+                                              Command="{Binding SelectCommand}">
+                                        <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                                          <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
+                                          <TextBlock Grid.Column="1" Text="{Binding Display}" />
+                                        </Grid>
+                                      </Button>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </ScrollViewer>
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
+                      </Grid>
+                      <!-- The Notiz is prose, so it gets the card's whole width: one line while it is
+                           short, wrapping as it grows. -->
+                      <Grid Classes="party-field party-notes">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="NOTIZ" Classes="overline" FontSize="10"
+                                   VerticalAlignment="Top" Margin="0,8,12,0" />
+                        <TextBox Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True"
+                                 AutomationProperties.Name="Notiz"
+                                 MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNotesLength}"
+                                 Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 IsEnabled="{Binding !IsReadOnly}" />
+                      </Grid>
+                      <TextBlock Classes="field-error party-error"
+                                 Text="{Binding Error}"
+                                 IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
                     </Grid>
-                    <TextBlock Grid.Row="5" Grid.Column="1" Classes="field-error"
-                               Text="{Binding Error}"
-                               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <Button Grid.Column="1" Classes="icon-btn card-action" VerticalAlignment="Top"
+                            Margin="8,0,0,0"
+                            IsVisible="{Binding !IsReadOnly}"
+                            Command="{Binding RemoveCommand}"
+                            ToolTip.Tip="Beteiligte/n entfernen" AutomationProperties.Name="Beteiligte/n entfernen">
+                      <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </Button>
                   </Grid>
-                  <Button Grid.Column="1" Classes="icon-btn card-action" VerticalAlignment="Top"
-                          Margin="8,0,0,0"
-                          IsVisible="{Binding !IsReadOnly}"
-                          Command="{Binding RemoveCommand}"
-                          ToolTip.Tip="Beteiligte/n entfernen" AutomationProperties.Name="Beteiligte/n entfernen">
-                    <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                  </Button>
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
       </ScrollViewer>
     </Border>
   </DockPanel>
