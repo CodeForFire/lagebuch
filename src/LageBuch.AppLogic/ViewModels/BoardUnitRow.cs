@@ -20,7 +20,8 @@ public sealed partial class BoardUnitRow : ObservableObject
     /// <param name="incident">The incident its picker offers the nodes of.</param>
     /// <param name="isReadOnly">A closed Einsatz is a record: a stray pick is inert instead of throwing.</param>
     /// <param name="onMoved">Moves the unit; called only for a node other than the current one.</param>
-    public BoardUnitRow(ForceUnit unit, Incident incident, bool isReadOnly, Action<Guid?> onMoved)
+    /// <param name="isWaitingByStatus">See <see cref="IsWaitingByStatus"/>.</param>
+    public BoardUnitRow(ForceUnit unit, Incident incident, bool isReadOnly, Action<Guid?> onMoved, bool isWaitingByStatus = false)
     {
         ArgumentNullException.ThrowIfNull(unit);
         ArgumentNullException.ThrowIfNull(incident);
@@ -32,6 +33,7 @@ public sealed partial class BoardUnitRow : ObservableObject
         _onMoved = onMoved;
         _strengthText = unit.StrengthText;
         _scbaCount = unit.ScbaCount;
+        _isWaitingByStatus = isWaitingByStatus;
         (NodeChoices, NodeLabel) = BuildNode(unit, incident);
         _placedNodeId = ViewModels.NodeChoices.CurrentNodeId(NodeChoices);
     }
@@ -53,6 +55,16 @@ public sealed partial class BoardUnitRow : ObservableObject
     [ObservableProperty]
     private int _scbaCount;
 
+    /// <summary>What a waiting row says under the unit, in place of the Raum it has not been given.</summary>
+    public const string WaitingText = "● Laut Status im BR – Raum zuweisen";
+
+    /// <summary>
+    /// The unit's status says Bereitstellungsraum but it sits in no node, so the board shows it in
+    /// every Bereitstellungsraum until one is picked (#825). Flips in place once the unit is placed.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isWaitingByStatus;
+
     /// <summary>The Abschnitt picker's entries; replaced only on a real change (#408).</summary>
     public IReadOnlyList<NodeChoice> NodeChoices { get; private set; }
 
@@ -60,10 +72,11 @@ public sealed partial class BoardUnitRow : ObservableObject
     public string NodeLabel { get; private set; }
 
     /// <summary>Brings the row in line with its unit; <paramref name="unit"/> may be a new instance.</summary>
-    public void Update(ForceUnit unit, Incident incident)
+    public void Update(ForceUnit unit, Incident incident, bool isWaitingByStatus = false)
     {
         ArgumentNullException.ThrowIfNull(unit);
         ArgumentNullException.ThrowIfNull(incident);
+        IsWaitingByStatus = isWaitingByStatus;
         StrengthText = unit.StrengthText;
         ScbaCount = unit.ScbaCount;
 

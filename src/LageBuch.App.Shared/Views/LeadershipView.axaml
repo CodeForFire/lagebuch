@@ -256,7 +256,7 @@
     <!-- One unit: on a card a row of the units table, in the strip a chip. The grip starts a drag on
          the desktop; the picker moves the unit anywhere, and is the phone's only way. -->
     <DataTemplate x:Key="UnitRowTemplate" x:DataType="vm:BoardUnitRow">
-      <Grid RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
           <ColumnDefinition Width="*" />
@@ -283,6 +283,10 @@
         <ctrl:NodeChoicePicker Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitNodePicker" Classes="unit-picker"
                                HorizontalAlignment="Left" MinWidth="80" MaxWidth="200"
                                Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}" />
+        <!-- #825: shown in every Bereitstellungsraum by its status alone, until one is picked. -->
+        <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitWaitingHint" Classes="board-hint"
+                   Text="{x:Static vm:BoardUnitRow.WaitingText}" IsVisible="{Binding IsWaitingByStatus}"
+                   ToolTip.Tip="Der Status sagt Bereitstellungsraum, die Einheit steht aber in keinem. Raum im Auswahlfeld wählen oder hineinziehen." />
       </Grid>
     </DataTemplate>
 
@@ -539,8 +543,9 @@
                         IsVisible="{Binding Members.Count}" />
 
           <!-- The units table. Shown whenever the card has a sum, so an Abschnitt whose units all sit
-               in Unterabschnitte still heads its SUMME row with EINHEITEN / STÄRKE / AGT. -->
-          <StackPanel Spacing="5" IsVisible="{Binding HasStrengthTotal}">
+               in Unterabschnitte still heads its SUMME row with EINHEITEN / STÄRKE / AGT, and
+               whenever it has rows, which a Bereitstellungsraum's waiting units are without a sum. -->
+          <StackPanel Spacing="5" IsVisible="{Binding HasUnitTable}">
             <Grid ColumnSpacing="8">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />

@@ -1,0 +1,1 @@
+On the Führung board, Kräfte with the status Bereitstellungsraum that sit in no Abschnitt now appear in every Bereitstellungsraum, marked until a Raum is chosen, instead of only under „Nicht zugeordnet“ (#825).
