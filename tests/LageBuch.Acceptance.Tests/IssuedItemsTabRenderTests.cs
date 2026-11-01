@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -250,6 +251,41 @@ public class IssuedItemsTabRenderTests
         Assert.Equal(Devices.Select(d => d.Name).Where(n => n != "Weste Presse"), list.Items.Cast<string>());
 
         CaptureWithPopup(window, popup, "ausgabe-geraete-none-left.png");
+    }
+
+    // #837: typing narrows the Beteiligte and Kontakte; Enter takes the arrowed-onto name without
+    // issuing anything yet, and the pick brings its number along.
+    [AvaloniaFact]
+    public void Typing_in_ausgegeben_an_offers_matching_beteiligte_and_kontakte()
+    {
+        var (window, vm, session) = ShowWorkspace(withItems: false);
+        session.AddInvolvedParty("Beispiel, Lena", "0171 0000005", null);
+        WorkspaceRenderHelper.SelectTab(window, "AUSGABE");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var box = Named<AutoCompleteBox>(content, "NewIssuedToBox");
+
+        box.Focus();
+        window.KeyTextInput("muster");
+        Dispatcher.UIThread.RunJobs();
+
+        var popup = box.GetVisualDescendants().OfType<Popup>().Single();
+        var list = popup.Child!.GetVisualDescendants().OfType<ListBox>().Single();
+        Assert.True(popup.IsOpen);
+        Assert.Equal(["Mustermann, Max", "Musterfrau, Erika"], list.Items.Cast<string>());
+        CaptureWithPopup(window, popup, "ausgabe-issued-to-suggestions.png");
+
+        box.Text = string.Empty;
+        window.KeyTextInput("lena");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["Beispiel, Lena"], list.Items.Cast<string>());
+
+        window.Press(PhysicalKey.ArrowDown);
+        window.Press(PhysicalKey.Enter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Beispiel, Lena", vm.IssuedItems.NewIssuedTo);
+        Assert.Equal("0171 0000005", vm.IssuedItems.NewIssuedToPhone);
+        Assert.Empty(session.Incident.IssuedItems);
     }
 
     private static void CaptureWithPopup(Window window, Popup popup, string name)

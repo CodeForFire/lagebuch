@@ -23,15 +23,12 @@ public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
     private readonly (ContactEntry Entry, string Haystack)[] _entries;
     private readonly IFileDialogService _dialogs;
 
-    // Of the vehicles, only those with a number or an address are listed, after the people, in
-    // Stammdaten order: a vehicle with neither is nobody to reach.
+    // Which vehicles are listed is ContactEntry.Roster's rule, shared with the Ausgabeliste.
     public ContactsViewModel(IReadOnlyList<Person> people, IFileDialogService dialogs, IReadOnlyList<Vehicle>? vehicles = null)
     {
         ArgumentNullException.ThrowIfNull(people);
         _dialogs = dialogs;
-        Contacts = people.Select(ContactEntry.FromPerson)
-            .Concat((vehicles ?? Array.Empty<Vehicle>()).Where(v => v.HasPhone || v.HasEmail).Select(ContactEntry.FromVehicle))
-            .ToArray();
+        Contacts = ContactEntry.Roster(people, vehicles);
         _entries = Contacts.Select(c => (c, HaystackFor(c))).ToArray();
         VisibleContacts = new ObservableCollection<ContactRow>(Contacts.Select(c => RowFor(c, Array.Empty<string>())));
     }
