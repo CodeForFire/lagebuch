@@ -431,6 +431,20 @@ public class InvolvedPartiesViewModelTests
         Assert.Equal("3 von 5", vm.MatchCountText);
     }
 
+    // The count sits in the search box: an entry synced in while a search is typed must move it.
+    [Fact]
+    public void A_change_elsewhere_updates_the_match_count_on_screen()
+    {
+        var (session, vm) = WithThreeParties();
+        vm.FilterText = "beispiel";
+        var notified = new List<string?>();
+        vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+
+        session.AddInvolvedParty("Hans Beispiel", null, null);
+
+        Assert.Contains(nameof(InvolvedPartiesViewModel.MatchCountText), notified);
+    }
+
     [Fact]
     public void Match_count_and_no_match_message_describe_the_search()
     {
