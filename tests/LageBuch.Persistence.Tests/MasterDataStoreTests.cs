@@ -847,6 +847,23 @@ public class MasterDataStoreTests : IDisposable
         }
     }
 
+    // #833: a store saved before the favourite existed holds Funkgruppen without is_favorite. The
+    // repaired column must default to 0 for those rows, or reading them back fails.
+    [Fact]
+    public void A_funkgruppe_stored_before_favourites_reads_back_as_no_favourite()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { TalkGroups = [new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo)] });
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            DropColumns(cn, [("md_talk_groups", "is_favorite")]);
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo), Assert.Single(MasterDataStore.GetOrCreate(_path).TalkGroups));
+    }
+
     /// <summary>Writes a md_trupp_types in its pre-#398 shape: names only, no rules.</summary>
     private void WriteLegacyTruppTypes(params string[] names)
     {
@@ -1006,7 +1023,7 @@ public class MasterDataStoreTests : IDisposable
             TalkGroups = new[]
             {
                 new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
-                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, IsFavorite: true),
             },
         };
         MasterDataStore.Save(_path, set);

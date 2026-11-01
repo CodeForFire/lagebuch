@@ -68,7 +68,10 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         _parentId = parentId;
         _nodeId = nodeId;
         _name = name;
-        FunkgruppeOptions = [.. masterData.TalkGroups.Select(g => g.Display)];
+
+        // Favourites first, then alphabetical (#833) -- sorted here rather than trusted from the store,
+        // since a joined client's Stammdaten come from the host's export.
+        FunkgruppeOptions = [.. TalkGroup.FavouritesFirst(masterData.TalkGroups, g => g.Display).Select(g => g.Display)];
         FahrzeugOptions = FahrzeugeOf(session, masterData);
 
         // The field already says TMO or DMO, so its suggestions leave the kind off: "FW_MUSTER 1000".
@@ -294,9 +297,10 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private static IReadOnlyList<string> GroupsOf(MasterDataSet masterData, TalkGroupKind kind) =>
-        [.. masterData.TalkGroups
-            .Where(g => g.Kind == kind)
-            .Select(g => string.IsNullOrWhiteSpace(g.Number) ? g.Name : $"{g.Name} {g.Number}")];
+        [.. TalkGroup.FavouritesFirst(masterData.TalkGroups.Where(g => g.Kind == kind), WithoutKind).Select(WithoutKind)];
+
+    private static string WithoutKind(TalkGroup g) =>
+        string.IsNullOrWhiteSpace(g.Number) ? g.Name : $"{g.Name} {g.Number}";
 
     // One field per recorded group, and an empty one when there are none: every Einsatzleitung
     // offers at least one of each (#828), and saving it empty is still allowed.

@@ -294,7 +294,16 @@ public class VersionHandshakeTests
     {
         // 31 adds fuehrungsfahrzeug to the whole-post and whole-node commands. A client at 30 editing
         // one would send none, which a host at 31 reads as "none", so a 30 and a 31 must not connect.
-        Assert.Equal(31, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 31, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 31, int.MaxValue);
+    }
+
+    [Fact]
+    public void Funkgruppen_favourites_raise_the_protocol_to_thirty_two_and_keep_the_floor()
+    {
+        // 32 adds an optional favorite to the Stammdaten payload's talk groups. A client at 31 skips
+        // it and a payload without it reads as no favourites, so a 31 and a 32 still connect.
+        Assert.Equal(32, SyncProtocol.ProtocolVersion);
         Assert.Equal(31, SyncProtocol.MinimumProtocolVersion);
     }
 }

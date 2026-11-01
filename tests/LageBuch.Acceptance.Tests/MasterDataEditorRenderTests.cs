@@ -33,7 +33,7 @@ public class MasterDataEditorRenderTests
             },
             TalkGroups = new[]
             {
-                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle", IsFavorite: true),
                 new TalkGroup("RD_MUSTER", "1001", TalkGroupKind.Tmo),
                 new TalkGroup("301_F", null, TalkGroupKind.Dmo, "Atemschutzüberwachung"),
                 new TalkGroup("302_F", null, TalkGroupKind.Dmo),
@@ -674,12 +674,19 @@ public class MasterDataEditorRenderTests
         var kinds = view.GetVisualDescendants().OfType<ComboBox>()
             .Where(c => AutomationProperties.GetName(c) == "Art der Funkgruppe")
             .Select(c => c.SelectedValue);
+
+        // The favourite FW_MUSTER leads, the rest follow alphabetically (#833).
         Assert.Equal(
-            new object?[] { TalkGroupKind.Tmo, TalkGroupKind.Tmo, TalkGroupKind.Dmo, TalkGroupKind.Dmo },
+            new object?[] { TalkGroupKind.Tmo, TalkGroupKind.Dmo, TalkGroupKind.Dmo, TalkGroupKind.Tmo },
             kinds);
+        var favourites = view.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Favorit")
+            .Select(c => c.IsChecked);
+        Assert.Equal(new bool?[] { true, false, false, false }, favourites);
         var labels = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("NUMMER", labels);
         Assert.Contains("ART", labels);
+        Assert.Contains("FAVORIT", labels);
     }
 
     // The other half of the same binding: choosing a mode in the view has to reach the row the

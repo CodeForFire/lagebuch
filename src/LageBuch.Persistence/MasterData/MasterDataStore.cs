@@ -183,13 +183,14 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_talk_groups (value, number, kind, note) VALUES ($v,$n,$k,$o);",
+                "INSERT INTO md_talk_groups (value, number, kind, note, is_favorite) VALUES ($v,$n,$k,$o,$f);",
                 p =>
                 {
                     p("$v", g.Name);
                     p("$n", (object?)g.Number ?? DBNull.Value);
                     p("$k", TalkGroup.KindName(g.Kind));
                     p("$o", (object?)g.Note ?? DBNull.Value);
+                    p("$f", g.IsFavorite ? 1 : 0);
                 });
         }
 
@@ -344,7 +345,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL DEFAULT '', place TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT, vehicle_type TEXT);
-            CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT);
+            CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT, is_favorite INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -498,6 +499,9 @@ public sealed class MasterDataStore
         // every repairable column to the same rule.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_talk_groups", "number", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_talk_groups", "note", "TEXT");
+
+        // The favourite flag (#833). A store from before it reads 0: no favourites, as it was.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_talk_groups", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
 
         // Wachen and Funkrufnamen used to be lists of their own; they are derived from md_vehicles
         // (and md_personnel) now. Drop the stale tables a pre-change store still carries -- their
@@ -956,12 +960,12 @@ public sealed class MasterDataStore
     private static List<TalkGroup> ReadTalkGroups(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT value, number, kind, note FROM md_talk_groups;";
+        cmd.CommandText = "SELECT value, number, kind, note, is_favorite FROM md_talk_groups;";
         using var r = cmd.ExecuteReader();
         var list = new List<TalkGroup>();
         while (r.Read())
         {
-            list.Add(new TalkGroup(r.GetString(0), Str(r, 1), TalkGroup.KindFrom(Str(r, 2)), Str(r, 3)));
+            list.Add(new TalkGroup(r.GetString(0), Str(r, 1), TalkGroup.KindFrom(Str(r, 2)), Str(r, 3), r.GetInt32(4) != 0));
         }
 
         return list;

@@ -258,7 +258,30 @@ public class CommandNodeDialogViewModelTests
     {
         var vm = CommandNodeDialogViewModel.ForCreate(NewSession(), WithTalkGroups(), CommandNodeKind.Abschnitt, null, "Abschnitt 1");
 
-        Assert.Equal(["TMO FW_MUSTER 1000", "DMO 301_F"], vm.FunkgruppeOptions);
+        Assert.Equal(["DMO 301_F", "TMO FW_MUSTER 1000"], vm.FunkgruppeOptions);
+    }
+
+    [Fact]
+    public void Funkgruppe_options_list_the_favourites_first_then_alphabetically()
+    {
+        var master = MasterDataSet.Empty with
+        {
+            TalkGroups =
+            [
+                new TalkGroup("FW_NACHBAR", "2000", TalkGroupKind.Tmo),
+                new TalkGroup("302_F", null, TalkGroupKind.Dmo),
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, IsFavorite: true),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, IsFavorite: true),
+                new TalkGroup("FW_ANDERE", "3000", TalkGroupKind.Tmo),
+            ],
+        };
+
+        var node = CommandNodeDialogViewModel.ForCreate(NewSession(), master, CommandNodeKind.Abschnitt, null, "Abschnitt 1");
+        var post = CommandNodeDialogViewModel.ForPost(NewSession(), master);
+
+        Assert.Equal(["DMO 301_F", "TMO FW_MUSTER 1000", "DMO 302_F", "TMO FW_ANDERE 3000", "TMO FW_NACHBAR 2000"], node.FunkgruppeOptions);
+        Assert.Equal(["FW_MUSTER 1000", "FW_ANDERE 3000", "FW_NACHBAR 2000"], post.TmoOptions);
+        Assert.Equal(["301_F", "302_F"], post.DmoOptions);
     }
 
     [Fact]

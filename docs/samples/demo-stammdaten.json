@@ -99,10 +99,10 @@
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 47/1", "seats": 6, "hasZugfuehrer": false }
   ],
   "talkGroups": [
-    { "name": "FW_MUSTER", "number": "1000", "kind": "tmo", "note": "Einsatzstelle" },
-    { "name": "RD_MUSTER", "number": "1001", "kind": "tmo", "note": null },
-    { "name": "301_F", "number": null, "kind": "dmo", "note": "Atemschutzüberwachung" },
-    { "name": "302_F", "number": null, "kind": "dmo", "note": null }
+    { "name": "FW_MUSTER", "number": "1000", "kind": "tmo", "note": "Einsatzstelle", "favorite": true },
+    { "name": "RD_MUSTER", "number": "1001", "kind": "tmo", "note": null, "favorite": false },
+    { "name": "301_F", "number": null, "kind": "dmo", "note": "Atemschutzüberwachung", "favorite": false },
+    { "name": "302_F", "number": null, "kind": "dmo", "note": null, "favorite": false }
   ],
   "personnel": [
     { "lastName": "Mustermann", "firstName": "Max", "role": "EL", "callSign": "Florian Musterstadt 11/1", "phone": "01 71 / 1 23 45 67", "email": "max.mustermann@ff-musterstadt.example", "note": "Kreisbrandrat, KBI Vertretung" },

@@ -1019,7 +1019,7 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Funkgruppen editor: NAME / NUMMER / ART (TMO or DMO) / NOTIZ. -->
+              <!-- Funkgruppen editor: NAME / NUMMER / ART (TMO or DMO) / FAVORIT / NOTIZ. -->
               <DataTemplate x:DataType="vm:TalkGroupsSection">
                 <DockPanel Classes="add-below">
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
@@ -1031,6 +1031,8 @@
                       <TextBlock Width="110" Text="NUMMER" Classes="overline" FontSize="10" />
                       <TextBlock Width="100" Text="ART" Classes="overline" FontSize="10"
                                  ToolTip.Tip="Netzbetrieb (TMO) oder Direktbetrieb (DMO)" />
+                      <TextBlock Width="70" Text="FAVORIT" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Favoriten stehen in der Auswahl oben" />
                     </StackPanel>
                     <TextBlock Grid.Column="2" Text="NOTIZ" Classes="overline" FontSize="10" />
                   </Grid>
@@ -1058,6 +1060,13 @@
                                     <DataTemplate x:DataType="vm:TalkGroupKindOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
                                   </ComboBox.ItemTemplate>
                                 </ComboBox>
+                              </StackPanel>
+                              <!-- Favourites lead every Funkgruppen picker (#833). -->
+                              <StackPanel Width="70" VerticalAlignment="Center">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="FAVORIT" />
+                                <CheckBox IsChecked="{Binding IsFavorite}" Margin="0,0,6,0"
+                                          ToolTip.Tip="Favoriten stehen in der Auswahl oben"
+                                          AutomationProperties.Name="Favorit" />
                               </StackPanel>
                             </WrapPanel>
                             <StackPanel Classes="row-note">

@@ -7,6 +7,12 @@ namespace LageBuch.AppLogic.ViewModels;
 /// <summary>
 /// Editor for the Funkgruppen Stammdaten: rows of name, number, TMO/DMO and a note. A row without
 /// a name is dropped on save; the first spelling wins a case-insensitive duplicate of kind, name and number.
+/// <para>
+/// The rows run favourites first, then alphabetically (#833), the order every picker lists them in.
+/// Like the Geräte (#830) they are sorted when the section is built -- on opening, SPEICHERN,
+/// Verwerfen and Import alike -- and not while a row is edited: a row moving under the cursor would
+/// take the focus with it, mid-Tab (#773). A new favourite moves to the top on SPEICHERN.
+/// </para>
 /// </summary>
 public sealed partial class TalkGroupsSection : EditorSection
 {
@@ -17,7 +23,8 @@ public sealed partial class TalkGroupsSection : EditorSection
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<TalkGroupRow>(
-            groups.Select(g => NewRow(g.Name, g.Number ?? string.Empty, g.Kind, g.Note ?? string.Empty)));
+            TalkGroup.FavouritesFirst(groups, EditorLabel)
+                .Select(g => NewRow(g.Name, g.Number ?? string.Empty, g.Kind, g.Note ?? string.Empty, g.IsFavorite)));
     }
 
     public ObservableCollection<TalkGroupRow> Rows { get; }
@@ -27,13 +34,16 @@ public sealed partial class TalkGroupsSection : EditorSection
             .Select(k => new TalkGroupKindOption(k, TalkGroup.KindLabel(k)))
             .ToArray();
 
-    private TalkGroupRow NewRow(string name, string number, TalkGroupKind kind, string note) =>
-        new(name, number, kind, note, _onChanged);
+    // The row shows name and number in columns of their own, so those two decide its place.
+    private static string EditorLabel(TalkGroup g) => $"{g.Name.Trim()} {g.Number?.Trim()}";
+
+    private TalkGroupRow NewRow(string name, string number, TalkGroupKind kind, string note, bool isFavorite) =>
+        new(name, number, kind, note, isFavorite, _onChanged);
 
     [RelayCommand]
     private void Add()
     {
-        var row = NewRow(string.Empty, string.Empty, TalkGroupKind.Tmo, string.Empty);
+        var row = NewRow(string.Empty, string.Empty, TalkGroupKind.Tmo, string.Empty, isFavorite: false);
         Rows.Add(row);
         _onChanged();
         OnRowAdded(row);
@@ -56,7 +66,10 @@ public sealed partial class TalkGroupsSection : EditorSection
         });
     }
 
-    /// <summary>Rows with a non-blank name, trimmed; blank number and note become null.</summary>
+    /// <summary>
+    /// Rows with a non-blank name, trimmed; blank number and note become null. Favourites first, then
+    /// alphabetical, so the store and the JSON export hold them in the order the editor shows.
+    /// </summary>
     public IReadOnlyList<TalkGroup> ToValues()
     {
         var result = new List<TalkGroup>();
@@ -77,10 +90,10 @@ public sealed partial class TalkGroupsSection : EditorSection
                 continue;
             }
 
-            result.Add(new TalkGroup(name, number, row.Kind, Blank(row.Note)));
+            result.Add(new TalkGroup(name, number, row.Kind, Blank(row.Note), row.IsFavorite));
         }
 
-        return result;
+        return [.. TalkGroup.FavouritesFirst(result, EditorLabel)];
     }
 
     private static string? Blank(string? value) =>
