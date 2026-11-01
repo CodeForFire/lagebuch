@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using LageBuch.App.Shared.Controls;
 using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.App.Shared.Views;
@@ -16,18 +17,22 @@ public partial class LeadershipView : UserControl
     /// <summary>What a dragged card carries: its node's id, as text.</summary>
     public static readonly DataFormat<string> NodeDragFormat = DataFormat.CreateStringApplicationFormat("lagebuch-abschnitt");
 
+    // A target off screen on a small display is reached by dragging to the edge (#826).
+    private readonly DragAutoScroll _autoScroll;
+
     // The card or strip a drop would land in, for the highlight only; whether it may is the view model's.
     private Border? _dropTarget;
 
     public LeadershipView()
     {
         InitializeComponent();
+        _autoScroll = new DragAutoScroll(BoardScroll, ChartScroll);
 
         // Drag and drop of units between the cards. DragDrop's events are routed events, not bindable
         // commands, so they are forwarded from here; CanMoveUnit and MoveUnit decide.
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
         BoardRoot.AddHandler(DragDrop.DragOverEvent, OnDragOver);
-        BoardRoot.AddHandler(DragDrop.DragLeaveEvent, (_, _) => SetDropTarget(null));
+        BoardRoot.AddHandler(DragDrop.DragLeaveEvent, (_, _) => EndDragFeedback());
         BoardRoot.AddHandler(DragDrop.DropEvent, OnDrop);
     }
 
@@ -73,7 +78,7 @@ public partial class LeadershipView : UserControl
         {
             vm.EndDrag();
             vm.EndNodeDrag();
-            SetDropTarget(null);
+            EndDragFeedback();
         }
     }
 
@@ -138,6 +143,8 @@ public partial class LeadershipView : UserControl
 
     private void OnDragOver(object? sender, DragEventArgs e)
     {
+        // Before the target check: the way to a valid target leads over ones that refuse the drop.
+        _autoScroll.Update(e);
         Border? highlight = null;
         if (DraggedId(e) is { } dragged
             && TryTargetUnder(e, out var target, out var nodeId)
@@ -159,7 +166,7 @@ public partial class LeadershipView : UserControl
 
     private void OnDrop(object? sender, DragEventArgs e)
     {
-        SetDropTarget(null);
+        EndDragFeedback();
         if (DraggedId(e) is { } dragged && TryTargetUnder(e, out _, out var nodeId))
         {
             ViewModel?.MoveUnit(dragged, nodeId);
@@ -170,6 +177,12 @@ public partial class LeadershipView : UserControl
         }
 
         e.Handled = true;
+    }
+
+    private void EndDragFeedback()
+    {
+        _autoScroll.Stop();
+        SetDropTarget(null);
     }
 
     private void SetDropTarget(Border? target)
