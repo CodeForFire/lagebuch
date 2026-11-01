@@ -507,6 +507,7 @@ public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, 
 
     // German order, because a person reads these lists: "Äxte" next to "Axt", not after "Z", and
     // numbers by value, so "FW 2" comes before "FW 10" -- the comparer the Geräte use (#846).
+    // Stryker disable once String : ICU's German collation is its root collation, so the invariant culture sorts every name alike
     private static readonly StringComparer Alphabetical = StringComparer.Create(
         CultureInfo.GetCultureInfo("de-DE"), CompareOptions.IgnoreCase | CompareOptions.NumericOrdering);
 
