@@ -19,10 +19,10 @@ public class MainWindowViewModelTests
     // ConnectAsync has no accept-any fallback -- it needs a real ITrustStore to even attempt the TLS
     // handshake it's cancelling. A fresh temp-backed JsonTrustStore per HomeViewModel keeps every
     // test's TOFU state isolated from the others.
-    private static MainWindowViewModel New(IFileDialogService? dialogs = null)
+    private static MainWindowViewModel New(IFileDialogService? dialogs = null, ILastConnectionStore? lastConnection = null)
     {
         var trustStore = new JsonTrustStore(Path.Join(Path.GetTempPath(), $"trust-{Guid.NewGuid():N}.json"));
-        var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", trustStore: trustStore);
+        var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", trustStore: trustStore, lastConnection: lastConnection);
         return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), dialogs ?? new FakeDialogs(), "0.1.0");
     }
 
@@ -149,6 +149,28 @@ public class MainWindowViewModelTests
         Assert.Equal("0000", prompt.Pin);
         Assert.True(prompt.IsHostStage);
         Assert.IsType<HomeViewModel>(vm.CurrentView);
+    }
+
+    [Fact]
+    public void Join_prompt_prefills_the_host_and_pin_of_the_last_connection()
+    {
+        var vm = New(lastConnection: new FakeLastConnectionStore { Saved = new LastConnection("elw-1", null, T0, "5393") });
+
+        vm.RequestJoinDeviceCommand.Execute(null);
+
+        Assert.Equal("elw-1", vm.PendingPrompt?.Host);
+        Assert.Equal("5393", vm.PendingPrompt?.Pin);
+    }
+
+    [Fact]
+    public void Join_prompt_starts_empty_without_a_last_connection()
+    {
+        var vm = New(lastConnection: new FakeLastConnectionStore());
+
+        vm.RequestJoinDeviceCommand.Execute(null);
+
+        Assert.Equal(string.Empty, vm.PendingPrompt?.Host);
+        Assert.Equal(string.Empty, vm.PendingPrompt?.Pin);
     }
 
     [Fact]
