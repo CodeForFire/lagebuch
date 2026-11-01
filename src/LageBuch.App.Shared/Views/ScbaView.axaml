@@ -256,7 +256,7 @@
            Styles.axaml would clip the last crew member. -->
       <!-- x:Name + SelectedItem: a jump from the header's Atemschutz bars selects the Trupp in the
            view model and the code-behind scrolls this grid to it (#422). -->
-      <DataGrid x:Name="TruppGrid" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
+      <DataGrid x:Name="TruppGrid" b:GridCopy.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
                 SelectedItem="{Binding SelectedTrupp}"
                 RowHeight="NaN">
         <!-- The grid makes its rows, so the alarm class reaches them through a row style (#669). -->
@@ -275,7 +275,7 @@
                test pins. Fixed widths mean content growth can no longer squeeze the crew column,
                and an eighth column would have to buy its width from the crew or from the action
                buttons. -->
-          <DataGridTemplateColumn Header="TRUPP" Width="240">
+          <DataGridTemplateColumn Header="TRUPP" ClipboardContentBinding="{Binding DisplayName}" Width="240">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <StackPanel VerticalAlignment="Center" Margin="12,6">
@@ -339,7 +339,7 @@
                column's content growth. Without a floor it collapses to the DataGrid's 20px
                minimum on a narrow window and the crew silently disappears. Scrolling the grid
                is the right trade-off; hiding who is under air is not. -->
-          <DataGridTemplateColumn Header="MANNSCHAFT" Width="*" MinWidth="180">
+          <DataGridTemplateColumn Header="MANNSCHAFT" ClipboardContentBinding="{Binding Members}" Width="*" MinWidth="180">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <ItemsControl ItemsSource="{Binding MemberLines}" VerticalAlignment="Center"
@@ -353,7 +353,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="ZEIT" Width="135">
+          <DataGridTemplateColumn Header="ZEIT" ClipboardContentBinding="{Binding StartTimeDisplay}" Width="135">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
@@ -368,7 +368,7 @@
           </DataGridTemplateColumn>
           <!-- Restzeit stays a column of its own and is alarm-coloured: it is the value that says
                whether the crew has to turn around now. -->
-          <DataGridTemplateColumn Header="RESTZEIT" Width="125">
+          <DataGridTemplateColumn Header="RESTZEIT" ClipboardContentBinding="{Binding RemainingDisplay}" Width="125">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <TextBlock Text="{Binding RemainingDisplay}" VerticalAlignment="Center" Margin="12,0"
@@ -376,7 +376,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="DRUCK" Width="145">
+          <DataGridTemplateColumn Header="DRUCK" ClipboardContentBinding="{Binding PressureDisplay}" Width="145">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
@@ -390,7 +390,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="STATUS" Width="130">
+          <DataGridTemplateColumn Header="STATUS" ClipboardContentBinding="{Binding StatusDisplay}" Width="130">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <TextBlock Text="{Binding StatusDisplay}" VerticalAlignment="Center" Margin="12,0"

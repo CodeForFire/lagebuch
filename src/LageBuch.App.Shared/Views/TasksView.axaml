@@ -245,7 +245,7 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="TasksGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="TasksGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
+      <DataGrid x:Name="TasksGrid" b:GridCopy.IsEnabled="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
                 IsReadOnly="{Binding IsReadOnly}" CanUserSortColumns="False">
         <DataGrid.Columns>
           <!-- A live CheckBox rather than a DataGridCheckBoxColumn (#543): that column only toggles
@@ -261,7 +261,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="WICHTIG" Width="120" IsReadOnly="True">
+          <DataGridTemplateColumn Header="WICHTIG" ClipboardContentBinding="{Binding ImportanceLabel}" Width="120" IsReadOnly="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding ImportanceLabel}"
@@ -271,7 +271,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="DRINGL." Width="120" IsReadOnly="True">
+          <DataGridTemplateColumn Header="DRINGL." ClipboardContentBinding="{Binding UrgencyLabel}" Width="120" IsReadOnly="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding UrgencyLabel}"
@@ -281,7 +281,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="TIMER" Width="110" IsReadOnly="True">
+          <DataGridTemplateColumn Header="TIMER" ClipboardContentBinding="{Binding RemainingDisplay}" Width="110" IsReadOnly="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding RemainingDisplay}"
@@ -290,7 +290,7 @@
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
           <DataGridTextColumn Header="ZUGETEILT AN" Binding="{Binding Assignee}" IsReadOnly="True" />
-          <DataGridTemplateColumn Header="AUFGABE" Width="*" IsReadOnly="True">
+          <DataGridTemplateColumn Header="AUFGABE" ClipboardContentBinding="{Binding Text}" Width="*" IsReadOnly="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <StackPanel Orientation="Vertical" Margin="6,4" Spacing="1">
