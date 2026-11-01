@@ -279,11 +279,11 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="ForcesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="ForcesGrid" Grid.IsSharedSizeScope="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" b:GridCellFocus.IsEnabled="True" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid x:Name="ForcesGrid" b:GridCopy.IsEnabled="True" Grid.IsSharedSizeScope="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" b:GridCellFocus.IsEnabled="True" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
-          <DataGridTemplateColumn Header="ABSCHNITT" Width="170">
+          <DataGridTemplateColumn Header="ABSCHNITT" ClipboardContentBinding="{Binding NodeCellLabel}" Width="170">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <ctrl:NodeChoicePicker Margin="6,4" Choices="{Binding NodeChoices}" Label="{Binding NodeCellLabel}"
@@ -294,7 +294,7 @@
           <!-- Stärke im 1/1/2-Format; die Zahlen bleiben nach dem Eintrag korrigierbar (#76),
                gebündelt in einem Editor, damit eine Korrektur ein Protokolleintrag bleibt.
                Verlauf zeigt die Wert-Historie der Einheit. -->
-          <DataGridTemplateColumn Header="STÄRKE" Width="190">
+          <DataGridTemplateColumn Header="STÄRKE" ClipboardContentBinding="{Binding StrengthText}" Width="190">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <!-- A shared-size column rather than a StackPanel: the pencil sat right after the
@@ -387,7 +387,7 @@
           <!-- Status and Bemerkung are live controls rather than printed text: both move while the
                Einsatz runs, so they have to stay changeable after the row was added. Template
                columns keep them one click away instead of behind DataGrid's edit mode. -->
-          <DataGridTemplateColumn Header="STATUS" Width="170">
+          <DataGridTemplateColumn Header="STATUS" ClipboardContentBinding="{Binding Status}" Width="170">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <ComboBox Margin="6,4" HorizontalAlignment="Stretch"
@@ -401,7 +401,7 @@
                (#33) and, since the row rebuilds on each commit, threw focus out of the box after
                every character. UpdateSourceTrigger=LostFocus pushes once, when the operator
                actually leaves the field. Mirrors RolesView's Handynummer fix. -->
-          <DataGridTemplateColumn Header="BEMERKUNG" Width="*">
+          <DataGridTemplateColumn Header="BEMERKUNG" ClipboardContentBinding="{Binding Notes}" Width="*">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <!-- Freitext: kein Platzhalter, siehe #137; die Spaltenüberschrift ist das Label. -->

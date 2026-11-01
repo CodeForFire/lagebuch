@@ -1,0 +1,1 @@
+Strg+C on the ETB, Aufgaben, Funktionen, Kräfte and Atemschutz grids copies the clicked cell instead of the whole row in quotes, a right-click on a cell offers „Kopieren“ and „Zeile kopieren“, and Aufgaben and Atemschutz rows no longer copy as empty quotes (#836).

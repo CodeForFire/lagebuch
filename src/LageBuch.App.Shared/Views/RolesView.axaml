@@ -270,12 +270,12 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="RolesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="RolesGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid x:Name="RolesGrid" b:GridCopy.IsEnabled="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FUNKTION" Binding="{Binding Role}" />
           <!-- A Funktion the Führungstafel placed reads as its node ("Abschnitt 1 / Nord") and is
                changed there, so the cell only says so. -->
-          <DataGridTemplateColumn Header="ABSCHNITT">
+          <DataGridTemplateColumn Header="ABSCHNITT" ClipboardContentBinding="{Binding SectionLabel}">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:RoleAssignmentRow">
                 <TextBlock x:Name="RoleSectionText" Text="{Binding SectionLabel}"
@@ -293,7 +293,7 @@
                partial numbers and, since the row rebuilds on each commit (see #33), throw focus out
                of the box after every character. UpdateSourceTrigger=LostFocus pushes once, when the
                operator actually leaves the field. -->
-          <DataGridTemplateColumn Header="HANDYNUMMER" Width="170">
+          <DataGridTemplateColumn Header="HANDYNUMMER" ClipboardContentBinding="{Binding Phone}" Width="170">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:RoleAssignmentRow">
                 <TextBox Margin="6,4"

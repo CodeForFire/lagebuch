@@ -267,12 +267,12 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
       <Border x:Name="EtbGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-        <DataGrid x:Name="EtbGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid x:Name="EtbGrid" b:GridCopy.IsEnabled="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
           <DataGrid.Columns>
             <DataGridTextColumn Header="ZEIT" Binding="{Binding Time}" />
             <DataGridTextColumn Header="VON" Binding="{Binding From}" />
             <DataGridTextColumn Header="AN" Binding="{Binding To}" />
-            <DataGridTemplateColumn Header="EINTRAG" Width="*">
+            <DataGridTemplateColumn Header="EINTRAG" ClipboardContentBinding="{Binding Text}" Width="*">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate x:DataType="vm:EtbEntryRow">
                   <!-- The Aufgaben given out from this entry, counted, beside the text that made
