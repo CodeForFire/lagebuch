@@ -178,15 +178,22 @@ public static class SyncProtocol
     /// <c>addForceUnit</c>, the snapshot's units and the Stammdaten payload's vehicles carry an
     /// optional <c>vehicleType</c>; the snapshot's units also carry the sign's offset.
     /// </para>
+    /// <para>
+    /// 31: the Führungsfahrzeug of every Führungsstelle (#829). <c>updateLeadershipPost</c>,
+    /// <c>addCommandNode</c> and <c>updateCommandNode</c> carry an optional <c>fuehrungsfahrzeug</c>,
+    /// the snapshot's post and nodes the same. Each command carries the whole post or node, so a
+    /// client at 30 editing one would send none, which a host at 31 reads as "none" -- wiping what
+    /// another device entered, the case of 29. The floor rises to 31.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 30;
+    public const int ProtocolVersion = 31;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 30;
+    public const int MinimumProtocolVersion = 31;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

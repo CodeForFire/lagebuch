@@ -101,6 +101,27 @@ public class FuehrungsorganisationSectionTests
     }
 
     [Fact]
+    public void The_fuehrungsfahrzeug_is_printed_with_the_Einsatzleitung_and_with_its_node()
+    {
+        var incident = Fresh();
+        El(incident);
+        incident.UpdateLeadershipPost(Clock, Op, null, null, null, new Funkgruppen(["FW_EMMERING 1000"], null), "Florian Emmering 12/1");
+        incident.AddCommandNode(
+            Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", funkgruppe: "DMO 301_F", fuehrungsfahrzeug: "Florian Emmering 11/1");
+        incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd");
+
+        var text = Print(incident);
+
+        PdfText.AssertInOrder(
+            text,
+            Heading,
+            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · TMO FW_EMMERING 1000 · Fahrzeug Florian Emmering 12/1",
+            "Abschnitt 1 Nord – Funkgruppe: DMO 301_F – Führungsfahrzeug: Florian Emmering 11/1",
+            "Abschnitt 2 Süd");
+        Assert.Equal(2, text.Split("Führungsfahrzeug:").Length);
+    }
+
+    [Fact]
     public void A_Melder_alone_at_the_Einsatzleitung_prints_the_section_with_him()
     {
         var incident = Fresh();

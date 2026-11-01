@@ -1,10 +1,12 @@
 namespace LageBuch.Domain.Leadership;
 
 /// <summary>
-/// Where and how a Führungsstelle can be reached: its Standort, Rufname, Telefon and its TMO and DMO
-/// Funkgruppen. <see cref="Normalized"/> is the one place its texts are trimmed and capped.
+/// Where and how a Führungsstelle can be reached: its Standort, Rufname, Telefon, its TMO and DMO
+/// Funkgruppen and the Führungsfahrzeug it is led from (#829), as its Funkrufname.
+/// <see cref="Normalized"/> is the one place its texts are trimmed and capped.
 /// </summary>
-public sealed record LeadershipPost(string? Standort, string? Rufname, string? Telefon, Funkgruppen Funkgruppen)
+public sealed record LeadershipPost(
+    string? Standort, string? Rufname, string? Telefon, Funkgruppen Funkgruppen, string? Fuehrungsfahrzeug = null)
 {
     public static LeadershipPost Empty { get; } = new(null, null, null, Funkgruppen.Empty);
 
@@ -13,5 +15,6 @@ public sealed record LeadershipPost(string? Standort, string? Rufname, string? T
         CommandNode.Clean(Standort, CommandNode.MaxTextLength, "Standort"),
         CommandNode.Clean(Rufname, CommandNode.MaxTextLength, "Rufname"),
         CommandNode.Clean(Telefon, CommandNode.MaxPhoneLength, "Telefon"),
-        Funkgruppen.Normalized());
+        Funkgruppen.Normalized(),
+        CommandNode.Clean(Fuehrungsfahrzeug, CommandNode.MaxTextLength, "Führungsfahrzeug"));
 }

@@ -43,6 +43,9 @@ public sealed record CommandNode
 
     public string? Telefon { get; private init; }
 
+    /// <summary>The Funkrufname of the vehicle the node is led from (#829), e.g. "FFB 1/12/1"; null when none.</summary>
+    public string? Fuehrungsfahrzeug { get; private init; }
+
     public DateTimeOffset? DissolvedAt { get; private init; }
 
     public bool IsLive => DissolvedAt is null;
@@ -76,7 +79,8 @@ public sealed record CommandNode
         string? rufname,
         string? telefon,
         DateTimeOffset? dissolvedAt,
-        Funkgruppen? funkgruppen = null)
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null)
         => new()
         {
             Id = id,
@@ -90,12 +94,14 @@ public sealed record CommandNode
             Telefon = telefon,
             DissolvedAt = dissolvedAt,
             Funkgruppen = funkgruppen ?? Funkgruppen.Empty,
+            Fuehrungsfahrzeug = fuehrungsfahrzeug,
         };
 
     /// <summary>
     /// Returns a copy with corrected details, trimmed and capped the way <see cref="Create"/> does. A
     /// partner Einsatzleitung takes <paramref name="funkgruppen"/> and no single Funkgruppe, every
-    /// other kind the reverse; null <paramref name="funkgruppen"/> means none.
+    /// other kind the reverse; null <paramref name="funkgruppen"/> means none. Every kind takes a
+    /// <paramref name="fuehrungsfahrzeug"/>, null for none.
     /// </summary>
     public CommandNode WithDetails(
         string name,
@@ -104,7 +110,8 @@ public sealed record CommandNode
         string? funkgruppe,
         string? rufname,
         string? telefon,
-        Funkgruppen? funkgruppen = null)
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null)
     {
         var single = Clean(funkgruppe, MaxTextLength, "Funkgruppe");
         var groups = (funkgruppen ?? Funkgruppen.Empty).Normalized();
@@ -127,6 +134,7 @@ public sealed record CommandNode
             Funkgruppen = groups,
             Rufname = Clean(rufname, MaxTextLength, "Rufname"),
             Telefon = Clean(telefon, MaxPhoneLength, "Telefon"),
+            Fuehrungsfahrzeug = Clean(fuehrungsfahrzeug, MaxTextLength, "Führungsfahrzeug"),
         };
     }
 

@@ -166,9 +166,10 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? funkgruppe = null,
         string? rufname = null,
         string? telefon = null,
-        Funkgruppen? funkgruppen = null) =>
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null) =>
         Mutate(() => Incident.AddCommandNode(
-            _clock, RequireOperator(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen));
+            _clock, RequireOperator(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen, fuehrungsfahrzeug));
 
     public void UpdateCommandNode(
         Guid nodeId,
@@ -178,9 +179,10 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? funkgruppe,
         string? rufname,
         string? telefon,
-        Funkgruppen? funkgruppen = null) =>
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null) =>
         Mutate(() => Incident.UpdateCommandNode(
-            _clock, RequireOperator(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen));
+            _clock, RequireOperator(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen, fuehrungsfahrzeug));
 
     public void DissolveCommandNode(Guid nodeId) =>
         Mutate(() => Incident.DissolveCommandNode(_clock, RequireOperator(), nodeId));
@@ -215,8 +217,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Mutate(() => Incident.SetFuehrungsstufe(_clock, RequireOperator(), stufe));
 
-    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen) =>
-        Mutate(() => Incident.UpdateLeadershipPost(_clock, RequireOperator(), standort, rufname, telefon, funkgruppen));
+    public void UpdateLeadershipPost(
+        string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
+        Mutate(() => Incident.UpdateLeadershipPost(_clock, RequireOperator(), standort, rufname, telefon, funkgruppen, fuehrungsfahrzeug));
 
     public void AddForceUnit(
         string brigade,

@@ -81,6 +81,14 @@
                        AutomationProperties.Name="Standort"
                        PlaceholderText="z. B. Hofeinfahrt Hauptstr. 12" />
             </HeaderedContentControl>
+            <!-- The vehicle the Führungsstelle is led from (#829): the Einsatz's Kräfte and the
+                 Stammdaten's vehicles as suggestions, any other Funkrufname typed in. -->
+            <HeaderedContentControl Classes="field suggest" Header="FÜHRUNGSFAHRZEUG">
+              <AutoCompleteBox x:Name="CommandNodeFahrzeugBox" ItemsSource="{Binding FahrzeugOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                               AutomationProperties.Name="Führungsfahrzeug"
+                               Text="{Binding Fuehrungsfahrzeug}" PlaceholderText="z. B. FFB 1/12/1" />
+            </HeaderedContentControl>
             <!-- The Stammdaten's Funkgruppen as suggestions, not a closed set: a channel the list
                  lacks stays enterable, so this is an AutoCompleteBox, as STICHWORT is. -->
             <HeaderedContentControl Classes="field suggest" Header="FUNKGRUPPE" IsVisible="{Binding ShowFunkgruppe}">

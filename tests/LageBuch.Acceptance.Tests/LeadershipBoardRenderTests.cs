@@ -40,9 +40,11 @@ public class LeadershipBoardRenderTests
         Guid? parent = null,
         string? auftrag = null,
         string? funkgruppe = null,
-        Funkgruppen? funkgruppen = null)
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null)
     {
-        session.AddCommandNode(kind, name, parent, auftrag: auftrag, funkgruppe: funkgruppe, funkgruppen: funkgruppen);
+        session.AddCommandNode(
+            kind, name, parent, auftrag: auftrag, funkgruppe: funkgruppe, funkgruppen: funkgruppen, fuehrungsfahrzeug: fuehrungsfahrzeug);
         return session.Incident.CommandNodes[^1].Id;
     }
 
@@ -62,7 +64,8 @@ public class LeadershipBoardRenderTests
     // A Wohnhausbrand in Emmering as the sheet would carry it an hour in.
     private static void Fill(LocalIncidentSession session)
     {
-        session.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 40123", new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
+        session.UpdateLeadershipPost(
+            "Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 40123", new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]), "Florian Emmering 12/1");
         session.AssignRole("Einsatzleiter", "Max Mustermann", "Florian Emmering 1", slot: RoleSlot.Leiter);
         session.AssignRole("Melder", "Lukas Brandl", slot: RoleSlot.Melder);
         session.AssignRole("S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
@@ -71,7 +74,12 @@ public class LeadershipBoardRenderTests
         AddUnit(session, "FF Steinhöring", "Florian Steinhöring 40/1", 9, 4, 1, markt);
 
         var nord = AddNode(
-            session, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung Wohnhaus, Menschenrettung", funkgruppe: "DMO 301_F");
+            session,
+            CommandNodeKind.Abschnitt,
+            "Abschnitt 1 Nord",
+            auftrag: "Brandbekämpfung Wohnhaus, Menschenrettung",
+            funkgruppe: "DMO 301_F",
+            fuehrungsfahrzeug: "Florian Aich 10/1");
         session.AssignRole("Abschnittsleiter", "Hans Huber", "Florian Aich 1", nodeId: nord, slot: RoleSlot.Leiter);
         session.AssignRole("Melder", "Lena Lehner", nodeId: nord, slot: RoleSlot.Melder);
         AddUnit(session, "FF Emmering", "Florian Emmering 40/1", 9, 4, 1, nord);
@@ -223,6 +231,10 @@ public class LeadershipBoardRenderTests
         Assert.Equal("Lukas Brandl", Named<TextBlock>(view, "ElMelderText").Text);
         Assert.Equal("FW_EMMERING 1000", Named<TextBlock>(view, "ElTmo").Text);
         Assert.Equal("307_F", Named<TextBlock>(view, "ElDmo").Text);
+        Assert.Equal("Florian Emmering 12/1", Named<TextBlock>(view, "ElFahrzeug").Text);
+        Assert.Equal(
+            ["Florian Aich 10/1"],
+            view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "NodeFahrzeug" && t.IsEffectivelyVisible).Select(t => t.Text));
         Assert.Equal(["RD_FFB 1001"], view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "NodeTmo" && t.IsEffectivelyVisible).Select(t => t.Text));
         Assert.False(Named<Grid>(view, "ElFurther").IsVisible);
         Assert.Equal("Stufe B", Named<TextBlock>(view, "StufeText").Text);

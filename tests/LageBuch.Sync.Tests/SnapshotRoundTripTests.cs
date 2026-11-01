@@ -254,13 +254,13 @@ public class SnapshotRoundTripTests
         var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
         var sub = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord 1", nord.Id);
         var gone = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR");
-        incident.UpdateCommandNode(clock, op, nord.Id, "Nord", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171");
+        incident.UpdateCommandNode(clock, op, nord.Id, "Nord", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171", null, "FFB 2/11/1");
         incident.DissolveCommandNode(clock, op, gone.Id);
         var unit = incident.AddForceUnit(clock, op, "Aich", 9, "Aich 42/1", null, null, 4);
         incident.MoveForceUnit(clock, op, unit.Id, sub.Id);
         var al = incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", nodeId: nord.Id, slot: RoleSlot.Leiter);
         incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
-        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"]));
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"]), "FFB 1/12/1");
         var polizei = incident.AddCommandNode(
             clock, op, CommandNodeKind.Partner, "Polizei", funkgruppen: new Funkgruppen(["POL 1", "POL 2"], ["303_F"]));
 
@@ -276,6 +276,8 @@ public class SnapshotRoundTripTests
         Assert.Equal("TG 2", nordBack.Funkgruppe);
         Assert.Equal("Florian Nord", nordBack.Rufname);
         Assert.Equal("0171", nordBack.Telefon);
+        Assert.Equal("FFB 2/11/1", nordBack.Fuehrungsfahrzeug);
+        Assert.Null(r.FindCommandNode(sub.Id)?.Fuehrungsfahrzeug);
         Assert.Equal(nord.Id, r.FindCommandNode(sub.Id)?.ParentId);
         Assert.False(r.FindCommandNode(gone.Id)?.IsLive);
         Assert.Equal(sub.Id, r.Forces.Single().NodeId);
@@ -283,7 +285,7 @@ public class SnapshotRoundTripTests
         Assert.Equal(nord.Id, roleBack.NodeId);
         Assert.Equal(RoleSlot.Leiter, roleBack.Slot);
         Assert.Equal(Fuehrungsstufe.C, r.Fuehrungsstufe);
-        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"])), r.LeadershipPost);
+        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"]), "FFB 1/12/1"), r.LeadershipPost);
         Assert.Equal(new Funkgruppen(["POL 1", "POL 2"], ["303_F"]), r.FindCommandNode(polizei.Id)?.Funkgruppen);
         Assert.Equal(Funkgruppen.Empty, nordBack.Funkgruppen);
     }

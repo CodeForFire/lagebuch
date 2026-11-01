@@ -79,7 +79,10 @@ public sealed record IncidentSnapshot(
     double? LocationLongitude = null,
 
     // The Einsatz's rail overrides, keyed by nav entry; a snapshot without the key reads as none.
-    IReadOnlyDictionary<string, bool>? NavOverrides = null);
+    IReadOnlyDictionary<string, bool>? NavOverrides = null,
+
+    // The Einsatzleitung's Führungsfahrzeug (#829); a snapshot without the key reads as none.
+    string? ElFuehrungsfahrzeug = null);
 
 public sealed record TimerDto(
     string Key,
@@ -238,7 +241,8 @@ public sealed record InvolvedPartyDto(
 public sealed record CommandNodeDto(
     Guid Id, CommandNodeKind Kind, string Name, Guid? ParentId, string? Auftrag, string? Standort,
     string? Funkgruppe, string? Rufname, string? Telefon, DateTimeOffset? DissolvedAt,
-    IReadOnlyList<string>? FunkgruppenTmo = null, IReadOnlyList<string>? FunkgruppenDmo = null);
+    IReadOnlyList<string>? FunkgruppenTmo = null, IReadOnlyList<string>? FunkgruppenDmo = null,
+    string? Fuehrungsfahrzeug = null);
 
 public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,

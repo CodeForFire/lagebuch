@@ -488,9 +488,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? funkgruppe = null,
         string? rufname = null,
         string? telefon = null,
-        Funkgruppen? funkgruppen = null) =>
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null) =>
         Send(new AddCommandNodeCommand(
-            Op(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo));
+            Op(), kind, name, parentId, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo, fuehrungsfahrzeug));
 
     public void UpdateCommandNode(
         Guid nodeId,
@@ -500,9 +501,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? funkgruppe,
         string? rufname,
         string? telefon,
-        Funkgruppen? funkgruppen = null) =>
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null) =>
         Send(new UpdateCommandNodeCommand(
-            Op(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo));
+            Op(), nodeId, name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo, fuehrungsfahrzeug));
 
     public void DissolveCommandNode(Guid nodeId) =>
         Send(new DissolveCommandNodeCommand(Op(), nodeId));
@@ -545,8 +547,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
         Send(new SetFuehrungsstufeCommand(Op(), stufe));
 
-    public void UpdateLeadershipPost(string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen) =>
-        Send(new UpdateLeadershipPostCommand(Op(), standort, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo));
+    public void UpdateLeadershipPost(
+        string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
+        Send(new UpdateLeadershipPostCommand(Op(), standort, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo, fuehrungsfahrzeug));
 
     public void AddForceUnit(
         string brigade,

@@ -145,7 +145,8 @@ public static class SnapshotMapper
                 n.Telefon,
                 n.DissolvedAt,
                 n.Funkgruppen.Tmo,
-                n.Funkgruppen.Dmo)).ToList(),
+                n.Funkgruppen.Dmo,
+                n.Fuehrungsfahrzeug)).ToList(),
             Fuehrungsstufe: incident.Fuehrungsstufe,
             ElStandort: incident.LeadershipPost.Standort,
             ElRufname: incident.LeadershipPost.Rufname,
@@ -154,7 +155,8 @@ public static class SnapshotMapper
             ElFunkgruppenDmo: incident.LeadershipPost.Funkgruppen.Dmo,
             LocationLatitude: incident.Location?.Latitude,
             LocationLongitude: incident.Location?.Longitude,
-            NavOverrides: incident.NavOverrides.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal));
+            NavOverrides: incident.NavOverrides.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
+            ElFuehrungsfahrzeug: incident.LeadershipPost.Fuehrungsfahrzeug);
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -277,13 +279,15 @@ public static class SnapshotMapper
                 n.Rufname,
                 n.Telefon,
                 n.DissolvedAt,
-                Funkgruppen.FromRecord(n.FunkgruppenTmo, n.FunkgruppenDmo))),
+                Funkgruppen.FromRecord(n.FunkgruppenTmo, n.FunkgruppenDmo),
+                n.Fuehrungsfahrzeug)),
             snapshot.Fuehrungsstufe,
             new LeadershipPost(
                 snapshot.ElStandort,
                 snapshot.ElRufname,
                 snapshot.ElTelefon,
-                Funkgruppen.FromRecord(snapshot.ElFunkgruppenTmo, snapshot.ElFunkgruppenDmo)),
+                Funkgruppen.FromRecord(snapshot.ElFunkgruppenTmo, snapshot.ElFunkgruppenDmo),
+                snapshot.ElFuehrungsfahrzeug),
             GeoPoint.TryCreate(snapshot.LocationLatitude, snapshot.LocationLongitude),
             snapshot.NavOverrides);
     }

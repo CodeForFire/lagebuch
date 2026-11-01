@@ -68,6 +68,7 @@ public class CommandNodeDialogRenderTests
         vm.Name = "Abschnitt 1 Nord";
         vm.Auftrag = "Brandbekämpfung Nordseite, Riegelstellung zum Stallgebäude.";
         vm.Standort = "Hofeinfahrt Hauptstraße 12, Emmering";
+        vm.Fuehrungsfahrzeug = "Florian Aich 10/1";
         vm.Funkgruppe = "TMO FW_EMMERING 1000";
         vm.Rufname = "Florian Emmering 11/1";
         vm.Telefon = "0151 2345678";
@@ -161,7 +162,11 @@ public class CommandNodeDialogRenderTests
     {
         var session = Session();
         session.UpdateLeadershipPost(
-            "Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 123456", new Funkgruppen(["FW_EMMERING 1000", "FW_AICH 1010"], ["301_F"]));
+            "Feuerwehrhaus Emmering",
+            "Florian Emmering 1",
+            "08141 123456",
+            new Funkgruppen(["FW_EMMERING 1000", "FW_AICH 1010"], ["301_F"]),
+            "Florian Emmering 12/1");
         var (window, vm) = Show(CommandNodeDialogViewModel.ForPost(session, MasterData()), 560, 900);
 
         Assert.DoesNotContain(
@@ -183,6 +188,20 @@ public class CommandNodeDialogRenderTests
         Assert.Equal(3, vm.TmoSlots.Count);
         Assert.False(Find<Button>(window, "CommandNodeAddTmoButton").IsEffectivelyEnabled);
         Assert.True(Find<Button>(window, "CommandNodeAddDmoButton").IsEffectivelyEnabled);
+    }
+
+    [AvaloniaFact]
+    public void The_fuehrungsfahrzeug_field_suggests_the_einsatzs_units_then_the_stammdaten_vehicles()
+    {
+        var session = Session();
+        session.AddForceUnit("FF Aich", 9, "Florian Aich 10/1");
+        var masterData = MasterData() with { Vehicles = [new Vehicle("FF Emmering", "Florian Emmering 12/1", 3)] };
+        var (window, _) = Show(CommandNodeDialogViewModel.ForPost(session, masterData), 560, 900);
+
+        var box = Find<AutoCompleteBox>(window, "CommandNodeFahrzeugBox");
+        Assert.True(box.IsEffectivelyVisible);
+        Assert.Equal("Führungsfahrzeug", AutomationProperties.GetName(box));
+        Assert.Equal(["Florian Aich 10/1", "Florian Emmering 12/1"], box.ItemsSource!.Cast<string>());
     }
 
     [AvaloniaFact]

@@ -140,6 +140,11 @@ public static class FuehrungsorganisationSection
             line += $" · {incident.LeadershipPost.Funkgruppen.Text}";
         }
 
+        if (incident.LeadershipPost.Fuehrungsfahrzeug is { } fahrzeug)
+        {
+            line += $" · Fahrzeug {fahrzeug}";
+        }
+
         return line;
     }
 
@@ -173,6 +178,11 @@ public static class FuehrungsorganisationSection
         if (!node.Funkgruppen.IsEmpty)
         {
             text += $" – Funkgruppen: {node.Funkgruppen.Text}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(node.Fuehrungsfahrzeug))
+        {
+            text += $" – Führungsfahrzeug: {node.Fuehrungsfahrzeug}";
         }
 
         // What the EAL leads: an Abschnitt's sum takes in its Unterabschnitte, as on the board.

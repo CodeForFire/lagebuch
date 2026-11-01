@@ -963,9 +963,9 @@ public sealed class Incident
     }
 
     /// <summary>
-    /// Corrects how the Einsatzleitung can be reached. Only a Funkgruppen change reaches the ETB;
-    /// Standort, Rufname and Telefon are working data and stay silent, like a node's. Null
-    /// <paramref name="funkgruppen"/> means none.
+    /// Corrects how the Einsatzleitung can be reached. Only a Funkgruppen or Führungsfahrzeug change
+    /// reaches the ETB; Standort, Rufname and Telefon are working data and stay silent, like a node's.
+    /// Null <paramref name="funkgruppen"/> means none, null <paramref name="fuehrungsfahrzeug"/> too.
     /// </summary>
     public LeadershipPost UpdateLeadershipPost(
         IClock clock,
@@ -973,19 +973,25 @@ public sealed class Incident
         string? standort,
         string? rufname,
         string? telefon,
-        Funkgruppen? funkgruppen)
+        Funkgruppen? funkgruppen,
+        string? fuehrungsfahrzeug = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var updated = new LeadershipPost(standort, rufname, telefon, funkgruppen ?? Funkgruppen.Empty).Normalized();
+        var updated = new LeadershipPost(standort, rufname, telefon, funkgruppen ?? Funkgruppen.Empty, fuehrungsfahrzeug).Normalized();
         var previous = LeadershipPost;
         LeadershipPost = updated;
 
         if (!updated.Funkgruppen.IsEmpty && !updated.Funkgruppen.Equals(previous.Funkgruppen))
         {
             AppendSystemEntry(clock, op, FunkgruppenText("Einsatzleitung", updated.Funkgruppen));
+        }
+
+        if (FahrzeugChanged(previous.Fuehrungsfahrzeug, updated.Fuehrungsfahrzeug))
+        {
+            AppendSystemEntry(clock, op, FahrzeugText("Einsatzleitung", updated.Fuehrungsfahrzeug));
         }
 
         return updated;
@@ -1029,7 +1035,8 @@ public sealed class Incident
         string? funkgruppe = null,
         string? rufname = null,
         string? telefon = null,
-        Funkgruppen? funkgruppen = null)
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -1047,9 +1054,10 @@ public sealed class Incident
         // runs before anything is added so a refused detail leaves the incident untouched.
         if (!string.IsNullOrWhiteSpace(auftrag) || !string.IsNullOrWhiteSpace(standort)
             || !string.IsNullOrWhiteSpace(funkgruppe) || !string.IsNullOrWhiteSpace(rufname)
-            || !string.IsNullOrWhiteSpace(telefon) || funkgruppen is { IsEmpty: false })
+            || !string.IsNullOrWhiteSpace(telefon) || funkgruppen is { IsEmpty: false }
+            || !string.IsNullOrWhiteSpace(fuehrungsfahrzeug))
         {
-            node = node.WithDetails(node.Name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen);
+            node = node.WithDetails(node.Name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen, fuehrungsfahrzeug);
         }
 
         CommandNode? parent = null;
@@ -1089,6 +1097,11 @@ public sealed class Incident
             AppendSystemEntry(clock, op, FunkgruppenText(node.Name, node.Funkgruppen));
         }
 
+        if (node.Fuehrungsfahrzeug is not null)
+        {
+            AppendSystemEntry(clock, op, FahrzeugText(node.Name, node.Fuehrungsfahrzeug));
+        }
+
         return node;
     }
 
@@ -1100,9 +1113,15 @@ public sealed class Incident
 
     private static string FunkgruppenText(string owner, Funkgruppen funkgruppen) => $"Funkgruppen {owner}: {funkgruppen.Text}";
 
+    // A Führungsfahrzeug set or swapped is worth the record; one taken away stays silent, like Funkgruppen.
+    private static bool FahrzeugChanged(string? previous, string? updated) =>
+        updated is not null && !string.Equals(previous, updated, StringComparison.Ordinal);
+
+    private static string FahrzeugText(string owner, string? fahrzeug) => $"Führungsfahrzeug {owner}: {fahrzeug}";
+
     /// <summary>
-    /// Corrects a node's name and details. Rename, Auftrag and Funkgruppe changes reach the ETB;
-    /// Standort, Rufname and Telefon are working data and stay silent, like a unit's Bemerkung.
+    /// Corrects a node's name and details. Rename, Auftrag, Funkgruppe and Führungsfahrzeug changes
+    /// reach the ETB; Standort, Rufname and Telefon are working data and stay silent, like a unit's Bemerkung.
     /// </summary>
     public CommandNode UpdateCommandNode(
         IClock clock,
@@ -1114,7 +1133,8 @@ public sealed class Incident
         string? funkgruppe,
         string? rufname,
         string? telefon,
-        Funkgruppen? funkgruppen = null)
+        Funkgruppen? funkgruppen = null,
+        string? fuehrungsfahrzeug = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -1127,7 +1147,7 @@ public sealed class Incident
             throw new InvalidOperationException("Abschnitt ist aufgelöst.");
         }
 
-        var updated = previous.WithDetails(name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen);
+        var updated = previous.WithDetails(name, auftrag, standort, funkgruppe, rufname, telefon, funkgruppen, fuehrungsfahrzeug);
         EnsureNameFree(updated.Name, updated.ParentId, updated.Id);
         _commandNodes[index] = updated;
 
@@ -1159,6 +1179,11 @@ public sealed class Incident
         if (!updated.Funkgruppen.IsEmpty && !updated.Funkgruppen.Equals(previous.Funkgruppen))
         {
             AppendSystemEntry(clock, op, FunkgruppenText(updated.Name, updated.Funkgruppen));
+        }
+
+        if (FahrzeugChanged(previous.Fuehrungsfahrzeug, updated.Fuehrungsfahrzeug))
+        {
+            AppendSystemEntry(clock, op, FahrzeugText(updated.Name, updated.Fuehrungsfahrzeug));
         }
 
         return updated;

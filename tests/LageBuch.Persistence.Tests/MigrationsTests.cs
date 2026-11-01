@@ -544,7 +544,7 @@ public class MigrationsTests : IDisposable
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
         Migrations.Migrate(cn2);
-        Assert.Equal(39, Migrations.GetVersion(cn2));
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
 
         using var check = cn2.CreateCommand();
         check.CommandText = "SELECT vehicle_type, label_dx, label_dy, position_lat FROM force_units WHERE id = 'u';";
@@ -552,5 +552,40 @@ public class MigrationsTests : IDisposable
         Assert.True(r.Read());
         Assert.True(r.IsDBNull(0) && r.IsDBNull(1) && r.IsDBNull(2));
         Assert.Equal(48.1785, r.GetDouble(3), precision: 6);
+    }
+
+    [Fact]
+    public void V39_database_upgrades_to_v40_and_no_fuehrungsstelle_has_a_fuehrungsfahrzeug()
+    {
+        // A V39 file: today's schema minus the Führungsfahrzeug columns, with an Abschnitt.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE incident_meta DROP COLUMN el_fuehrungsfahrzeug;
+                ALTER TABLE command_nodes DROP COLUMN fuehrungsfahrzeug;
+                INSERT INTO incident_meta (id, started_at, state, el_rufname) VALUES ('i', '2026-11-01T10:00:00Z', 0, 'Florian EL');
+                INSERT INTO command_nodes (id, ordinal, kind, name, standort) VALUES ('n', 0, 'abschnitt', 'Nord', 'Hof');
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (39);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(40, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = """
+            SELECT m.el_fuehrungsfahrzeug, m.el_rufname, n.fuehrungsfahrzeug, n.standort
+            FROM incident_meta m, command_nodes n WHERE m.id = 'i' AND n.id = 'n';
+            """;
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.True(r.IsDBNull(0) && r.IsDBNull(2));
+        Assert.Equal(("Florian EL", "Hof"), (r.GetString(1), r.GetString(3)));
     }
 }
