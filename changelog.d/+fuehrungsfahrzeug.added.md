@@ -1,0 +1,1 @@
+Every Führungsstelle — the Einsatzleitung, each Abschnitt, Unterabschnitt, Bereitstellung and partner Einsatzleitung — can be given a Führungsfahrzeug, suggested from the Einsatz's Kräfte and the Stammdaten vehicles and shown on the Führungstafel, in the ETB and in the Bericht (#829).

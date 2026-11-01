@@ -126,6 +126,10 @@ public sealed partial class BoardNodeCard : ObservableObject
     [ObservableProperty]
     private string? _standort;
 
+    /// <summary>The Funkrufname of the node's Führungsfahrzeug (#829); null when none.</summary>
+    [ObservableProperty]
+    private string? _fuehrungsfahrzeug;
+
     [ObservableProperty]
     private string? _rufname;
 
@@ -210,6 +214,7 @@ public sealed partial class BoardNodeCard : ObservableObject
         Tmo = ElCard.Lines(node.Funkgruppen.Tmo);
         Dmo = ElCard.Lines(node.Funkgruppen.Dmo);
         Standort = node.Standort;
+        Fuehrungsfahrzeug = node.Fuehrungsfahrzeug;
         Rufname = node.Rufname;
         Telefon = node.Telefon;
         Leiter = BoardPersonRow.Follow(Leiter, entry.Leiter);

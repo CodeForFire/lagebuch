@@ -972,6 +972,43 @@ public class CommandApplierTests
         Assert.Single(incident.CommandNodes);
     }
 
+    [Fact]
+    public void A_fuehrungsfahrzeug_over_the_wire_is_set_on_the_post_on_forming_and_on_correction()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var client = new OperatorDto("Maier", "FFB 2");
+
+        ApplyOverWire(new UpdateLeadershipPostCommand(client, null, null, null, null, null, "FFB 1/12/1"), incident, clock);
+        Assert.Equal("FFB 1/12/1", incident.LeadershipPost.Fuehrungsfahrzeug);
+
+        ApplyOverWire(
+            new AddCommandNodeCommand(client, CommandNodeKind.Abschnitt, "Nord", null, Fuehrungsfahrzeug: "FFB 2/11/1"), incident, clock);
+        var node = Assert.Single(incident.CommandNodes);
+        Assert.Equal("FFB 2/11/1", node.Fuehrungsfahrzeug);
+
+        ApplyOverWire(
+            new UpdateCommandNodeCommand(client, node.Id, "Nord", null, null, null, null, null, Fuehrungsfahrzeug: "FFB 2/12/1"), incident, clock);
+        Assert.Equal("FFB 2/12/1", Assert.Single(incident.CommandNodes).Fuehrungsfahrzeug);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Fact]
+    public void An_overlong_fuehrungsfahrzeug_over_the_wire_is_refused_and_changes_nothing()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var client = new OperatorDto("Maier", "FFB 2");
+
+        Assert.Throws<ArgumentException>(() => ApplyOverWire(
+            new UpdateLeadershipPostCommand(client, "Feuerwehrhaus", null, null, null, null, new string('x', 201)), incident, clock));
+        Assert.Throws<ArgumentException>(() => ApplyOverWire(
+            new AddCommandNodeCommand(client, CommandNodeKind.Abschnitt, "Nord", null, Fuehrungsfahrzeug: new string('x', 201)), incident, clock));
+
+        Assert.Equal(LeadershipPost.Empty, incident.LeadershipPost);
+        Assert.Empty(incident.CommandNodes);
+    }
+
     private static AddChecklistCommand AddChecklistOf(OperatorDto op, Guid id, int items) =>
         new(op, id, "Lagemeldung", Enumerable.Range(0, items).Select(i => new ChecklistSeedItemDto($"Punkt {i}", i == 0)).ToList());
 

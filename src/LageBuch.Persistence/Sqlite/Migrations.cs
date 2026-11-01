@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 39;
+    public const int CurrentVersion = 40;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -272,6 +272,15 @@ public static class Migrations
         if (version < 39)
         {
             ApplyV39(cn, tx);
+
+            // Stryker restore all
+        }
+
+        // Stryker disable all : V40 only adds nullable columns that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 40)
+        {
+            ApplyV40(cn, tx);
 
             // Stryker restore all
         }
@@ -1077,6 +1086,17 @@ public static class Migrations
     private static void ApplyV37(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "nav_overrides", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The Führungsfahrzeug of the Einsatzleitung and of each node (#829), as its Funkrufname.
+    // Additive and nullable: an older file's Führungsstellen read back with none, which is all they had.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV40(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "el_fuehrungsfahrzeug", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "command_nodes", "fuehrungsfahrzeug", "TEXT");
 
         // Stryker restore all
     }

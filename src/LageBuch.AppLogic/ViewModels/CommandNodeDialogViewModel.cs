@@ -11,7 +11,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// <summary>
 /// The Führung board's one form: forms a Bereitstellung, Abschnitt, Unterabschnitt or partner
 /// Einsatzleitung with all its details, edits an existing node, or edits the Einsatzleitung
-/// Feuerwehr's own post (Standort, Rufname, Telefon, TMO and DMO Funkgruppen). Buffered until the primary button,
+/// Feuerwehr's own post (Standort, Führungsfahrzeug, Rufname, Telefon, TMO and DMO Funkgruppen). Buffered until the primary button,
 /// with the Einsatzdaten dialog's contract: a discard question on ABBRECHEN after typing (#652) and
 /// <see cref="Closed"/> on every outcome so the host clears the overlay.
 /// </summary>
@@ -69,6 +69,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         _nodeId = nodeId;
         _name = name;
         FunkgruppeOptions = [.. masterData.TalkGroups.Select(g => g.Display)];
+        FahrzeugOptions = FahrzeugeOf(session, masterData);
 
         // The field already says TMO or DMO, so its suggestions leave the kind off: "FW_MUSTER 1000".
         TmoOptions = GroupsOf(masterData, TalkGroupKind.Tmo);
@@ -87,6 +88,12 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
     /// <summary>The Funkgruppen of the Stammdaten, offered as suggestions and never enforced.</summary>
     public IReadOnlyList<string> FunkgruppeOptions { get; }
+
+    /// <summary>
+    /// The Funkrufnamen offered for the Führungsfahrzeug (#829): the Einsatz's own Kräfte first, then
+    /// the Stammdaten's vehicles. Suggestions only; a vehicle on neither list is typed in.
+    /// </summary>
+    public IReadOnlyList<string> FahrzeugOptions { get; }
 
     /// <summary>The Stammdaten's TMO Funkgruppen without their kind, offered on every TMO field.</summary>
     public IReadOnlyList<string> TmoOptions { get; }
@@ -150,6 +157,10 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     [ObservableProperty]
     private string? _standort;
 
+    /// <summary>The Funkrufname of the vehicle the Führungsstelle is led from, e.g. "FFB 1/12/1".</summary>
+    [ObservableProperty]
+    private string? _fuehrungsfahrzeug;
+
     [ObservableProperty]
     private string? _funkgruppe;
 
@@ -212,6 +223,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             Title = $"{CommandNodeKindLabels.Of(kind)} bearbeiten",
             Auftrag = node?.Auftrag,
             Standort = node?.Standort,
+            Fuehrungsfahrzeug = node?.Fuehrungsfahrzeug,
             Funkgruppe = node?.Funkgruppe,
             Rufname = node?.Rufname,
             Telefon = node?.Telefon,
@@ -229,6 +241,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         {
             Title = "Einsatzleitung Feuerwehr",
             Standort = post.Standort,
+            Fuehrungsfahrzeug = post.Fuehrungsfahrzeug,
             Rufname = post.Rufname,
             Telefon = post.Telefon,
         }.Seeded();
@@ -270,6 +283,15 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     /// <summary>"+ DMO": one more DMO field, up to <see cref="Funkgruppen.MaxPerKind"/>.</summary>
     [RelayCommand(CanExecute = nameof(CanAddDmo))]
     private void AddDmo() => AddSlot(DmoSlots, AddDmoCommand);
+
+    // The units already on the Einsatz are where a Führungsfahrzeug usually comes from, so they lead;
+    // a roster person's Funkrufname is no vehicle and stays out.
+    private static IReadOnlyList<string> FahrzeugeOf(IIncidentSession session, MasterDataSet masterData) =>
+        [.. session.Incident.Forces.Select(u => u.CallSign ?? string.Empty)
+            .Concat(masterData.Vehicles.Select(v => v.CallSign))
+            .Select(c => c.Trim())
+            .Where(c => c.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private static IReadOnlyList<string> GroupsOf(MasterDataSet masterData, TalkGroupKind kind) =>
         [.. masterData.TalkGroups
@@ -360,7 +382,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             FunkgruppeToSave,
             Normalize(Rufname),
             Normalize(Telefon),
-            FunkgruppenToSave);
+            FunkgruppenToSave,
+            Normalize(StammdatenCatalogue.Normalize(Fuehrungsfahrzeug, FahrzeugOptions)));
 
     private CommandNodeDialogViewModel Seeded()
     {
@@ -496,7 +519,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                     typed.Funkgruppe,
                     typed.Rufname,
                     typed.Telefon,
-                    typed.Funkgruppen);
+                    typed.Funkgruppen,
+                    typed.Fuehrungsfahrzeug);
                 _onChanged?.Invoke();
                 return true;
             case Mode.Edit:
@@ -510,9 +534,17 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                 {
                     var save = Merge(
                         typed,
-                        Seen(node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon, node.Funkgruppen));
+                        Seen(node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon, node.Funkgruppen, node.Fuehrungsfahrzeug));
                     _session.UpdateCommandNode(
-                        node.Id, save.Name, save.Auftrag, save.Standort, save.Funkgruppe, save.Rufname, save.Telefon, save.Funkgruppen);
+                        node.Id,
+                        save.Name,
+                        save.Auftrag,
+                        save.Standort,
+                        save.Funkgruppe,
+                        save.Rufname,
+                        save.Telefon,
+                        save.Funkgruppen,
+                        save.Fuehrungsfahrzeug);
                     _onChanged?.Invoke();
                 }
 
@@ -529,8 +561,10 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                 if (HasChanges)
                 {
                     var post = _session.Incident.LeadershipPost;
-                    var save = Merge(typed, Seen(string.Empty, null, post.Standort, null, post.Rufname, post.Telefon, post.Funkgruppen));
-                    _session.UpdateLeadershipPost(save.Standort, save.Rufname, save.Telefon, save.Funkgruppen);
+                    var save = Merge(
+                        typed,
+                        Seen(string.Empty, null, post.Standort, null, post.Rufname, post.Telefon, post.Funkgruppen, post.Fuehrungsfahrzeug));
+                    _session.UpdateLeadershipPost(save.Standort, save.Rufname, save.Telefon, save.Funkgruppen, save.Fuehrungsfahrzeug);
                     _onChanged?.Invoke();
                 }
 
@@ -546,7 +580,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         string? funkgruppe,
         string? rufname,
         string? telefon,
-        Funkgruppen funkgruppen) =>
+        Funkgruppen funkgruppen,
+        string? fuehrungsfahrzeug) =>
         new(
             name.Trim(),
             Normalize(auftrag),
@@ -554,7 +589,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             ShowFunkgruppe ? Normalize(StammdatenCatalogue.Normalize(funkgruppe, FunkgruppeOptions)) : null,
             Normalize(rufname),
             Normalize(telefon),
-            ShowFunkgruppen ? InCatalogueSpelling(funkgruppen.Tmo, funkgruppen.Dmo) : Funkgruppen.Empty);
+            ShowFunkgruppen ? InCatalogueSpelling(funkgruppen.Tmo, funkgruppen.Dmo) : Funkgruppen.Empty,
+            Normalize(StammdatenCatalogue.Normalize(fuehrungsfahrzeug, FahrzeugOptions)));
 
     // A save writes every field, so one the Lagebuchführer left alone takes the live value: a peer
     // may have changed it meanwhile, and renaming the node must not put back the Auftrag the dialog
@@ -568,7 +604,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         Pick(typed.Telefon, _seeded.Telefon, live.Telefon),
         new Funkgruppen(
             Pick(typed.Funkgruppen.Tmo, _seeded.Funkgruppen.Tmo, live.Funkgruppen.Tmo),
-            Pick(typed.Funkgruppen.Dmo, _seeded.Funkgruppen.Dmo, live.Funkgruppen.Dmo)));
+            Pick(typed.Funkgruppen.Dmo, _seeded.Funkgruppen.Dmo, live.Funkgruppen.Dmo)),
+        Pick(typed.Fuehrungsfahrzeug, _seeded.Fuehrungsfahrzeug, live.Fuehrungsfahrzeug));
 
     private static T Pick<T>(T typed, T seeded, T live) =>
         EqualityComparer<T>.Default.Equals(typed, seeded) ? live : typed;
@@ -614,5 +651,6 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         string? Funkgruppe,
         string? Rufname,
         string? Telefon,
-        Funkgruppen Funkgruppen);
+        Funkgruppen Funkgruppen,
+        string? Fuehrungsfahrzeug);
 }

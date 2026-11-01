@@ -792,13 +792,32 @@ public class IncidentRoundTripTests : IDisposable
         var incident = Incident.Start(clock, op, "Brand");
         incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
         var groups = new Funkgruppen(["FW_MUSTER 1000", "FW_MUSTER 1001"], ["301_F", "302_F", "Kanal „Süd“"]);
-        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", groups);
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", groups, "FFB 1/12/1");
 
         IncidentRepository.Save(_path, incident);
         var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(Fuehrungsstufe.C, loaded.Fuehrungsstufe);
-        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0171 0000002", groups), loaded.LeadershipPost);
+        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0171 0000002", groups, "FFB 1/12/1"), loaded.LeadershipPost);
+    }
+
+    [Fact]
+    public void A_nodes_fuehrungsfahrzeug_round_trips_and_one_without_reads_as_none()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord", fuehrungsfahrzeug: "FFB 2/11/1");
+        var polizei = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei", fuehrungsfahrzeug: "Pirol 12/1");
+        var sued = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Süd");
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal("FFB 2/11/1", loaded.FindCommandNode(nord.Id)?.Fuehrungsfahrzeug);
+        Assert.Equal("Pirol 12/1", loaded.FindCommandNode(polizei.Id)?.Fuehrungsfahrzeug);
+        Assert.Null(loaded.FindCommandNode(sued.Id)?.Fuehrungsfahrzeug);
+        Assert.Null(loaded.LeadershipPost.Fuehrungsfahrzeug);
     }
 
     [Fact]

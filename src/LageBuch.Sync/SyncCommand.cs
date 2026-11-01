@@ -132,13 +132,15 @@ public sealed record AddCommandNodeCommand(
     string? Rufname = null,
     string? Telefon = null,
     IReadOnlyList<string>? FunkgruppenTmo = null,
-    IReadOnlyList<string>? FunkgruppenDmo = null) : SyncCommand;
+    IReadOnlyList<string>? FunkgruppenDmo = null,
+    string? Fuehrungsfahrzeug = null) : SyncCommand;
 
-// The whole corrected state: absent Funkgruppen lists mean none, as an absent Standort does.
+// The whole corrected state: absent Funkgruppen lists mean none, as an absent Standort or Führungsfahrzeug does.
 public sealed record UpdateCommandNodeCommand(
     OperatorDto Operator, Guid NodeId, string Name, string? Auftrag, string? Standort,
     string? Funkgruppe, string? Rufname, string? Telefon,
-    IReadOnlyList<string>? FunkgruppenTmo = null, IReadOnlyList<string>? FunkgruppenDmo = null) : SyncCommand;
+    IReadOnlyList<string>? FunkgruppenTmo = null, IReadOnlyList<string>? FunkgruppenDmo = null,
+    string? Fuehrungsfahrzeug = null) : SyncCommand;
 
 public sealed record DissolveCommandNodeCommand(OperatorDto Operator, Guid NodeId) : SyncCommand;
 
@@ -175,10 +177,11 @@ public sealed record AddChecklistCommand(
 
 public sealed record ChecklistSeedItemDto(string Text, bool IsMandatory);
 
-/// <summary>The Einsatzleitung's whole post; absent Funkgruppen lists mean none.</summary>
+/// <summary>The Einsatzleitung's whole post; absent Funkgruppen lists mean none, an absent Führungsfahrzeug too.</summary>
 public sealed record UpdateLeadershipPostCommand(
     OperatorDto Operator, string? Standort, string? Rufname, string? Telefon,
-    IReadOnlyList<string>? FunkgruppenTmo, IReadOnlyList<string>? FunkgruppenDmo) : SyncCommand;
+    IReadOnlyList<string>? FunkgruppenTmo, IReadOnlyList<string>? FunkgruppenDmo,
+    string? Fuehrungsfahrzeug = null) : SyncCommand;
 
 // OfficerCount/ZugfuehrerCount default to 0 so a pre-#76/#216 payload (no such property on the
 // wire) deserializes as "keine Führungskraft/kein ZF erfasst" instead of failing the contract.

@@ -40,7 +40,7 @@ public sealed partial class ElCard : ObservableObject
         StufeChoices = BuildStufeChoices(null);
     }
 
-    /// <summary>Opens the dialog for the Standort, Rufname, Telefon and Funkgruppen; cannot execute on a read-only Einsatz.</summary>
+    /// <summary>Opens the dialog for the Standort, Führungsfahrzeug, Rufname, Telefon and Funkgruppen; cannot execute on a read-only Einsatz.</summary>
     public IRelayCommand EditPostCommand { get; }
 
     /// <summary>Sets the Einsatzleiter, handing over from a running one; off on a read-only Einsatz.</summary>
@@ -54,6 +54,10 @@ public sealed partial class ElCard : ObservableObject
 
     [ObservableProperty]
     private string? _standort;
+
+    /// <summary>The Funkrufname of the Einsatzleitung's Führungsfahrzeug (#829); null when none.</summary>
+    [ObservableProperty]
+    private string? _fuehrungsfahrzeug;
 
     [ObservableProperty]
     private string? _rufname;
@@ -110,6 +114,7 @@ public sealed partial class ElCard : ObservableObject
         ArgumentNullException.ThrowIfNull(suggestion);
 
         Standort = post.Standort;
+        Fuehrungsfahrzeug = post.Fuehrungsfahrzeug;
         Rufname = post.Rufname;
         Telefon = post.Telefon;
         Tmo = Lines(post.Funkgruppen.Tmo);

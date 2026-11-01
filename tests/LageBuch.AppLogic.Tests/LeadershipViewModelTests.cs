@@ -100,7 +100,11 @@ public class LeadershipViewModelTests
     {
         var session = NewSession();
         session.UpdateLeadershipPost(
-            "Feuerwehrhaus Emmering", "Florian Emmering 1", "08141 12345", new Funkgruppen(["FW_EMMERING 1000", "FW_EMMERING 1001"], ["307_F"]));
+            "Feuerwehrhaus Emmering",
+            "Florian Emmering 1",
+            "08141 12345",
+            new Funkgruppen(["FW_EMMERING 1000", "FW_EMMERING 1001"], ["307_F"]),
+            "Florian Emmering 12/1");
         session.AssignRole("Einsatzleiter", "Max Mustermann", "Florian Emmering 1", slot: RoleSlot.Leiter);
         session.AssignRole("Führungsassistent", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
         var bereitstellung = AddNode(session, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz");
@@ -111,7 +115,8 @@ public class LeadershipViewModelTests
             standort: "Hauptstraße 12",
             funkgruppe: "DMO 301_F",
             rufname: "Florian Emmering 11",
-            telefon: "0170 1234567");
+            telefon: "0170 1234567",
+            fuehrungsfahrzeug: "Florian Emmering 11/1");
         var abschnitt = session.Incident.CommandNodes[^1].Id;
         session.AssignRole("Abschnittsleiter", "Hans Huber", "Florian Aich 1", nodeId: abschnitt, slot: RoleSlot.Leiter);
         session.AssignRole("Melder", "Lena Lehner", nodeId: abschnitt, slot: RoleSlot.Melder);
@@ -131,6 +136,7 @@ public class LeadershipViewModelTests
 
         // Einsatzleitung
         Assert.Equal("Feuerwehrhaus Emmering", vm.El.Standort);
+        Assert.Equal("Florian Emmering 12/1", vm.El.Fuehrungsfahrzeug);
         Assert.Equal("Florian Emmering 1", vm.El.Rufname);
         Assert.Equal("08141 12345", vm.El.Telefon);
         Assert.Equal("FW_EMMERING 1000\nFW_EMMERING 1001", vm.El.Tmo);
@@ -159,6 +165,8 @@ public class LeadershipViewModelTests
         Assert.Equal("Brandbekämpfung Wohnhaus", card.Auftrag);
         Assert.Equal("DMO 301_F", card.Funkgruppe);
         Assert.Equal("Hauptstraße 12", card.Standort);
+        Assert.Equal("Florian Emmering 11/1", card.Fuehrungsfahrzeug);
+        Assert.Null(staging.Fuehrungsfahrzeug);
         Assert.Equal("Florian Emmering 11", card.Rufname);
         Assert.Equal("0170 1234567", card.Telefon);
         Assert.NotNull(card.Leiter);

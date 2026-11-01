@@ -110,6 +110,71 @@ public class FuehrungsstufeTests
     }
 
     [Fact]
+    public void Post_fuehrungsfahrzeug_reaches_the_etb_on_a_change_only()
+    {
+        var (incident, clock, op) = NewIncident();
+
+        incident.UpdateLeadershipPost(clock, op, "Feuerwache", null, null, null, " FFB 1/12/1 ");
+        Assert.Equal("FFB 1/12/1", incident.LeadershipPost.Fuehrungsfahrzeug);
+        Assert.Equal("Führungsfahrzeug Einsatzleitung: FFB 1/12/1", Last(incident).Text);
+
+        var count = incident.Journal.Count;
+        incident.UpdateLeadershipPost(clock, op, "Wache 2", null, null, null, "FFB 1/12/1");
+        Assert.Equal(count, incident.Journal.Count);
+
+        incident.UpdateLeadershipPost(clock, op, "Wache 2", null, null, null, "FFB 1/10/1");
+        Assert.Equal("Führungsfahrzeug Einsatzleitung: FFB 1/10/1", Last(incident).Text);
+
+        count = incident.Journal.Count;
+        incident.UpdateLeadershipPost(clock, op, "Wache 2", null, null, null, null);
+        Assert.Equal(count, incident.Journal.Count);
+        Assert.Null(incident.LeadershipPost.Fuehrungsfahrzeug);
+    }
+
+    [Fact]
+    public void Node_fuehrungsfahrzeug_reaches_the_etb_on_forming_and_on_a_change_only()
+    {
+        var (incident, clock, op) = NewIncident();
+
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord", fuehrungsfahrzeug: "FFB 2/11/1");
+        Assert.Equal("FFB 2/11/1", node.Fuehrungsfahrzeug);
+        Assert.Equal("Führungsfahrzeug Nord: FFB 2/11/1", Last(incident).Text);
+
+        var count = incident.Journal.Count;
+        incident.UpdateCommandNode(clock, op, node.Id, "Nord", null, "Hof", null, null, null, null, "FFB 2/11/1");
+        Assert.Equal(count, incident.Journal.Count);
+
+        incident.UpdateCommandNode(clock, op, node.Id, "Nord", null, "Hof", null, null, null, null, "FFB 2/12/1");
+        Assert.Equal("Führungsfahrzeug Nord: FFB 2/12/1", Last(incident).Text);
+
+        count = incident.Journal.Count;
+        var cleared = incident.UpdateCommandNode(clock, op, node.Id, "Nord", null, "Hof", null, null, null, null, null);
+        Assert.Equal(count, incident.Journal.Count);
+        Assert.Null(cleared.Fuehrungsfahrzeug);
+    }
+
+    [Fact]
+    public void A_node_formed_with_only_a_telefon_keeps_it_trimmed()
+    {
+        var (incident, clock, op) = NewIncident();
+
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord", telefon: " 0171 0000001 ");
+
+        Assert.Equal("0171 0000001", node.Telefon);
+    }
+
+    [Fact]
+    public void Post_fuehrungsfahrzeug_over_200_is_refused_and_changes_nothing()
+    {
+        var (incident, clock, op) = NewIncident();
+
+        Assert.Throws<ArgumentException>(
+            () => incident.UpdateLeadershipPost(clock, op, "Wache", null, null, null, new string('x', 201)));
+
+        Assert.Equal(LeadershipPost.Empty, incident.LeadershipPost);
+    }
+
+    [Fact]
     public void Post_telefon_over_50_is_refused()
     {
         var (incident, clock, op) = NewIncident();

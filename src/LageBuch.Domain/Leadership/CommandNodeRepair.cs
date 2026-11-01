@@ -33,5 +33,16 @@ internal static class CommandNodeRepair
 
     private static CommandNode Rebuild(CommandNode n, CommandNodeKind kind, Guid? parentId) =>
         CommandNode.Rehydrate(
-            n.Id, kind, n.Name, parentId, n.Auftrag, n.Standort, n.Funkgruppe, n.Rufname, n.Telefon, n.DissolvedAt, n.Funkgruppen);
+            n.Id,
+            kind,
+            n.Name,
+            parentId,
+            n.Auftrag,
+            n.Standort,
+            n.Funkgruppe,
+            n.Rufname,
+            n.Telefon,
+            n.DissolvedAt,
+            n.Funkgruppen,
+            n.Fuehrungsfahrzeug);
 }

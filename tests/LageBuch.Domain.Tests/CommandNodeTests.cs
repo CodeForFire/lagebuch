@@ -144,4 +144,42 @@ public class CommandNodeTests
         Assert.StartsWith("Nur eine Einsatzleitung hat Funkgruppen TMO und DMO.", ex.Message, StringComparison.Ordinal);
         Assert.Equal(Funkgruppen.Empty, abschnitt.WithDetails("Nord", null, null, "DMO 301_F", null, null, Funkgruppen.Empty).Funkgruppen);
     }
+
+    [Fact]
+    public void Every_kind_takes_a_fuehrungsfahrzeug_trimmed_and_capped()
+    {
+        foreach (var kind in Enum.GetValues<CommandNodeKind>())
+        {
+            var node = CommandNode.Create(kind, "Nord", kind == CommandNodeKind.Unterabschnitt ? Guid.NewGuid() : null);
+
+            var edited = node.WithDetails("Nord", null, null, null, null, null, null, " FFB 1/12/1 ");
+
+            Assert.Equal("FFB 1/12/1", edited.Fuehrungsfahrzeug);
+            Assert.Null(node.WithDetails("Nord", null, null, null, null, null, null, "   ").Fuehrungsfahrzeug);
+            var ex = Assert.Throws<ArgumentException>(
+                () => node.WithDetails("Nord", null, null, null, null, null, null, new string('x', 201)));
+            Assert.StartsWith("Führungsfahrzeug ist länger", ex.Message, StringComparison.Ordinal);
+            Assert.Equal(200, node.WithDetails("Nord", null, null, null, null, null, null, new string('x', 200)).Fuehrungsfahrzeug?.Length);
+        }
+    }
+
+    [Fact]
+    public void Rehydrate_keeps_the_fuehrungsfahrzeug()
+    {
+        var node = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, null, null, "FFB 40/1");
+
+        Assert.Equal("FFB 40/1", node.Fuehrungsfahrzeug);
+        Assert.Null(CommandNode.Rehydrate(Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, null).Fuehrungsfahrzeug);
+    }
+
+    [Fact]
+    public void LeadershipPost_normalizes_and_caps_the_fuehrungsfahrzeug()
+    {
+        Assert.Equal("FFB 1/12/1", new LeadershipPost(null, null, null, Funkgruppen.Empty, " FFB 1/12/1 ").Normalized().Fuehrungsfahrzeug);
+        Assert.Null(new LeadershipPost(null, null, null, Funkgruppen.Empty, "  ").Normalized().Fuehrungsfahrzeug);
+        Assert.Null(LeadershipPost.Empty.Fuehrungsfahrzeug);
+        var ex = Assert.Throws<ArgumentException>(() => new LeadershipPost(null, null, null, Funkgruppen.Empty, new string('x', 201)).Normalized());
+        Assert.StartsWith("Führungsfahrzeug ist länger", ex.Message, StringComparison.Ordinal);
+    }
 }

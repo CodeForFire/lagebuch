@@ -73,7 +73,8 @@ public static class CommandApplier
                     c.Funkgruppe,
                     c.Rufname,
                     c.Telefon,
-                    new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo));
+                    new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo),
+                    c.Fuehrungsfahrzeug);
                 break;
             case UpdateCommandNodeCommand c:
                 incident.UpdateCommandNode(
@@ -86,7 +87,8 @@ public static class CommandApplier
                     c.Funkgruppe,
                     c.Rufname,
                     c.Telefon,
-                    new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo));
+                    new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo),
+                    c.Fuehrungsfahrzeug);
                 break;
             case DissolveCommandNodeCommand c:
                 incident.DissolveCommandNode(clock, Operator(c.Operator), c.NodeId);
@@ -126,7 +128,13 @@ public static class CommandApplier
                 break;
             case UpdateLeadershipPostCommand c:
                 incident.UpdateLeadershipPost(
-                    clock, Operator(c.Operator), c.Standort, c.Rufname, c.Telefon, new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo));
+                    clock,
+                    Operator(c.Operator),
+                    c.Standort,
+                    c.Rufname,
+                    c.Telefon,
+                    new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo),
+                    c.Fuehrungsfahrzeug);
                 break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(

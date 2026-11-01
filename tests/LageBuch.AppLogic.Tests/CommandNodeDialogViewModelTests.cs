@@ -18,6 +18,18 @@ public class CommandNodeDialogViewModelTests
             ],
         };
 
+    private static MasterDataSet WithVehicles() =>
+        MasterDataSet.Empty with
+        {
+            Vehicles =
+            [
+                new Vehicle("FF Emmering", "Florian Emmering 12/1", 3),
+                new Vehicle("FF Emmering", " florian emmering 40/1 ", 9),
+                new Vehicle("FF Aich", "  ", 9),
+            ],
+            Personnel = [new Person("Mustermann", "Max", "Kommandant", "Florian Emmering 1", null)],
+        };
+
     private static LocalIncidentSession ReadOnlySession()
     {
         var store = new FakeStore();
@@ -276,6 +288,83 @@ public class CommandNodeDialogViewModelTests
         Assert.Equal("0151 1", node.Telefon);
         Assert.Equal(1, closed);
         Assert.Equal(1, changes[0]);
+    }
+
+    [Fact]
+    public void Fahrzeug_options_are_the_einsatzs_units_first_then_the_stammdaten_vehicles_and_no_persons()
+    {
+        var session = NewSession();
+        AddUnit(session, "FF Emmering", "Florian Emmering 40/1");
+        AddUnit(session, "FF Aich", null);
+        AddUnit(session, "FF Aich", "Florian Aich 11/1");
+
+        var vm = CommandNodeDialogViewModel.ForPost(session, WithVehicles());
+
+        Assert.Equal(["Florian Emmering 40/1", "Florian Aich 11/1", "Florian Emmering 12/1"], vm.FahrzeugOptions);
+    }
+
+    [Theory]
+    [InlineData(CommandNodeKind.Abschnitt)]
+    [InlineData(CommandNodeKind.Bereitstellung)]
+    [InlineData(CommandNodeKind.Partner)]
+    public void Create_saves_the_fuehrungsfahrzeug_in_the_catalogues_spelling(CommandNodeKind kind)
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForCreate(session, WithVehicles(), kind, null, "Nord");
+
+        vm.Fuehrungsfahrzeug = " florian EMMERING 12/1 ";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Florian Emmering 12/1", Assert.Single(session.Incident.CommandNodes).Fuehrungsfahrzeug);
+    }
+
+    [Fact]
+    public void Edit_seeds_and_saves_the_fuehrungsfahrzeug_and_an_off_catalogue_one_as_typed()
+    {
+        var session = NewSession();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", fuehrungsfahrzeug: "Florian Emmering 12/1");
+        var id = session.Incident.CommandNodes[^1].Id;
+        var vm = CommandNodeDialogViewModel.ForEdit(session, WithVehicles(), id);
+        Assert.Equal("Florian Emmering 12/1", vm.Fuehrungsfahrzeug);
+        Assert.False(vm.HasChanges);
+
+        vm.Fuehrungsfahrzeug = " Kater Fürstenfeldbruck 1 ";
+        Assert.True(vm.HasChanges);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Kater Fürstenfeldbruck 1", session.Incident.CommandNodes.Single().Fuehrungsfahrzeug);
+    }
+
+    [Fact]
+    public void Post_seeds_and_saves_the_fuehrungsfahrzeug_and_clearing_it_saves_none()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, WithVehicles());
+        vm.Fuehrungsfahrzeug = "Florian Emmering 12/1";
+        vm.SaveCommand.Execute(null);
+        Assert.Equal("Florian Emmering 12/1", session.Incident.LeadershipPost.Fuehrungsfahrzeug);
+
+        var again = CommandNodeDialogViewModel.ForPost(session, WithVehicles());
+        Assert.Equal("Florian Emmering 12/1", again.Fuehrungsfahrzeug);
+        again.Fuehrungsfahrzeug = "  ";
+        again.SaveCommand.Execute(null);
+
+        Assert.Null(session.Incident.LeadershipPost.Fuehrungsfahrzeug);
+    }
+
+    [Fact]
+    public void Saving_another_post_field_keeps_a_peers_fuehrungsfahrzeug()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, MasterDataSet.Empty);
+
+        session.UpdateLeadershipPost(null, null, null, null, "Florian Emmering 12/1");
+        vm.Standort = "ELW am Marktplatz";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            ("ELW am Marktplatz", "Florian Emmering 12/1"),
+            (session.Incident.LeadershipPost.Standort, session.Incident.LeadershipPost.Fuehrungsfahrzeug));
     }
 
     [Fact]

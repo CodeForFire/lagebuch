@@ -367,6 +367,23 @@ public class CommandSerializationTests
         Assert.Null(old.Funkgruppe);
         Assert.Null(old.Rufname);
         Assert.Null(old.Telefon);
+        Assert.Null(old.Fuehrungsfahrzeug);
+    }
+
+    [Fact]
+    public void The_fuehrungsfahrzeug_round_trips_on_every_command_that_carries_it()
+    {
+        var add = Assert.IsType<AddCommandNodeCommand>(SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize<SyncCommand>(
+            new AddCommandNodeCommand(Op, CommandNodeKind.Abschnitt, "Nord", null, Fuehrungsfahrzeug: "FFB 2/11/1"))));
+        var update = Assert.IsType<UpdateCommandNodeCommand>(SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize<SyncCommand>(
+            new UpdateCommandNodeCommand(Op, Guid.NewGuid(), "Nord", null, null, null, null, null, Fuehrungsfahrzeug: "FFB 2/12/1"))));
+        var postJson = SyncJson.Serialize<SyncCommand>(new UpdateLeadershipPostCommand(Op, null, null, null, null, null, "FFB 1/12/1"));
+        var post = Assert.IsType<UpdateLeadershipPostCommand>(SyncJson.Deserialize<SyncCommand>(postJson));
+
+        Assert.Equal("FFB 2/11/1", add.Fuehrungsfahrzeug);
+        Assert.Equal("FFB 2/12/1", update.Fuehrungsfahrzeug);
+        Assert.Equal("FFB 1/12/1", post.Fuehrungsfahrzeug);
+        Assert.Contains("\"fuehrungsfahrzeug\":\"FFB 1/12/1\"", postJson, StringComparison.Ordinal);
     }
 
     [Fact]
