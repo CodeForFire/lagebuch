@@ -246,6 +246,31 @@ public class LeadershipBoardRenderTests
         Assert.Equal("Max Mustermann · Florian Emmering 1", await board.Window.Clipboard!.TryGetTextAsync());
     }
 
+    // #825: a unit set to Bereitstellungsraum but placed nowhere stands in every Bereitstellungsraum,
+    // marked, and leaves the Nicht-zugeordnet strip.
+    [AvaloniaFact]
+    public void A_unit_waiting_by_status_is_marked_in_every_Bereitstellungsraum()
+    {
+        var board = Show(more: s =>
+        {
+            AddNode(s, CommandNodeKind.Bereitstellung, "Bereitstellung Gewerbegebiet");
+            s.AddForceUnit("FF Puch", 9, "Florian Puch 40/1", status: "Bereitstellungsraum", scbaCount: 4, officerCount: 1);
+        });
+        Capture(board.Window, "leadership-bereitstellung-wartend.png");
+
+        foreach (var name in new[] { "Bereitstellung Marktplatz", "Bereitstellung Gewerbegebiet" })
+        {
+            var hints = Card(board.View, name).GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.Name == "UnitWaitingHint" && t.IsEffectivelyVisible)
+                .ToList();
+            Assert.Equal(BoardUnitRow.WaitingText, Assert.Single(hints).Text);
+        }
+
+        Assert.DoesNotContain(
+            board.View.GetControl<ItemsControl>("UnplacedUnits").GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Text == "Florian Puch 40/1");
+    }
+
     // A value turned selectable keeps the look its TextBlock had: the theme's TextBlock styles name
     // their type, and a type selector does not match a subclass.
     [AvaloniaFact]

@@ -36,6 +36,10 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     // The incident as the last refresh showed it: the move guard judges against what the board offers.
     private Incident _incident;
 
+    // The unplaced units whose status says Bereitstellungsraum, as the last refresh found them. They
+    // stay unplaced; the board only shows them in every Bereitstellungsraum card (#825).
+    private IReadOnlyList<ForceUnit> _waiting = [];
+
     /// <summary>
     /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action (title, message,
     /// the action, the confirm button's label); without it the action runs at once, as in tests.
@@ -158,6 +162,9 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         _incident = incident;
         var line = ReportingLine.Of(incident);
         var hints = FuehrungsspanneHints.For(incident);
+        var unplaced = ReportingLine.UnplacedUnits(incident);
+        var hasBereitstellung = line.Any(e => e.Kind == ReportingEntryKind.Bereitstellung);
+        _waiting = hasBereitstellung ? unplaced.Where(u => IsBereitstellungStatus(u.Status)).ToList() : [];
 
         if (line.FirstOrDefault(e => e.Kind == ReportingEntryKind.Einsatzleitung) is { } el)
         {
@@ -176,7 +183,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         BoardPersonRow.Reconcile(
             Fachberater,
             line.Where(e => e.Kind == ReportingEntryKind.Fachberater).SelectMany(e => e.Others).ToList());
-        ReconcileUnits(UnplacedUnits, ReportingLine.UnplacedUnits(incident), incident);
+        ReconcileUnits(UnplacedUnits, unplaced.Where(u => !IsIn(_waiting, u)).ToList(), incident);
         RowReconciler.Reconcile(
             FreeTextSections,
             ReportingLine.FreeTextSections(incident),
@@ -261,21 +268,43 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     {
         var hint = hints.FirstOrDefault(h => h.NodeId == e.Node.Id)?.Text;
         card.Update(e.Entry, e.Node, hint, BoardNodeCard.BlockedReason(incident, e.Node), IsReadOnly);
+
+        // The Stärke counts the placed units only: a waiting unit stands in every Bereitstellungsraum
+        // and would be summed once per card.
         card.UpdateStrength(NodeStrength.Of(incident, e.Node.Id), childrenOf(e.Node).Count > 0);
-        ReconcileUnits(card.Units, e.Entry.Units, incident);
+        if (e.Node.Kind == CommandNodeKind.Bereitstellung)
+        {
+            ReconcileUnits(card.Units, [.. e.Entry.Units, .. _waiting], incident, _waiting);
+        }
+        else
+        {
+            ReconcileUnits(card.Units, e.Entry.Units, incident);
+        }
 
         // Unterabschnitte go one level deep: their own children are never asked for.
         ReconcileCards(card.Children, childrenOf(e.Node), incident, hints, _ => []);
     }
 
-    private void ReconcileUnits(ObservableCollection<BoardUnitRow> rows, IReadOnlyList<ForceUnit> units, Incident incident) =>
+    private void ReconcileUnits(
+        ObservableCollection<BoardUnitRow> rows,
+        IReadOnlyList<ForceUnit> units,
+        Incident incident,
+        IReadOnlyList<ForceUnit>? waiting = null) =>
         RowReconciler.Reconcile(
             rows,
             units,
             r => r.Id,
             u => u.Id,
-            u => new BoardUnitRow(u, incident, IsReadOnly, nodeId => MoveUnit(u.Id, nodeId)),
-            (r, u) => r.Update(u, incident));
+            u => new BoardUnitRow(u, incident, IsReadOnly, nodeId => MoveUnit(u.Id, nodeId), IsIn(waiting, u)),
+            (r, u) => r.Update(u, incident, IsIn(waiting, u)));
+
+    private static bool IsIn(IReadOnlyList<ForceUnit>? units, ForceUnit unit) =>
+        units is not null && units.Any(u => u.Id == unit.Id);
+
+    // #825: the status is a free Stammdaten string, so the Bereitstellungsraum is recognised by its
+    // name, the way the sample Stammdaten spell it.
+    private static bool IsBereitstellungStatus(string? status) =>
+        string.Equals(status?.Trim(), "Bereitstellungsraum", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Whether <paramref name="unitId"/> may go to <paramref name="nodeId"/> (null = unplace it): the

@@ -34,6 +34,7 @@ public sealed partial class BoardNodeCard : ObservableObject
         SetLeiterCommand = new RelayCommand(() => onPerson?.Invoke(this, RoleSlot.Leiter), () => !_isReadOnly);
         SetMelderCommand = new RelayCommand(() => onPerson?.Invoke(this, RoleSlot.Melder), () => !_isReadOnly);
         AddMemberCommand = new RelayCommand(() => onPerson?.Invoke(this, RoleSlot.None), () => !_isReadOnly);
+        Units.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasUnitTable));
     }
 
     private bool _isReadOnly = true;
@@ -87,7 +88,14 @@ public sealed partial class BoardNodeCard : ObservableObject
 
     /// <summary>Whether any unit adds to the sum; a card without one shows no SUMME row.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUnitTable))]
     private bool _hasStrengthTotal;
+
+    /// <summary>
+    /// Whether the card shows its units table: it has a sum, or rows that add nothing to it, as a
+    /// Bereitstellungsraum's units waiting by status alone do (#825).
+    /// </summary>
+    public bool HasUnitTable => HasStrengthTotal || Units.Count > 0;
 
     /// <summary>
     /// "SUMME", or "SUMME INKL. UA" while the card has Unterabschnitte: they hang below it on the
