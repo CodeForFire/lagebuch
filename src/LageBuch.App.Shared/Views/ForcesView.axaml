@@ -407,7 +407,7 @@
                 <!-- Freitext: kein Platzhalter, siehe #137; die Spaltenüberschrift ist das Label. -->
                 <TextBox Margin="6,4"
                          Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                         IsEnabled="{Binding !IsReadOnly}" />
+                         IsReadOnly="{Binding IsReadOnly}" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
@@ -484,7 +484,7 @@
                   <!-- Freitext: kein Platzhalter, siehe #137; LostFocus for the same reason as the
                        grid's column — a commit per keystroke rewrites the Einsatzdatei (#33). -->
                   <TextBox Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                           IsEnabled="{Binding !IsReadOnly}" />
+                           IsReadOnly="{Binding IsReadOnly}" />
                 </StackPanel>
               </Border>
             </DataTemplate>

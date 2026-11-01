@@ -130,24 +130,33 @@
         <!-- Where the tab starts (WorkspaceFocus): the open report's first field, else NEUE
              LAGEMELDUNG above. The Stammdaten Funkrufnamen as suggestions, as on the ETB's VON;
              a name outside them stays enterable, so an AutoCompleteBox rather than a ComboBox. It
-             has no IsReadOnly, so a sent report disables it instead. -->
-        <HeaderedContentControl Classes="field suggest" Header="MELDENDER">
-          <AutoCompleteBox x:Name="ReporterBox" Text="{Binding Reporter}" IsEnabled="{Binding IsEditable}"
-                           ItemsSource="{Binding CallSignOptions}"
-                           FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                           b:WorkspaceFocus.IsStart="True"
-                           MaxLength="{x:Static vm:SituationReportsViewModel.MaxReporterLength}" />
+             has no IsReadOnly, and its list would still offer a pick, so a sent report shows a
+             read-only TextBox in its place: disabled, the text could not be copied (#836). -->
+        <HeaderedContentControl Classes="field" Classes.suggest="{Binding IsEditable}" Header="MELDENDER">
+          <Panel>
+            <AutoCompleteBox x:Name="ReporterBox" Text="{Binding Reporter}" IsVisible="{Binding IsEditable}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             b:WorkspaceFocus.IsStart="True"
+                             MaxLength="{x:Static vm:SituationReportsViewModel.MaxReporterLength}" />
+            <TextBox x:Name="SentReporterBox" Text="{Binding Reporter, Mode=OneWay}" IsReadOnly="True"
+                     IsVisible="{Binding !IsEditable}" />
+          </Panel>
         </HeaderedContentControl>
 
         <!-- The Einsatzdaten address first, then the Stammdaten Straßen; free text stays enterable. -->
         <!-- The ABC button sits beside the field, not inside it: a suggest field pins its chevron
              to the right edge of its whole content, which would put it on top of the button. -->
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-          <HeaderedContentControl Grid.Column="0" Classes="field suggest" Header="EINSATZSTELLE">
-            <AutoCompleteBox x:Name="LocationBox" Text="{Binding Location}" IsEnabled="{Binding IsEditable}"
-                             ItemsSource="{Binding LocationOptions}"
-                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             MaxLength="{x:Static vm:SituationReportsViewModel.MaxLocationLength}" />
+          <HeaderedContentControl Grid.Column="0" Classes="field" Classes.suggest="{Binding IsEditable}" Header="EINSATZSTELLE">
+            <Panel>
+              <AutoCompleteBox x:Name="LocationBox" Text="{Binding Location}" IsVisible="{Binding IsEditable}"
+                               ItemsSource="{Binding LocationOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               MaxLength="{x:Static vm:SituationReportsViewModel.MaxLocationLength}" />
+              <TextBox x:Name="SentLocationBox" Text="{Binding Location, Mode=OneWay}" IsReadOnly="True"
+                       IsVisible="{Binding !IsEditable}" />
+            </Panel>
           </HeaderedContentControl>
           <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Bottom"
                   ToolTip.Tip="Einsatzstelle buchstabieren" AutomationProperties.Name="Einsatzstelle buchstabieren"

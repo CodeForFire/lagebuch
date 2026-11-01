@@ -266,27 +266,27 @@
                                  AutomationProperties.Name="Gerät"
                                  MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDeviceLength}"
                                  Text="{Binding Device, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                 IsEnabled="{Binding !IsReadOnly}" />
+                                 IsReadOnly="{Binding IsReadOnly}" />
                         <TextBox Grid.Column="2" TextWrapping="Wrap" VerticalAlignment="Top"
                                  AutomationProperties.Name="Ausgegeben an"
                                  MaxLength="{x:Static vm:IssuedItemsViewModel.MaxIssuedToLength}"
                                  Text="{Binding IssuedTo, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                 IsEnabled="{Binding !IsReadOnly}" />
+                                 IsReadOnly="{Binding IsReadOnly}" />
                         <TextBox Grid.Column="3" Classes="mono" VerticalAlignment="Top"
                                  AutomationProperties.Name="Telefon"
                                  MaxLength="{x:Static vm:IssuedItemsViewModel.MaxPhoneLength}"
                                  Text="{Binding IssuedToPhone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                 IsEnabled="{Binding !IsReadOnly}" />
+                                 IsReadOnly="{Binding IsReadOnly}" />
                         <TextBox Grid.Column="4" TextWrapping="Wrap" VerticalAlignment="Top"
                                  AutomationProperties.Name="Organisation / Kontakt"
                                  MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDetailsLength}"
                                  Text="{Binding IssuedToDetails, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                 IsEnabled="{Binding !IsReadOnly}" />
+                                 IsReadOnly="{Binding IsReadOnly}" />
                         <TextBox Grid.Column="5" TextWrapping="Wrap" AcceptsReturn="True" VerticalAlignment="Top"
                                  AutomationProperties.Name="Bemerkung"
                                  MaxLength="{x:Static vm:IssuedItemsViewModel.MaxRemarkLength}"
                                  Text="{Binding Remark, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                 IsEnabled="{Binding !IsReadOnly}" />
+                                 IsReadOnly="{Binding IsReadOnly}" />
                         <StackPanel Grid.Column="6" VerticalAlignment="Top" Margin="0,2,0,0" Spacing="1">
                           <TextBlock x:Name="IssuedStamp" Classes="mono" FontSize="11"
                                      Foreground="{StaticResource TextMutedBrush}"
@@ -364,35 +364,35 @@
                                AutomationProperties.Name="Gerät"
                                MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDeviceLength}"
                                Text="{Binding Device, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                               IsEnabled="{Binding !IsReadOnly}" />
+                               IsReadOnly="{Binding IsReadOnly}" />
                       <TextBlock Grid.Row="1" Grid.Column="0" Text="AUSGEGEBEN AN" Classes="overline" FontSize="10"
                                  VerticalAlignment="Center" Margin="0,0,12,0" />
                       <TextBox Grid.Row="1" Grid.Column="1"
                                AutomationProperties.Name="Ausgegeben an"
                                MaxLength="{x:Static vm:IssuedItemsViewModel.MaxIssuedToLength}"
                                Text="{Binding IssuedTo, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                               IsEnabled="{Binding !IsReadOnly}" />
+                               IsReadOnly="{Binding IsReadOnly}" />
                       <TextBlock Grid.Row="2" Grid.Column="0" Text="TELEFON" Classes="overline" FontSize="10"
                                  VerticalAlignment="Center" Margin="0,0,12,0" />
                       <TextBox Grid.Row="2" Grid.Column="1" Classes="mono"
                                AutomationProperties.Name="Telefon"
                                MaxLength="{x:Static vm:IssuedItemsViewModel.MaxPhoneLength}"
                                Text="{Binding IssuedToPhone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                               IsEnabled="{Binding !IsReadOnly}" />
+                               IsReadOnly="{Binding IsReadOnly}" />
                       <TextBlock Grid.Row="3" Grid.Column="0" Text="ORGANISATION" Classes="overline" FontSize="10"
                                  VerticalAlignment="Center" Margin="0,0,12,0" />
                       <TextBox Grid.Row="3" Grid.Column="1"
                                AutomationProperties.Name="Organisation / Kontakt"
                                MaxLength="{x:Static vm:IssuedItemsViewModel.MaxDetailsLength}"
                                Text="{Binding IssuedToDetails, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                               IsEnabled="{Binding !IsReadOnly}" />
+                               IsReadOnly="{Binding IsReadOnly}" />
                       <TextBlock Grid.Row="4" Grid.Column="0" Text="BEMERKUNG" Classes="overline" FontSize="10"
                                  VerticalAlignment="Top" Margin="0,8,12,0" />
                       <TextBox Grid.Row="4" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True"
                                AutomationProperties.Name="Bemerkung"
                                MaxLength="{x:Static vm:IssuedItemsViewModel.MaxRemarkLength}"
                                Text="{Binding Remark, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                               IsEnabled="{Binding !IsReadOnly}" />
+                               IsReadOnly="{Binding IsReadOnly}" />
                       <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="12">
                         <TextBlock x:Name="IssuedStamp" Classes="mono" FontSize="11"
                                    Foreground="{StaticResource TextMutedBrush}"
