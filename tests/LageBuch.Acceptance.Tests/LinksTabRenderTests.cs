@@ -313,6 +313,16 @@ public class LinksTabRenderTests
         Assert.Equal(4, RenderedLinkCount(window));
     }
 
+    // #836: a link's name and address could not be copied; ÖFFNEN was the only thing to do with it.
+    [AvaloniaFact]
+    public void A_link_s_name_and_address_are_selectable()
+    {
+        var window = ShowLinksView(new Link("Wetterdienst", "https://dwd.de"));
+
+        Assert.Equal("Wetterdienst", Assert.IsType<SelectableTextBlock>(Named<TextBlock>(window, "LinkNameText")).Text);
+        Assert.Equal("https://dwd.de", Assert.IsType<SelectableTextBlock>(Named<TextBlock>(window, "LinkUrlText")).Text);
+    }
+
     // A Wehr that never uses groups keeps exactly the flat list it had: no header, nothing to fold.
     [AvaloniaFact]
     public void Without_any_group_the_list_shows_no_headers_and_no_fold_buttons()

@@ -145,9 +145,9 @@
                                         Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
                             </StackPanel>
                           </Button>
-                          <TextBlock Grid.Column="1" x:Name="LinkNameText" Text="{Binding Name}"
+                          <SelectableTextBlock Grid.Column="1" x:Name="LinkNameText" Text="{Binding Name}"
                                      VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Grid.Column="2" Classes="mono" Text="{Binding Url}" Margin="10,0,0,0"
+                          <SelectableTextBlock Grid.Column="2" x:Name="LinkUrlText" Classes="mono" Text="{Binding Url}" Margin="10,0,0,0"
                                      VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         </Grid>
                       </DataTemplate>

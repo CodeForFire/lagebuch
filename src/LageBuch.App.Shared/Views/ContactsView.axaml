@@ -157,12 +157,13 @@
                            stays on the name line; a WrapPanel lets it drop below on a phone. -->
                       <WrapPanel Grid.Row="0" Grid.Column="0" ItemSpacing="10" LineSpacing="2"
                                  VerticalAlignment="Center">
-                        <TextBlock x:Name="ContactName" FontSize="15" FontWeight="SemiBold"
+                        <!-- Selectable, as everything a caller might paste elsewhere is (#836). -->
+                        <SelectableTextBlock x:Name="ContactName" FontSize="15" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
                                    b:HighlightedText.Segments="{Binding NameSegments}" />
-                        <TextBlock Text="{Binding Entry.Caption}" VerticalAlignment="Center"
+                        <SelectableTextBlock x:Name="ContactCaption" Text="{Binding Entry.Caption}" VerticalAlignment="Center"
                                    Foreground="{StaticResource TextSecondaryBrush}" />
-                        <TextBlock Classes="mono" Text="{Binding Entry.CallSign}" VerticalAlignment="Center" />
+                        <SelectableTextBlock x:Name="ContactCallSign" Classes="mono" Text="{Binding Entry.CallSign}" VerticalAlignment="Center" />
                         <!-- #458: somebody from a neighbouring brigade. A quiet tag, not a colour: it
                              explains a surprise ("why can't I pick them as Lagebuchführer?") rather
                              than warning about anything. -->
@@ -184,7 +185,7 @@
                            text, not a muted caption, and a hit inside it lights up. In a Grid cell,
                            not a StackPanel: a wrapping TextBlock in a horizontal StackPanel measures
                            at infinite width and never wraps. -->
-                      <TextBlock Grid.Row="1" Grid.Column="0" x:Name="ContactNote" Margin="0,4,0,0"
+                      <SelectableTextBlock Grid.Row="1" Grid.Column="0" x:Name="ContactNote" Margin="0,4,0,0"
                                  FontSize="14" TextWrapping="Wrap"
                                  Foreground="{StaticResource TextPrimaryBrush}"
                                  b:HighlightedText.Segments="{Binding NoteSegments}"
@@ -214,13 +215,16 @@
                         <!-- The number reads the DIN 5008 way and dials as +49… (#700). One with no
                              global form ("112") is plain text: a button that can only fail is worse
                              than none. -->
-                        <TextBlock x:Name="ContactPhoneText" DockPanel.Dock="Left" Classes="mono" VerticalAlignment="Center"
+                        <SelectableTextBlock x:Name="ContactPhoneText" DockPanel.Dock="Left" Classes="mono" VerticalAlignment="Center"
                                    Text="{Binding PhoneDisplay}"
                                    IsVisible="{Binding ShowsUndialablePhone}" />
-                        <!-- Named explicitly: the content is a panel, so no name is derived from it. -->
+                        <!-- Named explicitly: the content is a panel, so no name is derived from it.
+                             A button's text cannot be selected, so a right-click copies the number
+                             (#836). -->
                         <Button Classes="ghost contact-call" HorizontalContentAlignment="Left"
                                 KeyboardNavigation.TabIndex="0"
                                 IsVisible="{Binding CanDial}"
+                                b:CopyMenu.Text="{Binding PhoneDisplay}"
                                 AutomationProperties.Name="{Binding PhoneDisplay, StringFormat='{}{0} wählen'}"
                                 Command="{ReflectionBinding $parent[ItemsControl].DataContext.CallCommand}"
                                 CommandParameter="{Binding Entry}"

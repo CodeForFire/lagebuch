@@ -62,16 +62,16 @@
          TextBlock.scbaStatus.alarm pattern. Dangerous reuses SignalHotBrush rather than
          SignalBrush so it's visibly a step below Lethal, which gets the full alarm red plus
          weight. -->
-    <Style Selector="TextBlock.coValue">
+    <Style Selector="TextBlock.coValue, SelectableTextBlock.coValue">
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     </Style>
-    <Style Selector="TextBlock.coValue.elevated">
+    <Style Selector="TextBlock.coValue.elevated, SelectableTextBlock.coValue.elevated">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
     </Style>
-    <Style Selector="TextBlock.coValue.dangerous">
+    <Style Selector="TextBlock.coValue.dangerous, SelectableTextBlock.coValue.dangerous">
       <Setter Property="Foreground" Value="{StaticResource SignalHotBrush}" />
     </Style>
-    <Style Selector="TextBlock.coValue.lethal">
+    <Style Selector="TextBlock.coValue.lethal, SelectableTextBlock.coValue.lethal">
       <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="Bold" />
     </Style>
@@ -398,16 +398,16 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:CoReadingRow">
                     <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,2,0,0">
-                      <TextBlock Grid.Column="0" Text="{Binding Time}"
+                      <SelectableTextBlock Grid.Column="0" Text="{Binding Time}"
                                  FontFamily="{StaticResource MonoFont}" FontSize="11"
                                  Foreground="{StaticResource TextMutedBrush}" Margin="0,0,8,0" />
-                      <TextBlock Grid.Column="1" Text="{Binding Value}"
+                      <SelectableTextBlock Grid.Column="1" Text="{Binding Value}"
                                  FontFamily="{StaticResource MonoFont}" FontSize="11"
                                  Classes="coValue"
                                  Classes.elevated="{Binding IsCoElevated}"
                                  Classes.dangerous="{Binding IsCoDangerous}"
                                  Classes.lethal="{Binding IsCoLethal}" />
-                      <TextBlock Grid.Column="2" Text="{Binding RecordedBy}"
+                      <SelectableTextBlock Grid.Column="2" Text="{Binding RecordedBy}"
                                  FontSize="10" Margin="8,0,0,0"
                                  VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis"
@@ -441,7 +441,7 @@
               <ItemsControl ItemsSource="{Binding Editor.InvolvedPartyNames}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="x:String">
-                    <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                    <SelectableTextBlock Text="{Binding}" TextWrapping="Wrap" />
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
@@ -483,9 +483,9 @@
       <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
         <StackPanel Grid.Column="0" Spacing="6">
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <TextBlock Text="{Binding SelectedBuildingName}" FontWeight="SemiBold" FontSize="14"
+            <SelectableTextBlock x:Name="CoBuildingName" Text="{Binding SelectedBuildingName}" FontWeight="SemiBold" FontSize="14"
                        Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
-            <TextBlock Text="{Binding SummaryLine}" FontSize="12"
+            <SelectableTextBlock x:Name="CoSummaryLine" Text="{Binding SummaryLine}" FontSize="12"
                        Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
           </StackPanel>
           <!-- Segmented, not a single percentage: "wie viel ist erledigt" and "wie viel ist
