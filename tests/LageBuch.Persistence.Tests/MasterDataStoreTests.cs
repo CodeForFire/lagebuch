@@ -1006,7 +1006,7 @@ public class MasterDataStoreTests : IDisposable
             TalkGroups = new[]
             {
                 new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
-                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, IsFavorite: true),
             },
         };
         MasterDataStore.Save(_path, set);

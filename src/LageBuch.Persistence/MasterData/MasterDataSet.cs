@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using LageBuch.Domain;
@@ -497,11 +498,17 @@ public enum TalkGroupKind
 /// <summary>
 /// One Funkgruppe from the Stammdaten, e.g. "TMO FW_MUSTER 1000" (name FW_MUSTER, number 1000) or "DMO 301_F" (named by its number, no separate one). Number is the
 /// optional channel or group number and Note free text; both are null or blank when not given.
+/// A favourite is one the Feuerwehr uses most; every picker lists it first (#833).
 /// </summary>
-public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, string? Note = null)
+public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, string? Note = null, bool IsFavorite = false)
 {
     /// <summary>The longest name a Funkgruppe may carry; the JSON import and the editor both enforce it.</summary>
     public const int MaxNameLength = 200;
+
+    // German order, because a person reads these lists: "Äxte" next to "Axt", not after "Z", and
+    // numbers by value, so "FW 2" comes before "FW 10" -- the comparer the Geräte use (#846).
+    private static readonly StringComparer Alphabetical = StringComparer.Create(
+        CultureInfo.GetCultureInfo("de-DE"), CompareOptions.IgnoreCase | CompareOptions.NumericOrdering);
 
     /// <summary>The kind upper-case, then the name, then the number when present.</summary>
     public string Display =>
@@ -518,6 +525,18 @@ public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, 
     /// <summary>Total: an unknown or missing kind reads as <see cref="TalkGroupKind.Tmo"/>.</summary>
     public static TalkGroupKind KindFrom(string? name) =>
         string.Equals(name?.Trim(), "dmo", StringComparison.OrdinalIgnoreCase) ? TalkGroupKind.Dmo : TalkGroupKind.Tmo;
+
+    /// <summary>
+    /// The order a person looks a Funkgruppe up in (#833): the favourites first, then everything
+    /// else, each part alphabetical by <paramref name="label"/> -- what the list shows of a group.
+    /// Stable, so two groups of the same label keep the order they were written in.
+    /// </summary>
+    public static IEnumerable<TalkGroup> FavouritesFirst(IEnumerable<TalkGroup> groups, Func<TalkGroup, string> label)
+    {
+        ArgumentNullException.ThrowIfNull(groups);
+        ArgumentNullException.ThrowIfNull(label);
+        return groups.OrderBy(g => !g.IsFavorite).ThenBy(label, Alphabetical);
+    }
 }
 
 /// <summary>
@@ -1059,7 +1078,8 @@ public static class MasterDataJson
                 name,
                 BlankToNull(OptionalString(x, "number")),
                 TalkGroup.KindFrom(OptionalString(x, "kind")),
-                BlankToNull(OptionalString(x, "note"))));
+                BlankToNull(OptionalString(x, "note")),
+                x.TryGetProperty("favorite", out var f) && f.ValueKind == JsonValueKind.True));
         }
 
         return result;
@@ -1531,6 +1551,7 @@ public static class MasterDataJson
                 number = t.Number,
                 kind = TalkGroup.KindName(t.Kind),
                 note = t.Note,
+                favorite = t.IsFavorite,
             }),
             personnel = set.Personnel.Select(p => new
             {

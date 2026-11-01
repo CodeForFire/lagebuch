@@ -81,4 +81,53 @@ public class TalkGroupsSectionTests
         Assert.Equal(0, asked);
         Assert.Equal(0, changed);
     }
+
+    [Fact]
+    public void Rows_open_with_the_favourites_first_then_alphabetically()
+    {
+        var groups = new TalkGroupsSection(
+            "Funkgruppen",
+            new[]
+            {
+                new TalkGroup("FW_NACHBAR", "2000", TalkGroupKind.Tmo),
+                new TalkGroup("302_F", null, TalkGroupKind.Dmo, IsFavorite: true),
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+            },
+            () => { });
+
+        Assert.Equal(["302_F", "301_F", "FW_MUSTER", "FW_NACHBAR"], groups.Rows.Select(r => r.Name));
+        Assert.True(groups.Rows[0].IsFavorite);
+    }
+
+    [Fact]
+    public void Marking_a_favourite_marks_the_editor_changed_without_moving_the_row()
+    {
+        var changed = 0;
+        var groups = new TalkGroupsSection(
+            "Funkgruppen",
+            new[] { new TalkGroup("A", null, TalkGroupKind.Tmo), new TalkGroup("B", null, TalkGroupKind.Tmo) },
+            () => changed++);
+        var b = groups.Rows[1];
+
+        b.IsFavorite = true;
+
+        Assert.Equal(1, changed);
+        Assert.Same(b, groups.Rows[1]);
+    }
+
+    [Fact]
+    public void Saved_values_carry_the_favourite_and_run_favourites_first()
+    {
+        var groups = new TalkGroupsSection(
+            "Funkgruppen",
+            new[] { new TalkGroup("A", null, TalkGroupKind.Tmo), new TalkGroup("B", "1", TalkGroupKind.Tmo, "Notiz") },
+            () => { });
+
+        groups.Rows[1].IsFavorite = true;
+
+        Assert.Equal(
+            [new TalkGroup("B", "1", TalkGroupKind.Tmo, "Notiz", IsFavorite: true), new TalkGroup("A", null, TalkGroupKind.Tmo)],
+            groups.ToValues());
+    }
 }

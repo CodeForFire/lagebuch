@@ -131,7 +131,7 @@ public class MasterDataSyncTests
         var hostSet = MasterDataSet.Empty with
         {
             Roles = new[] { new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection, RoleSlot.Leiter) },
-            TalkGroups = new[] { new TalkGroup("FW_MUSTER", "401", TalkGroupKind.Dmo, "Einsatzstelle") },
+            TalkGroups = new[] { new TalkGroup("FW_MUSTER", "401", TalkGroupKind.Dmo, "Einsatzstelle", IsFavorite: true) },
         };
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
         await using var _ = host;
@@ -141,7 +141,7 @@ public class MasterDataSyncTests
             await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
 
         Assert.Equal(RoleSlot.Leiter, Assert.Single(set.Roles).Slot);
-        Assert.Equal(new TalkGroup("FW_MUSTER", "401", TalkGroupKind.Dmo, "Einsatzstelle"), Assert.Single(set.TalkGroups));
+        Assert.Equal(new TalkGroup("FW_MUSTER", "401", TalkGroupKind.Dmo, "Einsatzstelle", IsFavorite: true), Assert.Single(set.TalkGroups));
     }
 
     [Fact]

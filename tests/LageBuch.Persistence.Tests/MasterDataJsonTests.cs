@@ -1129,7 +1129,7 @@ public class MasterDataJsonTests
             TalkGroups = new[]
             {
                 new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
-                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, IsFavorite: true),
             },
         };
 
@@ -1138,6 +1138,28 @@ public class MasterDataJsonTests
         Assert.Equal(original.TalkGroups, reparsed.TalkGroups);
         Assert.Equal("TMO FW_MUSTER 1000", reparsed.TalkGroups[0].Display);
         Assert.Equal("DMO 301_F", reparsed.TalkGroups[1].Display);
+    }
+
+    [Fact]
+    public void A_talk_group_is_a_favourite_only_when_favorite_is_true()
+    {
+        var set = Parse("""
+            { "talkGroups": [
+              { "name": "A", "favorite": true },
+              { "name": "B" },
+              { "name": "C", "favorite": "true" },
+              { "name": "D", "favorite": false } ] }
+            """);
+
+        Assert.Equal([true, false, false, false], set.TalkGroups.Select(g => g.IsFavorite));
+    }
+
+    [Fact]
+    public void Serialize_writes_the_favourite_flag_of_every_talk_group()
+    {
+        var set = MasterDataSet.Empty with { TalkGroups = [new TalkGroup("A", null, TalkGroupKind.Tmo, IsFavorite: true)] };
+
+        Assert.Contains("\"favorite\": true", MasterDataJson.Serialize(set), StringComparison.Ordinal);
     }
 
     [Fact]

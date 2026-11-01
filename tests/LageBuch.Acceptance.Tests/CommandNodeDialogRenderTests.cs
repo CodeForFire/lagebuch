@@ -35,7 +35,7 @@ public class CommandNodeDialogRenderTests
         {
             TalkGroups =
             [
-                new TalkGroup("FW_EMMERING", "1000", TalkGroupKind.Tmo),
+                new TalkGroup("FW_EMMERING", "1000", TalkGroupKind.Tmo, IsFavorite: true),
                 new TalkGroup("FW_AICH", "1010", TalkGroupKind.Tmo),
                 new TalkGroup("301_F", null, TalkGroupKind.Dmo),
             ],
@@ -135,12 +135,12 @@ public class CommandNodeDialogRenderTests
     }
 
     [AvaloniaFact]
-    public void Funkgruppe_field_lists_the_stammdaten_talk_groups()
+    public void Funkgruppe_field_lists_the_stammdaten_talk_groups_favourites_first()
     {
         var (window, _) = Show(Filled(Session()), 560, 760);
 
         var box = Find<AutoCompleteBox>(window, "CommandNodeFunkgruppeBox");
-        Assert.Equal(["TMO FW_EMMERING 1000", "TMO FW_AICH 1010", "DMO 301_F"], box.ItemsSource!.Cast<string>());
+        Assert.Equal(["TMO FW_EMMERING 1000", "DMO 301_F", "TMO FW_AICH 1010"], box.ItemsSource!.Cast<string>());
     }
 
     [AvaloniaFact]

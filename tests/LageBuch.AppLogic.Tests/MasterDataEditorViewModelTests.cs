@@ -1269,10 +1269,11 @@ public class MasterDataEditorViewModelTests
 
         var values = groups.ToValues();
 
+        // Alphabetical by name and number (#833); the TMO and DMO of one name keep their written order.
         Assert.Equal(3, values.Count);
         Assert.Equal("erste", values[0].Note);
-        Assert.Equal("1001", values[1].Number);
-        Assert.Equal(TalkGroupKind.Dmo, values[2].Kind);
+        Assert.Equal(TalkGroupKind.Dmo, values[1].Kind);
+        Assert.Equal("1001", values[2].Number);
     }
 
     [Fact]

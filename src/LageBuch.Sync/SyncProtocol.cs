@@ -185,8 +185,13 @@ public static class SyncProtocol
     /// client at 30 editing one would send none, which a host at 31 reads as "none" -- wiping what
     /// another device entered, the case of 29. The floor rises to 31.
     /// </para>
+    /// <para>
+    /// 32: Funkgruppen favourites (#833). The Stammdaten payload's talk groups carry an optional
+    /// <c>favorite</c>. A client at 31 skips the key and lists the host's groups unmarked, and a
+    /// payload without it reads as no favourites, so the floor stays at 31.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 31;
+    public const int ProtocolVersion = 32;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

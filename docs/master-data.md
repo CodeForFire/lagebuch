@@ -96,7 +96,9 @@ dropped, and a list holds at most 500 Objekte.
 
 `talkGroups` lists the Funkgruppen a Führungsstelle works on: each has a `name`, an
 optional `number`, a `kind` (`"tmo"` or `"dmo"`, TMO when missing or unknown) and an
-optional `note`. A name is required and at most 200 characters. The editor shows them in
+optional `note`. `favorite: true` marks a group used most often; every Funkgruppen
+picker lists the favourites first, then the rest alphabetically, and a missing
+`favorite` means no favourite. A name is required and at most 200 characters. The editor shows them in
 a **Funkgruppen** section, and an Einsatz copies the text it uses, so renaming or
 deleting a group here never changes a past Einsatz.
 
