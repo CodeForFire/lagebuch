@@ -1170,6 +1170,29 @@ public class MasterDataEditorViewModelTests
             provider.Get().Streets);
     }
 
+    // #830: a renamed Gerät stays where it is while it is typed and moves into place on SPEICHERN,
+    // as a renamed person does in the Personal.
+    [Fact]
+    public void Saving_moves_a_renamed_geraet_to_its_alphabetical_place()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Devices = new[] { new Device("AED", 1), new Device("Fernglas", 1), new Device("Weste EL", 2) },
+        });
+        var vm = Vm(provider);
+        var devices = vm.Sections.OfType<DevicesSection>().Single();
+
+        devices.Rows[0].Name = "Wärmebildkamera";
+        Assert.Equal(new[] { "Wärmebildkamera", "Fernglas", "Weste EL" }, devices.Rows.Select(r => r.Name));
+        vm.SaveCommand.Execute(null);
+
+        devices = vm.Sections.OfType<DevicesSection>().Single();
+        Assert.Equal(new[] { "Fernglas", "Wärmebildkamera", "Weste EL" }, devices.Rows.Select(r => r.Name));
+        Assert.Equal(
+            new[] { new Device("Fernglas", 1), new Device("Wärmebildkamera", 1), new Device("Weste EL", 2) },
+            provider.Get().Devices);
+    }
+
     [Fact]
     public void Adding_a_funkgruppe_and_changing_a_slot_marks_dirty_and_saves_both()
     {

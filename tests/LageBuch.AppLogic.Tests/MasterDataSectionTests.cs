@@ -538,11 +538,48 @@ public class MasterDataSectionTests
                 new Device("Sonstiges", 0),
             },
             () => { });
-        s.Rows[3].Count = -1;
-        s.Rows[4].Count = 5000;
+        s.Rows.Single(r => r.Name == "HRT").Count = -1;
+        s.Rows.Single(r => r.Name == "Sonstiges").Count = 5000;
 
         Assert.Equal(
-            new[] { new Device("Weste EL", 2), new Device("HRT", 0), new Device("Sonstiges", Device.MaxCount) },
+            new[] { new Device("HRT", 0), new Device("Sonstiges", Device.MaxCount), new Device("Weste EL", 2) },
+            s.ToValues());
+    }
+
+    // #830: the Ausgabeliste's Geräte are found by reading down the list, so it is alphabetical
+    // whatever order the Stammdaten were written in -- German order, and numbers by value.
+    [Fact]
+    public void Devices_are_listed_alphabetically_whatever_order_the_Stammdaten_hold()
+    {
+        var s = new DevicesSection(
+            "Geräte",
+            new[]
+            {
+                new Device("Weste EL", 2),
+                new Device("HRT 10", 1),
+                new Device("Äxte", 2),
+                new Device("aed", 1),
+                new Device("HRT 2", 1),
+                new Device("Bolzenschneider", 1),
+            },
+            () => { });
+
+        Assert.Equal(
+            new[] { "aed", "Äxte", "Bolzenschneider", "HRT 2", "HRT 10", "Weste EL" },
+            s.Rows.Select(r => r.Name));
+    }
+
+    [Fact]
+    public void Devices_ToValues_puts_a_geraet_added_at_the_bottom_in_its_alphabetical_place()
+    {
+        var s = new DevicesSection("Geräte", new[] { new Device("AED", 1), new Device("Weste EL", 2) }, () => { });
+
+        s.AddCommand.Execute(null);
+        Assert.Equal(string.Empty, s.Rows[^1].Name); // a new row still appears at the bottom, under the cursor
+        s.Rows[^1].Name = "Fernglas";
+
+        Assert.Equal(
+            new[] { new Device("AED", 1), new Device("Fernglas", 1), new Device("Weste EL", 2) },
             s.ToValues());
     }
 

@@ -400,8 +400,10 @@ public class MasterDataEditorRenderTests
         var names = view.GetVisualDescendants().OfType<TextBox>().Select(t => t.Text).ToList();
         Assert.Contains("Mobilteil 1", names);
         Assert.Contains("Weste EL", names);
+
+        // Alphabetical (#830): Mobilteil 1, Sonstiges (siehe Bemerkung), Weste EL.
         var counts = view.GetVisualDescendants().OfType<NumericUpDown>().Select(n => n.Value).ToList();
-        Assert.Equal(new decimal?[] { 1, 2, 0 }, counts);
+        Assert.Equal(new decimal?[] { 1, 0, 2 }, counts);
 
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (!string.IsNullOrWhiteSpace(dir))
