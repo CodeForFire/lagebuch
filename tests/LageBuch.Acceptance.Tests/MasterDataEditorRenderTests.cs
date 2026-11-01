@@ -581,13 +581,13 @@ public class MasterDataEditorRenderTests
             },
             pickers.Select(c => c.SelectedValue));
 
-        // The Führungstafel slot picker carries each row's own post, "—" for none.
+        // The Führungs-Organisation slot picker carries each row's own post, "—" for none.
         Assert.Equal(
             new object?[] { RoleSlot.Leiter, RoleSlot.Leiter, RoleSlot.Melder, RoleSlot.None, RoleSlot.None },
             view.GetVisualDescendants().OfType<ComboBox>()
-                .Where(c => AutomationProperties.GetName(c) == "Auf der Führungstafel")
+                .Where(c => AutomationProperties.GetName(c) == "Führungs-Organisation")
                 .Select(c => c.SelectedValue));
-        Assert.Contains("AUF DER FÜHRUNGSTAFEL", view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        Assert.Contains("FÜHRUNGS-ORGANISATION", view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
 
         // The item template renders the German label, so the selection is readable and not a bare
         // enum.
@@ -634,10 +634,10 @@ public class MasterDataEditorRenderTests
             var first = view.GetVisualDescendants().OfType<ComboBox>()
                 .First(c => AutomationProperties.GetName(c) == "Eindeutigkeit");
             var second = view.GetVisualDescendants().OfType<ComboBox>()
-                .First(c => AutomationProperties.GetName(c) == "Auf der Führungstafel");
+                .First(c => AutomationProperties.GetName(c) == "Führungs-Organisation");
             var left1 = first.TranslatePoint(default, view)!.Value.X;
             var left2 = second.TranslatePoint(default, view)!.Value.X;
-            Assert.True(Math.Abs(left1 - left2) <= 1.0, $"Eindeutigkeit starts at {left1:F0}, Führungstafel at {left2:F0}");
+            Assert.True(Math.Abs(left1 - left2) <= 1.0, $"Eindeutigkeit starts at {left1:F0}, Führungs-Organisation at {left2:F0}");
         }
     }
 

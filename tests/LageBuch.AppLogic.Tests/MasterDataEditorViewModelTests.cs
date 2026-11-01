@@ -1238,7 +1238,7 @@ public class MasterDataEditorViewModelTests
         var row = Roles(vm).Rows[0];
 
         Assert.Equal(
-            new[] { "—", "Leiter", "Melder", "Führungsassistent", "Fachberater" },
+            new[] { "—", "Leiter", "Melder", "Führungsunterstützung", "Fachberater" },
             row.SlotOptions.Select(o => o.Label));
     }
 
