@@ -215,6 +215,30 @@ public class LeadershipBoardRenderTests
         return over;
     }
 
+    // A drag over the board at a point given in the scroller's own coordinates.
+    private static void OverIn(DataTransfer transfer, Board board, ScrollViewer scroller, Point point)
+    {
+        var root = board.View.GetControl<StackPanel>("BoardRoot");
+        var at = scroller.TranslatePoint(point, root)!.Value;
+        root.RaiseEvent(new DragEventArgs(DragDrop.DragOverEvent, transfer, root, at, KeyModifiers.None));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    // #826: a small screen, so the board and its chart both run past the visible area.
+    private static Board ShowSmall()
+    {
+        var board = Show(width: 1024, more: s =>
+        {
+            foreach (var n in new[] { "Abschnitt 3 West", "Abschnitt 4 Ost", "Abschnitt 5 Rückseite" })
+            {
+                s.AddCommandNode(CommandNodeKind.Abschnitt, n);
+            }
+        });
+        board.Window.Height = 600;
+        Dispatcher.UIThread.RunJobs();
+        return board;
+    }
+
     private static void Drop(DataTransfer transfer, Control target)
     {
         target.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, transfer, target, new Point(4, 4), KeyModifiers.None));
@@ -540,6 +564,54 @@ public class LeadershipBoardRenderTests
         Assert.Equal(NodeId(session, "Abschnitt 2 Süd"), NodeOfUnit(session, unit));
         Assert.DoesNotContain(board.View.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("drop-target"));
         Assert.Contains(board.Vm.Sections.Single(c => c.Name == "Abschnitt 2 Süd").Units, u => u.Id == unit);
+    }
+
+    [AvaloniaFact]
+    public void Dragging_a_unit_near_the_bottom_edge_scrolls_the_board_down()
+    {
+        var board = ShowSmall();
+        var scroll = board.View.GetControl<ScrollViewer>("BoardScroll");
+        Assert.True(scroll.Extent.Height > scroll.Viewport.Height + 1, $"extent {scroll.Extent.Height}, viewport {scroll.Viewport.Height}");
+        using var transfer = Dragging(UnitId(board, "Florian Steinhöring 40/1"));
+        Capture(board.Window, "fuehrung-board-autoscroll-before.png");
+
+        OverIn(transfer, board, scroll, new Point(200, scroll.Viewport.Height - 4));
+
+        Assert.True(scroll.Offset.Y > 1, $"offset {scroll.Offset.Y}");
+        Capture(board.Window, "fuehrung-board-autoscroll.png");
+        var down = scroll.Offset.Y;
+        OverIn(transfer, board, scroll, new Point(200, 4));
+        Assert.True(scroll.Offset.Y < down, $"offset {scroll.Offset.Y} after {down}");
+        Drop(transfer, board.View.GetControl<StackPanel>("BoardRoot"));
+    }
+
+    [AvaloniaFact]
+    public void Dragging_a_unit_near_the_right_edge_of_the_chart_scrolls_it_sideways()
+    {
+        var board = ShowSmall();
+        var chart = board.View.GetControl<ScrollViewer>("ChartScroll");
+        Assert.True(chart.Extent.Width > chart.Viewport.Width + 1, $"extent {chart.Extent.Width}, viewport {chart.Viewport.Width}");
+        using var transfer = Dragging(UnitId(board, "Florian Steinhöring 40/1"));
+
+        OverIn(transfer, board, chart, new Point(chart.Viewport.Width - 4, 40));
+
+        Assert.True(chart.Offset.X > 1, $"offset {chart.Offset.X}");
+        Drop(transfer, board.View.GetControl<StackPanel>("BoardRoot"));
+    }
+
+    [AvaloniaFact]
+    public void Dragging_away_from_the_edges_does_not_scroll()
+    {
+        var board = ShowSmall();
+        var scroll = board.View.GetControl<ScrollViewer>("BoardScroll");
+        var chart = board.View.GetControl<ScrollViewer>("ChartScroll");
+        using var transfer = Dragging(UnitId(board, "Florian Steinhöring 40/1"));
+
+        OverIn(transfer, board, scroll, new Point(scroll.Viewport.Width / 2, scroll.Viewport.Height / 2));
+
+        Assert.True(scroll.Offset.Y < 0.5, $"offset {scroll.Offset.Y}");
+        Assert.True(chart.Offset.X < 0.5, $"offset {chart.Offset.X}");
+        Drop(transfer, board.View.GetControl<StackPanel>("BoardRoot"));
     }
 
     [AvaloniaFact]
