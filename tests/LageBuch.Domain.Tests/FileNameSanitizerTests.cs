@@ -19,7 +19,7 @@ public class FileNameSanitizerTests
 
     [Theory]
     [InlineData("...")]
-    [InlineData("‮")]
+    [InlineData("\u202E")]
     [InlineData("../")]
     public void Sanitize_substitutes_the_fallback_when_nothing_usable_is_left(string hostile)
     {

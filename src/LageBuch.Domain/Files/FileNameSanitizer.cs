@@ -83,9 +83,9 @@ public static class FileNameSanitizer
     /// Characters that occupy no width of their own, so they cannot be seen in a rendered file name
     /// but can still change how it reads. <see cref="char.IsControl(char)"/> alone misses the
     /// bidirectional overrides (U+202E and friends), which are <see cref="UnicodeCategory.Format"/>:
-    /// they are invisible but reorder what follows, so <c>"Lageplan‮gnp.exe"</c> reads as
-    /// <c>Lageplan exe.png</c> while still being an <c>.exe</c>. This also removes the zero-width
-    /// joiners, which no file name needs. (#302)
+    /// they are invisible but reorder what follows, so <c>"Lageplan" + U+202E + "gnp.exe"</c>
+    /// reads as <c>Lageplan exe.png</c> while still being an <c>.exe</c>. This also removes the
+    /// zero-width joiners, which no file name needs. (#302)
     /// </summary>
     private static bool IsHidden(char c) =>
         char.IsControl(c) || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format;

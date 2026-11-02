@@ -16,6 +16,17 @@ cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see 
 
 <!-- towncrier release notes start -->
 
+## [0.9.2] - 2026-11-02
+
+A patch release with one fix: antivirus software on Windows quarantined a documentation file
+that the 0.9.1 installer carried, which blocked the install. The app itself is unchanged, and so
+are the file format and the sync protocol.
+
+### Fixed
+
+- [#864](https://github.com/CodeForFire/lagebuch/pull/864) - The installed app no longer ships XML documentation files, one of which contained a right-to-left override character that antivirus software quarantined as an extension-spoofing script.
+
+
 ## [0.9.1] - 2026-10-22
 
 A patch release with the first field reports on 0.9.0, all of them about the screen and the
@@ -583,7 +594,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/CodeForFire/lagebuch/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/CodeForFire/lagebuch/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/CodeForFire/lagebuch/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/CodeForFire/lagebuch/compare/v0.8.0...v0.8.1
