@@ -6,9 +6,10 @@ namespace LageBuch.Domain.Tests;
 /// <summary>
 /// The Sicherheitstrupp link (#399). The theme running through these is that the domain records a
 /// decision rather than policing it: sharing one standby crew, keeping it after it goes under air,
-/// and changing it mid-Einsatz are all allowed. The two things that are refused are the two that
-/// can only ever be bugs — a Trupp covering itself, and a link to a Trupp that is not in this
-/// incident at all.
+/// and changing it mid-Einsatz are all allowed. What is refused can only ever be a bug — a Trupp
+/// covering itself, a link to a Trupp that is not in this incident at all — or a chain of cover
+/// (#834): a crew standing by as Sicherheitstrupp gets none of its own, and a Trupp that has one
+/// does not stand by for another.
 /// </summary>
 public class SicherheitstruppTests
 {
@@ -108,6 +109,88 @@ public class SicherheitstruppTests
         // The app documents the decision and warns in the UI; it does not refuse it.
         Assert.Equal(sicherheit.Id, first.SafetyTruppId);
         Assert.Equal(sicherheit.Id, second.SafetyTruppId);
+    }
+
+    // #834: a crew standing by as Sicherheitstrupp is the cover, not a Trupp that needs one.
+    [Fact]
+    public void A_trupp_standing_by_for_another_cannot_be_given_a_safety_trupp()
+    {
+        var incident = NewIncident(out var clock);
+        var angriff = AddTrupp(incident, clock, "Angriffstrupp");
+        var sicherheit = AddTrupp(incident, clock, "Sicherheitstrupp");
+        var wasser = AddTrupp(incident, clock, "Wassertrupp");
+        incident.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
+
+        var refused = Assert.Throws<InvalidOperationException>(() => incident.SetScbaSafetyTrupp(sicherheit.Id, wasser.Id));
+
+        Assert.Equal("Sicherheitstrupp steht selbst als Sicherheitstrupp bereit und bekommt keinen eigenen.", refused.Message);
+        Assert.Null(sicherheit.SafetyTruppId);
+        Assert.True(incident.IsStandingByAsScbaSafetyTrupp(sicherheit.Id));
+        Assert.False(incident.IsStandingByAsScbaSafetyTrupp(angriff.Id));
+    }
+
+    [Fact]
+    public void A_trupp_with_its_own_safety_trupp_cannot_stand_by_for_another()
+    {
+        var incident = NewIncident(out var clock);
+        var angriff = AddTrupp(incident, clock, "Angriffstrupp");
+        var sicherheit = AddTrupp(incident, clock, "Sicherheitstrupp");
+        var wasser = AddTrupp(incident, clock, "Wassertrupp");
+        incident.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
+
+        var refused = Assert.Throws<InvalidOperationException>(() => incident.SetScbaSafetyTrupp(wasser.Id, angriff.Id));
+
+        Assert.Equal("Angriffstrupp hat selbst einen Sicherheitstrupp und kann keinen anderen Trupp sichern.", refused.Message);
+        Assert.Null(wasser.SafetyTruppId);
+    }
+
+    [Fact]
+    public void A_standby_crew_can_always_be_cleared_of_a_safety_trupp()
+    {
+        var incident = NewIncident(out var clock);
+        var angriff = AddTrupp(incident, clock, "Angriffstrupp");
+        var sicherheit = AddTrupp(incident, clock, "Sicherheitstrupp");
+        incident.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
+
+        incident.SetScbaSafetyTrupp(sicherheit.Id, null);
+
+        Assert.Null(sicherheit.SafetyTruppId);
+    }
+
+    // The rotation #835 describes: the Sicherheitstrupp goes in next, and from then on it needs
+    // cover of its own even while the Trupp it stood by for still names it.
+    [Fact]
+    public void A_safety_trupp_that_goes_under_air_may_be_given_its_own()
+    {
+        var incident = NewIncident(out var clock);
+        var angriff = AddTrupp(incident, clock, "Angriffstrupp");
+        var sicherheit = AddTrupp(incident, clock, "Sicherheitstrupp");
+        var wasser = AddTrupp(incident, clock, "Wassertrupp");
+        incident.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
+        incident.StartScbaTrupp(clock, sicherheit.Id);
+
+        incident.SetScbaSafetyTrupp(sicherheit.Id, wasser.Id);
+
+        Assert.False(incident.IsStandingByAsScbaSafetyTrupp(sicherheit.Id));
+        Assert.Equal(wasser.Id, sicherheit.SafetyTruppId);
+    }
+
+    [Fact]
+    public void A_standby_crew_is_released_once_the_trupp_it_covered_is_abgenommen()
+    {
+        var incident = NewIncident(out var clock);
+        var angriff = AddTrupp(incident, clock, "Angriffstrupp");
+        var sicherheit = AddTrupp(incident, clock, "Sicherheitstrupp");
+        var wasser = AddTrupp(incident, clock, "Wassertrupp");
+        incident.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
+        incident.StartScbaTrupp(clock, angriff.Id);
+        incident.WithdrawScbaTrupp(clock, angriff.Id);
+        incident.MarkScbaRemoved(clock, angriff.Id);
+
+        incident.SetScbaSafetyTrupp(sicherheit.Id, wasser.Id);
+
+        Assert.False(incident.IsStandingByAsScbaSafetyTrupp(sicherheit.Id));
+        Assert.Equal(wasser.Id, sicherheit.SafetyTruppId);
     }
 
     [Fact]

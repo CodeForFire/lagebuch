@@ -1,0 +1,1 @@
+In the Atemschutzüberwachung, a Trupp standing by as Sicherheitstrupp can no longer be given a Sicherheitstrupp of its own and shows whom it covers instead, and a Trupp that already has one is no longer offered as Sicherheitstrupp for another (#834).
