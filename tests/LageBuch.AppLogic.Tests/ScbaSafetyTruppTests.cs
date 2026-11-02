@@ -455,6 +455,80 @@ public class ScbaSafetyTruppTests
         Assert.Equal("deckt auch Angriffstrupp", Row(vm, second.Id).SafetyTruppHint);
     }
 
+    // #834: the crew standing by is the cover. Its picker says whom it covers and takes no choice.
+    [Fact]
+    public void A_trupp_standing_by_for_another_cannot_be_given_a_sicherheitstrupp()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var wasser = Register(vm, "Wassertrupp");
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+        Assert.True(Row(vm, sicherheit.Id).CanAssignSafetyTrupp);
+
+        Assign(vm, angriff.Id, sicherheit.Id);
+        Assign(vm, wasser.Id, sicherheit.Id);
+
+        var row = Row(vm, sicherheit.Id);
+        Assert.False(row.CanAssignSafetyTrupp);
+        Assert.Equal("sichert Angriffstrupp, Wassertrupp", row.SafetyTruppButtonText);
+        Assert.True(Row(vm, angriff.Id).CanAssignSafetyTrupp);
+        Assert.Equal("Sicherheitstrupp", Row(vm, angriff.Id).SafetyTruppButtonText);
+    }
+
+    [Fact]
+    public void A_trupp_with_its_own_sicherheitstrupp_is_not_offered_as_one()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var wasser = Register(vm, "Wassertrupp");
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+
+        Assign(vm, angriff.Id, sicherheit.Id);
+
+        Assert.Equal(
+            new Guid?[] { null, sicherheit.Id },
+            Row(vm, wasser.Id).SafetyTruppChoices.Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Clearing_the_link_frees_the_standby_crews_picker()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+        Assign(vm, angriff.Id, sicherheit.Id);
+
+        Assign(vm, angriff.Id, null);
+
+        Assert.True(Row(vm, sicherheit.Id).CanAssignSafetyTrupp);
+        Assert.Equal(SafetyTruppChoice.NoneDisplay, Row(vm, sicherheit.Id).SafetyTruppButtonText);
+    }
+
+    // The rotation #835 describes: once the standby crew goes in, it needs cover of its own.
+    [Fact]
+    public void A_standby_crew_that_goes_under_air_can_be_given_a_sicherheitstrupp()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+        var wasser = Register(vm, "Wassertrupp");
+        Assign(vm, angriff.Id, sicherheit.Id);
+
+        Row(vm, sicherheit.Id).StartCommand.Execute(null);
+        Assign(vm, sicherheit.Id, wasser.Id);
+
+        Assert.True(Row(vm, sicherheit.Id).CanAssignSafetyTrupp);
+        Assert.Equal(wasser.Id, Current(Row(vm, sicherheit.Id)));
+    }
+
     [Fact]
     public void A_read_only_workspace_cannot_assign()
     {

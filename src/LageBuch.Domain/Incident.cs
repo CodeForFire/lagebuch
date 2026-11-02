@@ -1724,6 +1724,13 @@ public sealed class Incident
     /// deliberately stricter than <see cref="AtemschutzTrupp.Rehydrate"/>, which accepts whatever a
     /// stored file holds: a live command carrying an unknown id is a bug in the caller, while a
     /// stored row carrying one is history, and refusing to open the file would help nobody.
+    /// <para>
+    /// Cover does not chain (#834). A crew standing by as Sicherheitstrupp
+    /// (<see cref="IsStandingByAsScbaSafetyTrupp"/>) is given none of its own, and a Trupp that has
+    /// one is not designated to stand by for another. Both are refused here and not only in the
+    /// picker, so a joined device's command meets the same rule. Clearing is never refused, and a
+    /// chain an older file already holds is left as it is.
+    /// </para>
     /// </remarks>
     public AtemschutzTrupp SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId)
     {
@@ -1731,12 +1738,34 @@ public sealed class Incident
         var trupp = FindScbaTrupp(truppId);
         if (safetyTruppId is { } id)
         {
-            _ = FindScbaTrupp(id);
+            var standby = FindScbaTrupp(id);
+            if (IsStandingByAsScbaSafetyTrupp(truppId))
+            {
+                throw new InvalidOperationException(
+                    $"{trupp.DisplayName} steht selbst als Sicherheitstrupp bereit und bekommt keinen eigenen.");
+            }
+
+            if (standby.SafetyTruppId is not null)
+            {
+                throw new InvalidOperationException(
+                    $"{standby.DisplayName} hat selbst einen Sicherheitstrupp und kann keinen anderen Trupp sichern.");
+            }
         }
 
         trupp.AssignSafetyTrupp(safetyTruppId);
         return trupp;
     }
+
+    /// <summary>
+    /// Whether <paramref name="truppId"/> is standing by as Sicherheitstrupp right now (#834): it is
+    /// still bereitgestellt, and another Trupp not yet abgenommen names it. The link is the fact, never
+    /// the Trupp-Art's name. Once the crew goes under air itself it stands by for nobody, even
+    /// while the Trupp it covered still names it — that is the rotation in which it needs cover of
+    /// its own (#835).
+    /// </summary>
+    public bool IsStandingByAsScbaSafetyTrupp(Guid truppId) =>
+        FindScbaTruppOrDefault(truppId) is { IsWaiting: true }
+            && _scbaTrupps.Exists(t => t.SafetyTruppId == truppId && !t.IsReturned);
 
     /// <summary>
     /// Records an attached file's metadata and logs it to the ETB. Bytes never pass through the

@@ -35,6 +35,10 @@ public sealed partial class ScbaTruppRow : ObservableObject
     // Re-pointed by Update rather than replaced with a whole new row (#294) -- see Update's remarks.
     private AtemschutzTrupp _trupp;
 
+    // The Trupps this one stands by for as Sicherheitstrupp, joined for display; null when it
+    // stands by for nobody (#834).
+    private string? _coveredTrupps;
+
     public ScbaTruppRow(
         AtemschutzTrupp trupp,
         IClock clock,
@@ -45,6 +49,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         Action onMarkRemoved,
         IReadOnlyList<SafetyTruppChoice> safetyTruppChoices,
         string? safetyTruppHint,
+        string? coveredTrupps,
         Action<Guid?> onAssignSafetyTrupp)
     {
         ArgumentNullException.ThrowIfNull(trupp);
@@ -58,6 +63,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _onAssignSafetyTrupp = onAssignSafetyTrupp;
         SafetyTruppChoices = safetyTruppChoices;
         SafetyTruppHint = safetyTruppHint;
+        _coveredTrupps = coveredTrupps;
     }
 
     public Guid Id => _trupp.Id;
@@ -140,10 +146,14 @@ public sealed partial class ScbaTruppRow : ObservableObject
     /// against the entry itself, the same shape ForceRow uses for its status options.</summary>
     public IReadOnlyList<SafetyTruppChoice> SafetyTruppChoices { get; private set; }
 
-    /// <summary>The flyout button's face: the Sicherheitstrupp in force, or "— kein —".</summary>
+    /// <summary>The flyout button's face: the Sicherheitstrupp in force, or "— kein —". A crew
+    /// standing by as Sicherheitstrupp shows whom it covers instead, which is also why its picker
+    /// is disabled (#834).</summary>
     public string SafetyTruppButtonText =>
-        SafetyTruppChoices.FirstOrDefault(c => c.Id == _trupp.SafetyTruppId)?.Display
-            ?? SafetyTruppChoice.NoneDisplay;
+        _coveredTrupps is not null
+            ? $"sichert {_coveredTrupps}"
+            : SafetyTruppChoices.FirstOrDefault(c => c.Id == _trupp.SafetyTruppId)?.Display
+                ?? SafetyTruppChoice.NoneDisplay;
 
     /// <summary>The single amber line under the picker, or null when there is nothing to say.
     /// Recomputed by the ViewModel on every incident change and pushed in through
@@ -152,7 +162,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     public bool HasSafetyTruppHint => !string.IsNullOrEmpty(SafetyTruppHint);
 
-    public bool CanAssignSafetyTrupp => !_isReadOnly && !_trupp.IsReturned;
+    public bool CanAssignSafetyTrupp => !_isReadOnly && !_trupp.IsReturned && _coveredTrupps is null;
 
     /// <summary>
     /// The Druck being typed for the next Druckkontrolle; null while the field is empty. It starts
@@ -273,13 +283,15 @@ public sealed partial class ScbaTruppRow : ObservableObject
     public void Update(
         AtemschutzTrupp trupp,
         IReadOnlyList<SafetyTruppChoice> safetyTruppChoices,
-        string? safetyTruppHint)
+        string? safetyTruppHint,
+        string? coveredTrupps)
     {
         ArgumentNullException.ThrowIfNull(trupp);
         ArgumentNullException.ThrowIfNull(safetyTruppChoices);
         _trupp = trupp;
         SafetyTruppChoices = safetyTruppChoices;
         SafetyTruppHint = safetyTruppHint;
+        _coveredTrupps = coveredTrupps;
 
         // Replacing the list outright is safe here, unlike with the ComboBox this replaced: a
         // flyout has no selection model holding indices into it, and its entries are only realised
@@ -916,12 +928,13 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             () => MarkRemoved(trupp.Id),
             SafetyChoicesFor(trupp),
             SafetyTruppHintFor(trupp),
+            CoveredTruppsFor(trupp),
             safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId));
 
     /// <summary>The flyout entries for one row: "— kein —", then every other Trupp still
-    /// bereitgestellt, ordered by Truppnummer. Each entry carries the command that designates it,
-    /// so the flyout's item template binds against the entry and never has to reach back out of
-    /// the popup's visual tree.</summary>
+    /// bereitgestellt and without a Sicherheitstrupp of its own (#834), ordered by Truppnummer.
+    /// Each entry carries the command that designates it, so the flyout's item template binds
+    /// against the entry and never has to reach back out of the popup's visual tree.</summary>
     private List<SafetyTruppChoice> SafetyChoicesFor(AtemschutzTrupp trupp)
     {
         void Select(Guid? safetyTruppId) => AssignSafetyTrupp(trupp.Id, safetyTruppId);
@@ -932,7 +945,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         };
         choices.AddRange(
             _session.Incident.ScbaTrupps
-                .Where(t => t.Id != trupp.Id && t.IsWaiting)
+                .Where(t => t.Id != trupp.Id && t.IsWaiting && t.SafetyTruppId is null)
                 .OrderBy(t => t.TruppNumber)
                 .Select(Choice));
 
@@ -982,6 +995,19 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
         return alsoCovered.Count > 0 ? $"deckt auch {string.Join(", ", alsoCovered)}" : null;
     }
+
+    /// <summary>The Trupps <paramref name="trupp"/> stands by for as Sicherheitstrupp, by name, or
+    /// null when it stands by for nobody — the same rule the domain refuses a chain of cover with
+    /// (#834).</summary>
+    private string? CoveredTruppsFor(AtemschutzTrupp trupp) =>
+        _session.Incident.IsStandingByAsScbaSafetyTrupp(trupp.Id)
+            ? string.Join(
+                ", ",
+                _session.Incident.ScbaTrupps
+                    .Where(t => t.SafetyTruppId == trupp.Id && !t.IsReturned)
+                    .OrderBy(t => t.TruppNumber)
+                    .Select(t => t.DisplayName))
+            : null;
 
     private void AssignSafetyTrupp(Guid truppId, Guid? safetyTruppId)
     {
@@ -1157,7 +1183,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
             if (i < Trupps.Count)
             {
-                Trupps[i].Update(trupp, SafetyChoicesFor(trupp), SafetyTruppHintFor(trupp));
+                Trupps[i].Update(trupp, SafetyChoicesFor(trupp), SafetyTruppHintFor(trupp), CoveredTruppsFor(trupp));
             }
             else
             {
