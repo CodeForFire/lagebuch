@@ -49,6 +49,21 @@ jobs:
         with:
           persist-credentials: false
 
+      # Bidirectional overrides and isolates (U+202A-U+202E, U+2066-U+2069) are invisible and
+      # reorder the text around them: the Trojan Source trick in code, and a literal one in a doc
+      # comment ended up in the shipped LageBuch.Domain.xml, which antivirus software quarantined
+      # as an extension-spoofing script (GHSA-3pc7-r86c-pwf2). Write them as escapes.
+      - name: No bidirectional control characters
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          LC_ALL: C.UTF-8
+        run: |
+          if git grep -nIP '[\x{202A}-\x{202E}\x{2066}-\x{2069}]'; then
+            echo "::error::Bidirectional control characters found; write them as escapes."
+            exit 1
+          fi
+
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
