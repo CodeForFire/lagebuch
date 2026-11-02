@@ -194,15 +194,19 @@ public static class SyncProtocol
     /// 33: a Trupp's Trupp-Art can be changed after Bereitstellung (#835). A client may send
     /// <c>changeScbaTruppType</c>, which a host at 32 does not know, so the floor rises to 33.
     /// </para>
+    /// <para>
+    /// 34: a Freitext-Abschnitt can be taken into the Führung structure (#824). A client may send
+    /// <c>adoptFreeTextSection</c>, which a host at 33 does not know, so the floor rises to 34.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 33;
+    public const int ProtocolVersion = 34;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 33;
+    public const int MinimumProtocolVersion = 34;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

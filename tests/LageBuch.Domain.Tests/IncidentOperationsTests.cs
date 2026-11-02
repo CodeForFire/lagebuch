@@ -771,6 +771,34 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Editing_moves_a_free_text_leiter_to_another_abschnitt()
+    {
+        // #824: FUNKTIONEN stamps the Stammdaten slot on an EAL typed with an Abschnitt, but nothing
+        // placed it on the board, so its Abschnitt stays text that can be corrected.
+        var incident = NewIncident(out var clock, out var op);
+        var eal = incident.AssignRole(clock, op, "EAL", "Meier", section: "Nrod", slot: RoleSlot.Leiter);
+
+        var moved = incident.EditRoleAssignment(clock, op, eal.Id, "Meier", null, null, "Nord");
+
+        Assert.Equal("Nord", moved.Section);
+        Assert.Equal(RoleSlot.Leiter, moved.Slot);
+        Assert.Null(moved.NodeId);
+    }
+
+    [Fact]
+    public void A_free_text_abschnitt_is_not_a_place_on_the_board_but_a_node_or_the_einsatzleitung_post_is()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+
+        Assert.False(incident.AssignRole(clock, op, "EAL", "Meier", section: "Süd", slot: RoleSlot.Leiter).IsPlacedOnBoard);
+        Assert.False(incident.AssignRole(clock, op, "ZF", "Huber", section: "Süd").IsPlacedOnBoard);
+        Assert.False(incident.AssignRole(clock, op, "ZF", "Schulz").IsPlacedOnBoard);
+        Assert.True(incident.AssignRole(clock, op, "EL", "Maier", slot: RoleSlot.Leiter).IsPlacedOnBoard);
+        Assert.True(incident.AssignRole(clock, op, "ZF", "Weber", nodeId: node.Id).IsPlacedOnBoard);
+    }
+
+    [Fact]
     public void Editing_a_role_assignment_refuses_on_a_closed_incident()
     {
         var incident = NewIncident(out var clock, out var op);

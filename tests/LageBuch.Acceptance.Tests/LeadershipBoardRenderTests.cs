@@ -546,6 +546,41 @@ public class LeadershipBoardRenderTests
         Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(board.View, "ElLeiterText").Text);
     }
 
+    // #824: an EAL typed on FUNKTIONEN with an Abschnitt stands on a Freitext card at the foot of the
+    // board; one press forms that Abschnitt and the EAL leads it.
+    private static void FreitextEal(LocalIncidentSession s)
+    {
+        s.AssignRole("Einsatzleiter", "Max Mustermann", "Florian Emmering 1", slot: RoleSlot.Leiter);
+        var nord = AddNode(s, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung Wohnhaus");
+        s.AssignRole("EAL", "Hans Huber", "Florian Aich 1", nodeId: nord, slot: RoleSlot.Leiter);
+        s.AssignRole("EAL", "Georg Lechner", "Florian Emmering 40/1", section: "Abschnitt 2 Süd", slot: RoleSlot.Leiter);
+        s.AssignRole("Melder", "Anna Brandl", section: "Abschnitt 2 Süd", slot: RoleSlot.Melder);
+    }
+
+    [AvaloniaFact]
+    public void A_freitext_abschnitt_is_taken_into_the_structure_from_its_card()
+    {
+        var board = Show(filled: false, more: FreitextEal);
+        var view = board.View;
+
+        var cards = view.GetControl<ItemsControl>("FreeTextSectionCards");
+        Assert.True(cards.IsVisible);
+        var adopt = cards.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "AdoptFreeTextSectionButton");
+        Assert.True(adopt.IsEffectivelyEnabled);
+        Assert.Equal("Abschnitt Abschnitt 2 Süd übernehmen", AutomationProperties.GetName(adopt));
+        Assert.Equal(2, cards.GetVisualDescendants().OfType<Button>().Count(b => b.Name == "EditAssistantButton"));
+        Capture(board.Window, "fuehrung-freitext-before-adopt.png");
+
+        Press(adopt);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(cards.IsVisible);
+        var sued = board.Vm.Sections.Single(c => c.Name == "Abschnitt 2 Süd");
+        Assert.Equal("Georg Lechner", sued.Leiter?.PersonName);
+        Assert.Equal("Anna Brandl", sued.Melder?.PersonName);
+        Capture(board.Window, "fuehrung-freitext-after-adopt.png");
+    }
+
     [AvaloniaFact]
     public void A_new_incident_shows_only_the_einsatzleitung_and_the_add_buttons()
     {

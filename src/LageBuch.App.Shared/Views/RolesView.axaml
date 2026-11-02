@@ -27,7 +27,7 @@
     <Style Selector="AutoCompleteBox#PersonNameBox">
       <Setter Property="Width" Value="200" />
     </Style>
-    <Style Selector="TextBox#SectionBox">
+    <Style Selector="AutoCompleteBox#SectionBox">
       <Setter Property="Width" Value="130" />
     </Style>
     <Style Selector="AutoCompleteBox#CallSignBox">
@@ -64,7 +64,7 @@
     <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#PersonNameBox">
       <Setter Property="Width" Value="NaN" />
     </Style>
-    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#SectionBox">
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#SectionBox">
       <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#CallSignBox">
@@ -146,10 +146,15 @@
                              MinimumPrefixLength="0"
                              Text="{Binding NewRole}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="ABSCHNITT">
-            <TextBox x:Name="SectionBox"
-                     PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
-                     Text="{Binding NewSection}" />
+          <!-- #824: suggests the Abschnitte FÜHRUNG has formed; one of them places the Funktion there
+               instead of in a Freitext-Abschnitt. Anything else is still taken as typed. -->
+          <HeaderedContentControl Classes="field suggest" Header="ABSCHNITT">
+            <AutoCompleteBox x:Name="SectionBox"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
+                             ItemsSource="{Binding SectionOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding NewSection}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest required" Header="NAME"
                                   Classes.invalid="{Binding NewPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">

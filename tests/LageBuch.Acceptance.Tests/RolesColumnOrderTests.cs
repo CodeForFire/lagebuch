@@ -36,7 +36,7 @@ public class RolesColumnOrderTests
 
         foreach (var next in new Control[]
         {
-            view.GetControl<TextBox>("SectionBox"),
+            view.GetControl<AutoCompleteBox>("SectionBox"),
             view.GetControl<AutoCompleteBox>("PersonNameBox"),
             view.GetControl<AutoCompleteBox>("CallSignBox"),
             view.GetControl<TextBox>("PhoneBox"),

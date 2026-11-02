@@ -438,4 +438,60 @@ public class LeadershipViewModelTests
         Assert.True(vm.IsNarrow);
         Assert.Contains(nameof(LeadershipViewModel.IsNarrow), raised);
     }
+
+    // --- #824: a Freitext-Abschnitt is taken into the structure from its card. ---
+    [Fact]
+    public void Adopting_a_freitext_card_moves_its_eal_into_a_new_abschnitt_card_as_leiter()
+    {
+        var session = NewSession();
+        session.AssignRole("EAL", "Josef Bauer", section: "Süd", slot: RoleSlot.Leiter);
+        var changes = new int[1];
+        using var vm = NewVm(session, changes);
+        var card = Assert.Single(vm.FreeTextSections);
+        Assert.Equal("Abschnitt Süd übernehmen", card.AdoptAutomationName);
+        Assert.True(card.AdoptCommand.CanExecute(null));
+
+        card.AdoptCommand.Execute(null);
+
+        Assert.Empty(vm.FreeTextSections);
+        Assert.False(vm.HasFreeTextSections);
+        var section = Assert.Single(vm.Sections);
+        Assert.Equal("Süd", section.Name);
+        Assert.Equal("Josef Bauer", section.Leiter?.PersonName);
+        Assert.Equal(1, changes[0]);
+        Assert.Null(vm.ActionError);
+    }
+
+    [Fact]
+    public void A_refused_adoption_is_said_on_the_board()
+    {
+        var session = NewSession();
+        AddNode(session, CommandNodeKind.Bereitstellung, "Süd");
+        session.AssignRole("EAL", "Josef Bauer", section: "Süd", slot: RoleSlot.Leiter);
+        var changes = new int[1];
+        using var vm = NewVm(session, changes);
+
+        vm.FreeTextSections[0].AdoptCommand.Execute(null);
+
+        Assert.Equal("Nicht möglich: Name ist bereits vergeben.", vm.ActionError);
+        Assert.Single(vm.FreeTextSections);
+        Assert.Equal(0, changes[0]);
+    }
+
+    [Fact]
+    public void A_freitext_card_offers_correction_and_adoption_only_while_the_einsatz_is_open()
+    {
+        var store = new FakeStore();
+        var seed = NewSession(store);
+        seed.AssignRole("EAL", "Josef Bauer", section: "Süd", slot: RoleSlot.Leiter);
+        seed.Save();
+
+        using var open = NewVm(seed);
+        Assert.True(open.FreeTextSections[0].People[0].EditCommand.CanExecute(null));
+
+        using var readOnly = NewVm(LocalIncidentSession.OpenReadOnly(store, Clock, IncidentPath));
+        var card = Assert.Single(readOnly.FreeTextSections);
+        Assert.False(card.AdoptCommand.CanExecute(null));
+        Assert.False(card.People[0].EditCommand.CanExecute(null));
+    }
 }

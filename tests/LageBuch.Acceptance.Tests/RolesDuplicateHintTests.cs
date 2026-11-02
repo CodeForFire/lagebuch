@@ -84,7 +84,7 @@ public class RolesDuplicateHintTests
         // grid marks and what the form says. Typed into the box rather than set on the view model,
         // the same route the test above drives.
         view.GetControl<AutoCompleteBox>("RoleBox").Text = "EL";
-        view.GetControl<TextBox>("SectionBox").Text = Section;
+        view.GetControl<AutoCompleteBox>("SectionBox").Text = Section;
         Dispatcher.UIThread.RunJobs();
 
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");

@@ -312,7 +312,16 @@ public class VersionHandshakeTests
     {
         // 33 adds changeScbaTruppType, a command a client may send. A host at 32 has it nowhere in
         // its allowlist and would reject it, so a 32 and a 33 must not connect.
-        Assert.Equal(33, SyncProtocol.ProtocolVersion);
-        Assert.Equal(33, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 33, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 33, int.MaxValue);
+    }
+
+    [Fact]
+    public void Adopting_a_freitext_abschnitt_raises_the_protocol_and_the_floor_to_thirty_four()
+    {
+        // 34 adds adoptFreeTextSection, a command a client may send. A host at 33 has it nowhere in
+        // its allowlist and would reject it, so a 33 and a 34 must not connect.
+        Assert.Equal(34, SyncProtocol.ProtocolVersion);
+        Assert.Equal(34, SyncProtocol.MinimumProtocolVersion);
     }
 }

@@ -1,0 +1,1 @@
+A Funktion typed in FUNKTIONEN with an Abschnitt the Führung board has formed is placed there instead of in a Freitext-Abschnitt, the ABSCHNITT box suggests those Abschnitte, a Freitext-Abschnitt card on the board can be taken into the structure with ALS ABSCHNITT ÜBERNEHMEN, and its Funktionen, an EAL included, can be corrected again (#824).

@@ -140,6 +140,9 @@ public interface IIncidentSession
     /// <summary>Places a running Funktion in a node and board slot; a null <paramref name="nodeId"/> is the Einsatzleitung.</summary>
     void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot);
 
+    /// <summary>Takes a Freitext-Abschnitt into the Führung structure. See <c>Incident.AdoptFreeTextSection</c>.</summary>
+    void AdoptFreeTextSection(string section);
+
     /// <summary>Sets the Führungsstufe; null clears it.</summary>
     void SetFuehrungsstufe(Fuehrungsstufe? stufe);
 

@@ -75,6 +75,20 @@ public class RoleAssignmentDialogRenderTests
     }
 
     [AvaloniaFact]
+    public void Bearbeiten_offers_the_abschnitt_of_an_eal_typed_with_one_at_phone_width()
+    {
+        // #824: the Stammdaten slot alone no longer locks a typed Abschnitt.
+        var session = Session();
+        session.AssignRole("EAL", "Musterfrau, Erika", "Florian Emmering 40/1", section: "Nord", slot: RoleSlot.Leiter);
+        var vm = new RoleAssignmentDialogViewModel(session, MasterData, session.Incident.Roles[0].Id, RoleAssignmentDialogMode.Edit);
+        var window = Show(vm, 412, 800);
+
+        Assert.True(Find<TextBox>(window, "AssignmentDialogSectionBox").IsEffectivelyVisible);
+        Assert.Equal("Nord", Find<TextBox>(window, "AssignmentDialogSectionBox").Text);
+        Capture(window, "role-assignment-eal-abschnitt-narrow.png");
+    }
+
+    [AvaloniaFact]
     public void Uebertragen_from_the_board_renders_at_phone_width_without_an_abschnitt()
     {
         var session = Session();

@@ -208,6 +208,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Mutate(() => Incident.PlaceRoleAssignment(_clock, RequireOperator(), assignmentId, nodeId, slot));
 
+    public void AdoptFreeTextSection(string section) =>
+        Mutate(() => Incident.AdoptFreeTextSection(_clock, RequireOperator(), section));
+
     public void SetNavVisibility(string key, bool visible) =>
         Mutate(() => Incident.SetNavVisibility(key, visible));
 

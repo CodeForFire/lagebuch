@@ -31,6 +31,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetForceUnitVehicleTypeCommand), "setForceUnitVehicleType")]
 [JsonDerivedType(typeof(MoveForceUnitLabelCommand), "moveForceUnitLabel")]
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
+[JsonDerivedType(typeof(AdoptFreeTextSectionCommand), "adoptFreeTextSection")]
 [JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
 [JsonDerivedType(typeof(SetNavVisibilityCommand), "setNavVisibility")]
 [JsonDerivedType(typeof(AddChecklistCommand), "addChecklist")]
@@ -165,6 +166,8 @@ public sealed record MoveForceUnitLabelCommand(OperatorDto Operator, Guid UnitId
 
 /// <summary>Places a running Funktion in a node and board slot; a null NodeId is the Einsatzleitung.</summary>
 public sealed record PlaceRoleAssignmentCommand(OperatorDto Operator, Guid AssignmentId, Guid? NodeId, RoleSlot Slot) : SyncCommand;
+
+public sealed record AdoptFreeTextSectionCommand(OperatorDto Operator, string Section) : SyncCommand;
 
 /// <summary>Sets the Führungsstufe; a null Stufe clears it.</summary>
 public sealed record SetFuehrungsstufeCommand(OperatorDto Operator, Fuehrungsstufe? Stufe) : SyncCommand;

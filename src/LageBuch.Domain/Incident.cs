@@ -700,6 +700,57 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Takes a Freitext-Abschnitt into the Führung structure (#824): the live top-level Abschnitt of
+    /// that name, formed here when there is none, receives every running Funktion that was typed
+    /// with the Abschnitt and placed nowhere. Each keeps its slot, so an EAL leads the Abschnitt; a
+    /// second Leiter beside one already there is shown among its members, as on the board. One step,
+    /// because a joined client is never told the id of a node it asks the host to form.
+    /// </summary>
+    /// <returns>The Abschnitt the Funktionen now sit in.</returns>
+    public CommandNode AdoptFreeTextSection(IClock clock, SessionOperator op, string section)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            throw new ArgumentException("Abschnitt darf nicht leer sein.", nameof(section));
+        }
+
+        // The grouping ReportingLine.FreeTextSections shows as one card: trimmed, ignoring case.
+        var name = section.Trim();
+        var members = new List<int>();
+        for (var i = 0; i < _roles.Count; i++)
+        {
+            if (_roles[i] is { To: null, NodeId: null, Section: { } typed }
+                && string.Equals(typed, name, StringComparison.OrdinalIgnoreCase))
+            {
+                members.Add(i);
+            }
+        }
+
+        if (members.Count == 0)
+        {
+            throw new InvalidOperationException($"Kein Abschnitt (Freitext) „{name}“ mit laufender Funktion.");
+        }
+
+        // Forming it first: AddCommandNode refuses a name a live Bereitstellung or Einsatzleitung
+        // already carries, and then nobody has moved yet.
+        var node = _commandNodes.Find(n => n is { IsLive: true, Kind: CommandNodeKind.Abschnitt, ParentId: null }
+                && string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase))
+            ?? AddCommandNode(clock, op, CommandNodeKind.Abschnitt, name);
+
+        foreach (var i in members)
+        {
+            _roles[i] = _roles[i] with { NodeId = node.Id, Section = node.Name };
+        }
+
+        var count = members.Count == 1 ? "1 Funktion" : $"{members.Count} Funktionen";
+        AppendSystemEntry(clock, op, $"Abschnitt (Freitext) {name} übernommen: {count}");
+        return node;
+    }
+
+    /// <summary>
     /// Corrects a role assignment's phone number. Mirrors <see cref="UpdateForceUnit"/>: only a real
     /// change reaches the ETB, so re-saving the same (normalised) number is not a reportable event.
     /// </summary>
@@ -762,7 +813,7 @@ public sealed class Incident
         }
 
         var updated = previous.WithDetails(personName, callSign, phone, section);
-        if ((previous.NodeId is not null || previous.Slot != RoleSlot.None)
+        if (previous.IsPlacedOnBoard
             && !string.Equals(previous.Section, updated.Section, StringComparison.Ordinal))
         {
             throw new InvalidOperationException("Diese Funktion ist unter FÜHRUNG zugeordnet und wird dort verschoben.");

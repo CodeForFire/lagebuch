@@ -117,6 +117,22 @@ public class RoleAssignmentDialogViewModelTests
     }
 
     [Fact]
+    public void Bearbeiten_offers_the_abschnitt_of_an_eal_typed_with_one_in_funktionen()
+    {
+        // #824: FUNKTIONEN stamps the Stammdaten slot, but nothing placed the EAL on the board.
+        var session = NewSession();
+        var typed = Assign(session, "EAL", "Erika Musterfrau", section: "Nrod", slot: RoleSlot.Leiter);
+        var vm = Open(session, typed, RoleAssignmentDialogMode.Edit);
+        Assert.True(vm.IsSectionEditable);
+
+        vm.Section = "Nord";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Nord", Running(session, "EAL").Section);
+        Assert.Equal(RoleSlot.Leiter, Running(session, "EAL").Slot);
+    }
+
+    [Fact]
     public void Bearbeiten_moves_a_typed_funktion_to_another_abschnitt()
     {
         var session = NewSession();
