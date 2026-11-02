@@ -214,6 +214,9 @@ jobs:
     needs: version
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    # The upload keystore lives in this Environment's secrets, which a run only sees after a
+    # maintainer approves it (docs/releasing.md, "Google Play").
+    environment: google-play
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -232,6 +235,19 @@ jobs:
         run: |
           dotnet workload config --update-mode manifests
           dotnet workload install android
+      # The password goes to a file, not onto the command line: the csproj reads it through
+      # the file: prefix, so it never lands in the binlog or in `ps`.
+      - name: Write the upload keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASS }}
+        run: |
+          test -n "$KEYSTORE_B64" && test -n "$KEYSTORE_PASS" \
+            || { echo "::error::The google-play environment lacks ANDROID_UPLOAD_KEYSTORE_B64 or ANDROID_UPLOAD_KEYSTORE_PASS"; exit 1; }
+          umask 077
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/keys/lagebuch-upload.p12"
+          printf '%s' "$KEYSTORE_PASS" > "$RUNNER_TEMP/keys/lagebuch-upload.pass"
       - name: Publish
         env:
           VERSION: ${{ needs.version.outputs.version }}
@@ -241,7 +257,14 @@ jobs:
           "-p:ApplicationVersion=${VERSION_CODE}"
           "-p:ApplicationDisplayVersion=${VERSION}"
           "-p:Version=${VERSION}"
+          "-p:AndroidSigningKeyStore=${RUNNER_TEMP}/keys/lagebuch-upload.p12"
+          -p:AndroidSigningKeyAlias=lagebuch-upload
+          "-p:AndroidSigningStorePass=file:${RUNNER_TEMP}/keys/lagebuch-upload.pass"
+          "-p:AndroidSigningKeyPass=file:${RUNNER_TEMP}/keys/lagebuch-upload.pass"
           -o publish-android
+      - name: Remove the upload keystore
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
       - name: Write the Android SBOM
         env:
           VERSION: ${{ needs.version.outputs.version }}
@@ -255,8 +278,8 @@ jobs:
           path: sbom/*.cdx.json
           if-no-files-found: error
       # The publish emits both formats: the .aab, and the universal .apk bundletool extracts
-      # from that same signed bundle. The .apk goes on the release as before; the .aab is kept
-      # as a build artifact for the manual Google Play upload (docs/releasing.md).
+      # from that same signed bundle. The .apk goes on the release; the .aab is handed to the
+      # `play` job, which uploads it to Google Play (docs/releasing.md).
       - name: Locate and rename the packages
         env:
           VERSION: ${{ needs.version.outputs.version }}
@@ -274,6 +297,13 @@ jobs:
           aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -n1)
           min_sdk=$("$aapt2" dump badging "$apk" | sed -n "s/^\(minSdkVersion\|sdkVersion\):'\([0-9]*\)'$/\2/p")
           test "${min_sdk:-0}" -ge 24 || { echo "::error::The APK has minSdkVersion '${min_sdk}', Play needs 24 - check SupportedOSPlatformVersion"; exit 1; }
+          # Without the signing properties the SDK silently falls back to a fresh debug key, and
+          # Play rejects that bundle only at the upload. Refuse it here instead.
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n1)
+          certs=$("$apksigner" verify --print-certs "$apk")
+          if grep -q "CN=Android Debug" <<< "$certs"; then
+            echo "::error::The APK is signed with the debug key - check the AndroidSigning* properties"; exit 1
+          fi
           mkdir -p dist play
           cp "$apk" "dist/lagebuch-${VERSION}.apk"
           cp "$aab" "play/lagebuch-${VERSION}.aab"
@@ -282,8 +312,7 @@ jobs:
           name: apk
           path: dist/*.apk
           if-no-files-found: error
-      # Deliberately not a release asset: it is signed with the CI debug key, so it is only good
-      # for inspection. The bundle that goes to Play is built on a laptop with the upload key.
+      # Deliberately not a release asset: nobody installs a bundle. It exists for the `play` job.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aab
@@ -304,8 +333,8 @@ jobs:
         with:
           persist-credentials: false
       # Only the packages a user installs. Without a pattern this pulls every artifact of the
-      # run, and the CI-debug-signed .aab ended up on the 0.7.0-0.8.1 releases; it is a build
-      # artifact for inspection only (docs/releasing.md).
+      # run, and the .aab ended up on the 0.7.0-0.8.1 releases; it is meant for Google Play only
+      # (the `play` job, docs/releasing.md).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: '{msi,deb,apk,sbom-desktop,sbom-android}'
@@ -439,6 +468,48 @@ jobs:
           prerelease: ${{ needs.version.outputs.prerelease }}
           files: dist/* # flat since the checksum step; includes SHA256SUMS.txt
           body_path: release-notes.md
+
+  # Uploads the signed bundle to Google Play as a draft; a maintainer rolls it out in the Play
+  # Console. After `release`, so Play never carries a version the GitHub release does not.
+  # Authentication is Workload Identity Federation: GitHub's OIDC token is exchanged for a
+  # short-lived Google credential, so no service-account key exists to leak. The provider and
+  # the service account are names, not secrets, and live in the Environment's variables.
+  play:
+    needs: [version, android, release]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: google-play
+    permissions:
+      contents: read
+      id-token: write # the OIDC token Workload Identity Federation exchanges
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: aab
+          path: play
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_PLAY_SERVICE_ACCOUNT }}
+      # A prerelease tag (v0.6.0-beta.1) goes to closed testing, a final one to production.
+      # In the Play API closed testing is the track named `alpha` (`beta` is *open* testing);
+      # it is the track the 12-testers/14-days gate counts. Both as drafts: nothing reaches a
+      # device until someone presses roll out in the Console.
+      - id: track
+        name: Pick the track
+        env:
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          if [ "$PRERELEASE" = true ]; then track=alpha; else track=production; fi
+          echo "track=$track" >> "$GITHUB_OUTPUT"
+      - uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJson: ${{ steps.auth.outputs.credentials_file_path }}
+          packageName: de.codeforfire.lagebuch
+          releaseFiles: play/*.aab
+          track: ${{ steps.track.outputs.track }}
+          status: draft
 
   # macOS carries the 10x minute multiplier, so it is not built on every tag. Run this workflow
   # manually (workflow_dispatch) with the version of an existing release to add the .dmg to it.
