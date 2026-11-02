@@ -1,4 +1,7 @@
+using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -21,7 +24,7 @@ namespace LageBuch.Acceptance.Tests;
 /// </remarks>
 public class ScbaSafetyTruppFlyoutTests
 {
-    private static (Window Window, ScbaView View, ScbaViewModel Scba) Build()
+    private static (Window Window, ScbaView View, ScbaViewModel Scba) Build(bool narrow = false)
     {
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
         var scba = vm.Scba;
@@ -34,8 +37,12 @@ public class ScbaSafetyTruppFlyoutTests
             scba.AddTruppCommand.Execute(null);
         }
 
+        // A phone's width folds the grid into cards, set up the way ScbaLocationInputTests does it.
+        vm.IsNarrow = narrow;
         var view = new ScbaView { DataContext = scba };
-        var window = new Window { Content = view, Width = 1400, Height = 900 };
+        var workspace = new Panel { Name = "WorkspaceRoot", Children = { view } };
+        workspace.Classes.Set("narrow", narrow);
+        var window = new Window { Content = workspace, Width = narrow ? 420 : 1400, Height = 900 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return (window, view, scba);
@@ -71,6 +78,43 @@ public class ScbaSafetyTruppFlyoutTests
 
         Assert.Equal(standby.Id, scba.Trupps.Single(r => r.Id == row.Id).SafetyTruppChoices.Single(c => c.IsCurrent).Id);
         Assert.Equal(standby.DisplayName, scba.Trupps.Single(r => r.Id == row.Id).SafetyTruppButtonText);
+    }
+
+    // #832: an entry is a Button, and a Button inside a Flyout does not dismiss it. Pressed for
+    // real rather than through its command, because running the command alone never closed anything.
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Picking_a_sicherheitstrupp_designates_it_and_closes_the_flyout(bool narrow)
+    {
+        var (_, view, scba) = Build(narrow);
+        var row = scba.Trupps[^1];
+        var standby = scba.Trupps.Single(r => r.Designation == "Sicherheitstrupp");
+        var picker = view.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.IsEffectivelyVisible && ReferenceEquals(b.DataContext, row)
+                && AutomationProperties.GetName(b) == "Sicherheitstrupp wählen");
+
+        Click(picker);
+        var flyout = Assert.IsType<Flyout>(picker.Flyout);
+        Assert.True(flyout.IsOpen);
+        var entry = Assert.IsAssignableFrom<Control>(flyout.Content).GetVisualDescendants().OfType<Button>()
+            .Single(b => b.DataContext is SafetyTruppChoice c && c.Id == standby.Id);
+        Click(entry);
+
+        Assert.Equal(standby.DisplayName, scba.Trupps.Single(r => r.Id == row.Id).SafetyTruppButtonText);
+        Assert.False(flyout.IsOpen);
+    }
+
+    private static void Click(Control control)
+    {
+        // The phone's cards stack below the form, so the last Trupp's picker starts off screen.
+        control.BringIntoView();
+        Dispatcher.UIThread.RunJobs();
+        var topLevel = TopLevel.GetTopLevel(control)!;
+        var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), topLevel)!.Value;
+        topLevel.MouseDown(centre, MouseButton.Left);
+        topLevel.MouseUp(centre, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
     }
 
     [AvaloniaFact]
