@@ -17,6 +17,14 @@
          for them. Play splits the .aab per ABI, so arm64 devices download no extra bytes; only the
          universal sideload .apk grows. release.yml fails if one of these ABIs goes missing. -->
     <RuntimeIdentifiers>android-arm;android-arm64;android-x64</RuntimeIdentifiers>
+    <!-- Dependabot restores this head on an SDK without the Android workload. There the SDK's own
+         CoreCLR runtime-pack list applies, which knows android-arm64 and android-x64 but not
+         android-arm, so the RID graph falls back to Microsoft.NETCore.App.Runtime.linux-bionic-arm
+         — a package that was never published. The restore fails with NU1101 and every Dependabot
+         NuGet job with it. It only reads package references, so drop the 32-bit RID there.
+         DEPENDABOT_HOME is set by Dependabot's updater image and survives into its dotnet calls,
+         which strip only MSBuild* variables. A real build has the workload and keeps all three. -->
+    <RuntimeIdentifiers Condition="'$(DEPENDABOT_HOME)' != ''">android-arm64;android-x64</RuntimeIdentifiers>
     <!-- No packages.lock.json for this head (see Directory.Build.props). The Android SDK injects
          Microsoft.NET.ILLink.Tasks at the version of whichever SDK runs the restore, so a lock
          file here would fail CI's locked restore on every SDK patch release, and Dependabot
