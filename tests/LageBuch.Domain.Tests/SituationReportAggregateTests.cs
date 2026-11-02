@@ -48,7 +48,7 @@ public class SituationReportAggregateTests
         Assert.Equal("Florian Musterstadt 11/1", entry.From);
         Assert.Equal("ILS", entry.To);
         Assert.Equal(
-            "Lagemeldung Nr. 1: Blumenstraße 13 · Schuppen im Vollbrand · Brandbekämpfung mit einem C-Hohlstrahlrohr · 1 Trupp unter PA im Einsatz",
+            "1. Lagemeldung von Blumenstraße 13 · Schuppen im Vollbrand · Brandbekämpfung mit einem C-Hohlstrahlrohr · 1 Trupp unter PA im Einsatz",
             entry.Text);
         Assert.Equal(entry.Id, sent.EtbEntryId);
     }

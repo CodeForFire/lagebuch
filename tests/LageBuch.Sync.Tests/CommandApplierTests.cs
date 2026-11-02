@@ -817,7 +817,7 @@ public class CommandApplierTests
         Assert.Equal(Domain.Etb.EtbDirection.Outgoing, entry.Direction);
         Assert.Equal("ELW 1", entry.From);
         Assert.Equal("ILS", entry.To);
-        Assert.Equal("Lagemeldung Nr. 1: Blumenstraße 13 · Schuppen im Vollbrand", entry.Text);
+        Assert.Equal("1. Lagemeldung von Blumenstraße 13 · Schuppen im Vollbrand", entry.Text);
     }
 
     [Fact]

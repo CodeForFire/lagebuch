@@ -26,7 +26,7 @@ public class SituationReportsViewModelTests
         new(session, () => { }, "ILS", requestConfirm);
 
     [Fact]
-    public void A_new_report_is_prefilled_from_the_funkrufname_the_address_and_the_kraefte()
+    public void A_new_report_is_prefilled_from_the_funkrufname_the_street_and_the_kraefte()
     {
         var (session, _) = NewSession();
         session.SetAddress("Blumenstraße", "Nord", "13", "12345", "Musterstadt");
@@ -39,7 +39,7 @@ public class SituationReportsViewModelTests
         Assert.Equal("Entwurf", Assert.Single(vm.Reports).Title);
         Assert.Same(vm.Reports[0], vm.SelectedReport);
         Assert.Equal("Florian Musterstadt 11/1", vm.Reporter);
-        Assert.Equal("Blumenstraße 13, Nord, 12345 Musterstadt", vm.Location);
+        Assert.Equal("Blumenstraße 13", vm.Location);
         Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9, FF Beispieldorf 0/1/5/6", vm.Units);
         Assert.Null(vm.Situation);
         Assert.True(vm.IsEditable);
@@ -57,32 +57,30 @@ public class SituationReportsViewModelTests
     }
 
     [Fact]
-    public void Einsatzstelle_suggests_the_einsatzdaten_address_first_then_the_stammdaten_strassen()
+    public void Einsatzstelle_suggests_the_einsatzdaten_street_first_then_the_stammdaten_strassen()
     {
         var (session, _) = NewSession();
         session.SetAddress("Blumenstraße", "Nord", "13", "12345", "Musterstadt");
-        string[] streets = ["Am Markt, 12345 Musterstadt", "Blumenstraße 13, Nord, 12345 Musterstadt", "Lindenweg, Süd, 12345 Musterstadt"];
+        string[] streets = ["Am Markt", "Blumenstraße 13", "Lindenweg"];
 
         using var vm = new SituationReportsViewModel(session, () => { }, "ILS", addresses: streets);
 
-        Assert.Equal(
-            ["Blumenstraße 13, Nord, 12345 Musterstadt", "Am Markt, 12345 Musterstadt", "Lindenweg, Süd, 12345 Musterstadt"],
-            vm.LocationOptions);
+        Assert.Equal(["Blumenstraße 13", "Am Markt", "Lindenweg"], vm.LocationOptions);
     }
 
     [Fact]
     public void Einsatzstelle_follows_a_change_of_the_einsatzdaten_address()
     {
         var (session, _) = NewSession();
-        using var vm = new SituationReportsViewModel(session, () => { }, "ILS", addresses: ["Am Markt, 12345 Musterstadt"]);
-        Assert.Equal(["Am Markt, 12345 Musterstadt"], vm.LocationOptions);
+        using var vm = new SituationReportsViewModel(session, () => { }, "ILS", addresses: ["Am Markt"]);
+        Assert.Equal(["Am Markt"], vm.LocationOptions);
         var raised = new List<string?>();
         vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
         session.SetAddress("Lindenweg", "Süd", "4", "12345", "Musterstadt");
 
         Assert.Contains(nameof(SituationReportsViewModel.LocationOptions), raised);
-        Assert.Equal("Lindenweg 4, Süd, 12345 Musterstadt", vm.LocationOptions[0]);
+        Assert.Equal("Lindenweg 4", vm.LocationOptions[0]);
     }
 
     [Fact]
@@ -94,8 +92,41 @@ public class SituationReportsViewModelTests
 
         vm.Situation = "Schuppen im Vollbrand";
 
-        Assert.Equal("Schuppen im Vollbrand", vm.FunkspruchPreview);
+        Assert.Equal("1. Lagemeldung · Schuppen im Vollbrand", vm.FunkspruchPreview);
         Assert.Null(session.Incident.SituationReports[0].Situation);
+    }
+
+    [Fact]
+    public void The_funkspruch_preview_of_a_draft_carries_the_nr_it_will_be_sent_as()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session, (_, _, onConfirmed) => onConfirmed());
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Schuppen im Vollbrand";
+        vm.SendCommand.Execute(null);
+
+        vm.NewReportCommand.Execute(null);
+        vm.Location = "Blumenstraße 13";
+        vm.Situation = "Feuer aus";
+
+        Assert.Equal("2. Lagemeldung von Blumenstraße 13 · Feuer aus", vm.FunkspruchPreview);
+    }
+
+    [Fact]
+    public void The_funkspruch_preview_of_a_sent_report_carries_its_own_nr()
+    {
+        var (session, _) = NewSession();
+        using var vm = NewVm(session, (_, _, onConfirmed) => onConfirmed());
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Schuppen im Vollbrand";
+        vm.SendCommand.Execute(null);
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Feuer aus";
+        vm.SendCommand.Execute(null);
+
+        vm.SelectedReport = vm.Reports.Single(r => r.Title == "Nr. 1");
+
+        Assert.Equal("1. Lagemeldung · Schuppen im Vollbrand", vm.FunkspruchPreview);
     }
 
     [Fact]
@@ -231,7 +262,7 @@ public class SituationReportsViewModelTests
         var entry = session.Incident.Journal[^1];
         Assert.Equal(EtbDirection.Outgoing, entry.Direction);
         Assert.Equal("ILS", entry.To);
-        Assert.Equal("Lagemeldung Nr. 1: Blumenstraße 13 · Schuppen im Vollbrand", entry.Text);
+        Assert.Equal("1. Lagemeldung von Blumenstraße 13 · Schuppen im Vollbrand", entry.Text);
     }
 
     [Fact]

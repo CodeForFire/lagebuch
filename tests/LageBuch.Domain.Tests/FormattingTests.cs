@@ -71,6 +71,32 @@ public class FormattingTests
         Assert.Equal(expected, Formatting.Address(street, district, houseNumber, postalCode, place));
     }
 
+    [Fact]
+    public void StreetAddress_is_street_and_house_number_without_ortsteil_plz_or_ort()
+    {
+        var incident = Incident.Start(new FixedClock(DateTimeOffset.UnixEpoch), new SessionOperator("Muster"));
+        incident.SetAddress("Buchenauerstraße", "Puch", houseNumber: "12", postalCode: "82256", place: "Fürstenfeldbruck");
+
+        Assert.Equal("Buchenauerstraße 12", Formatting.StreetAddress(incident));
+    }
+
+    [Fact]
+    public void StreetAddress_without_a_street_falls_back_to_the_rest_of_the_address()
+    {
+        var incident = Incident.Start(new FixedClock(DateTimeOffset.UnixEpoch), new SessionOperator("Muster"));
+        incident.SetAddress(null, "Puch", houseNumber: "12", place: "Fürstenfeldbruck");
+
+        Assert.Equal("12, Puch, Fürstenfeldbruck", Formatting.StreetAddress(incident));
+    }
+
+    [Fact]
+    public void StreetAddress_is_null_without_an_address()
+    {
+        var incident = Incident.Start(new FixedClock(DateTimeOffset.UnixEpoch), new SessionOperator("Muster"));
+
+        Assert.Null(Formatting.StreetAddress(incident));
+    }
+
     public static TheoryData<TaskImportance, string> ImportanceLabels => new()
     {
         { TaskImportance.High, "Hoch" },

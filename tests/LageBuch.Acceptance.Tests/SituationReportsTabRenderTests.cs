@@ -105,7 +105,7 @@ public class SituationReportsTabRenderTests
         Assert.True(Named<Button>(content, "SendReportButton").IsEffectivelyVisible);
         Assert.True(Named<Border>(content, "HelperPanel").IsEffectivelyVisible);
         Assert.False(Named<Button>(content, "OpenHelperButton").IsEffectivelyVisible);
-        Assert.StartsWith("Blumenstraße 13 · Feuer unter Kontrolle", Named<SelectableTextBlock>(content, "FunkspruchText").Text, StringComparison.Ordinal);
+        Assert.StartsWith("2. Lagemeldung von Blumenstraße 13 · Feuer unter Kontrolle", Named<SelectableTextBlock>(content, "FunkspruchText").Text, StringComparison.Ordinal);
         Assert.StartsWith("Berta – Ludwig", Named<SelectableTextBlock>(content, "SpelledText").Text, StringComparison.Ordinal);
         Capture(window, "lagemeldung-tab.png");
     }
@@ -214,7 +214,7 @@ public class SituationReportsTabRenderTests
         var (_, vm, session) = ShowWorkspace();
         var entryId = session.Incident.SituationReports[0].EtbEntryId!.Value;
 
-        session.EditJournalEntry(entryId, "Lagemeldung Nr. 1 (berichtigt)");
+        session.EditJournalEntry(entryId, "1. Lagemeldung (berichtigt)");
 
         Assert.Equal("LM 1", vm.Etb.Entries.Single(row => row.Id == entryId).SituationReportLabel);
     }

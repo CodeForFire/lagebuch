@@ -109,6 +109,9 @@ public sealed class Incident
     /// <summary>The Lagemeldungen (#592) — drafts and sent ones — in creation order.</summary>
     public IReadOnlyList<SituationReport> SituationReports => _situationReports;
 
+    /// <summary>The Nr. the next Lagemeldung is sent as: one after the last one sent.</summary>
+    public int NextSituationReportNumber => _situationReports.Select(r => r.Number ?? 0).DefaultIfEmpty(0).Max() + 1;
+
     /// <summary>The Ausgabeliste: every Gerät handed out, in the order it was issued.</summary>
     public IReadOnlyList<IssuedItem> IssuedItems => _issuedItems;
 
@@ -2219,12 +2222,12 @@ public sealed class Incident
             throw new ArgumentException("Die Lagemeldung ist leer.", nameof(reportId));
         }
 
-        var number = _situationReports.Select(r => r.Number ?? 0).DefaultIfEmpty(0).Max() + 1;
+        var number = NextSituationReportNumber;
         var entry = AddJournalEntry(
             clock,
             op,
             EtbDirection.Outgoing,
-            $"Lagemeldung Nr. {number}: {draft.Funkspruch}",
+            draft.AnnounceAs(number),
             from: draft.Reporter,
             to: dispatchCentreName.Trim());
         var sent = draft.AsSent(number, clock.Now, op, entry.Id);

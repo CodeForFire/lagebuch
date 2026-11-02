@@ -79,6 +79,19 @@ public static class Formatting
         return Address(incident.Street, incident.District, incident.HouseNumber, incident.PostalCode, incident.Place);
     }
 
+    /// <summary>
+    /// The address as a Lagemeldung names the Einsatzstelle: street and house number, without
+    /// Ortsteil, PLZ or Ort, which the Leitstelle already has. Without a street, the rest of the
+    /// address; null when there is none.
+    /// </summary>
+    public static string? StreetAddress(Incident incident)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        return string.IsNullOrWhiteSpace(incident.Street)
+            ? Address(incident)
+            : Address(incident.Street, null, incident.HouseNumber);
+    }
+
     private static string Join(string separator, params string?[] parts) =>
         string.Join(separator, parts.OfType<string>().Select(s => s.Trim()).Where(s => s.Length > 0));
 
