@@ -521,7 +521,7 @@ public class IncidentWorkspaceViewModelTests
             session,
             clock,
             new FakeTicker(),
-            Md() with { Streets = [new Street("Am Markt", PostalCode: "12345", Place: "Musterstadt"), new Street("Lindenweg", "Süd", "12345", "Musterstadt"), new Street("Lindenweg", "Nord", "12345", "Musterstadt")] },
+            Md() with { Streets = [new Street("Am Markt", PostalCode: "12345", Place: "Musterstadt"), new Street("Lindenweg", "Süd", "12345", "Musterstadt"), new Street("Lindenweg", "Nord", "12345", "Musterstadt"), new Street(" ", Place: "Musterstadt")] },
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());

@@ -113,6 +113,25 @@ public class SituationReportsViewModelTests
     }
 
     [Fact]
+    public void The_funkspruch_preview_of_an_open_draft_moves_on_when_another_report_is_sent_elsewhere()
+    {
+        var (session, _) = NewSession();
+        session.AddSituationReport(null, null, "Schuppen im Vollbrand", null, null, null);
+        var other = session.Incident.SituationReports[0].Id;
+        using var vm = NewVm(session);
+        vm.NewReportCommand.Execute(null);
+        vm.Situation = "Feuer aus";
+        Assert.Equal("1. Lagemeldung · Feuer aus", vm.FunkspruchPreview);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        session.SendSituationReport(other, "ILS");
+
+        Assert.Contains(nameof(SituationReportsViewModel.FunkspruchPreview), raised);
+        Assert.Equal("2. Lagemeldung · Feuer aus", vm.FunkspruchPreview);
+    }
+
+    [Fact]
     public void The_funkspruch_preview_of_a_sent_report_carries_its_own_nr()
     {
         var (session, _) = NewSession();
