@@ -73,6 +73,7 @@ public class CommandSerializationTests
         new MarkScbaRemovedCommand(Guid.NewGuid()),
         new SetScbaSafetyTruppCommand(Guid.NewGuid(), Guid.NewGuid()),
         new SetScbaSafetyTruppCommand(Guid.NewGuid(), null),
+        new ChangeScbaTruppTypeCommand(Guid.NewGuid(), "Angriffstrupp", 30, 10),
         new SetIncidentNumberCommand("B 1.2 260812 001"),
         new SetKeywordCommand("Brand 2"),
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),
@@ -163,6 +164,17 @@ public class CommandSerializationTests
         var back = Assert.IsType<SetScbaSafetyTruppCommand>(SyncJson.Deserialize<SyncCommand>(json));
         Assert.Equal(truppId, back.TruppId);
         Assert.Null(back.SafetyTruppId);
+    }
+
+    [Fact]
+    public void ChangeScbaTruppType_discriminator_survives_the_wire()
+    {
+        var truppId = Guid.NewGuid();
+        var json = SyncJson.Serialize<SyncCommand>(new ChangeScbaTruppTypeCommand(truppId, "Angriffstrupp", 25, 8));
+        Assert.Contains("\"$type\":\"changeScbaTruppType\"", json, StringComparison.Ordinal);
+
+        var back = Assert.IsType<ChangeScbaTruppTypeCommand>(SyncJson.Deserialize<SyncCommand>(json));
+        Assert.Equal(new ChangeScbaTruppTypeCommand(truppId, "Angriffstrupp", 25, 8), back);
     }
 
     [Fact]

@@ -190,15 +190,19 @@ public static class SyncProtocol
     /// <c>favorite</c>. A client at 31 skips the key and lists the host's groups unmarked, and a
     /// payload without it reads as no favourites, so the floor stays at 31.
     /// </para>
+    /// <para>
+    /// 33: a Trupp's Trupp-Art can be changed after Bereitstellung (#835). A client may send
+    /// <c>changeScbaTruppType</c>, which a host at 32 does not know, so the floor rises to 33.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 32;
+    public const int ProtocolVersion = 33;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 31;
+    public const int MinimumProtocolVersion = 33;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

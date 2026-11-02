@@ -280,8 +280,39 @@
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <StackPanel VerticalAlignment="Center" Margin="12,6">
                   <!-- Funkrufname · Trupp-Art. Wraps rather than ellipsising: the Funkrufname is
-                       what tells two Angriffstrupps apart, and the row has height to spare. -->
-                  <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" />
+                       what tells two Angriffstrupps apart, and the row has height to spare. The
+                       pencil changes the Trupp-Art (#835) — the Sicherheitstrupp goes in next and
+                       another crew takes over — with the same command-driven flyout as the
+                       Sicherheitstrupp picker below, for the same reason. -->
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1" x:Name="TruppTypeButton" Classes="icon-btn" VerticalAlignment="Top"
+                            IsVisible="{Binding CanChangeTruppType}"
+                            ToolTip.Tip="Trupp-Art ändern"
+                            AutomationProperties.Name="Trupp-Art ändern">
+                      <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                          <ItemsControl ItemsSource="{Binding TruppTypeChoices}" MinWidth="170">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:TruppTypeChoice">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left" Padding="8,5"
+                                        Command="{Binding SelectCommand}" Click="OnFlyoutChoiceClick">
+                                  <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                                    <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold"
+                                               IsVisible="{Binding IsCurrent}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" />
+                                  </Grid>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                  </Grid>
                   <!-- FwDV 7's Sicherheitstrupp (#399) stacks here rather than taking a column of
                        its own: eight columns already need every pixel of a 1280px ELW screen, and
                        the width for a ninth would have to come out of the crew or the action
@@ -295,7 +326,7 @@
                        inside its own SelectionModel batch, which still holds indices into the list
                        being rebuilt — it crashed with an IndexOutOfRange out of EndBatchUpdate.
                        A command runs with no selection model in the picture, and the flyout is
-                       closed after it by OnSafetyTruppChoiceClick (#832). Same Button.Flyout idiom
+                       closed after it by OnFlyoutChoiceClick (#832). Same Button.Flyout idiom
                        as ForcesView's Stärke editor. -->
                   <StackPanel Margin="0,4,0,0" Spacing="2">
                     <TextBlock Text="Sicherheitstrupp" Classes="cellLabel" />
@@ -313,7 +344,7 @@
                               <DataTemplate x:DataType="vm:SafetyTruppChoice">
                                 <Button Classes="ghost" HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Left" Padding="8,5"
-                                        Command="{Binding SelectCommand}" Click="OnSafetyTruppChoiceClick">
+                                        Command="{Binding SelectCommand}" Click="OnFlyoutChoiceClick">
                                   <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
                                     <!-- The entry in force is marked rather than styled, so it
                                          still reads at a glance on the ELW's dimmed screen. -->
@@ -468,11 +499,38 @@
             <DataTemplate x:DataType="vm:ScbaTruppRow">
               <Border Classes="row-card" Classes.alarm="{Binding IsAlarm}">
                 <StackPanel Spacing="6">
-                  <Grid ColumnDefinitions="*,Auto">
+                  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
                     <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center"
                                FontWeight="SemiBold" TextWrapping="Wrap"
                                Foreground="{StaticResource TextPrimaryBrush}" />
-                    <TextBlock Grid.Column="1" Text="{Binding StatusDisplay}" VerticalAlignment="Center"
+                    <!-- The grid's Trupp-Art picker (#835); no x:Name, as with the Sicherheitstrupp
+                         picker below, so the grid's TruppTypeButton stays unambiguous in tests. -->
+                    <Button Grid.Column="1" Classes="icon-btn card-action" VerticalAlignment="Center"
+                            IsVisible="{Binding CanChangeTruppType}"
+                            ToolTip.Tip="Trupp-Art ändern"
+                            AutomationProperties.Name="Trupp-Art ändern">
+                      <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                          <ItemsControl ItemsSource="{Binding TruppTypeChoices}" MinWidth="170">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:TruppTypeChoice">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left" Padding="8,5"
+                                        Command="{Binding SelectCommand}" Click="OnFlyoutChoiceClick">
+                                  <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                                    <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold"
+                                               IsVisible="{Binding IsCurrent}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" />
+                                  </Grid>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                    <TextBlock Grid.Column="2" Text="{Binding StatusDisplay}" VerticalAlignment="Center"
                                FontWeight="SemiBold" Classes="scbaStatus"
                                Classes.alarm="{Binding IsAlarm}" Classes.control="{Binding IsControlDue}" />
                   </Grid>
@@ -537,7 +595,7 @@
                               <DataTemplate x:DataType="vm:SafetyTruppChoice">
                                 <Button Classes="ghost" HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Left" Padding="8,5"
-                                        Command="{Binding SelectCommand}" Click="OnSafetyTruppChoiceClick">
+                                        Command="{Binding SelectCommand}" Click="OnFlyoutChoiceClick">
                                   <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
                                     <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold"
                                                IsVisible="{Binding IsCurrent}" />

@@ -45,6 +45,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(WithdrawScbaTruppCommand), "withdrawScbaTrupp")]
 [JsonDerivedType(typeof(MarkScbaRemovedCommand), "markScbaRemoved")]
 [JsonDerivedType(typeof(SetScbaSafetyTruppCommand), "setScbaSafetyTrupp")]
+[JsonDerivedType(typeof(ChangeScbaTruppTypeCommand), "changeScbaTruppType")]
 [JsonDerivedType(typeof(SetIncidentNumberCommand), "setIncidentNumber")]
 [JsonDerivedType(typeof(SetKeywordCommand), "setKeyword")]
 [JsonDerivedType(typeof(SetAddressCommand), "setAddress")]
@@ -223,6 +224,12 @@ public sealed record MarkScbaRemovedCommand(Guid TruppId) : SyncCommand;
 /// clears it. Carries no operator: the ETB line is written by the sending device through
 /// AddJournalEntry, exactly like every other Atemschutz mutation.</summary>
 public sealed record SetScbaSafetyTruppCommand(Guid TruppId, Guid? SafetyTruppId) : SyncCommand;
+
+/// <summary>Gives a Trupp another Trupp-Art (#835). The Einsatzzeit and Abfrage-Intervall are the
+/// sending device's reading of its Stammdaten; the host takes them over only while the Trupp still
+/// waits. Carries no operator, like <see cref="SetScbaSafetyTruppCommand"/>.</summary>
+public sealed record ChangeScbaTruppTypeCommand(
+    Guid TruppId, string Designation, int MaxDurationMinutes, int PressureControlIntervalMinutes) : SyncCommand;
 
 public sealed record SetIncidentNumberCommand(string? IncidentNumber) : SyncCommand;
 

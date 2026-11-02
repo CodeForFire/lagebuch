@@ -1446,6 +1446,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public void SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId) =>
         _inner.SetScbaSafetyTrupp(truppId, safetyTruppId);
 
+    public void ChangeScbaTruppType(Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes) =>
+        _inner.ChangeScbaTruppType(truppId, designation, maxDurationMinutes, pressureControlIntervalMinutes);
+
     public void SetIncidentNumber(IncidentNumber? number) => _inner.SetIncidentNumber(number);
 
     public void SetKeyword(string? keyword) => _inner.SetKeyword(keyword);

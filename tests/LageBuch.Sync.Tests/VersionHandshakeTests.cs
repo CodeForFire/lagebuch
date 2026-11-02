@@ -303,7 +303,16 @@ public class VersionHandshakeTests
     {
         // 32 adds an optional favorite to the Stammdaten payload's talk groups. A client at 31 skips
         // it and a payload without it reads as no favourites, so a 31 and a 32 still connect.
-        Assert.Equal(32, SyncProtocol.ProtocolVersion);
-        Assert.Equal(31, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 32, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 31, int.MaxValue);
+    }
+
+    [Fact]
+    public void Changing_a_trupp_art_raises_the_protocol_and_the_floor_to_thirty_three()
+    {
+        // 33 adds changeScbaTruppType, a command a client may send. A host at 32 has it nowhere in
+        // its allowlist and would reject it, so a 32 and a 33 must not connect.
+        Assert.Equal(33, SyncProtocol.ProtocolVersion);
+        Assert.Equal(33, SyncProtocol.MinimumProtocolVersion);
     }
 }

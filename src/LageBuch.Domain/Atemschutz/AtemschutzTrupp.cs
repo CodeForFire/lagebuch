@@ -71,7 +71,7 @@ public sealed class AtemschutzTrupp
 
     public int TruppNumber { get; private init; }
 
-    public string Designation { get; private init; } = string.Empty;
+    public string Designation { get; private set; } = string.Empty;
 
     /// <summary>
     /// "{CallSign} · {Designation}" — how the crew names a Trupp: the vehicle it rides with and
@@ -127,11 +127,11 @@ public sealed class AtemschutzTrupp
     /// Null only for a legacy row registered before this field existed.</summary>
     public int? EntryPressure { get; private set; }
 
-    public int MaxDurationMinutes { get; private init; }
+    public int MaxDurationMinutes { get; private set; }
 
     public int ReturnPressureBar { get; private init; }
 
-    public int PressureControlIntervalMinutes { get; private init; }
+    public int PressureControlIntervalMinutes { get; private set; }
 
     /// <summary>When the Trupp began its Rückzug. Null before withdrawing, and while still waiting/active.</summary>
     public DateTimeOffset? WithdrawTime { get; private set; }
@@ -280,6 +280,40 @@ public sealed class AtemschutzTrupp
         }
 
         SafetyTruppId = safetyTruppId;
+    }
+
+    /// <summary>
+    /// Gives the Trupp another Trupp-Art (#835): the Sicherheitstrupp goes in next and another
+    /// crew takes over as Sicherheitstrupp. Crew, Druckwerte and the Sicherheitstrupp link stay —
+    /// it is the same Trupp doing a different job.
+    /// <para>
+    /// The Einsatzzeit and Abfrage-Intervall the caller derived from the new Trupp-Art are taken
+    /// over only while the Trupp still waits. Under air they stay as they are, because they
+    /// drive the running clock and its alarms, and a Trupp-Art change must never move the
+    /// Rückzugszeit of a crew that is already inside. An abgenommen Trupp is refused: its record is
+    /// complete, and the Bericht should show what the Trupp was while it was inside.
+    /// </para>
+    /// </summary>
+    public void ChangeType(string designation, int maxDurationMinutes, int pressureControlIntervalMinutes)
+    {
+        if (string.IsNullOrWhiteSpace(designation))
+        {
+            throw new ArgumentException("Trupp-Bezeichnung darf nicht leer sein.", nameof(designation));
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxDurationMinutes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pressureControlIntervalMinutes);
+        if (IsReturned)
+        {
+            throw new InvalidOperationException("Die Trupp-Art eines abgenommenen Trupps kann nicht mehr geändert werden.");
+        }
+
+        Designation = designation.Trim();
+        if (IsWaiting)
+        {
+            MaxDurationMinutes = maxDurationMinutes;
+            PressureControlIntervalMinutes = pressureControlIntervalMinutes;
+        }
     }
 
     /// <summary>Sends the Trupp under air: starts the clock. The entry pressure was already

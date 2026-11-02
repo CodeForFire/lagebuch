@@ -1,0 +1,1 @@
+In the Atemschutzüberwachung, a Trupp's Trupp-Art can be changed from its row, so a Sicherheitstrupp that goes in next keeps its crew and Druckwerte; a Trupp still bereitgestellt takes over the new Trupp-Art's Einsatzzeit, a Trupp under air keeps its running clock, and the change is written to the ETB (#835).

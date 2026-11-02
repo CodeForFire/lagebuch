@@ -194,6 +194,9 @@ public static class CommandApplier
             case SetScbaSafetyTruppCommand c:
                 incident.SetScbaSafetyTrupp(c.TruppId, c.SafetyTruppId);
                 break;
+            case ChangeScbaTruppTypeCommand c:
+                incident.ChangeScbaTruppType(c.TruppId, c.Designation, c.MaxDurationMinutes, c.PressureControlIntervalMinutes);
+                break;
             case SetIncidentNumberCommand c:
                 incident.SetIncidentNumber(c.IncidentNumber is { } n ? new IncidentNumber(n) : null);
                 break;
