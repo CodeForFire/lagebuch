@@ -1,0 +1,1 @@
+Dependabot's NuGet updates run again: since the 32-bit Android build was added, every weekly job failed restoring the Android head on a runtime pack that does not exist, so no NuGet update pull request has been opened since 27 September.
