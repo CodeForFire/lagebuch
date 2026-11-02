@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
@@ -72,6 +73,32 @@ public class RoleAssignmentDialogRenderTests
         Assert.True(Find<TextBox>(window, "AssignmentDialogSectionBox").IsEffectivelyVisible);
         Assert.Equal("SPEICHERN", Find<Button>(window, "AssignmentDialogSaveButton").Content);
         Capture(window, "role-assignment-edit.png");
+    }
+
+    [AvaloniaFact]
+    public void Funktion_beenden_fits_a_phone_and_asks_in_place_of_the_buttons()
+    {
+        var session = Session();
+        session.AssignRole("EAL", "Musterfrau, Erika", "Florian Emmering 40/1", section: "Nord", slot: RoleSlot.Leiter);
+        var vm = new RoleAssignmentDialogViewModel(session, MasterData, session.Incident.Roles[0].Id, RoleAssignmentDialogMode.Edit);
+        var window = Show(vm, 412, 800);
+
+        // On a phone the third button wraps instead of running past the card (#823).
+        var card = Find<Border>(window, "AssignmentDialogCard");
+        var end = Find<Button>(window, "AssignmentDialogEndButton");
+        Assert.True(end.IsEffectivelyVisible);
+        var right = end.TranslatePoint(new Point(end.Bounds.Width, 0), card);
+        Assert.NotNull(right);
+        Assert.True(right.Value.X <= card.Bounds.Width + 1, $"FUNKTION BEENDEN ends at {right.Value.X}, past the card's {card.Bounds.Width}");
+        Capture(window, "role-assignment-end-button-narrow.png");
+
+        end.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(Find<WrapPanel>(window, "AssignmentDialogActions").IsVisible);
+        Assert.True(Find<Border>(window, "AssignmentDialogEndPanel").IsVisible);
+        Assert.Equal("Funktion EAL (Musterfrau, Erika) beenden?", Find<TextBlock>(window, "AssignmentDialogEndQuestion").Text);
+        Capture(window, "role-assignment-end-confirm-narrow.png");
     }
 
     [AvaloniaFact]

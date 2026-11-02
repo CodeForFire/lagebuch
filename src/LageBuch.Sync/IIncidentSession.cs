@@ -140,6 +140,9 @@ public interface IIncidentSession
     /// <summary>Places a running Funktion in a node and board slot; a null <paramref name="nodeId"/> is the Einsatzleitung.</summary>
     void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot);
 
+    /// <summary>Ends a running Funktion now, with no successor. See <c>Incident.EndRoleAssignment</c>.</summary>
+    void EndRoleAssignment(Guid assignmentId);
+
     /// <summary>Sets the Führungsstufe; null clears it.</summary>
     void SetFuehrungsstufe(Fuehrungsstufe? stufe);
 

@@ -55,13 +55,38 @@
             <TextBlock x:Name="AssignmentDialogSaveError" Classes="field-error" TextWrapping="Wrap"
                        Text="{Binding SaveError}"
                        IsVisible="{Binding SaveError, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <!-- Left, primary first (#694): the actions start under the fields they save. -->
-            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0"
-                        IsVisible="{Binding !IsDiscardConfirmOpen}">
+            <!-- Left, primary first (#694): the actions start under the fields they save. A WrapPanel,
+                 so FUNKTION BEENDEN drops to its own line on a phone rather than past the card. -->
+            <WrapPanel x:Name="AssignmentDialogActions" Orientation="Horizontal" ItemSpacing="10" LineSpacing="10"
+                       HorizontalAlignment="Left" Margin="0,8,0,0"
+                       IsVisible="{Binding ShowActions}">
               <Button x:Name="AssignmentDialogSaveButton" Classes="signal" Content="{Binding PrimaryText}"
                       Command="{Binding SaveCommand}" />
               <Button x:Name="AssignmentDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
-            </StackPanel>
+              <!-- #823: the person leaves the Funktion and nobody takes it over. Last, away from SPEICHERN. -->
+              <Button x:Name="AssignmentDialogEndButton" Content="FUNKTION BEENDEN"
+                      IsVisible="{Binding CanOfferEnd}"
+                      Command="{Binding BeginEndCommand}"
+                      ToolTip.Tip="Funktion ohne Nachfolger beenden" />
+            </WrapPanel>
+            <!-- #823: a Bis stamp cannot be taken back, so ending asks first, in place of the buttons. -->
+            <Border x:Name="AssignmentDialogEndPanel" Margin="0,8,0,0"
+                    IsVisible="{Binding IsEndConfirmOpen}"
+                    b:Overlay.IsInline="True"
+                    b:Overlay.CancelCommand="{Binding CancelEndCommand}"
+                    b:Overlay.InitialFocus="{Binding #AssignmentDialogKeepRunningButton}"
+                    BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+              <StackPanel Spacing="8">
+                <TextBlock Text="FUNKTION BEENDEN?" Classes="overline" />
+                <TextBlock x:Name="AssignmentDialogEndQuestion" Text="{Binding EndQuestion}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
+                  <Button x:Name="AssignmentDialogConfirmEndButton" Classes="signal" Content="BEENDEN"
+                          Command="{Binding ConfirmEndCommand}" />
+                  <Button x:Name="AssignmentDialogKeepRunningButton" Content="ZURÜCK"
+                          Command="{Binding CancelEndCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
             <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. -->
             <Border x:Name="AssignmentDialogDiscardPanel" Margin="0,8,0,0"
                     IsVisible="{Binding IsDiscardConfirmOpen}"
