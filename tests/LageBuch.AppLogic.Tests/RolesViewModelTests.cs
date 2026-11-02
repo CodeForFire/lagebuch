@@ -276,6 +276,156 @@ public class RolesViewModelTests
         Assert.False(row.BeginTransferCommand.CanExecute(null));
     }
 
+    // --- Funktion beenden (#823): ends with nobody taking over, after a question. ---
+    [Fact]
+    public void Beenden_asks_first_and_writes_nothing_until_confirmed()
+    {
+        var changes = 0;
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md(), () => changes++);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        changes = 0;
+
+        var row = Assert.Single(vm.Roles);
+        Assert.True(row.BeginEndCommand.CanExecute(null));
+        Assert.False(vm.ConfirmEndCommand.CanExecute(null));
+        row.BeginEndCommand.Execute(null);
+
+        Assert.True(vm.IsEndConfirmOpen);
+        Assert.True(vm.ConfirmEndCommand.CanExecute(null));
+        Assert.Equal("Funktion EL (Müller) beenden?", vm.EndQuestion);
+        Assert.True(row.IsRunning);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void Confirming_beenden_ends_the_funktion_and_hides_it_from_the_current_view()
+    {
+        var changes = 0;
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md(), () => changes++);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        changes = 0;
+        Assert.Single(vm.Roles).BeginEndCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(30);
+        vm.ConfirmEndCommand.Execute(null);
+
+        Assert.False(vm.IsEndConfirmOpen);
+        Assert.Equal(1, changes);
+        Assert.Empty(vm.Roles); // "Nur aktuell" drops the ended assignment
+        vm.ShowAllRoles = true;
+        var ended = Assert.Single(vm.Roles);
+        Assert.Equal(T0.AddMinutes(30), ended.To);
+        Assert.False(ended.BeginEndCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Cancelling_beenden_leaves_the_funktion_running()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md());
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        Assert.Single(vm.Roles).BeginEndCommand.Execute(null);
+
+        vm.CancelEndCommand.Execute(null);
+
+        Assert.False(vm.IsEndConfirmOpen);
+        Assert.True(Assert.Single(vm.Roles).IsRunning);
+    }
+
+    [Fact]
+    public void Confirming_beenden_after_a_peer_ended_it_writes_nothing()
+    {
+        var changes = 0;
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new RolesViewModel(session, clock, Md(), () => changes++) { NewRole = "EL", NewPersonName = "Müller" };
+        vm.AddRoleCommand.Execute(null);
+        var row = Assert.Single(vm.Roles);
+        row.BeginEndCommand.Execute(null);
+        session.EndRoleAssignment(row.Id); // another device got there first
+        changes = 0;
+        var entries = session.Incident.Journal.Count;
+
+        vm.ConfirmEndCommand.Execute(null); // the local domain would refuse a second end
+
+        Assert.False(vm.IsEndConfirmOpen);
+        Assert.Equal(0, changes);
+        Assert.Equal(entries, session.Incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Beenden_clears_the_handover_complaint_it_replaces()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md());
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        var row = Assert.Single(vm.Roles);
+        row.BeginTransferCommand.Execute(null);
+        vm.ConfirmTransferCommand.Execute(null); // blank successor: the panel complains
+        Assert.NotNull(vm.TransferPersonNameError);
+
+        row.BeginEndCommand.Execute(null);
+
+        Assert.Null(vm.TransferPersonNameError);
+        Assert.Null(vm.TransferErrorSummary);
+    }
+
+    [Fact]
+    public void Beenden_and_the_handover_never_stand_open_together()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md());
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        var row = Assert.Single(vm.Roles);
+
+        row.BeginTransferCommand.Execute(null);
+        row.BeginEndCommand.Execute(null);
+        Assert.False(vm.IsTransferring);
+        Assert.True(vm.IsEndConfirmOpen);
+
+        row.BeginTransferCommand.Execute(null);
+        Assert.True(vm.IsTransferring);
+        Assert.False(vm.IsEndConfirmOpen);
+    }
+
+    [Fact]
+    public void ReadOnly_disables_beenden()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        seed.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", from: T0);
+        seed.Save();
+
+        var vm = new RolesViewModel(LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch"), clock, Md(), () => { });
+
+        Assert.False(Assert.Single(vm.Roles).BeginEndCommand.CanExecute(null));
+    }
+
     // --- Handynummer editieren (issue #75): a live cell, mirroring ForceRow's Status/Notes. ---
     [Fact]
     public void Editing_the_phone_number_inline_writes_through_and_notifies()

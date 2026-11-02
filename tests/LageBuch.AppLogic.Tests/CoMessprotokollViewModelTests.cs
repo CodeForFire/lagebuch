@@ -1323,6 +1323,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
 
+    public void EndRoleAssignment(Guid assignmentId) => _inner.EndRoleAssignment(assignmentId);
+
     public void AdoptFreeTextSection(string section) => _inner.AdoptFreeTextSection(section);
 
     /// <summary>

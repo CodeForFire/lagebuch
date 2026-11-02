@@ -652,6 +652,51 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Ending_a_role_stamps_bis_and_logs_it()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EAL", "Müller", from: clock.Now, section: "Nord");
+
+        clock.Now = clock.Now.AddMinutes(25);
+        var ended = incident.EndRoleAssignment(clock, op, assigned.Id);
+
+        Assert.Equal(clock.Now, ended.To);
+        Assert.Equal(clock.Now, incident.Roles.Single(r => r.Id == assigned.Id).To);
+        Assert.Single(incident.Roles);
+        Assert.Equal("Funktion EAL beendet: Müller", incident.Journal[^1].Text);
+        Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
+    }
+
+    [Fact]
+    public void Ending_a_role_twice_is_rejected_and_logs_nothing_more()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", from: clock.Now);
+        incident.EndRoleAssignment(clock, op, assigned.Id);
+        var before = incident.Journal.Count;
+
+        Assert.Throws<InvalidOperationException>(() => incident.EndRoleAssignment(clock, op, assigned.Id));
+        Assert.Equal(before, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Ending_a_role_now_on_an_unknown_assignment_is_rejected()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        Assert.Throws<ArgumentException>(() => incident.EndRoleAssignment(clock, op, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void Ending_a_role_in_a_closed_incident_is_rejected()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", from: clock.Now);
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(() => incident.EndRoleAssignment(clock, op, assigned.Id));
+    }
+
+    [Fact]
     public void Editing_a_role_phone_number_logs_the_change()
     {
         var incident = NewIncident(out var clock, out var op);

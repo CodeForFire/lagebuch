@@ -16,14 +16,15 @@ namespace LageBuch.AppLogic.ViewModels;
 /// <summary>
 /// One row of the Funktionszuweisung grid. Unlike the other read-only row records this one is
 /// observable: the phone number is a live cell (mirroring <see cref="ForceRow"/>'s Status/Notes),
-/// and a running assignment carries a "Rolle übertragen" command supplied as a callback so XAML
-/// binds a parameterless command, the same shape <see cref="ScbaTruppRow"/> uses.
+/// and a running assignment carries "Rolle übertragen" and "beenden" commands supplied as callbacks
+/// so XAML binds a parameterless command, the same shape <see cref="ScbaTruppRow"/> uses.
 /// </summary>
 public sealed partial class RoleAssignmentRow : ObservableObject
 {
     private readonly Action<RoleAssignmentRow> _onTransfer;
     private readonly Action<RoleAssignmentRow, string?> _onPhoneEdited;
     private readonly Action<RoleAssignmentRow>? _onEdit;
+    private readonly Action<RoleAssignmentRow>? _onEnd;
 
     public RoleAssignmentRow(
         Guid id,
@@ -39,7 +40,8 @@ public sealed partial class RoleAssignmentRow : ObservableObject
         bool isReadOnly,
         Action<RoleAssignmentRow> onTransfer,
         Action<RoleAssignmentRow, string?> onPhoneEdited,
-        Action<RoleAssignmentRow>? onEdit = null)
+        Action<RoleAssignmentRow>? onEdit = null,
+        Action<RoleAssignmentRow>? onEnd = null)
     {
         Id = id;
         Role = role;
@@ -53,6 +55,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
         _onTransfer = onTransfer;
         _onPhoneEdited = onPhoneEdited;
         _onEdit = onEdit;
+        _onEnd = onEnd;
         _phone = phone; // bypasses the setter below, so building the row doesn't push an edit
         To = to;
     }
@@ -63,6 +66,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
     /// <summary>Who holds the Funktion; BEARBEITEN corrects it on the same assignment.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EndAutomationName))]
     private string _personName;
 
     /// <summary>The free-text Abschnitt; for a placed row the node's name, which the incident keeps in step.</summary>
@@ -144,6 +148,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsRunning))]
     [NotifyCanExecuteChangedFor(nameof(BeginTransferCommand))]
     [NotifyCanExecuteChangedFor(nameof(BeginEditCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginEndCommand))]
     private DateTimeOffset? _to;
 
     /// <summary>
@@ -175,6 +180,15 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     /// <summary>BEARBEITEN: corrects Name, Funkrufname, Handynummer and a typed Abschnitt without a handover.</summary>
     [RelayCommand(CanExecute = nameof(CanBeginEdit))]
     private void BeginEdit() => _onEdit?.Invoke(this);
+
+    private bool CanBeginEnd => _onEnd is not null && CanBeginTransfer;
+
+    /// <summary>BEENDEN: asks first, then ends the Funktion with nobody taking it over (#823).</summary>
+    [RelayCommand(CanExecute = nameof(CanBeginEnd))]
+    private void BeginEnd() => _onEnd?.Invoke(this);
+
+    /// <summary>The BEENDEN button's tooltip and automation name.</summary>
+    public string EndAutomationName => $"{Role} ({PersonName}) beenden";
 }
 
 public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
@@ -656,8 +670,8 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
 
     // --- Rolle übertragen: a small panel below the grid, mirroring EtbViewModel's edit panel
     //     rather than inline DataGrid cell editing — a handover needs its own person/call
-    //     sign/phone, not a single cell. Replaces the old standalone "beenden" action; an
-    //     assignment now only ends as part of a handover, or automatically when the incident closes. ---
+    //     sign/phone, not a single cell. A Funktion nobody takes over is ended with BEENDEN
+    //     below instead, and every running one ends when the incident closes. ---
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsTransferring))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmTransferCommand))]
@@ -682,6 +696,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
 
     private void BeginTransfer(RoleAssignmentRow row)
     {
+        EndingRow = null; // one question below the grid at a time
         TransferringRow = row;
         TransferPersonName = string.Empty;
         TransferCallSign = null;
@@ -723,6 +738,48 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         TransferringRow = null;
         ShowTransferErrors(false);
     }
+
+    // --- Funktion beenden (#823): the same panel slot as the handover, as a question. A Bis stamp is
+    //     a record that cannot be taken back, so one click must not set it. ---
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEndConfirmOpen))]
+    [NotifyPropertyChangedFor(nameof(EndQuestion))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmEndCommand))]
+    private RoleAssignmentRow? _endingRow;
+
+    /// <summary>Whether the "beenden?" question is on screen.</summary>
+    public bool IsEndConfirmOpen => EndingRow is not null;
+
+    /// <summary>"Funktion EAL (Müller) beenden?", or null with no question open.</summary>
+    public string? EndQuestion => EndingRow is { } row ? $"Funktion {row.Role} ({row.PersonName}) beenden?" : null;
+
+    private void BeginEnd(RoleAssignmentRow row)
+    {
+        TransferringRow = null; // one question below the grid at a time
+        ShowTransferErrors(false);
+        EndingRow = row;
+    }
+
+    // No read-only test of its own: a read-only grid's BEENDEN is disabled, so no question opens.
+    [RelayCommand(CanExecute = nameof(IsEndConfirmOpen))]
+    private void ConfirmEnd()
+    {
+        var row = EndingRow;
+        EndingRow = null;
+
+        // A peer may have ended or handed it over while the question stood; then there is nothing
+        // left to end, and the grid already shows why.
+        if (row is not { IsRunning: true })
+        {
+            return;
+        }
+
+        _session.EndRoleAssignment(row.Id); // Changed → RefreshRoles
+        _onChanged();
+    }
+
+    [RelayCommand]
+    private void CancelEnd() => EndingRow = null;
 
     private void ShowTransferErrors(bool shown)
     {
@@ -773,7 +830,8 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
             IsReadOnly,
             BeginTransfer,
             EditPhone,
-            _openEditDialog is null ? null : BeginEdit);
+            _openEditDialog is null ? null : BeginEdit,
+            BeginEnd);
 
     private void BeginEdit(RoleAssignmentRow row) =>
         _openEditDialog?.Invoke(new RoleAssignmentDialogViewModel(_session, _masterData, row.Id, RoleAssignmentDialogMode.Edit, _onChanged));

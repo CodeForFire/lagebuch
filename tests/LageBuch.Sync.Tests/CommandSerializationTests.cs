@@ -413,6 +413,7 @@ public class CommandSerializationTests
         Assert.Contains("\"$type\":\"moveForceUnit\"", SyncJson.Serialize<SyncCommand>(new MoveForceUnitCommand(Op, Guid.NewGuid(), null)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"moveCommandNode\"", SyncJson.Serialize<SyncCommand>(new MoveCommandNodeCommand(Op, Guid.NewGuid(), null, null)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"placeRoleAssignment\"", SyncJson.Serialize<SyncCommand>(new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), null, RoleSlot.Leiter)), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"endRoleAssignment\"", SyncJson.Serialize<SyncCommand>(new EndRoleAssignmentCommand(Op, Guid.NewGuid())), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"adoptFreeTextSection\"", SyncJson.Serialize<SyncCommand>(new AdoptFreeTextSectionCommand(Op, "Nord")), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"setFuehrungsstufe\"", SyncJson.Serialize<SyncCommand>(new SetFuehrungsstufeCommand(Op, Fuehrungsstufe.B)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"setNavVisibility\"", SyncJson.Serialize<SyncCommand>(new SetNavVisibilityCommand(Op, "lagekarte", true)), StringComparison.Ordinal);

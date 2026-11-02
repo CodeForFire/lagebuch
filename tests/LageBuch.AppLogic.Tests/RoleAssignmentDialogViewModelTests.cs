@@ -202,8 +202,148 @@ public class RoleAssignmentDialogViewModelTests
 
         session.TransferRole(id, "Mustermann, Max");
 
-        Assert.Equal("Diese Funktion wurde inzwischen übergeben.", vm.SaveError);
+        Assert.Equal("Diese Funktion wurde inzwischen übergeben oder beendet.", vm.SaveError);
         Assert.False(vm.SaveCommand.CanExecute(null));
+        vm.Detach();
+    }
+
+    [Fact]
+    public void Funktion_beenden_asks_first_then_ends_it_and_closes()
+    {
+        var session = NewSession();
+        var id = Assign(session, "S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
+        var changes = 0;
+        var closed = false;
+        var vm = Open(session, id, RoleAssignmentDialogMode.Edit, () => changes++);
+        vm.Closed += (_, _) => closed = true;
+
+        Assert.True(vm.CanOfferEnd);
+        vm.BeginEndCommand.Execute(null);
+
+        Assert.True(vm.IsEndConfirmOpen);
+        Assert.False(vm.BeginEndCommand.CanExecute(null));
+        Assert.False(vm.ShowActions);
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.Equal("Funktion S2 Lage (Erika Musterfrau) beenden?", vm.EndQuestion);
+        Assert.Null(Assert.Single(session.Incident.Roles).To);
+
+        vm.ConfirmEndCommand.Execute(null);
+
+        Assert.NotNull(Assert.Single(session.Incident.Roles).To);
+        Assert.Equal("Funktion S2 Lage beendet: Erika Musterfrau", session.Incident.Journal[^1].Text);
+        Assert.Equal(1, changes);
+        Assert.True(closed);
+    }
+
+    [Fact]
+    public void Zurueck_from_funktion_beenden_keeps_it_running_and_the_dialog_open()
+    {
+        var session = NewSession();
+        var id = Assign(session, "S2 Lage", "Erika Musterfrau");
+        var closed = false;
+        var vm = Open(session, id, RoleAssignmentDialogMode.Edit);
+        vm.Closed += (_, _) => closed = true;
+
+        vm.BeginEndCommand.Execute(null);
+        vm.CancelEndCommand.Execute(null);
+
+        Assert.False(vm.IsEndConfirmOpen);
+        Assert.True(vm.ShowActions);
+        Assert.Null(Assert.Single(session.Incident.Roles).To);
+        Assert.False(closed);
+        vm.Detach();
+    }
+
+    [Fact]
+    public void Funktion_beenden_waits_while_the_discard_question_stands()
+    {
+        var session = NewSession();
+        var id = Assign(session, "S2 Lage", "Erika Musterfrau");
+        var vm = Open(session, id, RoleAssignmentDialogMode.Edit);
+        vm.PersonName = "Erika Musterfrau-Beispiel";
+        vm.CancelCommand.Execute(null);
+
+        Assert.True(vm.IsDiscardConfirmOpen);
+        Assert.False(vm.BeginEndCommand.CanExecute(null));
+        vm.Detach();
+    }
+
+    [Fact]
+    public void Confirming_after_an_end_elsewhere_says_why_and_stays_open()
+    {
+        var session = NewSession();
+        var id = Assign(session, "S2 Lage", "Erika Musterfrau");
+        var closed = false;
+        var vm = Open(session, id, RoleAssignmentDialogMode.Edit);
+        vm.Closed += (_, _) => closed = true;
+        vm.BeginEndCommand.Execute(null);
+        vm.Detach(); // stops following the session, so the question is still up when the peer's end lands
+        session.EndRoleAssignment(id);
+        Assert.True(vm.IsEndConfirmOpen);
+
+        vm.ConfirmEndCommand.Execute(null);
+
+        Assert.False(vm.IsEndConfirmOpen);
+        Assert.StartsWith("Nicht möglich", vm.SaveError, StringComparison.Ordinal);
+        Assert.False(closed);
+    }
+
+    [Fact]
+    public void An_end_elsewhere_tells_the_beenden_button_to_disable()
+    {
+        var session = NewSession();
+        var id = Assign(session, "S2 Lage", "Erika Musterfrau");
+        var vm = Open(session, id, RoleAssignmentDialogMode.Edit);
+        var raised = 0;
+        vm.BeginEndCommand.CanExecuteChanged += (_, _) => raised++;
+
+        session.EndRoleAssignment(id);
+
+        Assert.True(raised > 0);
+        vm.Detach();
+    }
+
+    [Fact]
+    public void A_handover_offers_no_funktion_beenden()
+    {
+        var session = NewSession();
+        var id = Assign(session, "S2 Lage", "Erika Musterfrau");
+        var vm = Open(session, id, RoleAssignmentDialogMode.Transfer);
+
+        Assert.False(vm.CanOfferEnd);
+        Assert.False(vm.BeginEndCommand.CanExecute(null));
+        vm.Detach();
+    }
+
+    [Fact]
+    public void An_end_elsewhere_while_asking_closes_the_question_and_blocks_the_save()
+    {
+        var session = NewSession();
+        var id = Assign(session, "S2 Lage", "Erika Musterfrau");
+        var vm = Open(session, id, RoleAssignmentDialogMode.Edit);
+        vm.BeginEndCommand.Execute(null);
+
+        session.EndRoleAssignment(id);
+
+        Assert.False(vm.IsEndConfirmOpen);
+        Assert.Equal("Diese Funktion wurde inzwischen übergeben oder beendet.", vm.SaveError);
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.False(vm.BeginEndCommand.CanExecute(null));
+        vm.Detach();
+    }
+
+    [Fact]
+    public void A_read_only_einsatz_offers_no_funktion_beenden_on_a_running_funktion()
+    {
+        var store = new FakeStore();
+        var seeded = NewSession(store);
+        Assign(seeded, "S2 Lage", "Erika Musterfrau");
+        seeded.Save();
+        var session = LocalIncidentSession.OpenReadOnly(store, Clock, IncidentPath);
+        var vm = Open(session, session.Incident.Roles[0].Id, RoleAssignmentDialogMode.Edit);
+
+        Assert.Null(session.Incident.Roles[0].To);
+        Assert.False(vm.BeginEndCommand.CanExecute(null));
         vm.Detach();
     }
 
@@ -217,7 +357,9 @@ public class RoleAssignmentDialogViewModelTests
         var session = LocalIncidentSession.OpenReadOnly(store, Clock, IncidentPath);
         var id = session.Incident.Roles[0].Id;
 
-        Assert.False(Open(session, id, RoleAssignmentDialogMode.Edit).SaveCommand.CanExecute(null));
+        var vm = Open(session, id, RoleAssignmentDialogMode.Edit);
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.False(vm.BeginEndCommand.CanExecute(null));
     }
 
     [Fact]
@@ -240,7 +382,7 @@ public class RoleAssignmentDialogViewModelTests
         session.TransferRole(id, "Mustermann, Max");
         var ended = Open(session, id, RoleAssignmentDialogMode.Edit);
 
-        Assert.Equal("Diese Funktion wurde inzwischen übergeben.", ended.SaveError);
+        Assert.Equal("Diese Funktion wurde inzwischen übergeben oder beendet.", ended.SaveError);
         Assert.False(ended.SaveCommand.CanExecute(null));
         ended.Detach();
     }

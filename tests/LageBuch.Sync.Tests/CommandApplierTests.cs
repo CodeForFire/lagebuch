@@ -1160,6 +1160,22 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void EndRoleAssignment_over_the_wire_ends_the_funktion_attributed_to_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var host = new SessionOperator("Host", "FFB 1");
+        var role = incident.AssignRole(clock, host, "EAL", "Huber", from: clock.Now, section: "Nord");
+
+        ApplyOverWire(new EndRoleAssignmentCommand(new OperatorDto("Maier", "FFB 2"), role.Id), incident, clock);
+
+        var ended = Assert.Single(incident.Roles);
+        Assert.Equal(clock.Now, ended.To);
+        Assert.Equal("Funktion EAL beendet: Huber", incident.Journal[^1].Text);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Fact]
     public void AdoptFreeTextSection_over_the_wire_places_the_funktionen_attributed_to_the_sender()
     {
         var clock = new FixedClock();

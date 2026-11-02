@@ -272,6 +272,25 @@
       </StackPanel>
     </Border>
 
+    <!-- #823: BEENDEN asks first, in the transfer panel's place: a Bis stamp cannot be taken back. -->
+    <Border KeyboardNavigation.TabIndex="2" DockPanel.Dock="Bottom" x:Name="EndPanel" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14"
+            IsVisible="{Binding IsEndConfirmOpen}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CancelEndCommand}" b:Overlay.PrimaryCommand="{Binding ConfirmEndCommand}"
+            b:Overlay.InitialFocus="{Binding #CancelEndButton}" b:Overlay.FallbackFocus="{Binding #PersonNameBox}">
+      <StackPanel Spacing="10">
+        <TextBlock x:Name="EndQuestionText" Classes="mono" Text="{Binding EndQuestion}" TextWrapping="Wrap" />
+        <TextBlock Classes="secondary" FontSize="13" TextWrapping="Wrap"
+                   Text="BIS wird jetzt gesetzt. Niemand übernimmt die Funktion." />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="ConfirmEndButton" Classes="signal dock-action" Content="BEENDEN" Command="{Binding ConfirmEndCommand}" />
+          <Button x:Name="CancelEndButton" Classes="dock-action" Content="ABBRECHEN" Command="{Binding CancelEndCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="RolesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
@@ -310,7 +329,7 @@
           </DataGridTemplateColumn>
           <DataGridTextColumn Header="VON" Binding="{Binding FromDisplay}" />
           <DataGridTextColumn Header="BIS" Binding="{Binding ToDisplay}" />
-          <DataGridTemplateColumn Header="AKTION" Width="250">
+          <DataGridTemplateColumn Header="AKTION" Width="340">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:RoleAssignmentRow">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -332,6 +351,12 @@
                           IsVisible="{Binding IsRunning}"
                           Command="{Binding BeginEditCommand}"
                           ToolTip.Tip="Name, Funkrufname, Handynummer oder Abschnitt korrigieren" />
+                  <!-- #823: ends the Funktion with nobody taking it over; asks first below the grid. -->
+                  <Button x:Name="EndRowButton" Content="BEENDEN" Margin="4,2"
+                          IsVisible="{Binding IsRunning}"
+                          Command="{Binding BeginEndCommand}"
+                          AutomationProperties.Name="{Binding EndAutomationName}"
+                          ToolTip.Tip="Funktion ohne Nachfolger beenden" />
                 </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
@@ -376,7 +401,8 @@
                       <TextBlock Text="{Binding ToDisplay}" Classes="mono" FontSize="12" />
                     </StackPanel>
                   </WrapPanel>
-                  <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsRunning}">
+                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8"
+                        IsVisible="{Binding IsRunning}">
                     <Button Grid.Column="0" Content="ÜBERTRAGEN" HorizontalAlignment="Stretch"
                             Height="{StaticResource ControlHeightTouch}"
                             Command="{Binding BeginTransferCommand}"
@@ -385,6 +411,11 @@
                             Height="{StaticResource ControlHeightTouch}"
                             Command="{Binding BeginEditCommand}"
                             ToolTip.Tip="Name, Funkrufname, Handynummer oder Abschnitt korrigieren" />
+                    <Button Grid.Row="1" Grid.ColumnSpan="2" x:Name="EndCardButton" Content="BEENDEN"
+                            HorizontalAlignment="Stretch" Height="{StaticResource ControlHeightTouch}"
+                            Command="{Binding BeginEndCommand}"
+                            AutomationProperties.Name="{Binding EndAutomationName}"
+                            ToolTip.Tip="Funktion ohne Nachfolger beenden" />
                   </Grid>
                 </StackPanel>
               </Border>

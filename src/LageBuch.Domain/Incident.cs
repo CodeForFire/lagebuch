@@ -332,8 +332,8 @@ public sealed class Incident
         AppendSystemEntry(clock, closedBy, "Einsatz abgeschlossen");
 
         // A closed incident is a historical record: nobody hands over a role after the fact, so any
-        // still-running assignment is stamped closed right along with it, silently — same as a plain
-        // AssignRole/EndRoleAssignment, which don't log to the ETB either.
+        // still-running assignment is stamped closed right along with it, silently: "Einsatz
+        // abgeschlossen" already says when every Funktion ended.
         for (var i = 0; i < _roles.Count; i++)
         {
             if (_roles[i].To is null)
@@ -572,9 +572,24 @@ public sealed class Incident
     }
 
     /// <summary>
-    /// Stamps the end of an assignment. Ending an already-ended assignment is rejected: the Bis
-    /// time is a record of when someone actually handed over, not a field to be corrected by
-    /// pressing the button twice.
+    /// Ends a running Funktion now, with nobody taking it over: the person left the Funktion, or
+    /// it is no longer needed (#823). Logged like <see cref="TransferRole"/>, because "wer hatte
+    /// die Funktion bis wann" is what the journal answers; the Bis stamp comes from the clock.
+    /// </summary>
+    public RoleAssignment EndRoleAssignment(IClock clock, SessionOperator op, Guid assignmentId)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var ended = EndRoleAssignment(assignmentId, clock.Now);
+        AppendSystemEntry(clock, op, $"Funktion {ended.Role} beendet: {ended.PersonName}");
+        return ended;
+    }
+
+    /// <summary>
+    /// Stamps the end of an assignment, silently. Ending an already-ended assignment is rejected:
+    /// the Bis time is a record of when someone actually handed over, not a field to be corrected
+    /// by pressing the button twice.
     /// </summary>
     public RoleAssignment EndRoleAssignment(Guid assignmentId, DateTimeOffset to)
     {
@@ -597,9 +612,8 @@ public sealed class Incident
 
     /// <summary>
     /// Ends a running assignment and starts a new one for the same role and section in one step —
-    /// a handover, not two independent edits. Unlike <see cref="AssignRole"/>/
-    /// <see cref="EndRoleAssignment"/> (which stay silent), a transfer always appends a System
-    /// entry: "wer hat wann welche Funktion übernommen" is exactly what the journal exists to answer.
+    /// a handover, not two independent edits. A transfer always appends a System entry: "wer hat
+    /// wann welche Funktion übernommen" is exactly what the journal exists to answer.
     /// </summary>
     public RoleAssignment TransferRole(
         IClock clock,
@@ -886,7 +900,7 @@ public sealed class Incident
 
     /// <summary>
     /// Updates a unit's Status and Bemerkung in place, keeping its identity and position. Mirrors
-    /// <see cref="EndRoleAssignment"/>: ForceUnit is a record, so "changing" it means replacing the
+    /// <see cref="EndRoleAssignment(Guid, DateTimeOffset)"/>: ForceUnit is a record, so "changing" it means replacing the
     /// entry rather than mutating it.
     ///
     /// Only a real status transition reaches the ETB. The Bemerkung is a working note rather than
