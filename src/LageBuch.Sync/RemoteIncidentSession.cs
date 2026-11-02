@@ -530,6 +530,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Send(new PlaceRoleAssignmentCommand(Op(), assignmentId, nodeId, slot));
 
+    public void EndRoleAssignment(Guid assignmentId) =>
+        Send(new EndRoleAssignmentCommand(Op(), assignmentId));
+
     public void SetNavVisibility(string key, bool visible) =>
         Send(new SetNavVisibilityCommand(Op(), key, visible));
 

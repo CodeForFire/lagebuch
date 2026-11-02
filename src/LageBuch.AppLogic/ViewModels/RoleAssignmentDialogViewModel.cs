@@ -18,7 +18,8 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 /// <remarks>
 /// The Abschnitt is offered only for a Funktion nobody placed on the board; a placed one is moved
-/// there, and the domain refuses the move here as well.
+/// there, and the domain refuses the move here as well. A correction can also end the Funktion with
+/// nobody taking it over (#823), after a question of its own, the way FUNKTIONEN's BEENDEN does.
 /// </remarks>
 public sealed partial class RoleAssignmentDialogViewModel : ObservableObject
 {
@@ -128,8 +129,26 @@ public sealed partial class RoleAssignmentDialogViewModel : ObservableObject
 
     /// <summary>Set while ABBRECHEN asks whether typed details may go (#652); the primary button waits for the answer.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowActions))]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginEndCommand))]
     private bool _isDiscardConfirmOpen;
+
+    /// <summary>Set while FUNKTION BEENDEN asks first; the primary button waits for the answer.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowActions))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginEndCommand))]
+    private bool _isEndConfirmOpen;
+
+    /// <summary>Whether the action buttons show: not while either question stands in their place.</summary>
+    public bool ShowActions => !IsDiscardConfirmOpen && !IsEndConfirmOpen;
+
+    /// <summary>Whether FUNKTION BEENDEN is offered: when correcting, never in a handover.</summary>
+    public bool CanOfferEnd => Mode == RoleAssignmentDialogMode.Edit;
+
+    /// <summary>"Funktion EAL (Müller) beenden?"</summary>
+    public string EndQuestion => $"Funktion {_seed.Role} ({_seed.PersonName}) beenden?";
 
     // True once the assignment ended or vanished under the dialog (a peer's handover).
     private bool _isGone;
@@ -141,7 +160,9 @@ public sealed partial class RoleAssignmentDialogViewModel : ObservableObject
         : !string.IsNullOrWhiteSpace(PersonName) || !string.IsNullOrWhiteSpace(CallSign)
             || !string.IsNullOrWhiteSpace(Phone);
 
-    private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen && !_isGone && SectionError is null;
+    private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen && !IsEndConfirmOpen && !_isGone && SectionError is null;
+
+    private bool CanBeginEnd => CanOfferEnd && !_session.IsReadOnly && !IsDiscardConfirmOpen && !IsEndConfirmOpen && !_isGone;
 
     partial void OnPersonNameChanged(string value)
     {
@@ -169,17 +190,19 @@ public sealed partial class RoleAssignmentDialogViewModel : ObservableObject
         RefreshSectionError();
     }
 
-    // A peer may hand the Funktion over while this is open; the save would then be refused, so the
-    // dialog says so at once and keeps what was typed visible.
+    // A peer may hand the Funktion over or end it while this is open; the save would then be
+    // refused, so the dialog says so at once and keeps what was typed visible.
     private void RefreshGone()
     {
         _isGone = !_session.Incident.Roles.Any(r => r.Id == _assignmentId && r.To is null);
         if (_isGone)
         {
-            SaveError = "Diese Funktion wurde inzwischen übergeben.";
+            SaveError = "Diese Funktion wurde inzwischen übergeben oder beendet.";
+            IsEndConfirmOpen = false;
         }
 
         SaveCommand.NotifyCanExecuteChanged();
+        BeginEndCommand.NotifyCanExecuteChanged();
     }
 
     private void RefreshSectionError()
@@ -237,6 +260,33 @@ public sealed partial class RoleAssignmentDialogViewModel : ObservableObject
         _onChanged?.Invoke();
         Close();
     }
+
+    /// <summary>FUNKTION BEENDEN: asks first, since a Bis stamp cannot be taken back.</summary>
+    [RelayCommand(CanExecute = nameof(CanBeginEnd))]
+    private void BeginEnd() => IsEndConfirmOpen = true;
+
+    /// <summary>Ends the Funktion now and closes; anything typed in the form is not saved.</summary>
+    [RelayCommand]
+    private void ConfirmEnd()
+    {
+        IsEndConfirmOpen = false;
+        SaveError = null;
+        try
+        {
+            _session.EndRoleAssignment(_assignmentId);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            SaveError = DomainRefusal.Message(ex);
+            return;
+        }
+
+        _onChanged?.Invoke();
+        Close();
+    }
+
+    [RelayCommand]
+    private void CancelEnd() => IsEndConfirmOpen = false;
 
     /// <summary>ABBRECHEN, and Esc: closes at once when nothing was typed, asks first otherwise.</summary>
     [RelayCommand]

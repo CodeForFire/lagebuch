@@ -1323,6 +1323,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
 
+    public void EndRoleAssignment(Guid assignmentId) => _inner.EndRoleAssignment(assignmentId);
+
     /// <summary>
     /// When set, a rail edit is only sent, the way a joined client's is: it lands when the test
     /// calls <see cref="DeliverRailEdits"/>, as the host's broadcast would.
