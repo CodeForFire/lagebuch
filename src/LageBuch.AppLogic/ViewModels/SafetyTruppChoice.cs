@@ -14,7 +14,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// to a setter that writes to the domain crashed the app: the write re-enters through the incident's
 /// Changed event and alters the same collection Avalonia is using as its ItemsSource, while the
 /// selection model is still mid-<c>BatchUpdateOperation</c> holding indices into it. A command runs
-/// after the flyout dismisses, with no selection model involved at all.
+/// with no selection model involved at all; the view closes the flyout once it has (#832).
 /// </para>
 /// </remarks>
 public sealed class SafetyTruppChoice

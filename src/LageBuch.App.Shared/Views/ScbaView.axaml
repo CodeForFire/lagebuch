@@ -294,8 +294,9 @@
                        through Changed to rebuild this row and its entries. A ComboBox does that
                        inside its own SelectionModel batch, which still holds indices into the list
                        being rebuilt — it crashed with an IndexOutOfRange out of EndBatchUpdate.
-                       A command runs after the flyout has dismissed, with no selection model in
-                       the picture. Same Button.Flyout idiom as ForcesView's Stärke editor. -->
+                       A command runs with no selection model in the picture, and the flyout is
+                       closed after it by OnSafetyTruppChoiceClick (#832). Same Button.Flyout idiom
+                       as ForcesView's Stärke editor. -->
                   <StackPanel Margin="0,4,0,0" Spacing="2">
                     <TextBlock Text="Sicherheitstrupp" Classes="cellLabel" />
                     <Button x:Name="SafetyTruppButton"
@@ -312,7 +313,7 @@
                               <DataTemplate x:DataType="vm:SafetyTruppChoice">
                                 <Button Classes="ghost" HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Left" Padding="8,5"
-                                        Command="{Binding SelectCommand}">
+                                        Command="{Binding SelectCommand}" Click="OnSafetyTruppChoiceClick">
                                   <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
                                     <!-- The entry in force is marked rather than styled, so it
                                          still reads at a glance on the ELW's dimmed screen. -->
@@ -536,7 +537,7 @@
                               <DataTemplate x:DataType="vm:SafetyTruppChoice">
                                 <Button Classes="ghost" HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Left" Padding="8,5"
-                                        Command="{Binding SelectCommand}">
+                                        Command="{Binding SelectCommand}" Click="OnSafetyTruppChoiceClick">
                                   <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
                                     <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold"
                                                IsVisible="{Binding IsCurrent}" />
