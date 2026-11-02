@@ -948,7 +948,7 @@ public class EtbViewModelTests
 
         var row = Assert.Single(vm.Entries, e => e.SituationReportNumber is not null);
         Assert.Equal("LM 1", row.SituationReportLabel);
-        Assert.StartsWith("Lagemeldung Nr. 1:", row.Text, StringComparison.Ordinal);
+        Assert.StartsWith("1. Lagemeldung", row.Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1025,7 +1025,7 @@ public class EtbViewModelTests
         var (session, unlinked, linked) = SentLagemeldungInTwoSteps();
         var vm = new EtbViewModel(session, new FixedClock(T0), MasterDataSet.Empty, () => { });
         session.Replace(unlinked);
-        var row = vm.Entries.Single(e => e.Text.StartsWith("Lagemeldung Nr. 1:", StringComparison.Ordinal));
+        var row = vm.Entries.Single(e => e.Text.StartsWith("1. Lagemeldung", StringComparison.Ordinal));
         Assert.Null(row.SituationReportNumber);
 
         session.Replace(linked);

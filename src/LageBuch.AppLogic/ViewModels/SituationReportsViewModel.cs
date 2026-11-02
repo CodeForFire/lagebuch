@@ -88,11 +88,11 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     public IReadOnlyList<string> CallSignOptions { get; }
 
     /// <summary>
-    /// What the Einsatzstelle suggests: the address in the Einsatzdaten first, as it stands now,
+    /// What the Einsatzstelle suggests: the street in the Einsatzdaten first, as it stands now,
     /// then the Stammdaten Straßen. Free text can still be typed.
     /// </summary>
     public IReadOnlyList<string> LocationOptions =>
-        Formatting.Address(_session.Incident) is { } own
+        Formatting.StreetAddress(_session.Incident) is { } own
             ? [own, .. _addresses.Where(a => !string.Equals(a, own, StringComparison.Ordinal))]
             : _addresses;
 
@@ -182,8 +182,10 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         ? $"Gesendet {Formatting.TimeOfDay(sentAt)} von {report.SentBy}"
         : null;
 
-    /// <summary>The Funkspruch as it will be read out, live while the fields are typed.</summary>
-    public string FunkspruchPreview => SituationReport.Compose(Location, Situation, Measures, Units, Requests);
+    /// <summary>The Funkspruch as it will be read out, live while the fields are typed: under its
+    /// own Nr. once sent, under the Nr. a send would give it while a draft.</summary>
+    public string FunkspruchPreview => SituationReport.Announce(
+        _saved?.Number ?? _session.Incident.NextSituationReportNumber, Location, Situation, Measures, Units, Requests);
 
     partial void OnSelectedReportChanged(SituationReportRow? oldValue, SituationReportRow? newValue)
     {
@@ -206,7 +208,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
 
     /// <summary>
     /// Starts a new draft, prefilled from the incident: Meldender from the Lagebuchführer's
-    /// Funkrufname, Einsatzstelle from the address, Eingesetzte Einheiten from the Kräfte.
+    /// Funkrufname, Einsatzstelle from the street, Eingesetzte Einheiten from the Kräfte.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private void NewReport()
@@ -216,7 +218,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         _draftsBeforeAdd = incident.SituationReports.Where(r => !r.IsSent).Select(r => r.Id).ToHashSet();
         Write(() => _session.AddSituationReport(
             _session.Operator?.CallSign,
-            Formatting.Address(incident),
+            Formatting.StreetAddress(incident),
             null,
             null,
             DescribeUnits(incident.Forces),
@@ -463,6 +465,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
 
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SentInfo));
+        OnPropertyChanged(nameof(FunkspruchPreview));
         OnPropertyChanged(nameof(IsEditable));
         OnPropertyChanged(nameof(EditorHeader));
         SendCommand.NotifyCanExecuteChanged();

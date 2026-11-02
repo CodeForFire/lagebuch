@@ -32,6 +32,26 @@ public class SituationReportTests
     }
 
     [Fact]
+    public void The_spoken_funkspruch_opens_with_the_nr_and_the_einsatzstelle()
+    {
+        var report = SituationReport.Create(T0, "ELW 1", " Buchenauerstraße 12 ", "Schuppen im Vollbrand", null, null, "1 DLK", Op);
+
+        Assert.Equal("3. Lagemeldung von Buchenauerstraße 12 · Schuppen im Vollbrand · Nachforderung: 1 DLK", report.AnnounceAs(3));
+    }
+
+    [Fact]
+    public void The_spoken_funkspruch_without_an_einsatzstelle_opens_with_the_nr_alone()
+    {
+        Assert.Equal("1. Lagemeldung · Lage unverändert", SituationReport.Announce(1, "  ", "Lage unverändert", null, null, null));
+    }
+
+    [Fact]
+    public void The_spoken_funkspruch_is_empty_while_nothing_is_filled_in()
+    {
+        Assert.Equal(string.Empty, SituationReport.Announce(1, null, " ", null, null, null));
+    }
+
+    [Fact]
     public void Fields_are_trimmed_and_blank_ones_become_null()
     {
         var report = SituationReport.Create(T0, "  ELW 1 ", string.Empty, " Lage ", null, null, null, Op);
@@ -77,6 +97,6 @@ public class SituationReportTests
         var report = SituationReport.Create(
             T0, null, new string('x', SituationReport.MaxLocationLength), field, field, field, field, Op);
 
-        Assert.True($"Lagemeldung Nr. 999: {report.Funkspruch}".Length <= Etb.EtbEntry.MaxTextLength);
+        Assert.True(report.AnnounceAs(999).Length <= Etb.EtbEntry.MaxTextLength);
     }
 }

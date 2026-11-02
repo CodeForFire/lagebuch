@@ -1,0 +1,1 @@
+A Lagemeldung is now read out and written to the ETB as "3. Lagemeldung von Buchenauerstraße 12 · …", and its Einsatzstelle is prefilled and suggested as street and house number only, without Ortsteil, PLZ or Ort.

@@ -14,7 +14,7 @@ namespace LageBuch.Domain.SituationReports;
 public sealed record SituationReport
 {
     // Caps bound the storage and snapshot footprint of input that may come from a sync peer. Taken
-    // together they keep the composed Funkspruch, with its "Lagemeldung Nr. N: " prefix, well below
+    // together they keep the spoken Funkspruch, with its "N. Lagemeldung von " opening, well below
     // EtbEntry.MaxTextLength, so sending can never be refused for length.
     public const int MaxReporterLength = 100;
 
@@ -73,6 +73,10 @@ public sealed record SituationReport
     /// the sender. Empty while nothing has been filled in.
     /// </summary>
     public string Funkspruch => Compose(Location, Situation, Measures, Units, Requests);
+
+    /// <summary>The Funkspruch as it is read out and written to the ETB under the Nr. it is sent
+    /// as. Empty while nothing has been filled in.</summary>
+    public string AnnounceAs(int number) => Announce(number, Location, Situation, Measures, Units, Requests);
 
     public static SituationReport Create(
         DateTimeOffset createdAt,
@@ -140,6 +144,26 @@ public sealed record SituationReport
         }
 
         return string.Join(FunkspruchSeparator, parts);
+    }
+
+    /// <summary>
+    /// The Funkspruch as it is read out: "3. Lagemeldung von Buchenauerstraße 12", then the other
+    /// parts. Without an Einsatzstelle it opens with "3. Lagemeldung" alone; empty while nothing has
+    /// been filled in, so an empty draft still cannot be sent.
+    /// </summary>
+    public static string Announce(
+        int number, string? location, string? situation, string? measures, string? units, string? requests)
+    {
+        if (Compose(location, situation, measures, units, requests).Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var opening = Trimmed(location) is { } einsatzstelle
+            ? $"{number}. Lagemeldung von {einsatzstelle}"
+            : $"{number}. Lagemeldung";
+        var rest = Compose(null, situation, measures, units, requests);
+        return rest.Length == 0 ? opening : string.Join(FunkspruchSeparator, opening, rest);
     }
 
     /// <summary>Returns a copy with corrected details, validated and trimmed. Id, creation stamp

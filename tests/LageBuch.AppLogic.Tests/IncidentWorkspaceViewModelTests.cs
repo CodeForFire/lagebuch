@@ -507,7 +507,7 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
-    public void The_lagemeldung_offers_each_stammdaten_strasse_as_an_address()
+    public void The_lagemeldung_offers_each_stammdaten_strasse_once_by_its_name_without_the_ort()
     {
         var clock = new FixedClock(T0);
         var session = TestSession.StartNew(
@@ -521,12 +521,12 @@ public class IncidentWorkspaceViewModelTests
             session,
             clock,
             new FakeTicker(),
-            Md() with { Streets = [new Street("Am Markt", PostalCode: "12345", Place: "Musterstadt"), new Street("Lindenweg", "Süd", "12345", "Musterstadt")] },
+            Md() with { Streets = [new Street("Am Markt", PostalCode: "12345", Place: "Musterstadt"), new Street("Lindenweg", "Süd", "12345", "Musterstadt"), new Street("Lindenweg", "Nord", "12345", "Musterstadt"), new Street(" ", Place: "Musterstadt")] },
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
 
-        Assert.Equal(["Am Markt, 12345 Musterstadt", "Lindenweg, Süd, 12345 Musterstadt"], vm.SituationReports.LocationOptions);
+        Assert.Equal(["Am Markt", "Lindenweg"], vm.SituationReports.LocationOptions);
     }
 
     [Fact]

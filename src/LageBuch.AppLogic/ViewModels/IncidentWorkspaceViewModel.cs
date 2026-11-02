@@ -1084,8 +1084,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             (message, label, onConfirmed) => RequestConfirmAs("Lagemeldung", message, label, onConfirmed),
             _masterData.RadioCallSigns,
             _masterData.Streets
-                .Select(street => Formatting.Address(street.Name, street.District, null, street.PostalCode, street.Place))
-                .OfType<string>()
+                .Select(street => street.Name.Trim())
+                .Where(name => name.Length > 0)
                 .Distinct(StringComparer.Ordinal)
                 .ToList());
 
