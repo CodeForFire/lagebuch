@@ -533,6 +533,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void EndRoleAssignment(Guid assignmentId) =>
         Send(new EndRoleAssignmentCommand(Op(), assignmentId));
 
+    public void AdoptFreeTextSection(string section) =>
+        Send(new AdoptFreeTextSectionCommand(Op(), section));
+
     public void SetNavVisibility(string key, bool visible) =>
         Send(new SetNavVisibilityCommand(Op(), key, visible));
 

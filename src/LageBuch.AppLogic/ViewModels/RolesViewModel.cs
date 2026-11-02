@@ -280,6 +280,16 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         MarkDuplicates(); // after every row exists — see the comment on it
         ApplyFilter();
 
+        // The Abschnitte the board has formed, as the ABSCHNITT box suggests them; in place, so an
+        // open suggestion list is not replaced under the operator's finger (#408).
+        RowReconciler.Reconcile(
+            SectionOptions,
+            PlaceableNodes().Select(n => _session.Incident.NodeLabel(n.Id) ?? n.Name).ToList(),
+            o => o,
+            o => o,
+            o => o,
+            (_, _) => { });
+
         // A handover changes who holds what without touching the form, so a conflict computed from
         // the rows has to be re-raised here or the hint would name the person who just left (#470).
         OnPropertyChanged(nameof(ConflictingRow));
@@ -454,12 +464,49 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     // leave a second EL in another Abschnitt unflagged, so the duplicate marking the grid carries
     // (MarkDuplicates) has to branch the same way.
     //
-    // The form has no node and creates free-text assignments only, so it stays keyed on the typed
-    // Section; the node-aware overload with a null node is the same call.
-    private RoleAssignment? FindRunningHolder() =>
-        NewRoleUniqueness == RoleUniqueness.UniquePerSection
-            ? _session.Incident.FindRunningRoleHolder(NewRole, NewSection)
-            : _session.Incident.FindRunningRoleHolderInAnySection(NewRole);
+    // An Abschnitt typed as the board names it is that node (#824), and is asked by node, since
+    // Unterabschnitte under different Abschnitte may share a name; anything else stays free text.
+    private RoleAssignment? FindRunningHolder()
+    {
+        if (NewRoleUniqueness != RoleUniqueness.UniquePerSection)
+        {
+            return _session.Incident.FindRunningRoleHolderInAnySection(NewRole);
+        }
+
+        return NewSectionNode() is { } node
+            ? _session.Incident.FindRunningRoleHolder(NewRole, node.Name, node.Id)
+            : _session.Incident.FindRunningRoleHolder(NewRole, NewSection);
+    }
+
+    /// <summary>
+    /// The live Abschnitte, Unterabschnitte and Bereitstellungen as the ABSCHNITT box offers them
+    /// ("Abschnitt 1 / Nord" for an Unterabschnitt). Picking or typing one places the Funktion there
+    /// rather than in a Freitext-Abschnitt (#824); any other text is still taken as typed.
+    /// </summary>
+    public ObservableCollection<string> SectionOptions { get; } = [];
+
+    private IEnumerable<CommandNode> PlaceableNodes() =>
+        _session.Incident.CommandNodes.Where(n => n.IsLive && n.Kind != CommandNodeKind.Partner);
+
+    // The node the typed Abschnitt names: by its full label first, then by a name only one node
+    // carries. Ignoring case and the spaces around it, as FreeTextSections groups; null otherwise.
+    private CommandNode? NewSectionNode()
+    {
+        if (NewSection?.Trim() is not { Length: > 0 } typed)
+        {
+            return null;
+        }
+
+        var nodes = PlaceableNodes().ToList();
+        var byLabel = nodes.Where(n => string.Equals(_session.Incident.NodeLabel(n.Id), typed, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (byLabel.Count == 1)
+        {
+            return byLabel[0];
+        }
+
+        var byName = nodes.Where(n => string.Equals(n.Name, typed, StringComparison.OrdinalIgnoreCase)).ToList();
+        return byName.Count == 1 ? byName[0] : null;
+    }
 
     /// <summary>What to say about the conflict, or null when there is none: who holds the typed
     /// Funktion, so the operator can see that the press hands over rather than assigns.</summary>
@@ -579,6 +626,10 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         // The Funktion adopts the Stammdaten spelling when it matches one apart from case or
         // spacing, so "el" and "EL " do not become two more Funktionen alongside the configured
         // "EL". An unrecognised one is assigned as typed -- see IsNewRoleUnknown.
+        //
+        // An Abschnitt the board has formed places the Funktion there, so an EAL typed with it
+        // leads it instead of standing in a Freitext-Abschnitt of the same name (#824). With a
+        // node, the incident records the node's name as the Abschnitt, whatever was typed.
         _session.AssignRole(
             StammdatenCatalogue.Normalize(NewRole, RoleOptions) ?? NewRole,
             NewPersonName,
@@ -587,6 +638,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
             to: null,
             section: NewSection,
             phone: NewPhone,
+            nodeId: NewSectionNode()?.Id,
             slot: StammdatenCatalogue.Find(NewRole, _roles)?.Slot ?? RoleSlot.None); // Changed → RefreshRoles renders the row
         NewRole = string.Empty;
         NewPersonName = string.Empty;

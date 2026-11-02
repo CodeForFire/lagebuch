@@ -2,7 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
-using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
@@ -99,7 +98,7 @@ public sealed partial class RoleAssignmentDialogViewModel : ObservableObject
     /// placed. A handover keeps the place, and a placed Funktion is moved on the board.
     /// </summary>
     public bool IsSectionEditable =>
-        Mode == RoleAssignmentDialogMode.Edit && _seed.NodeId is null && _seed.Slot == RoleSlot.None;
+        Mode == RoleAssignmentDialogMode.Edit && !_seed.IsPlacedOnBoard;
 
     [ObservableProperty]
     private string _personName = string.Empty;

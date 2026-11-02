@@ -1175,6 +1175,24 @@ public class CommandApplierTests
         Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
     }
 
+    [Fact]
+    public void AdoptFreeTextSection_over_the_wire_places_the_funktionen_attributed_to_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var host = new SessionOperator("Host", "FFB 1");
+        incident.AssignRole(clock, host, "EAL", "Huber", section: "Nord", slot: RoleSlot.Leiter);
+
+        ApplyOverWire(new AdoptFreeTextSectionCommand(new OperatorDto("Maier", "FFB 2"), "Nord"), incident, clock);
+
+        var node = Assert.Single(incident.CommandNodes);
+        var placed = Assert.Single(incident.Roles);
+        Assert.Equal(node.Id, placed.NodeId);
+        Assert.Equal(RoleSlot.Leiter, placed.Slot);
+        Assert.Equal("Abschnitt (Freitext) Nord übernommen: 1 Funktion", incident.Journal[^1].Text);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
     [Theory]
     [InlineData("""{"$type":"addCommandNode","operator":{"name":"M","callSign":null},"kind":99,"name":"Nord","parentId":null}""")]
     [InlineData("""{"$type":"setFuehrungsstufe","operator":{"name":"M","callSign":null},"stufe":7}""")]

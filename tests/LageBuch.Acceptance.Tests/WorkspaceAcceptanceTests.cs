@@ -806,7 +806,7 @@ public class WorkspaceAcceptanceTests
         Assert.Equal("01 71 / 1 23 45 67", vm.Roles.NewPhone);
 
         vm.Roles.NewRole = "EL";
-        view.GetControl<TextBox>("SectionBox").Text = "Abschnitt Nord";
+        view.GetControl<AutoCompleteBox>("SectionBox").Text = "Abschnitt Nord";
         Dispatcher.UIThread.RunJobs();
         vm.Roles.AddRoleCommand.Execute(null);
 

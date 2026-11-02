@@ -189,7 +189,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             ReportingLine.FreeTextSections(incident),
             c => FreeTextSectionCard.KeyOf(c.Section),
             s => FreeTextSectionCard.KeyOf(s.Section),
-            s => new FreeTextSectionCard(s.Section, s.Assignments),
+            s => new FreeTextSectionCard(
+                s.Section, s.Assignments, IsReadOnly ? null : AdoptFreeTextSection, IsReadOnly ? null : OpenAssignment),
             (c, s) => c.Update(s.Section, s.Assignments));
         RowReconciler.Reconcile(
             Hints,
@@ -427,6 +428,9 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
     private void OpenPerson(Guid? nodeId, RoleSlot slot) =>
         _openPersonDialog?.Invoke(new LeadershipPersonDialogViewModel(_session, _clock, _masterData, nodeId, slot, _onChanged));
+
+    // #824: the card's people move into the Abschnitt of that name, formed when there is none.
+    private void AdoptFreeTextSection(string section) => Run(() => _session.AdoptFreeTextSection(section));
 
     private void OpenAssignment(Guid assignmentId, RoleAssignmentDialogMode mode) =>
         _openAssignmentDialog?.Invoke(new RoleAssignmentDialogViewModel(_session, _masterData, assignmentId, mode, _onChanged));

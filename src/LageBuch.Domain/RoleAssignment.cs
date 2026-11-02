@@ -94,6 +94,14 @@ public sealed record RoleAssignment(
         };
     }
 
+    /// <summary>
+    /// Whether the Führung board holds this Funktion's place, so it is moved there and not by
+    /// typing an Abschnitt: it sits in a node, or holds a post of the Einsatzleitung (a slot and no
+    /// Abschnitt). A Funktion typed in FUNKTIONEN with an Abschnitt keeps the Stammdaten slot but no
+    /// place on the board; its Abschnitt is text, and stays correctable (#824).
+    /// </summary>
+    public bool IsPlacedOnBoard => NodeId is not null || (Slot != RoleSlot.None && string.IsNullOrWhiteSpace(Section));
+
     private static string? Trimmed(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

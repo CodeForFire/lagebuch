@@ -321,7 +321,16 @@ public class VersionHandshakeTests
     {
         // 34 adds endRoleAssignment, a command a client may send. A host at 33 has it nowhere in
         // its allowlist and would reject it, so a 33 and a 34 must not connect.
-        Assert.Equal(34, SyncProtocol.ProtocolVersion);
-        Assert.Equal(34, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 34, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 34, int.MaxValue);
+    }
+
+    [Fact]
+    public void Adopting_a_freitext_abschnitt_raises_the_protocol_and_the_floor_to_thirty_five()
+    {
+        // 35 adds adoptFreeTextSection, a command a client may send. A host at 34 has it nowhere in
+        // its allowlist and would reject it, so a 34 and a 35 must not connect.
+        Assert.Equal(35, SyncProtocol.ProtocolVersion);
+        Assert.Equal(35, SyncProtocol.MinimumProtocolVersion);
     }
 }

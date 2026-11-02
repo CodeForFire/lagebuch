@@ -143,6 +143,9 @@ public interface IIncidentSession
     /// <summary>Ends a running Funktion now, with no successor. See <c>Incident.EndRoleAssignment</c>.</summary>
     void EndRoleAssignment(Guid assignmentId);
 
+    /// <summary>Takes a Freitext-Abschnitt into the Führung structure. See <c>Incident.AdoptFreeTextSection</c>.</summary>
+    void AdoptFreeTextSection(string section);
+
     /// <summary>Sets the Führungsstufe; null clears it.</summary>
     void SetFuehrungsstufe(Fuehrungsstufe? stufe);
 

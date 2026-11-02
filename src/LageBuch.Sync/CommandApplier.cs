@@ -99,6 +99,9 @@ public static class CommandApplier
             case EndRoleAssignmentCommand c:
                 incident.EndRoleAssignment(clock, Operator(c.Operator), c.AssignmentId);
                 break;
+            case AdoptFreeTextSectionCommand c:
+                incident.AdoptFreeTextSection(clock, Operator(c.Operator), c.Section);
+                break;
             case MoveCommandNodeCommand c:
                 incident.MoveCommandNode(clock, Operator(c.Operator), c.NodeId, c.ParentId, c.BeforeNodeId);
                 break;

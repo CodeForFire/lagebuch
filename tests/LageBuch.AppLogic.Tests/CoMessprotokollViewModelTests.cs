@@ -1325,6 +1325,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void EndRoleAssignment(Guid assignmentId) => _inner.EndRoleAssignment(assignmentId);
 
+    public void AdoptFreeTextSection(string section) => _inner.AdoptFreeTextSection(section);
+
     /// <summary>
     /// When set, a rail edit is only sent, the way a joined client's is: it lands when the test
     /// calls <see cref="DeliverRailEdits"/>, as the host's broadcast would.

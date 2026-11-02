@@ -198,15 +198,19 @@ public static class SyncProtocol
     /// 34: a Funktion can be ended without a handover (#823). A client may send
     /// <c>endRoleAssignment</c>, which a host at 33 does not know, so the floor rises to 34.
     /// </para>
+    /// <para>
+    /// 35: a Freitext-Abschnitt can be taken into the Führung structure (#824). A client may send
+    /// <c>adoptFreeTextSection</c>, which a host at 34 does not know, so the floor rises to 35.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 34;
+    public const int ProtocolVersion = 35;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 34;
+    public const int MinimumProtocolVersion = 35;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

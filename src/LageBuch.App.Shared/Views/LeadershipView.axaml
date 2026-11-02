@@ -708,7 +708,8 @@
         </StackPanel>
       </Border>
 
-      <!-- Funktionen typed on FUNKTIONEN with a free-text Abschnitt: shown, so nobody disappears. -->
+      <!-- Funktionen typed on FUNKTIONEN with a free-text Abschnitt: shown, so nobody disappears, and
+           taken into the structure with one button (#824). -->
       <ItemsControl x:Name="FreeTextSectionCards" Classes="board-wrap" ItemsSource="{Binding FreeTextSections}"
                     IsVisible="{Binding HasFreeTextSections}">
         <ItemsControl.ItemTemplate>
@@ -716,7 +717,19 @@
             <Border Classes="board-card">
               <StackPanel Spacing="6">
                 <TextBlock Classes="secondary" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Title}" />
-                <ItemsControl ItemsSource="{Binding People}" ItemTemplate="{StaticResource PersonRowTemplate}" />
+                <!-- ÄNDERN corrects the typed Abschnitt too, now that it is no place on the board. -->
+                <ItemsControl ItemsSource="{Binding People}" ItemTemplate="{StaticResource AssistantRowTemplate}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Spacing="8" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <Button x:Name="AdoptFreeTextSectionButton" Classes="board-action" Content="ALS ABSCHNITT ÜBERNEHMEN"
+                        HorizontalAlignment="Left" Margin="0,4,0,0"
+                        Command="{Binding AdoptCommand}"
+                        AutomationProperties.Name="{Binding AdoptAutomationName}"
+                        ToolTip.Tip="Abschnitt bilden (oder den gleichnamigen nehmen) und die Funktionen dort einordnen" />
               </StackPanel>
             </Border>
           </DataTemplate>

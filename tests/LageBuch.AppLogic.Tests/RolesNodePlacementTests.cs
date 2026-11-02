@@ -177,4 +177,84 @@ public class RolesNodePlacementTests
 
         Assert.All(vm.Roles, r => Assert.False(r.IsDuplicate));
     }
+
+    // --- #824: an Abschnitt typed as FÜHRUNG names it is that node, not a Freitext-Abschnitt. ---
+    [Fact]
+    public void The_abschnitt_box_suggests_the_live_nodes_by_label_and_follows_the_board()
+    {
+        var f = new Fixture(RoleUniqueness.Multiple);
+        var abschnitt = f.Node(CommandNodeKind.Abschnitt, "Abschnitt 1");
+        f.Node(CommandNodeKind.Unterabschnitt, "Nord", abschnitt);
+        f.Node(CommandNodeKind.Bereitstellung, "Marktplatz");
+        f.Node(CommandNodeKind.Partner, "Rettungsdienst");
+        var gone = f.Node(CommandNodeKind.Abschnitt, "Alt");
+        f.Session.Incident.DissolveCommandNode(f.Clock, Fixture.Op, gone);
+
+        using var vm = f.Vm();
+        Assert.Equal(["Abschnitt 1", "Abschnitt 1 / Nord", "Marktplatz"], vm.SectionOptions);
+
+        f.Session.AddCommandNode(CommandNodeKind.Abschnitt, "Süd");
+        Assert.Equal(["Abschnitt 1", "Abschnitt 1 / Nord", "Marktplatz", "Süd"], vm.SectionOptions);
+    }
+
+    [Theory]
+    [InlineData("Abschnitt 1 / Nord")]
+    [InlineData(" abschnitt 1 / nord ")]
+    [InlineData("Nord")]
+    public void Typing_a_nodes_label_or_its_only_name_places_the_funktion_there(string typed)
+    {
+        var f = new Fixture(RoleUniqueness.Multiple);
+        var abschnitt = f.Node(CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var nord = f.Node(CommandNodeKind.Unterabschnitt, "Nord", abschnitt);
+        using var vm = f.Vm();
+        vm.NewRole = "UAL";
+        vm.NewPersonName = "Mustermann, Max";
+        vm.NewSection = typed;
+
+        vm.AddRoleCommand.Execute(null);
+
+        var assigned = Assert.Single(f.Session.Incident.Roles);
+        Assert.Equal(nord, assigned.NodeId);
+        Assert.Equal("Nord", assigned.Section);
+        Assert.Empty(ReportingLine.FreeTextSections(f.Session.Incident));
+    }
+
+    [Fact]
+    public void A_name_two_nodes_share_or_unknown_text_stays_a_freitext_abschnitt()
+    {
+        var f = new Fixture(RoleUniqueness.Multiple);
+        f.Node(CommandNodeKind.Unterabschnitt, "Nord", f.Node(CommandNodeKind.Abschnitt, "Abschnitt 1"));
+        f.Node(CommandNodeKind.Unterabschnitt, "Nord", f.Node(CommandNodeKind.Abschnitt, "Abschnitt 2"));
+        using var vm = f.Vm();
+
+        foreach (var typed in new[] { "Nord", "Wache Süd" })
+        {
+            vm.NewRole = "ZF";
+            vm.NewPersonName = "Musterfrau, Erika";
+            vm.NewSection = typed;
+            vm.AddRoleCommand.Execute(null);
+
+            var assigned = f.Session.Incident.Roles[^1];
+            Assert.Null(assigned.NodeId);
+            Assert.Equal(typed, assigned.Section);
+        }
+    }
+
+    [Fact]
+    public void A_unique_per_abschnitt_funktion_typed_with_a_nodes_label_meets_its_holder_there()
+    {
+        var f = new Fixture(RoleUniqueness.UniquePerSection);
+        var abschnitt1 = f.Node(CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var nord1 = f.Node(CommandNodeKind.Unterabschnitt, "Nord", abschnitt1);
+        f.Node(CommandNodeKind.Unterabschnitt, "Nord", f.Node(CommandNodeKind.Abschnitt, "Abschnitt 2"));
+        f.Place("Mustermann, Max", nord1);
+        using var vm = f.Vm();
+        vm.NewRole = "UAL";
+
+        vm.NewSection = "Abschnitt 2 / Nord";
+        Assert.Null(vm.ConflictingRow);
+
+        vm.NewSection = "Abschnitt 1 / Nord";
+        Assert.Equal("Mustermann, Max", vm.ConflictingRow?.PersonName);
+    }
 }
