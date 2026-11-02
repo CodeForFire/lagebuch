@@ -88,13 +88,13 @@ public partial class ScbaView : UserControl
         FocusPressureField(next);
     }
 
-    // A Button inside a Flyout does not dismiss it (#832). The picker lives in both the grid's and
-    // the cards' templates, so the open one is looked up rather than named. Closed only once the
-    // click is over: Button runs its command after raising Click, and the entries take their
-    // choices from the DataContext the flyout inherits, which closing takes away — closed inside
-    // Click, the entry would have no command left and nothing would be chosen (as LeadershipView's
-    // Stufe picker found).
-    private void OnSafetyTruppChoiceClick(object? sender, RoutedEventArgs e) =>
+    // A Button inside a Flyout does not dismiss it (#832). The Sicherheitstrupp and Trupp-Art
+    // pickers (#835) live in both the grid's and the cards' templates, so the open one is looked
+    // up rather than named. Closed only once the click is over: Button runs its command after
+    // raising Click, and the entries take their choices from the DataContext the flyout inherits,
+    // which closing takes away — closed inside Click, the entry would have no command left and
+    // nothing would be chosen (as LeadershipView's Stufe picker found).
+    private void OnFlyoutChoiceClick(object? sender, RoutedEventArgs e) =>
         Dispatcher.UIThread.Post(() =>
             this.GetVisualDescendants().OfType<Button>()
                 .Select(b => b.Flyout)

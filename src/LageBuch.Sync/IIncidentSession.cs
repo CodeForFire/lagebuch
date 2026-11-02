@@ -259,6 +259,10 @@ public interface IIncidentSession
     /// with a null <paramref name="safetyTruppId"/>.</summary>
     void SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId);
 
+    /// <summary>Gives a Trupp another Trupp-Art (#835). The Einsatzzeit and Abfrage-Intervall
+    /// apply only while the Trupp still waits.</summary>
+    void ChangeScbaTruppType(Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes);
+
     void SetIncidentNumber(IncidentNumber? number);
 
     void SetKeyword(string? keyword);

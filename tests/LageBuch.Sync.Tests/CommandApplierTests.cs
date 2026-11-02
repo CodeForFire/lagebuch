@@ -31,6 +31,20 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void ChangeScbaTruppType_changes_the_trupp_art_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var trupp = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Maier"), entryPressure: 290);
+
+        ApplyOverWire(new ChangeScbaTruppTypeCommand(trupp.Id, "CSA-Trupp", 20, 6), incident, clock);
+
+        Assert.Equal("CSA-Trupp", trupp.Designation);
+        Assert.Equal(20, trupp.MaxDurationMinutes);
+        Assert.Equal(6, trupp.PressureControlIntervalMinutes);
+    }
+
+    [Fact]
     public void RecordScbaPressure_keeps_the_clients_Ort_on_the_host()
     {
         var clock = new FixedClock();

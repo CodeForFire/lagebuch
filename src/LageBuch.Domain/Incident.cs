@@ -1715,6 +1715,21 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Gives <paramref name="truppId"/> another Trupp-Art (#835); see
+    /// <see cref="AtemschutzTrupp.ChangeType"/>. The values come from the caller, who reads them
+    /// off today's Stammdaten. Takes no clock, and the ETB line is written by the caller, like
+    /// <see cref="SetScbaSafetyTrupp"/>.
+    /// </summary>
+    public AtemschutzTrupp ChangeScbaTruppType(
+        Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes)
+    {
+        EnsureOpen();
+        var trupp = FindScbaTrupp(truppId);
+        trupp.ChangeType(designation, maxDurationMinutes, pressureControlIntervalMinutes);
+        return trupp;
+    }
+
+    /// <summary>
     /// Designates the Sicherheitstrupp standing by for <paramref name="truppId"/> (#399), or clears
     /// it with a null <paramref name="safetyTruppId"/>. Takes no clock: nothing here is timestamped,
     /// and the ETB line is written by the caller like every other Atemschutz mutation.

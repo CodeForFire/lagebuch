@@ -50,6 +50,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         IReadOnlyList<SafetyTruppChoice> safetyTruppChoices,
         string? safetyTruppHint,
         string? coveredTrupps,
+        IReadOnlyList<TruppTypeChoice> truppTypeChoices,
         Action<Guid?> onAssignSafetyTrupp)
     {
         ArgumentNullException.ThrowIfNull(trupp);
@@ -64,6 +65,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         SafetyTruppChoices = safetyTruppChoices;
         SafetyTruppHint = safetyTruppHint;
         _coveredTrupps = coveredTrupps;
+        TruppTypeChoices = truppTypeChoices;
     }
 
     public Guid Id => _trupp.Id;
@@ -163,6 +165,14 @@ public sealed partial class ScbaTruppRow : ObservableObject
     public bool HasSafetyTruppHint => !string.IsNullOrEmpty(SafetyTruppHint);
 
     public bool CanAssignSafetyTrupp => !_isReadOnly && !_trupp.IsReturned && _coveredTrupps is null;
+
+    /// <summary>Today's Trupp-Arten for the row's Trupp-Art flyout (#835), plus the Trupp's own
+    /// when the Stammdaten no longer list it. Carried on the row for the reason
+    /// <see cref="SafetyTruppChoices"/> is.</summary>
+    public IReadOnlyList<TruppTypeChoice> TruppTypeChoices { get; private set; }
+
+    /// <summary>An abgenommen Trupp's record is complete, so its Trupp-Art is no longer changed.</summary>
+    public bool CanChangeTruppType => !_isReadOnly && !_trupp.IsReturned;
 
     /// <summary>
     /// The Druck being typed for the next Druckkontrolle; null while the field is empty. It starts
@@ -284,14 +294,17 @@ public sealed partial class ScbaTruppRow : ObservableObject
         AtemschutzTrupp trupp,
         IReadOnlyList<SafetyTruppChoice> safetyTruppChoices,
         string? safetyTruppHint,
-        string? coveredTrupps)
+        string? coveredTrupps,
+        IReadOnlyList<TruppTypeChoice> truppTypeChoices)
     {
         ArgumentNullException.ThrowIfNull(trupp);
         ArgumentNullException.ThrowIfNull(safetyTruppChoices);
+        ArgumentNullException.ThrowIfNull(truppTypeChoices);
         _trupp = trupp;
         SafetyTruppChoices = safetyTruppChoices;
         SafetyTruppHint = safetyTruppHint;
         _coveredTrupps = coveredTrupps;
+        TruppTypeChoices = truppTypeChoices;
 
         // Replacing the list outright is safe here, unlike with the ComboBox this replaced: a
         // flyout has no selection model holding indices into it, and its entries are only realised
@@ -300,6 +313,11 @@ public sealed partial class ScbaTruppRow : ObservableObject
         OnPropertyChanged(nameof(SafetyTruppButtonText));
         OnPropertyChanged(nameof(SafetyTruppHint));
         OnPropertyChanged(nameof(HasSafetyTruppHint));
+
+        // The Trupp-Art can change underneath the row (#835), and with it the name.
+        OnPropertyChanged(nameof(TruppTypeChoices));
+        OnPropertyChanged(nameof(Designation));
+        OnPropertyChanged(nameof(DisplayName));
         Refresh();
     }
 
@@ -321,6 +339,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         OnPropertyChanged(nameof(ControlRemainingDisplay));
         OnPropertyChanged(nameof(StatusDisplay));
         OnPropertyChanged(nameof(CanAssignSafetyTrupp));
+        OnPropertyChanged(nameof(CanChangeTruppType));
         StartCommand.NotifyCanExecuteChanged();
         RecordPressureCommand.NotifyCanExecuteChanged();
         WithdrawCommand.NotifyCanExecuteChanged();
@@ -929,7 +948,18 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             SafetyChoicesFor(trupp),
             SafetyTruppHintFor(trupp),
             CoveredTruppsFor(trupp),
+            TruppTypeChoicesFor(trupp),
             safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId));
+
+    /// <summary>The Trupp-Art flyout entries for one row (#835): today's Trupp-Arten, plus the
+    /// Trupp's own when the Stammdaten no longer list it, so the record is shown, never lost.</summary>
+    private List<TruppTypeChoice> TruppTypeChoicesFor(AtemschutzTrupp trupp) =>
+        StammdatenCatalogue.Including(TruppTypeOptions, trupp.Designation)
+            .Select(name => new TruppTypeChoice(
+                name,
+                string.Equals(name, trupp.Designation, StringComparison.Ordinal),
+                chosen => ChangeTruppType(trupp.Id, chosen)))
+            .ToList();
 
     /// <summary>The flyout entries for one row: "— kein —", then every other Trupp still
     /// bereitgestellt and without a Sicherheitstrupp of its own (#834), ordered by Truppnummer.
@@ -1008,6 +1038,42 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
                     .OrderBy(t => t.TruppNumber)
                     .Select(t => t.DisplayName))
             : null;
+
+    /// <summary>
+    /// Gives a Trupp another Trupp-Art (#835) and writes the ETB line. The new Trupp-Art's
+    /// Einsatzzeit and the Abfrage-Intervall derived from it are read off today's Stammdaten the
+    /// way the registration form reads them; the domain takes them over only while the Trupp still
+    /// waits, so the line names the Einsatzzeit only when it really changed.
+    /// </summary>
+    private void ChangeTruppType(Guid truppId, string designation)
+    {
+        // Inert rather than throwing, as AssignSafetyTrupp is: a programmatic Execute bypasses the
+        // hidden button, and re-choosing the Trupp-Art in force writes no line.
+        var incident = _session.Incident;
+        if (IsReadOnly
+            || incident.FindScbaTruppOrDefault(truppId) is not { IsReturned: false } trupp
+            || string.Equals(trupp.Designation, designation, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var maxDuration = StammdatenCatalogue.Find(designation, _truppTypes)?.MaxDurationMinutes
+            ?? AtemschutzTrupp.DefaultMaxDurationMinutes;
+        var interval = Math.Max(1, maxDuration / 3);
+
+        // Read before mutating: the mutation raises Changed, which rebuilds every row.
+        var name = trupp.CallSign ?? $"Trupp {trupp.TruppNumber}";
+        var text = $"Trupp-Art von {name} gewechselt: bisher {trupp.Designation}, jetzt {designation}";
+        if (trupp.IsWaiting && maxDuration != trupp.MaxDurationMinutes)
+        {
+            text += $", Einsatzzeit {maxDuration} Min.";
+        }
+
+        var callSign = trupp.CallSign;
+        _session.ChangeScbaTruppType(truppId, designation, maxDuration, interval);
+        _session.AddJournalEntry(EtbDirection.System, text, from: callSign);
+        _onChanged();
+    }
 
     private void AssignSafetyTrupp(Guid truppId, Guid? safetyTruppId)
     {
@@ -1183,7 +1249,8 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
             if (i < Trupps.Count)
             {
-                Trupps[i].Update(trupp, SafetyChoicesFor(trupp), SafetyTruppHintFor(trupp), CoveredTruppsFor(trupp));
+                Trupps[i].Update(
+                    trupp, SafetyChoicesFor(trupp), SafetyTruppHintFor(trupp), CoveredTruppsFor(trupp), TruppTypeChoicesFor(trupp));
             }
             else
             {

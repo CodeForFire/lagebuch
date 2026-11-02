@@ -661,6 +661,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId) =>
         Send(new SetScbaSafetyTruppCommand(truppId, safetyTruppId));
 
+    public void ChangeScbaTruppType(Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes) =>
+        Send(new ChangeScbaTruppTypeCommand(truppId, designation, maxDurationMinutes, pressureControlIntervalMinutes));
+
     public void SetIncidentNumber(IncidentNumber? number) => Send(new SetIncidentNumberCommand(number?.Value));
 
     public void SetKeyword(string? keyword) => Send(new SetKeywordCommand(keyword));
