@@ -102,6 +102,26 @@ public class ScbaTruppArtChangeTests
         Assert.Equal("CSA-Trupp", Assert.Single(Row(vm, row.Id).TruppTypeChoices, c => c.IsCurrent).Name);
     }
 
+    // The row is re-pointed in place (#294), so the view only learns of the new name if the row says so.
+    [Fact]
+    public void The_row_announces_the_new_name_and_choices()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var row = Register(vm, "Sicherheitstrupp");
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        Change(vm, row.Id, "Angriffstrupp");
+
+        Assert.Same(row, Row(vm, row.Id));
+        Assert.Contains(nameof(ScbaTruppRow.DisplayName), raised);
+        Assert.Contains(nameof(ScbaTruppRow.Designation), raised);
+        Assert.Contains(nameof(ScbaTruppRow.TruppTypeChoices), raised);
+        Assert.Contains(nameof(ScbaTruppRow.CanChangeTruppType), raised);
+        Assert.Equal("Angriffstrupp", row.Designation);
+    }
+
     [Fact]
     public void A_trupp_art_with_the_same_einsatzzeit_leaves_it_out_of_the_line()
     {

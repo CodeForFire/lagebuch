@@ -91,7 +91,9 @@ public class TruppArtChangeTests
         var incident = NewIncident(out var clock);
         var trupp = AddTrupp(incident, clock, "Sicherheitstrupp");
 
-        Assert.Throws<ArgumentException>(() => incident.ChangeScbaTruppType(trupp.Id, "  ", 30, 10));
+        var refused = Assert.Throws<ArgumentException>(() => incident.ChangeScbaTruppType(trupp.Id, "  ", 30, 10));
+
+        Assert.StartsWith("Trupp-Bezeichnung darf nicht leer sein.", refused.Message, StringComparison.Ordinal);
         Assert.Equal("Sicherheitstrupp", trupp.Designation);
     }
 
