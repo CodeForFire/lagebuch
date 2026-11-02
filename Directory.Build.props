@@ -21,6 +21,9 @@
     <!-- Required so IDE0005 (unused usings) runs during build; suppress the
          XML-doc-comment warnings that GenerateDocumentationFile turns on. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- The XML docs exist only for the build; nothing reads them at runtime. Keep them, and
+         every package's, out of the installed app (GHSA-3pc7-r86c-pwf2). -->
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
 
     <!-- Every project records its resolved package graph, content hashes included, in a
