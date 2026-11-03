@@ -36,7 +36,8 @@ public sealed record CommandNode
     /// <summary>
     /// The single, untyped Funkgruppe a node carried before #878. Read back from an old file or
     /// snapshot only: the V41 migration moves it into <see cref="Funkgruppen"/>, and
-    /// <see cref="WithDetails"/> refuses a new one and clears it.
+    /// <see cref="WithDetails"/> refuses a new one. An edit keeps one the migration had no room for,
+    /// until the node's Funkgruppen hold it.
     /// </summary>
     public string? Funkgruppe { get; private init; }
 
@@ -104,7 +105,8 @@ public sealed record CommandNode
     /// <summary>
     /// Returns a copy with corrected details, trimmed and capped the way <see cref="Create"/> does.
     /// Every kind takes TMO and DMO <paramref name="funkgruppen"/> (#878), null for none, and refuses
-    /// a single untyped <paramref name="funkgruppe"/>; the copy carries none. Every kind takes a
+    /// a single untyped <paramref name="funkgruppe"/>. The copy keeps the single one an old file
+    /// carried only while the new Funkgruppen lack it, so an unrelated edit never drops it. Every kind takes a
     /// <paramref name="fuehrungsfahrzeug"/>, null for none.
     /// </summary>
     public CommandNode WithDetails(
@@ -129,12 +131,30 @@ public sealed record CommandNode
             Name = CleanName(name),
             Auftrag = Clean(auftrag, MaxAuftragLength, "Auftrag"),
             Standort = Clean(standort, MaxTextLength, "Standort"),
-            Funkgruppe = null,
+            Funkgruppe = KeptSingle(Funkgruppe, groups),
             Funkgruppen = groups,
             Rufname = Clean(rufname, MaxTextLength, "Rufname"),
             Telefon = Clean(telefon, MaxPhoneLength, "Telefon"),
             Fuehrungsfahrzeug = Clean(fuehrungsfahrzeug, MaxTextLength, "Führungsfahrzeug"),
         };
+    }
+
+    // The single Funkgruppe of before #878 is written "TMO X", "DMO X" or just "X".
+    private static string? KeptSingle(string? single, Funkgruppen groups)
+    {
+        if (single is null)
+        {
+            return null;
+        }
+
+        var group = single.Trim();
+        if (group.StartsWith("TMO ", StringComparison.OrdinalIgnoreCase)
+            || group.StartsWith("DMO ", StringComparison.OrdinalIgnoreCase))
+        {
+            group = group[4..];
+        }
+
+        return groups.Tmo.Concat(groups.Dmo).Any(g => FunkCheck.SameGroup(g, group)) ? null : single;
     }
 
     /// <summary>

@@ -887,13 +887,15 @@ public class CommandNodeDialogViewModelTests
         Assert.Equal(("DMO", "Funkgruppe DMO", "z. B. 301_F"), (vm.DmoSlots[0].Kind, vm.DmoSlots[0].AccessibleName, vm.DmoSlots[0].Placeholder));
     }
 
-    // A file from a foreign build may still carry a node with the single Funkgruppe of before #878.
-    // Editing it must not write back the field the domain refuses, and must keep its lists.
+    // A file from a foreign build may still carry a node with the single Funkgruppe of before #878,
+    // one V41 had no room to move because its kind was full. Editing an unrelated field must not
+    // write back the field the domain refuses, and must not drop it either.
     [Fact]
-    public void Editing_a_foreign_files_node_drops_its_single_funkgruppe_and_keeps_its_lists()
+    public void Editing_a_foreign_files_node_keeps_its_single_funkgruppe_and_its_lists()
     {
+        var full = new Funkgruppen(null, ["301_F", "302_F", "303_F"]);
         var abschnitt = CommandNode.Rehydrate(
-            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, "TMO POL 1", null, null, null, new Funkgruppen(["X"], null));
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, "DMO 304_F", null, null, null, full);
         var session = Hostile([abschnitt]);
 
         var edit = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, abschnitt.Id);
@@ -902,7 +904,8 @@ public class CommandNodeDialogViewModelTests
 
         Assert.Null(edit.SaveError);
         var saved = session.Incident.FindCommandNode(abschnitt.Id);
-        Assert.Null(saved?.Funkgruppe);
-        Assert.Equal(new Funkgruppen(["X"], null), saved?.Funkgruppen);
+        Assert.Equal("Hof", saved?.Standort);
+        Assert.Equal("DMO 304_F", saved?.Funkgruppe);
+        Assert.Equal(full, saved?.Funkgruppen);
     }
 }

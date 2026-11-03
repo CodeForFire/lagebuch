@@ -145,6 +145,25 @@ public class CommandNodeTests
         Assert.Equal(new Funkgruppen(["TG 2"], null), edited.Funkgruppen);
     }
 
+    [Theory]
+    [InlineData("DMO 304_F", null, "DMO 304_F")]
+    [InlineData("DMO 304_F", "304_F", null)]
+    [InlineData("DMO 301_F", null, null)]
+    [InlineData(" tmo  fw   2 ", "FW 2", null)]
+    [InlineData("Kanal 9", "kanal  9", null)]
+    [InlineData("Kanal 9", "Kanal 5", "Kanal 9")]
+    public void An_edit_keeps_a_single_funkgruppe_until_the_lists_hold_it(string legacy, string? listed, string? kept)
+    {
+        var old = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, legacy, null, null, null, new Funkgruppen(null, ["301_F"]));
+        var groups = listed is null ? new Funkgruppen(null, ["301_F"]) : new Funkgruppen([listed], ["301_F"]);
+
+        var edited = old.WithDetails("Nord", null, "Hof", null, null, null, groups);
+
+        Assert.Equal(kept, edited.Funkgruppe);
+        Assert.Equal("Hof", edited.Standort);
+    }
+
     [Fact]
     public void Every_kind_takes_a_fuehrungsfahrzeug_trimmed_and_capped()
     {
