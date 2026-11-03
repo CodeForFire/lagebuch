@@ -284,9 +284,13 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          apk=$(find publish-android -name "*-Signed.apk" -o -name "*.apk" | head -n1)
-          aab=$(find publish-android -name "*.aab" | head -n1)
-          test -n "$aab" || { echo "::error::No .aab was produced - check AndroidPackageFormats"; exit 1; }
+          # The SDK writes an unsigned de.codeforfire.lagebuch.aab beside the -Signed one, and
+          # `find | head` once picked the unsigned bundle, which Play refused (v0.9.3-rc.1).
+          # Name the signed files exactly.
+          apk=$(find publish-android -name "*-Signed.apk" | head -n1)
+          aab=$(find publish-android -name "*-Signed.aab" | head -n1)
+          test -n "$apk" || { echo "::error::No -Signed.apk was produced - check AndroidPackageFormats"; exit 1; }
+          test -n "$aab" || { echo "::error::No -Signed.aab was produced - check AndroidPackageFormats"; exit 1; }
           # An SDK default once dropped armeabi-v7a without a word, and Play then hid the app from
           # every 32-bit tablet. Refuse to release a package missing any ABI the csproj lists.
           for abi in armeabi-v7a arm64-v8a x86_64; do
@@ -303,6 +307,15 @@ jobs:
           certs=$("$apksigner" verify --print-certs "$apk")
           if grep -q "CN=Android Debug" <<< "$certs"; then
             echo "::error::The APK is signed with the debug key - check the AndroidSigning* properties"; exit 1
+          fi
+          # The bundle is what Play checks, so check the bundle too. jarsigner exits 0 on an
+          # unsigned jar ("jar is unsigned."), hence the grep for "jar verified.". -certs prints the
+          # signer only together with -verbose.
+          bundle=$(jarsigner -verify -verbose -certs "$aab")
+          grep -q "^jar verified\." <<< "$bundle" \
+            || { echo "::error::The .aab is not signed - Play refuses it"; echo "$bundle" | tail -n5; exit 1; }
+          if grep -q "CN=Android Debug" <<< "$bundle"; then
+            echo "::error::The .aab is signed with the debug key - check the AndroidSigning* properties"; exit 1
           fi
           mkdir -p dist play
           cp "$apk" "dist/lagebuch-${VERSION}.apk"
@@ -508,7 +521,7 @@ jobs:
           serviceAccountJson: ${{ steps.auth.outputs.credentials_file_path }}
           packageName: de.codeforfire.lagebuch
           releaseFiles: play/*.aab
-          track: ${{ steps.track.outputs.track }}
+          tracks: ${{ steps.track.outputs.track }}
           status: draft
 
   # macOS carries the 10x minute multiplier, so it is not built on every tag. Run this workflow
