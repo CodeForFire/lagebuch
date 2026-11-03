@@ -108,8 +108,9 @@ public class MainWindowViewModelTests
         Assert.False(vm.IsIncidentOpen);
 
         vm.RequestNewIncidentCommand.Execute(null);
-        vm.PendingPrompt!.OperatorName = "Müller";
-        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        var prompt = Assert.IsType<OperatorPromptViewModel>(vm.PendingPrompt);
+        prompt.OperatorName = "Müller";
+        prompt.ConfirmCommand.Execute(null);
         vm.ConfirmOperatorCommand.Execute(null);
 
         Assert.True(vm.IsIncidentOpen);
