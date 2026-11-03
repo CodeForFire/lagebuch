@@ -59,8 +59,15 @@ jobs:
         env:
           LC_ALL: C.UTF-8
         run: |
-          if git grep -nIP '[\x{202A}-\x{202E}\x{2066}-\x{2069}]'; then
+          # Fail closed: git grep exits 1 for "no match" and 128 when it could not search at all
+          # (a PCRE build without UTF support, a broken checkout), which must not read as clean.
+          status=0
+          git grep -nIP '[\x{202A}-\x{202E}\x{2066}-\x{2069}]' || status=$?
+          if [ "$status" -eq 0 ]; then
             echo "::error::Bidirectional control characters found; write them as escapes."
+            exit 1
+          elif [ "$status" -ne 1 ]; then
+            echo "::error::git grep failed with exit $status; the check did not run."
             exit 1
           fi
 

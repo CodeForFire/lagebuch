@@ -77,7 +77,7 @@ rm -rf "$out/db"
   --format=sarif-latest --output="$out/raw.sarif" --threads=0 2>&1 | tee "$out/analyze.log"
 
 # A database that missed files reports nothing for them, which reads as clean.
-read -r scanned total < <(grep -oE 'scanned [0-9]+ out of [0-9]+' "$out/analyze.log" | awk '{print $2, $5}')
+read -r scanned total < <(grep -oE 'scanned [0-9]+ out of [0-9]+' "$out/analyze.log" | awk '{print $2, $5}') || true
 if [ -z "${total:-}" ] || [ $((scanned * 100)) -lt $((total * 95)) ]; then
   echo "CodeQL saw only ${scanned:-?} of ${total:-?} C# files; the build ran partly outside the tracer. Rerun." >&2
   exit 2

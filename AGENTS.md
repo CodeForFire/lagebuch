@@ -199,7 +199,9 @@ open a PR. Absolute rule, no exceptions.
   workflows may follow repo convention.
 - Always pin to the latest release: resolve with
   `gh api repos/<owner>/<action>/releases/latest --jq .tag_name`, then
-  `gh api repos/<owner>/<action>/git/refs/tags/<tag> --jq .object.sha`.
+  `gh api repos/<owner>/<action>/commits/<tag> --jq .sha`. That resolves an
+  annotated tag to its commit; `git/refs/tags/<tag>` would hand back the tag
+  object's SHA instead.
 - Every repo needs `.github/dependabot.yml` covering the `github-actions`
   ecosystem; add it if missing.
 - `zizmor.yml` audits every workflow and composite action, and its findings

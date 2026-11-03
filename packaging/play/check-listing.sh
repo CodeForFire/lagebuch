@@ -43,6 +43,15 @@ name=$(block 0)
 short=$(block 1)
 full=$(block 2)
 
+# A listing whose fences were edited away yields empty blocks, and an empty block
+# passes every length check, so absence is a failure of its own.
+for field in "app name:$name" "short description:$short" "full description:$full"; do
+    if [ -z "${field#*:}" ]; then
+        echo "error: the listing has no ${field%%:*} block — check its \`\`\` fences." >&2
+        exit 1
+    fi
+done
+
 echo "Length limits"
 check_len "app name" 30 "$name"
 check_len "short description" 80 "$short"
@@ -52,11 +61,15 @@ check_len "full description" 4000 "$full"
 # documented rejection risk for a fire-service app — see docs/releasing.md.
 echo
 echo "Forbidden wording (docs/releasing.md)"
-forbidden='amtlich|offiziell|behördlich|Leitstelle|Notruf|alarmier|Alarmierung|112'
-# The disclaimer has to say what the app is NOT, so it is exempt: it is the one place
-# these words legitimately appear.
-haystack=$(printf '%s\n%s\n%s' "$name" "$short" "$full" \
-    | grep -viE 'steht in keiner Verbindung|alarmiert nicht|ersetzt keine|keine Verbindung zu einer' || true)
+# Anchored at a word start: "ehrenamtlich" is not a claim of official status.
+forbidden='\b(amtlich|offiziell|behördlich|Leitstelle|Notruf|alarmier|Alarmierung|112)'
+# The disclaimer has to say what the app is NOT, so its exact phrases are exempt: it is the one
+# place these words legitimately appear. Only those phrases are cut, never the line around
+# them, so a claim sharing the disclaimer's line is still caught.
+haystack=$(printf '%s\n%s\n%s' "$name" "$short" "$full")
+for phrase in 'Es alarmiert nicht' 'stellt keine Verbindung zu einer Leitstelle her'; do
+    haystack=${haystack//"$phrase"/}
+done
 if hits=$(printf '%s' "$haystack" | grep -oiE "$forbidden" | sort -u); [ -n "$hits" ]; then
     echo "  FAIL  found: $(printf '%s' "$hits" | tr '\n' ' ')"
     fail=1

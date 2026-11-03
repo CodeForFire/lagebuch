@@ -164,7 +164,7 @@ def cmd_patterns(args: argparse.Namespace) -> int:
     root = Path(git("rev-parse", "--show-toplevel").strip())
     ranges = changed_lines(diff_since(args.base, args.project_dir, "-U0"))
     for name in sorted(ranges):
-        text = (root / name).read_text(encoding="utf-8-sig")
+        text = (root / name).read_bytes().decode("utf-8-sig")  # keeps a \r, as Roslyn does
         braces = "".join(f"{{{start}..{end}}}" for start, end in spans(text, ranges[name]))
         if braces:
             print(Path(name).relative_to(args.project_dir).as_posix() + braces)
