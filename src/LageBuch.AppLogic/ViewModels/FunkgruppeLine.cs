@@ -19,12 +19,10 @@ public sealed record FunkgruppeLine(string Text, bool? IsShared)
     public bool IsMarkedNotShared => IsShared == false;
 
     /// <summary>What a screen reader says for the mark; empty when there is none.</summary>
-    public string MarkName => IsShared switch
-    {
-        true => "gemeinsame Funkgruppe",
-        false => "keine gemeinsame Funkgruppe",
-        null => string.Empty,
-    };
+    public string MarkName =>
+        IsMarkedShared ? "gemeinsame Funkgruppe"
+        : IsMarkedNotShared ? "keine gemeinsame Funkgruppe"
+        : string.Empty;
 
     /// <summary>The lines for <paramref name="groups"/>, each marked by <paramref name="check"/> (unmarked when null).</summary>
     internal static FunkgruppeLine[] Of(IReadOnlyList<string> groups, FunkKindCheck? check) =>
