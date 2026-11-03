@@ -148,13 +148,15 @@ public sealed record CommandNode
         }
 
         var group = single.Trim();
-        if (group.StartsWith("TMO ", StringComparison.OrdinalIgnoreCase)
-            || group.StartsWith("DMO ", StringComparison.OrdinalIgnoreCase))
+        var isDmo = group.StartsWith("DMO ", StringComparison.OrdinalIgnoreCase);
+        if (isDmo || group.StartsWith("TMO ", StringComparison.OrdinalIgnoreCase))
         {
             group = group[4..];
         }
 
-        return groups.Tmo.Concat(groups.Dmo).Any(g => FunkCheck.SameGroup(g, group)) ? null : single;
+        // Only the list of its own kind holds it, as V41 would have put it: TMO unless it says DMO.
+        var ofItsKind = isDmo ? groups.Dmo : groups.Tmo;
+        return ofItsKind.Any(g => FunkCheck.SameGroup(g, group)) ? null : single;
     }
 
     /// <summary>

@@ -147,8 +147,9 @@ public class CommandNodeTests
 
     [Theory]
     [InlineData("DMO 304_F", null, "DMO 304_F")]
-    [InlineData("DMO 304_F", "304_F", null)]
+    [InlineData("DMO 304_F", "304_F", "DMO 304_F")]
     [InlineData("DMO 301_F", null, null)]
+    [InlineData("301_F", null, "301_F")]
     [InlineData(" tmo  fw   2 ", "FW 2", null)]
     [InlineData("Kanal 9", "kanal  9", null)]
     [InlineData("Kanal 9", "Kanal 5", "Kanal 9")]
