@@ -6,6 +6,15 @@
              x:Class="LageBuch.App.Shared.Views.CommandNodeDialogView"
              x:DataType="vm:CommandNodeDialogViewModel">
   <UserControl.Resources>
+    <!-- A suggested Funkgruppe with its Notiz underneath, so the Lagebuchführer sees what a group
+         is for; picking it fills in the group alone. -->
+    <DataTemplate x:Key="FunkgruppeOptionTemplate" x:DataType="vm:FunkgruppeOption">
+      <StackPanel>
+        <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Note}" Classes="secondary" FontSize="12" TextTrimming="CharacterEllipsis"
+                   IsVisible="{Binding Note, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </DataTemplate>
     <!-- One TMO or DMO field: the Stammdaten's groups of its kind as suggestions, free text allowed,
          and an x to take it away once there is more than one of its kind. Its field holds several
          boxes, so each draws the suggestion chevron itself, as Classes="field suggest" draws it once
@@ -14,6 +23,8 @@
       <!-- A fixed column for the x, so a field without one is as wide as one with it. -->
       <Grid ColumnDefinitions="*,32" ColumnSpacing="6">
         <AutoCompleteBox Grid.Column="0" x:Name="FunkgruppeSlotBox" ItemsSource="{Binding Options}"
+                         ValueMemberBinding="{Binding Text, DataType=vm:FunkgruppeOption}"
+                         ItemTemplate="{StaticResource FunkgruppeOptionTemplate}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
                          Padding="11,7,32,7"
                          AutomationProperties.Name="{Binding AccessibleName}"
@@ -93,9 +104,11 @@
                  lacks stays enterable, so this is an AutoCompleteBox, as STICHWORT is. -->
             <HeaderedContentControl Classes="field suggest" Header="FUNKGRUPPE" IsVisible="{Binding ShowFunkgruppe}">
               <AutoCompleteBox x:Name="CommandNodeFunkgruppeBox" ItemsSource="{Binding FunkgruppeOptions}"
+                               ValueMemberBinding="{Binding Text, DataType=vm:FunkgruppeOption}"
+                               ItemTemplate="{StaticResource FunkgruppeOptionTemplate}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
                                AutomationProperties.Name="Funkgruppe"
-                               Text="{Binding Funkgruppe}" PlaceholderText="z. B. TMO FW_MUSTER 1000" />
+                               Text="{Binding Funkgruppe}" PlaceholderText="z. B. TMO FW_MUSTER (KW: 1000)" />
             </HeaderedContentControl>
             <!-- An Einsatzleitung, ours or a partner's, works on up to three TMO and three DMO
                  Funkgruppen (#828). One field of each always shows; + adds one, × takes it away. -->

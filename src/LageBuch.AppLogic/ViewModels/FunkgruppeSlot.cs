@@ -17,7 +17,7 @@ public sealed partial class FunkgruppeSlot : ObservableObject
     private string? _text;
 
     internal FunkgruppeSlot(
-        string kind, string? text, IReadOnlyList<string> options, Action<FunkgruppeSlot> onRemove, Func<bool> canRemove)
+        string kind, string? text, IReadOnlyList<FunkgruppeOption> options, Action<FunkgruppeSlot> onRemove, Func<bool> canRemove)
     {
         Kind = kind;
         _text = text;
@@ -33,10 +33,10 @@ public sealed partial class FunkgruppeSlot : ObservableObject
     public string AccessibleName => $"Funkgruppe {Kind}";
 
     /// <summary>An example of the kind's naming, shown while the field is empty.</summary>
-    public string Placeholder => Kind == "DMO" ? "z. B. 301_F" : "z. B. FW_MUSTER 1000";
+    public string Placeholder => Kind == "DMO" ? "z. B. 301_F" : "z. B. FW_MUSTER (KW: 1000)";
 
-    /// <summary>The Stammdaten Funkgruppen of this kind, offered as suggestions and never enforced.</summary>
-    public IReadOnlyList<string> Options { get; }
+    /// <summary>The Stammdaten Funkgruppen of this kind with their Notiz, offered as suggestions and never enforced.</summary>
+    public IReadOnlyList<FunkgruppeOption> Options { get; }
 
     /// <summary>Whether this field can be taken away: one of each kind always stays.</summary>
     public bool CanRemove => _canRemove();

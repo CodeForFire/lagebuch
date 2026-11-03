@@ -71,12 +71,12 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
         // Favourites first, then alphabetical (#833) -- sorted here rather than trusted from the store,
         // since a joined client's Stammdaten come from the host's export.
-        FunkgruppeOptions = [.. TalkGroup.FavouritesFirst(masterData.TalkGroups, g => g.Display).Select(g => g.Display)];
+        FunkgruppeOptions = OptionsOf(masterData.TalkGroups, g => g.Display);
         FahrzeugOptions = FahrzeugeOf(session, masterData);
 
-        // The field already says TMO or DMO, so its suggestions leave the kind off: "FW_MUSTER 1000".
-        TmoOptions = GroupsOf(masterData, TalkGroupKind.Tmo);
-        DmoOptions = GroupsOf(masterData, TalkGroupKind.Dmo);
+        // The field already says TMO or DMO, so its suggestions leave the kind off: "FW_MUSTER (KW: 1000)".
+        TmoOptions = OptionsOf(masterData.TalkGroups.Where(g => g.Kind == TalkGroupKind.Tmo), g => g.Label);
+        DmoOptions = OptionsOf(masterData.TalkGroups.Where(g => g.Kind == TalkGroupKind.Dmo), g => g.Label);
         TmoSlots = Slots("TMO", funkgruppen.Tmo, TmoOptions);
         DmoSlots = Slots("DMO", funkgruppen.Dmo, DmoOptions);
     }
@@ -89,8 +89,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     /// <summary>The EINORDNEN VOR entry for "after every sibling".</summary>
     public const string AtEndLabel = "— am Ende —";
 
-    /// <summary>The Funkgruppen of the Stammdaten, offered as suggestions and never enforced.</summary>
-    public IReadOnlyList<string> FunkgruppeOptions { get; }
+    /// <summary>The Funkgruppen of the Stammdaten with their Notiz, offered as suggestions and never enforced.</summary>
+    public IReadOnlyList<FunkgruppeOption> FunkgruppeOptions { get; }
 
     /// <summary>
     /// The Funkrufnamen offered for the Führungsfahrzeug (#829): the Einsatz's own Kräfte first, then
@@ -99,10 +99,10 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     public IReadOnlyList<string> FahrzeugOptions { get; }
 
     /// <summary>The Stammdaten's TMO Funkgruppen without their kind, offered on every TMO field.</summary>
-    public IReadOnlyList<string> TmoOptions { get; }
+    public IReadOnlyList<FunkgruppeOption> TmoOptions { get; }
 
     /// <summary>The Stammdaten's DMO Funkgruppen without their kind, offered on every DMO field.</summary>
-    public IReadOnlyList<string> DmoOptions { get; }
+    public IReadOnlyList<FunkgruppeOption> DmoOptions { get; }
 
     /// <summary>The TMO fields of an Einsatzleitung: at least one, at most <see cref="Funkgruppen.MaxPerKind"/>.</summary>
     public ObservableCollection<FunkgruppeSlot> TmoSlots { get; }
@@ -268,7 +268,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
         _session.Incident.CommandNodes.FirstOrDefault(n => n.Id == _nodeId && n.IsLive);
 
     private string? FunkgruppeToSave =>
-        ShowFunkgruppe ? Normalize(StammdatenCatalogue.Normalize(Funkgruppe, FunkgruppeOptions)) : null;
+        ShowFunkgruppe ? Normalize(StammdatenCatalogue.Normalize(Funkgruppe, TextsOf(FunkgruppeOptions))) : null;
 
     private Funkgruppen FunkgruppenToSave =>
         ShowFunkgruppen
@@ -296,15 +296,16 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             .Where(c => c.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)];
 
-    private static IReadOnlyList<string> GroupsOf(MasterDataSet masterData, TalkGroupKind kind) =>
-        [.. TalkGroup.FavouritesFirst(masterData.TalkGroups.Where(g => g.Kind == kind), WithoutKind).Select(WithoutKind)];
+    // Each group with its Notiz, so the picker can say what a group is for; a blank Notiz is none.
+    private static IReadOnlyList<FunkgruppeOption> OptionsOf(IEnumerable<TalkGroup> groups, Func<TalkGroup, string> text) =>
+        [.. TalkGroup.FavouritesFirst(groups, text)
+            .Select(g => new FunkgruppeOption(text(g), string.IsNullOrWhiteSpace(g.Note) ? null : g.Note.Trim()))];
 
-    private static string WithoutKind(TalkGroup g) =>
-        string.IsNullOrWhiteSpace(g.Number) ? g.Name : $"{g.Name} {g.Number}";
+    private static string[] TextsOf(IReadOnlyList<FunkgruppeOption> options) => [.. options.Select(o => o.Text)];
 
     // One field per recorded group, and an empty one when there are none: every Einsatzleitung
     // offers at least one of each (#828), and saving it empty is still allowed.
-    private ObservableCollection<FunkgruppeSlot> Slots(string kind, IReadOnlyList<string> groups, IReadOnlyList<string> options)
+    private ObservableCollection<FunkgruppeSlot> Slots(string kind, IReadOnlyList<string> groups, IReadOnlyList<FunkgruppeOption> options)
     {
         var slots = new ObservableCollection<FunkgruppeSlot>();
         foreach (var group in groups)
@@ -321,7 +322,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     }
 
     private FunkgruppeSlot NewSlot(
-        string kind, string? text, IReadOnlyList<string> options, ObservableCollection<FunkgruppeSlot> slots) =>
+        string kind, string? text, IReadOnlyList<FunkgruppeOption> options, ObservableCollection<FunkgruppeSlot> slots) =>
         new(kind, text, options, s => RemoveSlot(slots, s), () => slots.Count > 1);
 
     private void AddSlot(ObservableCollection<FunkgruppeSlot> slots, IRelayCommand add)
@@ -354,8 +355,8 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     // Each entry in the catalogue's own spelling, as the single field is; blanks and repeats drop out.
     private Funkgruppen InCatalogueSpelling(IEnumerable<string?> tmo, IEnumerable<string?> dmo) =>
         Funkgruppen.FromRecord(
-            tmo.Select(t => StammdatenCatalogue.Normalize(t, TmoOptions)),
-            dmo.Select(d => StammdatenCatalogue.Normalize(d, DmoOptions)));
+            tmo.Select(t => StammdatenCatalogue.Normalize(t, TextsOf(TmoOptions))),
+            dmo.Select(d => StammdatenCatalogue.Normalize(d, TextsOf(DmoOptions))));
 
     partial void OnNameChanged(string value) => NameError = ValidateName();
 
@@ -590,7 +591,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
             name.Trim(),
             Normalize(auftrag),
             Normalize(standort),
-            ShowFunkgruppe ? Normalize(StammdatenCatalogue.Normalize(funkgruppe, FunkgruppeOptions)) : null,
+            ShowFunkgruppe ? Normalize(StammdatenCatalogue.Normalize(funkgruppe, TextsOf(FunkgruppeOptions))) : null,
             Normalize(rufname),
             Normalize(telefon),
             ShowFunkgruppen ? InCatalogueSpelling(funkgruppen.Tmo, funkgruppen.Dmo) : Funkgruppen.Empty,

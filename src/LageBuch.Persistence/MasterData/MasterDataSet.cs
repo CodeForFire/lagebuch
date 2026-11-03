@@ -496,8 +496,9 @@ public enum TalkGroupKind
 }
 
 /// <summary>
-/// One Funkgruppe from the Stammdaten, e.g. "TMO FW_MUSTER 1000" (name FW_MUSTER, number 1000) or "DMO 301_F" (named by its number, no separate one). Number is the
-/// optional channel or group number and Note free text; both are null or blank when not given.
+/// One Funkgruppe from the Stammdaten, e.g. "TMO FW_MUSTER (KW: 1000)" (name FW_MUSTER, Kurzwahl 1000) or "DMO 301_F"
+/// (no Kurzwahl). Number is the optional Kurzwahl, the short dial the radio selects the group by, and
+/// Note free text saying what the group is for; both are null or blank when not given.
 /// A favourite is one the Feuerwehr uses most; every picker lists it first (#833).
 /// </summary>
 public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, string? Note = null, bool IsFavorite = false)
@@ -511,11 +512,12 @@ public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, 
     private static readonly StringComparer Alphabetical = StringComparer.Create(
         CultureInfo.GetCultureInfo("de-DE"), CompareOptions.IgnoreCase | CompareOptions.NumericOrdering);
 
-    /// <summary>The kind upper-case, then the name, then the number when present.</summary>
-    public string Display =>
-        string.IsNullOrWhiteSpace(Number)
-            ? $"{KindLabel(Kind)} {Name}"
-            : $"{KindLabel(Kind)} {Name} {Number}";
+    /// <summary>The kind upper-case, then <see cref="Label"/>: "TMO FW_MUSTER (KW: 1000)".</summary>
+    public string Display => $"{KindLabel(Kind)} {Label}";
+
+    /// <summary>The name, then the Kurzwahl in brackets when present: "FW_MUSTER (KW: 1000)", "301_F".</summary>
+    public string Label =>
+        string.IsNullOrWhiteSpace(Number) ? Name : $"{Name} (KW: {Number.Trim()})";
 
     /// <summary>The label shown for <paramref name="kind"/>.</summary>
     public static string KindLabel(TalkGroupKind kind) => kind == TalkGroupKind.Dmo ? "DMO" : "TMO";
