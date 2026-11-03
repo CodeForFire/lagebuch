@@ -1,1 +1,1 @@
-The Stammdaten call a Funkgruppe's number its Kurzwahl, Funkgruppen pickers list it as "307_F (KW: 307)", and each suggestion shows the group's Notiz underneath so the Lagebuchführer can see what it is for.
+The Stammdaten call a Funkgruppe's number its Kurzwahl and its Art its Betriebsart, Funkgruppen pickers list a group as "307_F (KW: 307)", and each suggestion shows the group's Notiz underneath so the Lagebuchführer can see what it is for.

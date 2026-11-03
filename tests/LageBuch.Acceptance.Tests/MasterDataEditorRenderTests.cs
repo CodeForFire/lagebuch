@@ -672,7 +672,7 @@ public class MasterDataEditorRenderTests
         Assert.Contains("Atemschutzüberwachung", texts);
 
         var kinds = view.GetVisualDescendants().OfType<ComboBox>()
-            .Where(c => AutomationProperties.GetName(c) == "Art der Funkgruppe")
+            .Where(c => AutomationProperties.GetName(c) == "Betriebsart der Funkgruppe")
             .Select(c => c.SelectedValue);
 
         // The favourite FW_MUSTER leads, the rest follow alphabetically (#833).
@@ -686,7 +686,8 @@ public class MasterDataEditorRenderTests
         var labels = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("KURZWAHL", labels);
         Assert.DoesNotContain("NUMMER", labels);
-        Assert.Contains("ART", labels);
+        Assert.Contains("BETRIEBSART", labels);
+        Assert.DoesNotContain("ART", labels);
         Assert.Contains("FAVORIT", labels);
     }
 
