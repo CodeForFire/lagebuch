@@ -42,11 +42,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: '10.0.x'
-
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13 # v1.0.262
@@ -59,10 +54,9 @@ jobs:
           # Optional: Trigger when specific user is assigned to an issue
           # assignee_trigger: "claude-bot"
 
-          # Grant dotnet restore/build/test without an interactive approval,
-          # since there's no one to approve a Bash prompt in an unattended job.
-          claude_args: |
-            --allowedTools "Bash(dotnet restore:*),Bash(dotnet build:*),Bash(dotnet test:*)"
+          # No dotnet restore/build/test allowlist: they would run a PR's MSBuild
+          # targets, source generators and tests with this job's write token and
+          # secrets. The pushed branch's own PR CI builds and tests it instead.
 
           # Optional: Advanced settings configuration
           # settings: |
