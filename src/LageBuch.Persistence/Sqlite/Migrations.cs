@@ -1108,16 +1108,46 @@ public static class Migrations
 
     // TMO and DMO Funkgruppen on every Führungsstelle (#878). The single Funkgruppe an Abschnitt,
     // Unterabschnitt or Bereitstellung still holds moves into its kind the way V38 moved a partner's,
-    // and is cleared. A row that already has Funkgruppen keeps them: a node never held both.
+    // and is cleared. A row that already has Funkgruppen, as one a parallel build wrote may, gets the
+    // single one added to them. Only when that kind is already full does the row keep it as it is,
+    // because there is no room to put it.
     private static void ApplyV41(SqliteConnection cn, SqliteTransaction tx)
     {
-        if (SchemaHelpers.ColumnExists(cn, tx, "command_nodes", "funkgruppe"))
+        // Stryker disable once all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "command_nodes", "funkgruppen", "TEXT");
+        if (!SchemaHelpers.ColumnExists(cn, tx, "command_nodes", "funkgruppe"))
         {
-            MoveSingleFunkgruppe(
-                cn,
-                tx,
-                "SELECT id, funkgruppe FROM command_nodes WHERE funkgruppe IS NOT NULL AND funkgruppen IS NULL;",
-                "UPDATE command_nodes SET funkgruppen = $g, funkgruppe = NULL WHERE id = $id;");
+            return;
+        }
+
+        var rows = new List<(string Id, string Value, string? Groups)>();
+        using (var read = cn.CreateCommand())
+        {
+            read.Transaction = tx;
+            read.CommandText = "SELECT id, funkgruppe, funkgruppen FROM command_nodes WHERE funkgruppe IS NOT NULL;";
+            using var r = read.ExecuteReader();
+            while (r.Read())
+            {
+                rows.Add((r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2)));
+            }
+        }
+
+        foreach (var (id, value, groups) in rows)
+        {
+            var single = FunkgruppenFromSingle(value);
+            var held = FunkgruppenJson.Read(groups);
+            var merged = Domain.Leadership.Funkgruppen.FromRecord(held.Tmo.Concat(single.Tmo), held.Dmo.Concat(single.Dmo));
+            if (!single.Tmo.All(merged.Tmo.Contains) || !single.Dmo.All(merged.Dmo.Contains))
+            {
+                continue;
+            }
+
+            using var write = cn.CreateCommand();
+            write.Transaction = tx;
+            write.CommandText = "UPDATE command_nodes SET funkgruppen = $g, funkgruppe = NULL WHERE id = $id;";
+            write.Parameters.AddWithValue("$g", (object?)FunkgruppenJson.Write(merged) ?? DBNull.Value);
+            write.Parameters.AddWithValue("$id", id);
+            write.ExecuteNonQuery();
         }
     }
 
@@ -1168,7 +1198,7 @@ public static class Migrations
     [SuppressMessage(
         "Security",
         "CA2100",
-        Justification = "Audited: both statements are compile-time constants from ApplyV38 and ApplyV41; values use bound parameters.")]
+        Justification = "Audited: both statements are compile-time constants from ApplyV38; values use bound parameters.")]
     private static void MoveSingleFunkgruppe(SqliteConnection cn, SqliteTransaction tx, string select, string update)
     {
         var rows = new List<(string Id, string Value)>();

@@ -853,16 +853,23 @@ public class IncidentRoundTripTests : IDisposable
         var raum = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "B-Raum");
         var sued = incident.AddCommandNode(
             clock, op, CommandNodeKind.Abschnitt, "Süd", funkgruppen: new Funkgruppen(["FW 1000"], null));
+        var ost = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Ost", funkgruppen: new Funkgruppen(null, ["301_F", "302_F", "303_F"]));
+        var dach = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Unterabschnitt, "Dach", nord.Id, funkgruppen: new Funkgruppen(["FW 1000"], null));
         IncidentRepository.Save(_path, incident);
 
-        // Roll the file back to V40, where an Abschnitt held one free-text Funkgruppe. Süd is a row a
-        // parallel build already filled: what it holds is kept, not overwritten by the single one.
+        // Roll the file back to V40, where an Abschnitt held one free-text Funkgruppe. Süd and Ost are
+        // rows a parallel build already filled: Süd gets the single one added, Ost has no room for it
+        // and keeps it, and Dach already holds it.
         ExecRaw(
             "UPDATE schema_version SET version = 40;" +
             $"UPDATE command_nodes SET funkgruppe = 'DMO 302_F' WHERE id = '{nord.Id}';" +
             $"UPDATE command_nodes SET funkgruppe = 'Kanal 5' WHERE id = '{west.Id}';" +
             $"UPDATE command_nodes SET funkgruppe = ' tmo FW 2000 ' WHERE id = '{raum.Id}';" +
-            $"UPDATE command_nodes SET funkgruppe = 'Kanal 9' WHERE id = '{sued.Id}';");
+            $"UPDATE command_nodes SET funkgruppe = 'Kanal 9' WHERE id = '{sued.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'DMO 304_F' WHERE id = '{ost.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'FW 1000' WHERE id = '{dach.Id}';");
 
         var loaded = IncidentRepository.Load(_path);
 
@@ -875,7 +882,30 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal((null, new Funkgruppen(null, ["302_F"])), Of(nord.Id));
         Assert.Equal((null, new Funkgruppen(["Kanal 5"], null)), Of(west.Id));
         Assert.Equal((null, new Funkgruppen(["FW 2000"], null)), Of(raum.Id));
-        Assert.Equal(("Kanal 9", new Funkgruppen(["FW 1000"], null)), Of(sued.Id));
+        Assert.Equal((null, new Funkgruppen(["FW 1000", "Kanal 9"], null)), Of(sued.Id));
+        Assert.Equal(("DMO 304_F", new Funkgruppen(null, ["301_F", "302_F", "303_F"])), Of(ost.Id));
+        Assert.Equal((null, new Funkgruppen(["FW 1000"], null)), Of(dach.Id));
+    }
+
+    [Fact]
+    public void A_v40_file_without_the_funkgruppen_column_still_migrates()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        IncidentRepository.Save(_path, incident);
+
+        // A file stamped 40 by a build that never ran V38 has the single column and not the lists.
+        ExecRaw(
+            "UPDATE schema_version SET version = 40;" +
+            "ALTER TABLE command_nodes DROP COLUMN funkgruppen;" +
+            $"UPDATE command_nodes SET funkgruppe = 'DMO 302_F' WHERE id = '{nord.Id}';");
+
+        var loaded = IncidentRepository.Load(_path);
+
+        var n = loaded.CommandNodes.Single(n => n.Id == nord.Id);
+        Assert.Equal((null, new Funkgruppen(null, ["302_F"])), (n.Funkgruppe, n.Funkgruppen));
     }
 
     [Fact]
