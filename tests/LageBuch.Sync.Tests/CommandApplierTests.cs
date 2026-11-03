@@ -874,14 +874,14 @@ public class CommandApplierTests
         var entries = incident.Journal.Count;
 
         ApplyOverWire(
-            new AddCommandNodeCommand(adder, CommandNodeKind.Abschnitt, "Nord", null, "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"),
+            new AddCommandNodeCommand(adder, CommandNodeKind.Abschnitt, "Nord", null, "Brandbekämpfung", "Hauptstraße", null, "Florian Nord", "0171", ["TG 2"], ["302_F"]),
             incident,
             clock);
 
         var node = Assert.Single(incident.CommandNodes);
         Assert.Equal("Brandbekämpfung", node.Auftrag);
         Assert.Equal("Hauptstraße", node.Standort);
-        Assert.Equal("TG 2", node.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["TG 2"], ["302_F"]), node.Funkgruppen);
         Assert.Equal("Florian Nord", node.Rufname);
         Assert.Equal("0171", node.Telefon);
         Assert.Equal(entries + 3, incident.Journal.Count);
@@ -905,13 +905,13 @@ public class CommandApplierTests
         Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
 
         var entries = incident.Journal.Count;
-        ApplyOverWire(new UpdateCommandNodeCommand(editor, node.Id, "Nordseite", "Brandbekämpfung", "Hauptstraße", "TG 2", "Florian Nord", "0171"), incident, clock);
+        ApplyOverWire(new UpdateCommandNodeCommand(editor, node.Id, "Nordseite", "Brandbekämpfung", "Hauptstraße", null, "Florian Nord", "0171", ["TG 2"]), incident, clock);
         var updated = incident.CommandNodes.Single();
         Assert.Equal("Nordseite", updated.Name);
         Assert.Equal("Brandbekämpfung", updated.Auftrag);
-        Assert.Equal("TG 2", updated.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["TG 2"], null), updated.Funkgruppen);
 
-        // Rename, Auftrag and Funkgruppe each write a line; all three belong to the sender.
+        // Rename, Auftrag and Funkgruppen each write a line; all three belong to the sender.
         Assert.Equal(entries + 3, incident.Journal.Count);
         Assert.All(incident.Journal.Skip(entries), e => Assert.Equal("Bauer (FFB 3)", e.EnteredBy));
 
@@ -966,7 +966,7 @@ public class CommandApplierTests
     }
 
     [Fact]
-    public void A_partners_funkgruppen_over_the_wire_are_set_on_forming_and_on_correction()
+    public void Funkgruppen_over_the_wire_are_set_on_forming_and_on_correction_and_a_single_one_is_refused()
     {
         var clock = new FixedClock();
         var incident = NewIncident(clock);
@@ -981,9 +981,14 @@ public class CommandApplierTests
             new UpdateCommandNodeCommand(client, partner.Id, "Polizei", null, null, null, null, null, ["POL 1"], ["301_F"]), incident, clock);
         Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), Assert.Single(incident.CommandNodes).Funkgruppen);
 
+        ApplyOverWire(
+            new AddCommandNodeCommand(client, CommandNodeKind.Abschnitt, "Nord", null, FunkgruppenDmo: ["302_F"]), incident, clock);
+        Assert.Equal(new Funkgruppen(null, ["302_F"]), incident.CommandNodes[^1].Funkgruppen);
+
+        // What a peer at 35 sends for an Abschnitt: refused, and nothing is formed.
         Assert.Throws<ArgumentException>(() => ApplyOverWire(
-            new AddCommandNodeCommand(client, CommandNodeKind.Abschnitt, "Nord", null, FunkgruppenDmo: ["302_F"]), incident, clock));
-        Assert.Single(incident.CommandNodes);
+            new AddCommandNodeCommand(client, CommandNodeKind.Abschnitt, "Süd", null, Funkgruppe: "TG 2"), incident, clock));
+        Assert.Equal(2, incident.CommandNodes.Count);
     }
 
     [Fact]

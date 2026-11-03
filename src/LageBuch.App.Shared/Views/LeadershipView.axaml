@@ -140,6 +140,10 @@
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
     </Style>
+    <!-- A Funkgruppe the level above lacks (#878) reads amber, like the board's other hints. -->
+    <Style Selector="SelectableTextBlock.field-value.not-shared">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
     <!-- The Vorschlag reads quiet while it matches the Stufe set, amber when it does not. -->
     <Style Selector="TextBlock#StufeSuggestionText">
       <Setter Property="FontSize" Value="12" />
@@ -291,6 +295,23 @@
     </DataTemplate>
 
     <!-- A Funktion on a card: what it is, then who holds it. -->
+    <!-- One Funkgruppe of a node, marked against the level above (#878): a check when that level
+         has it too, an amber x when it does not, nothing while the kind is not checked. The mark
+         takes the first column so a long group still wraps. -->
+    <DataTemplate x:Key="FunkgruppeLineTemplate" x:DataType="vm:FunkgruppeLine">
+      <Grid ColumnDefinitions="14,*" ColumnSpacing="4">
+        <PathIcon Grid.Column="0" Width="11" Height="11" VerticalAlignment="Center"
+                  Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding IsMarkedShared}"
+                  AutomationProperties.Name="{Binding MarkName}"
+                  Data="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+        <PathIcon Grid.Column="0" Width="10" Height="10" VerticalAlignment="Center"
+                  Foreground="{StaticResource AmberBrush}" IsVisible="{Binding IsMarkedNotShared}"
+                  AutomationProperties.Name="{Binding MarkName}"
+                  Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+        <SelectableTextBlock Grid.Column="1" Classes="field-value" Classes.not-shared="{Binding IsMarkedNotShared}"
+                             Text="{Binding Text}" />
+      </Grid>
+    </DataTemplate>
     <DataTemplate x:Key="PersonRowTemplate" x:DataType="vm:BoardPersonRow">
       <StackPanel Spacing="0">
         <TextBlock Classes="card-kind" Text="{Binding Role}" TextTrimming="CharacterEllipsis" />
@@ -477,22 +498,20 @@
               <SelectableTextBlock Classes="card-name" x:Name="NodeCardName" Text="{Binding Name}" />
               <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap" Text="{Binding Auftrag}"
                          IsVisible="{Binding Auftrag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
-                    IsVisible="{Binding Funkgruppe, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="FUNKGRUPPE" />
-                <SelectableTextBlock Grid.Column="1" Classes="field-value" Text="{Binding Funkgruppe}" />
-              </Grid>
-              <!-- A partner Einsatzleitung's Funkgruppen (#828), one per line. -->
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
-                    IsVisible="{Binding Tmo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <!-- The node's Funkgruppen (#828, #878), one per line, each marked against the level
+                   above; the hint says which kind has none in common. -->
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasTmo}">
                 <TextBlock Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
-                <SelectableTextBlock Grid.Column="1" Classes="field-value" x:Name="NodeTmo" Text="{Binding Tmo}" />
+                <ItemsControl Grid.Column="1" x:Name="NodeTmo" ItemsSource="{Binding TmoLines}"
+                              ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
               </Grid>
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
-                    IsVisible="{Binding Dmo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasDmo}">
                 <TextBlock Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
-                <SelectableTextBlock Grid.Column="1" Classes="field-value" x:Name="NodeDmo" Text="{Binding Dmo}" />
+                <ItemsControl Grid.Column="1" x:Name="NodeDmo" ItemsSource="{Binding DmoLines}"
+                              ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
               </Grid>
+              <TextBlock x:Name="NodeFunkHint" Classes="board-hint" Margin="0,3,0,0" Text="{Binding FunkHint}"
+                         IsVisible="{Binding FunkHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
                     IsVisible="{Binding Rufname, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBlock Grid.Column="0" Classes="field-label" Text="RUFNAME" />

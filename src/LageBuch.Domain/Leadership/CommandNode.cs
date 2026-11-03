@@ -33,10 +33,15 @@ public sealed record CommandNode
 
     public string? Standort { get; private init; }
 
-    /// <summary>The single Funkgruppe of an Abschnitt, Unterabschnitt or Bereitstellung; null for a partner.</summary>
+    /// <summary>
+    /// The single, untyped Funkgruppe a node carried before #878. Read back from an old file or
+    /// snapshot only: the V41 migration moves it into <see cref="Funkgruppen"/>, and
+    /// <see cref="WithDetails"/> refuses a new one. An edit keeps one the migration had no room for,
+    /// until the node's Funkgruppen hold it.
+    /// </summary>
     public string? Funkgruppe { get; private init; }
 
-    /// <summary>A partner Einsatzleitung's TMO and DMO Funkgruppen (#828); empty for every other kind.</summary>
+    /// <summary>The node's TMO and DMO Funkgruppen: a partner Einsatzleitung's since #828, every other kind's since #878.</summary>
     public Funkgruppen Funkgruppen { get; private init; } = Funkgruppen.Empty;
 
     public string? Rufname { get; private init; }
@@ -98,9 +103,10 @@ public sealed record CommandNode
         };
 
     /// <summary>
-    /// Returns a copy with corrected details, trimmed and capped the way <see cref="Create"/> does. A
-    /// partner Einsatzleitung takes <paramref name="funkgruppen"/> and no single Funkgruppe, every
-    /// other kind the reverse; null <paramref name="funkgruppen"/> means none. Every kind takes a
+    /// Returns a copy with corrected details, trimmed and capped the way <see cref="Create"/> does.
+    /// Every kind takes TMO and DMO <paramref name="funkgruppen"/> (#878), null for none, and refuses
+    /// a single untyped <paramref name="funkgruppe"/>. The copy keeps the single one an old file
+    /// carried only while the new Funkgruppen lack it, so an unrelated edit never drops it. Every kind takes a
     /// <paramref name="fuehrungsfahrzeug"/>, null for none.
     /// </summary>
     public CommandNode WithDetails(
@@ -113,29 +119,44 @@ public sealed record CommandNode
         Funkgruppen? funkgruppen = null,
         string? fuehrungsfahrzeug = null)
     {
-        var single = Clean(funkgruppe, MaxTextLength, "Funkgruppe");
-        var groups = (funkgruppen ?? Funkgruppen.Empty).Normalized();
-        if (Kind == CommandNodeKind.Partner && single is not null)
+        if (!string.IsNullOrWhiteSpace(funkgruppe))
         {
-            throw new ArgumentException("Eine Einsatzleitung hat Funkgruppen TMO und DMO.", nameof(funkgruppe));
+            throw new ArgumentException("Funkgruppen werden als TMO und DMO erfasst.", nameof(funkgruppe));
         }
 
-        if (Kind != CommandNodeKind.Partner && !groups.IsEmpty)
-        {
-            throw new ArgumentException("Nur eine Einsatzleitung hat Funkgruppen TMO und DMO.", nameof(funkgruppen));
-        }
+        var groups = (funkgruppen ?? Funkgruppen.Empty).Normalized();
 
         return this with
         {
             Name = CleanName(name),
             Auftrag = Clean(auftrag, MaxAuftragLength, "Auftrag"),
             Standort = Clean(standort, MaxTextLength, "Standort"),
-            Funkgruppe = single,
+            Funkgruppe = KeptSingle(Funkgruppe, groups),
             Funkgruppen = groups,
             Rufname = Clean(rufname, MaxTextLength, "Rufname"),
             Telefon = Clean(telefon, MaxPhoneLength, "Telefon"),
             Fuehrungsfahrzeug = Clean(fuehrungsfahrzeug, MaxTextLength, "Führungsfahrzeug"),
         };
+    }
+
+    // The single Funkgruppe of before #878 is written "TMO X", "DMO X" or just "X".
+    private static string? KeptSingle(string? single, Funkgruppen groups)
+    {
+        if (single is null)
+        {
+            return null;
+        }
+
+        var group = single.Trim();
+        var isDmo = group.StartsWith("DMO ", StringComparison.OrdinalIgnoreCase);
+        if (isDmo || group.StartsWith("TMO ", StringComparison.OrdinalIgnoreCase))
+        {
+            group = group[4..];
+        }
+
+        // Only the list of its own kind holds it, as V41 would have put it: TMO unless it says DMO.
+        var ofItsKind = isDmo ? groups.Dmo : groups.Tmo;
+        return ofItsKind.Any(g => FunkCheck.SameGroup(g, group)) ? null : single;
     }
 
     /// <summary>

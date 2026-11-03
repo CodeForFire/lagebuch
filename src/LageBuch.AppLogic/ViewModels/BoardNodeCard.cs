@@ -120,16 +120,22 @@ public sealed partial class BoardNodeCard : ObservableObject
     [ObservableProperty]
     private string? _auftrag;
 
-    [ObservableProperty]
-    private string? _funkgruppe;
+    /// <summary>The node's TMO Funkgruppen, each marked against the level above (#878); empty when none.</summary>
+    public IReadOnlyList<FunkgruppeLine> TmoLines { get; private set; } = [];
 
-    /// <summary>A partner Einsatzleitung's TMO Funkgruppen, one per line; null when none.</summary>
-    [ObservableProperty]
-    private string? _tmo;
+    /// <summary>The node's DMO Funkgruppen, each marked against the level above (#878); empty when none.</summary>
+    public IReadOnlyList<FunkgruppeLine> DmoLines { get; private set; } = [];
 
-    /// <summary>A partner Einsatzleitung's DMO Funkgruppen, one per line; null when none.</summary>
+    public bool HasTmo => TmoLines.Count > 0;
+
+    public bool HasDmo => DmoLines.Count > 0;
+
+    /// <summary>
+    /// Which kind of Funkgruppe the node shares none of with the level above (#878), e.g. „Keine
+    /// gemeinsame DMO-Funkgruppe mit Einsatzleitung"; null when every checked kind has one in common.
+    /// </summary>
     [ObservableProperty]
-    private string? _dmo;
+    private string? _funkHint;
 
     [ObservableProperty]
     private string? _standort;
@@ -207,8 +213,33 @@ public sealed partial class BoardNodeCard : ObservableObject
             : null;
     }
 
-    /// <summary>Takes the node's details and people from its reporting-line row.</summary>
-    public void Update(ReportingEntry entry, CommandNode node, string? hint, string? blockedReason, bool isReadOnly)
+    /// <summary>
+    /// The hint for a node's <see cref="FunkCheck"/>: which kinds it shares no Funkgruppe of with the
+    /// level above, or null when there is none to give.
+    /// </summary>
+    internal static string? FunkHintOf(FunkCheckResult? check)
+    {
+        if (check is null)
+        {
+            return null;
+        }
+
+        var kinds = (check.Tmo.IsMismatch, check.Dmo.IsMismatch) switch
+        {
+            (true, true) => "TMO- und DMO",
+            (true, false) => "TMO",
+            (false, true) => "DMO",
+            _ => null,
+        };
+        return kinds is null ? null : $"Keine gemeinsame {kinds}-Funkgruppe mit {check.ParentLabel}";
+    }
+
+    /// <summary>
+    /// Takes the node's details and people from its reporting-line row, and its Funkgruppen marked by
+    /// <paramref name="funkCheck"/>; null leaves them unmarked.
+    /// </summary>
+    public void Update(
+        ReportingEntry entry, CommandNode node, string? hint, string? blockedReason, bool isReadOnly, FunkCheckResult? funkCheck = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(node);
@@ -218,9 +249,21 @@ public sealed partial class BoardNodeCard : ObservableObject
         ParentId = node.ParentId;
         Name = node.Name;
         Auftrag = node.Auftrag;
-        Funkgruppe = node.Funkgruppe;
-        Tmo = ElCard.Lines(node.Funkgruppen.Tmo);
-        Dmo = ElCard.Lines(node.Funkgruppen.Dmo);
+        if (ChangedLines(TmoLines, FunkgruppeLine.Of(node.Funkgruppen.Tmo, funkCheck?.Tmo)) is { } tmo)
+        {
+            TmoLines = tmo;
+            OnPropertyChanged(nameof(TmoLines));
+            OnPropertyChanged(nameof(HasTmo));
+        }
+
+        if (ChangedLines(DmoLines, FunkgruppeLine.Of(node.Funkgruppen.Dmo, funkCheck?.Dmo)) is { } dmo)
+        {
+            DmoLines = dmo;
+            OnPropertyChanged(nameof(DmoLines));
+            OnPropertyChanged(nameof(HasDmo));
+        }
+
+        FunkHint = FunkHintOf(funkCheck);
         Standort = node.Standort;
         Fuehrungsfahrzeug = node.Fuehrungsfahrzeug;
         Rufname = node.Rufname;
@@ -237,4 +280,9 @@ public sealed partial class BoardNodeCard : ObservableObject
         SetMelderCommand.NotifyCanExecuteChanged();
         AddMemberCommand.NotifyCanExecuteChanged();
     }
+
+    // The new lines when they differ from what the card shows, else null: a refresh that changed
+    // nothing raises nothing, so the list is not rebuilt under the Lagebuchführer's eyes (#294).
+    private static FunkgruppeLine[]? ChangedLines(IReadOnlyList<FunkgruppeLine> shown, FunkgruppeLine[] lines) =>
+        shown.SequenceEqual(lines) ? null : lines;
 }

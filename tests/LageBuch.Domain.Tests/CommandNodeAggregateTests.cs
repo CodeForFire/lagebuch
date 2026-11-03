@@ -17,7 +17,7 @@ public class CommandNodeAggregateTests
     private static EtbEntry Last(Incident incident) => incident.Journal[^1];
 
     [Fact]
-    public void Adding_a_node_with_details_records_them_and_logs_auftrag_and_funkgruppe()
+    public void Adding_a_node_with_details_records_them_and_logs_auftrag_and_funkgruppen()
     {
         var (incident, clock, op) = NewIncident();
         var before = incident.Journal.Count;
@@ -30,19 +30,19 @@ public class CommandNodeAggregateTests
             null,
             auftrag: " Brandbekämpfung ",
             standort: "Hauptstraße 1",
-            funkgruppe: "TG 2",
             rufname: "Florian Nord",
-            telefon: "0171 1234567");
+            telefon: "0171 1234567",
+            funkgruppen: new Funkgruppen(["TG 2"], ["301_F"]));
 
         Assert.Equal("Brandbekämpfung", node.Auftrag);
         Assert.Equal("Hauptstraße 1", node.Standort);
-        Assert.Equal("TG 2", node.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["TG 2"], ["301_F"]), node.Funkgruppen);
         Assert.Equal("Florian Nord", node.Rufname);
         Assert.Equal("0171 1234567", node.Telefon);
         Assert.Same(node, incident.FindCommandNode(node.Id));
         var lines = incident.Journal.Skip(before).ToList();
         Assert.Equal(
-            new[] { "Abschnitt gebildet: Nord", "Auftrag Nord: Brandbekämpfung", "Funkgruppe Nord: TG 2" },
+            new[] { "Abschnitt gebildet: Nord", "Auftrag Nord: Brandbekämpfung", "Funkgruppen Nord: TMO TG 2 · DMO 301_F" },
             lines.Select(e => e.Text).ToArray());
         Assert.All(lines, e => Assert.Equal(EtbDirection.System, e.Direction));
     }
@@ -75,10 +75,12 @@ public class CommandNodeAggregateTests
             null,
             auftrag: "  ",
             standort: string.Empty,
-            funkgruppe: " ");
+            funkgruppe: " ",
+            funkgruppen: new Funkgruppen([" "], null));
 
         Assert.Null(node.Auftrag);
         Assert.Null(node.Funkgruppe);
+        Assert.True(node.Funkgruppen.IsEmpty);
         Assert.Equal("Abschnitt gebildet: Nord", Assert.Single(incident.Journal.Skip(before)).Text);
     }
 
@@ -276,14 +278,14 @@ public class CommandNodeAggregateTests
     }
 
     [Fact]
-    public void Setting_the_funkgruppe_is_logged()
+    public void Setting_an_abschnitts_funkgruppen_is_logged()
     {
         var (incident, clock, op) = NewIncident();
         var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
 
-        incident.UpdateCommandNode(clock, op, node.Id, "Nord", null, null, "TG 3", null, null);
+        incident.UpdateCommandNode(clock, op, node.Id, "Nord", null, null, null, null, null, new Funkgruppen(null, ["305_F"]));
 
-        Assert.Equal("Funkgruppe Nord: TG 3", Last(incident).Text);
+        Assert.Equal("Funkgruppen Nord: DMO 305_F", Last(incident).Text);
     }
 
     [Fact]
@@ -321,7 +323,7 @@ public class CommandNodeAggregateTests
         var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
         var before = incident.Journal.Count;
 
-        incident.UpdateCommandNode(clock, op, node.Id, "Nordwest", "Löschen", null, "TG 3", null, null);
+        incident.UpdateCommandNode(clock, op, node.Id, "Nordwest", "Löschen", null, null, null, null, new Funkgruppen(["TG 3"], null));
 
         var lines = incident.Journal.Skip(before).Select(e => e.Text).ToArray();
         Assert.Equal(
@@ -329,7 +331,7 @@ public class CommandNodeAggregateTests
             {
                 "Abschnitt umbenannt: Nord → Nordwest",
                 "Auftrag Nordwest: Löschen",
-                "Funkgruppe Nordwest: TG 3",
+                "Funkgruppen Nordwest: TMO TG 3",
             },
             lines);
     }

@@ -170,11 +170,6 @@ public static class FuehrungsorganisationSection
             text += $" – Melder: {melder.PersonName}";
         }
 
-        if (!string.IsNullOrWhiteSpace(node.Funkgruppe))
-        {
-            text += $" – Funkgruppe: {node.Funkgruppe}";
-        }
-
         if (!node.Funkgruppen.IsEmpty)
         {
             text += $" – Funkgruppen: {node.Funkgruppen.Text}";

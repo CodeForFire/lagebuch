@@ -728,7 +728,7 @@ public class IncidentRoundTripTests : IDisposable
         var op = new SessionOperator("Muster", "FFB 12/1");
         var incident = Incident.Start(clock, op, "Brand");
         var abschnitt = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
-        incident.UpdateCommandNode(clock, op, abschnitt.Id, "Nord", "Brandbekämpfung", "Hauptstr. 1", "TBZ 1", "Florian Nord", "0171 0000001");
+        incident.UpdateCommandNode(clock, op, abschnitt.Id, "Nord", "Brandbekämpfung", "Hauptstr. 1", null, "Florian Nord", "0171 0000001", new Funkgruppen(["TBZ 1"], ["302_F"]));
         var unter = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord 1", abschnitt.Id);
         incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei");
         var bereit = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR 1");
@@ -821,14 +821,15 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
-    public void A_partners_funkgruppen_round_trip_and_an_abschnitt_keeps_its_one()
+    public void A_partners_and_an_abschnitts_funkgruppen_round_trip()
     {
         var clock = new Clock();
         var op = new SessionOperator("Muster");
         var incident = Incident.Start(clock, op, "Brand");
         var partner = incident.AddCommandNode(
             clock, op, CommandNodeKind.Partner, "Polizei", funkgruppen: new Funkgruppen(["POL 1"], ["301_F"]));
-        var abschnitt = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppe: "DMO 302_F");
+        var abschnitt = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 1000"], ["302_F"]));
 
         IncidentRepository.Save(_path, incident);
         var loaded = IncidentRepository.Load(_path);
@@ -837,12 +838,78 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), p.Funkgruppen);
         Assert.Null(p.Funkgruppe);
         var a = loaded.CommandNodes.Single(n => n.Id == abschnitt.Id);
-        Assert.Equal("DMO 302_F", a.Funkgruppe);
-        Assert.Equal(Funkgruppen.Empty, a.Funkgruppen);
+        Assert.Equal(new Funkgruppen(["FW 1000"], ["302_F"]), a.Funkgruppen);
+        Assert.Null(a.Funkgruppe);
     }
 
     [Fact]
-    public void A_v37_files_single_funkgruppe_moves_to_its_kind_and_an_abschnitts_stays()
+    public void A_v40_files_single_funkgruppe_moves_into_its_kind_on_every_node()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var west = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "West", nord.Id);
+        var raum = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "B-Raum");
+        var sued = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Süd", funkgruppen: new Funkgruppen(["FW 1000"], null));
+        var ost = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Ost", funkgruppen: new Funkgruppen(null, ["301_F", "302_F", "303_F"]));
+        var dach = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Unterabschnitt, "Dach", nord.Id, funkgruppen: new Funkgruppen(["FW 1000"], null));
+        IncidentRepository.Save(_path, incident);
+
+        // Roll the file back to V40, where an Abschnitt held one free-text Funkgruppe. Süd and Ost are
+        // rows a parallel build already filled: Süd gets the single one added, Ost has no room for it
+        // and keeps it, and Dach already holds it.
+        ExecRaw(
+            "UPDATE schema_version SET version = 40;" +
+            $"UPDATE command_nodes SET funkgruppe = 'DMO 302_F' WHERE id = '{nord.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'Kanal 5' WHERE id = '{west.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = ' tmo FW 2000 ' WHERE id = '{raum.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'Kanal 9' WHERE id = '{sued.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'DMO 304_F' WHERE id = '{ost.Id}';" +
+            $"UPDATE command_nodes SET funkgruppe = 'FW 1000' WHERE id = '{dach.Id}';");
+
+        var loaded = IncidentRepository.Load(_path);
+
+        (string? Single, Funkgruppen Groups) Of(Guid id)
+        {
+            var n = loaded.CommandNodes.Single(n => n.Id == id);
+            return (n.Funkgruppe, n.Funkgruppen);
+        }
+
+        Assert.Equal((null, new Funkgruppen(null, ["302_F"])), Of(nord.Id));
+        Assert.Equal((null, new Funkgruppen(["Kanal 5"], null)), Of(west.Id));
+        Assert.Equal((null, new Funkgruppen(["FW 2000"], null)), Of(raum.Id));
+        Assert.Equal((null, new Funkgruppen(["FW 1000", "Kanal 9"], null)), Of(sued.Id));
+        Assert.Equal(("DMO 304_F", new Funkgruppen(null, ["301_F", "302_F", "303_F"])), Of(ost.Id));
+        Assert.Equal((null, new Funkgruppen(["FW 1000"], null)), Of(dach.Id));
+    }
+
+    [Fact]
+    public void A_v40_file_without_the_funkgruppen_column_still_migrates()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        IncidentRepository.Save(_path, incident);
+
+        // A file stamped 40 by a build that never ran V38 has the single column and not the lists.
+        ExecRaw(
+            "UPDATE schema_version SET version = 40;" +
+            "ALTER TABLE command_nodes DROP COLUMN funkgruppen;" +
+            $"UPDATE command_nodes SET funkgruppe = 'DMO 302_F' WHERE id = '{nord.Id}';");
+
+        var loaded = IncidentRepository.Load(_path);
+
+        var n = loaded.CommandNodes.Single(n => n.Id == nord.Id);
+        Assert.Equal((null, new Funkgruppen(null, ["302_F"])), (n.Funkgruppe, n.Funkgruppen));
+    }
+
+    [Fact]
+    public void A_v37_files_single_funkgruppe_moves_to_its_kind()
     {
         var clock = new Clock();
         var op = new SessionOperator("Muster");
@@ -869,7 +936,7 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Null(p.Funkgruppe);
         Assert.Equal(new Funkgruppen(["Kanal 5"], null), loaded.CommandNodes.Single(n => n.Id == thw.Id).Funkgruppen);
         var a = loaded.CommandNodes.Single(n => n.Id == abschnitt.Id);
-        Assert.Equal(("DMO 302_F", Funkgruppen.Empty), (a.Funkgruppe, a.Funkgruppen));
+        Assert.Equal((null, new Funkgruppen(null, ["302_F"])), (a.Funkgruppe, a.Funkgruppen));
     }
 
     [Theory]

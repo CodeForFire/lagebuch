@@ -1155,11 +1155,6 @@ public sealed class Incident
             AppendSystemEntry(clock, op, AuftragText(node));
         }
 
-        if (node.Funkgruppe is not null)
-        {
-            AppendSystemEntry(clock, op, FunkgruppeText(node));
-        }
-
         if (!node.Funkgruppen.IsEmpty)
         {
             AppendSystemEntry(clock, op, FunkgruppenText(node.Name, node.Funkgruppen));
@@ -1177,8 +1172,6 @@ public sealed class Incident
         ? $"Auftrag {node.Name} aufgehoben"
         : $"Auftrag {node.Name}: {node.Auftrag}";
 
-    private static string FunkgruppeText(CommandNode node) => $"Funkgruppe {node.Name}: {node.Funkgruppe}";
-
     private static string FunkgruppenText(string owner, Funkgruppen funkgruppen) => $"Funkgruppen {owner}: {funkgruppen.Text}";
 
     // A Führungsfahrzeug set or swapped is worth the record; one taken away stays silent, like Funkgruppen.
@@ -1188,7 +1181,7 @@ public sealed class Incident
     private static string FahrzeugText(string owner, string? fahrzeug) => $"Führungsfahrzeug {owner}: {fahrzeug}";
 
     /// <summary>
-    /// Corrects a node's name and details. Rename, Auftrag, Funkgruppe and Führungsfahrzeug changes
+    /// Corrects a node's name and details. Rename, Auftrag, Funkgruppen and Führungsfahrzeug changes
     /// reach the ETB; Standort, Rufname and Telefon are working data and stay silent, like a unit's Bemerkung.
     /// </summary>
     public CommandNode UpdateCommandNode(
@@ -1236,12 +1229,6 @@ public sealed class Incident
         if (!string.Equals(previous.Auftrag, updated.Auftrag, StringComparison.Ordinal))
         {
             AppendSystemEntry(clock, op, AuftragText(updated));
-        }
-
-        if (updated.Funkgruppe is not null
-            && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
-        {
-            AppendSystemEntry(clock, op, FunkgruppeText(updated));
         }
 
         if (!updated.Funkgruppen.IsEmpty && !updated.Funkgruppen.Equals(previous.Funkgruppen))

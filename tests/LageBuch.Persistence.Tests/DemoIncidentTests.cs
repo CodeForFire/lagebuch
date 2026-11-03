@@ -77,7 +77,7 @@ public class DemoIncidentTests : IDisposable
         incident.AddForceUnit(c, elw, "FF Musterstadt", 9, callSign: "Florian Musterstadt 40/1", status: "Im Einsatz", notes: "Innenangriff", scbaCount: 4, officerCount: 1);
         incident.AddForceUnit(c, elw, "FF Musterstadt", 9, callSign: "Florian Musterstadt 41/1", status: "Im Einsatz", notes: "Wasserversorgung", scbaCount: 2, officerCount: 1);
         incident.AddForceUnit(c, elw, "FF Musterstadt", 3, callSign: "Florian Musterstadt 30/1", status: "Im Einsatz", notes: "Menschenrettung über DLK", scbaCount: 1, officerCount: 1);
-        var abschnittNord = incident.AddCommandNode(c, elw, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Innenangriff und Menschenrettung", funkgruppe: "Kanal 2");
+        var abschnittNord = incident.AddCommandNode(c, elw, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Innenangriff und Menschenrettung", funkgruppen: new Funkgruppen(["Kanal 2"], null));
         var bereitstellung = incident.AddCommandNode(c, elw, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz", standort: "Marktplatz");
         incident.MoveForceUnit(c, elw, incident.Forces[0].Id, abschnittNord.Id);
         incident.MoveForceUnit(c, elw, incident.Forces[1].Id, abschnittNord.Id);

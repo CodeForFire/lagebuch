@@ -15,7 +15,7 @@ public class CommandNodeTests
         Assert.True(node.IsLive);
         Assert.Null(node.Auftrag);
 
-        var edited = node.WithDetails("  Nord 2 ", "  ", " Hof ", string.Empty, " FL Nord ", "  ");
+        var edited = node.WithDetails("  Nord 2 ", "  ", " Hof ", null, " FL Nord ", "  ");
         Assert.Equal("Nord 2", edited.Name);
         Assert.Null(edited.Auftrag);
         Assert.Equal("Hof", edited.Standort);
@@ -117,32 +117,52 @@ public class CommandNodeTests
             () => new LeadershipPost(null, null, null, new Funkgruppen(null, ["1", "2", "3", "4"])).Normalized());
     }
 
-    [Fact]
-    public void A_partner_takes_funkgruppen_and_no_single_funkgruppe()
+    [Theory]
+    [InlineData(CommandNodeKind.Partner)]
+    [InlineData(CommandNodeKind.Abschnitt)]
+    [InlineData(CommandNodeKind.Bereitstellung)]
+    public void Every_kind_takes_funkgruppen_and_no_single_funkgruppe(CommandNodeKind kind)
     {
-        var partner = CommandNode.Create(CommandNodeKind.Partner, "Polizei", null);
+        var node = CommandNode.Create(kind, "Nord", null);
 
-        var edited = partner.WithDetails("Polizei", null, null, null, null, null, new Funkgruppen([" POL 1 "], ["301_F"]));
+        var edited = node.WithDetails("Nord", null, null, null, null, null, new Funkgruppen([" FW 1 "], ["301_F"]));
 
-        Assert.Equal(new Funkgruppen(["POL 1"], ["301_F"]), edited.Funkgruppen);
+        Assert.Equal(new Funkgruppen(["FW 1"], ["301_F"]), edited.Funkgruppen);
         Assert.Null(edited.Funkgruppe);
-        var ex = Assert.Throws<ArgumentException>(() => partner.WithDetails("Polizei", null, null, "TMO POL 1", null, null));
-        Assert.StartsWith("Eine Einsatzleitung hat Funkgruppen TMO und DMO.", ex.Message, StringComparison.Ordinal);
-        var tooLong = Assert.Throws<ArgumentException>(
-            () => CommandNode.Create(CommandNodeKind.Abschnitt, "Nord", null).WithDetails("Nord", null, null, new string('x', 201), null, null));
-        Assert.StartsWith("Funkgruppe ist länger", tooLong.Message, StringComparison.Ordinal);
+        var ex = Assert.Throws<ArgumentException>(() => node.WithDetails("Nord", null, null, "TMO FW 1", null, null));
+        Assert.StartsWith("Funkgruppen werden als TMO und DMO erfasst.", ex.Message, StringComparison.Ordinal);
+        Assert.Null(node.WithDetails("Nord", null, null, "  ", null, null).Funkgruppe);
     }
 
     [Fact]
-    public void Only_a_partner_takes_funkgruppen()
+    public void An_edit_clears_a_single_funkgruppe_an_old_file_carried()
     {
-        var abschnitt = CommandNode.Create(CommandNodeKind.Abschnitt, "Nord", null);
+        var old = CommandNode.Rehydrate(Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, "TG 2", null, null, null);
 
-        var ex = Assert.Throws<ArgumentException>(
-            () => abschnitt.WithDetails("Nord", null, null, null, null, null, new Funkgruppen(["A"], null)));
+        var edited = old.WithDetails("Nord", null, null, null, null, null, new Funkgruppen(["TG 2"], null));
 
-        Assert.StartsWith("Nur eine Einsatzleitung hat Funkgruppen TMO und DMO.", ex.Message, StringComparison.Ordinal);
-        Assert.Equal(Funkgruppen.Empty, abschnitt.WithDetails("Nord", null, null, "DMO 301_F", null, null, Funkgruppen.Empty).Funkgruppen);
+        Assert.Null(edited.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["TG 2"], null), edited.Funkgruppen);
+    }
+
+    [Theory]
+    [InlineData("DMO 304_F", null, "DMO 304_F")]
+    [InlineData("DMO 304_F", "304_F", "DMO 304_F")]
+    [InlineData("DMO 301_F", null, null)]
+    [InlineData("301_F", null, "301_F")]
+    [InlineData(" tmo  fw   2 ", "FW 2", null)]
+    [InlineData("Kanal 9", "kanal  9", null)]
+    [InlineData("Kanal 9", "Kanal 5", "Kanal 9")]
+    public void An_edit_keeps_a_single_funkgruppe_until_the_lists_hold_it(string legacy, string? listed, string? kept)
+    {
+        var old = CommandNode.Rehydrate(
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, legacy, null, null, null, new Funkgruppen(null, ["301_F"]));
+        var groups = listed is null ? new Funkgruppen(null, ["301_F"]) : new Funkgruppen([listed], ["301_F"]);
+
+        var edited = old.WithDetails("Nord", null, "Hof", null, null, null, groups);
+
+        Assert.Equal(kept, edited.Funkgruppe);
+        Assert.Equal("Hof", edited.Standort);
     }
 
     [Fact]

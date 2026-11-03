@@ -44,7 +44,7 @@
     </DataTemplate>
   </UserControl.Resources>
   <!-- The Einsatzdaten dialog's shell (MaxWidth, not Width; 16px scrim inset), with the form in a
-       ScrollViewer: six fields do not fit a landscape phone. Initial focus is left to the first tab
+       ScrollViewer: its fields do not fit a landscape phone. Initial focus is left to the first tab
        stop, which is NAME, or STANDORT when the Einsatzleitung's post has no name. -->
   <Border Background="#B3070A10" Padding="16"
           b:Overlay.CancelCommand="{Binding CancelCommand}" b:Overlay.PrimaryCommand="{Binding SaveCommand}">
@@ -100,20 +100,10 @@
                                AutomationProperties.Name="Führungsfahrzeug"
                                Text="{Binding Fuehrungsfahrzeug}" PlaceholderText="z. B. FFB 1/12/1" />
             </HeaderedContentControl>
-            <!-- The Stammdaten's Funkgruppen as suggestions, not a closed set: a channel the list
-                 lacks stays enterable, so this is an AutoCompleteBox, as STICHWORT is. -->
-            <HeaderedContentControl Classes="field suggest" Header="FUNKGRUPPE" IsVisible="{Binding ShowFunkgruppe}">
-              <AutoCompleteBox x:Name="CommandNodeFunkgruppeBox" ItemsSource="{Binding FunkgruppeOptions}"
-                               ValueMemberBinding="{Binding Text, DataType=vm:FunkgruppeOption}"
-                               ItemTemplate="{StaticResource FunkgruppeOptionTemplate}"
-                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
-                               AutomationProperties.Name="Funkgruppe"
-                               Text="{Binding Funkgruppe}" PlaceholderText="z. B. TMO FW_MUSTER (KW: 1000)" />
-            </HeaderedContentControl>
-            <!-- An Einsatzleitung, ours or a partner's, works on up to three TMO and three DMO
-                 Funkgruppen (#828). One field of each always shows; + adds one, × takes it away. -->
-            <HeaderedContentControl x:Name="CommandNodeTmoField" Classes="field" Header="FUNKGRUPPEN TMO"
-                                    IsVisible="{Binding ShowFunkgruppen}">
+            <!-- Every Führungsstelle works on up to three TMO and three DMO Funkgruppen (#828, #878),
+                 the Stammdaten's as suggestions and any other typed in. One field of each always
+                 shows; + adds one, × takes it away. -->
+            <HeaderedContentControl x:Name="CommandNodeTmoField" Classes="field" Header="FUNKGRUPPEN TMO">
               <StackPanel Spacing="6">
                 <ItemsControl x:Name="CommandNodeTmoSlots" ItemsSource="{Binding TmoSlots}"
                               ItemTemplate="{StaticResource FunkgruppeSlotTemplate}">
@@ -128,8 +118,7 @@
                         AutomationProperties.Name="TMO-Funkgruppe hinzufügen" />
               </StackPanel>
             </HeaderedContentControl>
-            <HeaderedContentControl x:Name="CommandNodeDmoField" Classes="field" Header="FUNKGRUPPEN DMO"
-                                    IsVisible="{Binding ShowFunkgruppen}">
+            <HeaderedContentControl x:Name="CommandNodeDmoField" Classes="field" Header="FUNKGRUPPEN DMO">
               <StackPanel Spacing="6">
                 <ItemsControl x:Name="CommandNodeDmoSlots" ItemsSource="{Binding DmoSlots}"
                               ItemTemplate="{StaticResource FunkgruppeSlotTemplate}">
