@@ -8,7 +8,7 @@ builds and attaches one package per platform:
 |----------|------|
 | Windows | `lagebuch-<version>-x64.msi` |
 | Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` |
-| Android | `lagebuch-<version>.apk` (plus a `.aab` build artefact, not a release asset) |
+| Android | `lagebuch-<version>.apk` (the `.aab` goes to Google Play as a draft, not onto the release) |
 | macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
 
 ## Cutting a release
@@ -240,13 +240,29 @@ universal `.apk` the GitHub release carries. The sideload APK is therefore a
 render of the exact bytes Play receives, not a second, independently built
 artefact — which is why there is no separate "verify the bundle" step below.
 
-Like winget, **submitting is a manual step at release time, and deliberately
-so.** Automating it would mean keeping the upload keystore and its password in
-this repository's secrets; a credential that can publish to every installed
-device is a larger concession than the winget token this project already
-declined, and releases here are tagged deliberately, a handful of times a year.
-The repository holds exactly one secret today and this is not the change that
-should make it six.
+**A tag uploads the bundle itself.** The release workflow signs it with the
+upload key and its `play` job hands it to Play as a **draft**. Rolling it out
+stays a person's decision, taken in the Console. Unlike the winget token, the
+credentials here are contained:
+
+- The keystore and its password are secrets of the **`google-play`
+  Environment**, not of the repository. A job sees them only after a maintainer
+  approves that run, and only for `v*` tags. A tag push therefore stops twice
+  for approval: once at `android`, which signs, and once at `play`, which
+  uploads.
+- Play is reached through **Workload Identity Federation**. The job swaps
+  GitHub's OIDC token for a Google credential that lives for an hour. No
+  service-account key exists anywhere, so none can leak.
+- What CI can publish is a draft. Even with both credentials, a release does not
+  reach a single device until someone rolls it out in the Console.
+
+The sideload `.apk` on the GitHub release is extracted from the same signed
+bundle, so it carries the upload key's certificate too. Before this change, every
+CI build was signed with a debug key the runner generated fresh. Each APK therefore
+had a different certificate, and Android refused to install one over the other.
+From this change on, a sideloaded install updates in place from release to
+release. The last debug-signed APK still has to be uninstalled once. That is a
+one-time step, and the release notes should mention it.
 
 ### One-time setup
 
@@ -278,19 +294,72 @@ Three things can never be changed after the first upload: the package name
 (`de.codeforfire.lagebuch`), the app signing key, and the account type. The
 package name already matches the sideloaded APK; keep it.
 
+#### Handing the key and Play access to CI
+
+Do this once, before the first tag that should reach Play.
+
+1. **Environment.** Under *Settings → Environments*, create `google-play`. Add
+   yourself as a *required reviewer*. Under *Deployment branches and tags*, allow
+   only the tag pattern `v*`.
+2. **Keystore secrets** in that Environment, not in the repository:
+   ```bash
+   base64 -w0 ~/.config/lagebuch/lagebuch-upload.p12 \
+     | gh secret set ANDROID_UPLOAD_KEYSTORE_B64 --env google-play
+   gh secret set ANDROID_UPLOAD_KEYSTORE_PASS --env google-play \
+     < ~/.config/lagebuch/lagebuch-upload.pass
+   ```
+3. **Workload Identity Federation** in a Google Cloud project with the *Google
+   Play Android Developer API* enabled:
+   ```bash
+   gcloud iam workload-identity-pools create github --location=global
+   gcloud iam workload-identity-pools providers create-oidc lagebuch \
+     --location=global --workload-identity-pool=github \
+     --issuer-uri=https://token.actions.githubusercontent.com \
+     --attribute-mapping=google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.environment=assertion.environment \
+     --attribute-condition="assertion.repository == 'CodeForFire/lagebuch' && assertion.environment == 'google-play'"
+   gcloud iam service-accounts create lagebuch-play
+   gcloud iam service-accounts add-iam-policy-binding \
+     lagebuch-play@<project>.iam.gserviceaccount.com \
+     --role=roles/iam.workloadIdentityUser \
+     --member="principalSet://iam.googleapis.com/projects/<number>/locations/global/workloadIdentityPools/github/attribute.repository/CodeForFire/lagebuch"
+   ```
+   The attribute condition is the lock. Only a job of this repository that runs
+   in the approved `google-play` Environment gets a token at all.
+4. **Play Console** → *Users and permissions* → invite
+   `lagebuch-play@<project>.iam.gserviceaccount.com`. Give it access to Lagebuch
+   only, with *Release apps to testing tracks* and *Release to production*.
+5. **Environment variables** (*variables*, not secrets, because both are names):
+   ```bash
+   gh variable set GCP_WIF_PROVIDER --env google-play \
+     --body projects/<number>/locations/global/workloadIdentityPools/github/providers/lagebuch
+   gh variable set GCP_PLAY_SERVICE_ACCOUNT --env google-play \
+     --body lagebuch-play@<project>.iam.gserviceaccount.com
+   ```
+
 ### Per release
 
-Build from the tag, not from `main`, so the bundle is the code that was released:
+Push the tag as usual. Approve the `google-play` deployment twice: first for
+`android`, then for `play` once the GitHub release exists. A prerelease tag lands
+as a draft on closed testing (the API calls that track `alpha`). A final tag
+lands as a draft on production. In the Play Console, open the draft, add the
+German release notes and roll it out.
+
+The `versionCode` is **derived, not typed** —
+[`scripts/android-version-code.sh`](../scripts/android-version-code.sh) computes
+it in the release workflow's `version` job, and `make aab` calls the same script,
+so the two cannot disagree.
+
+#### By hand, when CI cannot
+
+`make aab` builds the same bundle on a laptop. Build it from the tag, not from
+`main`, so the bundle is the code that was released:
 
 ```bash
 git checkout v0.6.1
 make aab VERSION=0.6.1
 ```
 
-The `versionCode` is **derived, not typed** —
-[`scripts/android-version-code.sh`](../scripts/android-version-code.sh) computes
-it from `VERSION`, and the release workflow calls the same script, so the two
-cannot disagree. The target prints the number before it builds:
+The target prints the `versionCode` before it builds:
 
 ```
 versionCode 601999   (0.6.1)
@@ -305,7 +374,9 @@ The keystore path, password file and alias are overridable (`KEYSTORE=`,
 refuses to run without a keystore and a password file.
 
 Then, in the Play Console: pick the track → *Create new release* → upload
-`de.codeforfire.lagebuch-Signed.aab` → German release notes → roll out.
+`de.codeforfire.lagebuch-Signed.aab` → German release notes → roll out. Never
+upload by hand a version the workflow already uploaded: Play refuses the
+`versionCode` a second time.
 
 **Which track takes what**
 

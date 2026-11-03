@@ -1,0 +1,1 @@
+A release tag now uploads the Android App Bundle to Google Play as a draft, and the release APK is signed with the stable upload key instead of a fresh debug key, so a sideloaded install updates in place from this release on (the previous debug-signed APK has to be uninstalled once).
