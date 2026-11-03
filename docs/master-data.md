@@ -95,8 +95,10 @@ dropped, and a list holds at most 500 Objekte.
 ## Funkgruppen and the Führungstafel slot of a Funktion
 
 `talkGroups` lists the Funkgruppen a Führungsstelle works on: each has a `name`, an
-optional `number`, a `kind` (`"tmo"` or `"dmo"`, TMO when missing or unknown) and an
-optional `note`. `favorite: true` marks a group used most often; every Funkgruppen
+optional `number` (the Kurzwahl, the short dial a radio selects the group by), a `kind`
+(`"tmo"` or `"dmo"`, TMO when missing or unknown) and an optional `note` saying what the
+group is for. A picker lists a group as `307_F (KW: 307)`, with its note underneath.
+`favorite: true` marks a group used most often; every Funkgruppen
 picker lists the favourites first, then the rest alphabetically, and a missing
 `favorite` means no favourite. A name is required and at most 200 characters. The editor shows them in
 a **Funkgruppen** section, and an Einsatz copies the text it uses, so renaming or

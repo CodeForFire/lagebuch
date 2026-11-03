@@ -188,8 +188,8 @@ public class CommandNodeDialogViewModelTests
 
         var vm = CommandNodeDialogViewModel.ForPost(NewSession(), master);
 
-        Assert.Equal(["FW_MUSTER 1000", "FW_NACHBAR 2000"], vm.TmoOptions);
-        Assert.Equal(["301_F"], vm.DmoOptions);
+        Assert.Equal(["FW_MUSTER (KW: 1000)", "FW_NACHBAR (KW: 2000)"], vm.TmoOptions.Select(o => o.Text));
+        Assert.Equal(["301_F"], vm.DmoOptions.Select(o => o.Text));
         Assert.Same(vm.TmoOptions, Assert.Single(vm.TmoSlots).Options);
         Assert.Same(vm.DmoOptions, Assert.Single(vm.DmoSlots).Options);
         Assert.Equal("Funkgruppe DMO", vm.DmoSlots[0].AccessibleName);
@@ -202,12 +202,12 @@ public class CommandNodeDialogViewModelTests
         var session = NewSession();
         var vm = CommandNodeDialogViewModel.ForPost(session, master);
         vm.AddTmoCommand.Execute(null);
-        vm.TmoSlots[0].Text = "fw_muster 1000";
+        vm.TmoSlots[0].Text = "fw_muster (kw: 1000)";
         vm.TmoSlots[1].Text = "Kanal Süd";
 
         vm.SaveCommand.Execute(null);
 
-        Assert.Equal(["FW_MUSTER 1000", "Kanal Süd"], session.Incident.LeadershipPost.Funkgruppen.Tmo);
+        Assert.Equal(["FW_MUSTER (KW: 1000)", "Kanal Süd"], session.Incident.LeadershipPost.Funkgruppen.Tmo);
     }
 
     [Fact]
@@ -258,7 +258,27 @@ public class CommandNodeDialogViewModelTests
     {
         var vm = CommandNodeDialogViewModel.ForCreate(NewSession(), WithTalkGroups(), CommandNodeKind.Abschnitt, null, "Abschnitt 1");
 
-        Assert.Equal(["DMO 301_F", "TMO FW_MUSTER 1000"], vm.FunkgruppeOptions);
+        Assert.Equal(["DMO 301_F", "TMO FW_MUSTER (KW: 1000)"], vm.FunkgruppeOptions.Select(o => o.Text));
+    }
+
+    [Fact]
+    public void Funkgruppe_options_carry_the_note_so_the_picker_says_what_a_group_is_for()
+    {
+        var master = MasterDataSet.Empty with
+        {
+            TalkGroups =
+            [
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, " Einsatzstelle "),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, "  "),
+            ],
+        };
+
+        var node = CommandNodeDialogViewModel.ForCreate(NewSession(), master, CommandNodeKind.Abschnitt, null, "Abschnitt 1");
+        var post = CommandNodeDialogViewModel.ForPost(NewSession(), master);
+
+        Assert.Equal([new FunkgruppeOption("DMO 301_F", null), new FunkgruppeOption("TMO FW_MUSTER (KW: 1000)", "Einsatzstelle")], node.FunkgruppeOptions);
+        Assert.Equal([new FunkgruppeOption("FW_MUSTER (KW: 1000)", "Einsatzstelle")], post.TmoOptions);
+        Assert.Equal([new FunkgruppeOption("301_F", null)], post.DmoOptions);
     }
 
     [Fact]
@@ -279,9 +299,11 @@ public class CommandNodeDialogViewModelTests
         var node = CommandNodeDialogViewModel.ForCreate(NewSession(), master, CommandNodeKind.Abschnitt, null, "Abschnitt 1");
         var post = CommandNodeDialogViewModel.ForPost(NewSession(), master);
 
-        Assert.Equal(["DMO 301_F", "TMO FW_MUSTER 1000", "DMO 302_F", "TMO FW_ANDERE 3000", "TMO FW_NACHBAR 2000"], node.FunkgruppeOptions);
-        Assert.Equal(["FW_MUSTER 1000", "FW_ANDERE 3000", "FW_NACHBAR 2000"], post.TmoOptions);
-        Assert.Equal(["301_F", "302_F"], post.DmoOptions);
+        Assert.Equal(
+            ["DMO 301_F", "TMO FW_MUSTER (KW: 1000)", "DMO 302_F", "TMO FW_ANDERE (KW: 3000)", "TMO FW_NACHBAR (KW: 2000)"],
+            node.FunkgruppeOptions.Select(o => o.Text));
+        Assert.Equal(["FW_MUSTER (KW: 1000)", "FW_ANDERE (KW: 3000)", "FW_NACHBAR (KW: 2000)"], post.TmoOptions.Select(o => o.Text));
+        Assert.Equal(["301_F", "302_F"], post.DmoOptions.Select(o => o.Text));
     }
 
     [Fact]
@@ -586,14 +608,14 @@ public class CommandNodeDialogViewModelTests
     {
         var session = NewSession();
         var vm = CommandNodeDialogViewModel.ForCreate(session, WithTalkGroups(), CommandNodeKind.Abschnitt, null, "Nord");
-        vm.Funkgruppe = "tmo fw_muster 1000";
+        vm.Funkgruppe = "tmo fw_muster (kw: 1000)";
         vm.SaveCommand.Execute(null);
 
         var other = CommandNodeDialogViewModel.ForCreate(session, WithTalkGroups(), CommandNodeKind.Abschnitt, null, "Süd");
         other.Funkgruppe = " Kanal 7 ";
         other.SaveCommand.Execute(null);
 
-        Assert.Equal("TMO FW_MUSTER 1000", session.Incident.CommandNodes[0].Funkgruppe);
+        Assert.Equal("TMO FW_MUSTER (KW: 1000)", session.Incident.CommandNodes[0].Funkgruppe);
         Assert.Equal("Kanal 7", session.Incident.CommandNodes[1].Funkgruppe);
     }
 
@@ -788,7 +810,7 @@ public class CommandNodeDialogViewModelTests
     public void An_untouched_edit_dialog_does_not_ask_over_a_funkgruppe_spelt_off_catalogue()
     {
         var session = NewSession();
-        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", null, null, null, "tmo fw_muster 1000", null, null);
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", null, null, null, "tmo fw_muster (kw: 1000)", null, null);
         var id = session.Incident.CommandNodes[^1].Id;
         var vm = CommandNodeDialogViewModel.ForEdit(session, WithTalkGroups(), id);
 
@@ -797,7 +819,7 @@ public class CommandNodeDialogViewModelTests
         // Once another field changes, the save writes the Funkgruppe in the catalogue's spelling.
         vm.Rufname = "Florian Emmering 11/1";
         vm.SaveCommand.Execute(null);
-        Assert.Equal("TMO FW_MUSTER 1000", session.Incident.CommandNodes.Single().Funkgruppe);
+        Assert.Equal("TMO FW_MUSTER (KW: 1000)", session.Incident.CommandNodes.Single().Funkgruppe);
     }
 
     [Fact]
@@ -882,7 +904,7 @@ public class CommandNodeDialogViewModelTests
     {
         var vm = CommandNodeDialogViewModel.ForPost(NewSession(), MasterDataSet.Empty);
 
-        Assert.Equal(("TMO", "Funkgruppe TMO", "z. B. FW_MUSTER 1000"), (vm.TmoSlots[0].Kind, vm.TmoSlots[0].AccessibleName, vm.TmoSlots[0].Placeholder));
+        Assert.Equal(("TMO", "Funkgruppe TMO", "z. B. FW_MUSTER (KW: 1000)"), (vm.TmoSlots[0].Kind, vm.TmoSlots[0].AccessibleName, vm.TmoSlots[0].Placeholder));
         Assert.Equal(("DMO", "Funkgruppe DMO", "z. B. 301_F"), (vm.DmoSlots[0].Kind, vm.DmoSlots[0].AccessibleName, vm.DmoSlots[0].Placeholder));
     }
 

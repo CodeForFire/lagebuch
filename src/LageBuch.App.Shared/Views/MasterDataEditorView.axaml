@@ -1019,7 +1019,7 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Funkgruppen editor: NAME / NUMMER / ART (TMO or DMO) / FAVORIT / NOTIZ. -->
+              <!-- Funkgruppen editor: NAME / KURZWAHL / ART (TMO or DMO) / FAVORIT / NOTIZ. -->
               <DataTemplate x:DataType="vm:TalkGroupsSection">
                 <DockPanel Classes="add-below">
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
@@ -1028,7 +1028,8 @@
                   <Grid DockPanel.Dock="Top" Classes="pick-header" ColumnDefinitions="*,Auto,*,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                      <TextBlock Width="110" Text="NUMMER" Classes="overline" FontSize="10" />
+                      <TextBlock Width="110" Text="KURZWAHL" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Kurzwahl der Gruppe am Funkgerät" />
                       <TextBlock Width="100" Text="ART" Classes="overline" FontSize="10"
                                  ToolTip.Tip="Netzbetrieb (TMO) oder Direktbetrieb (DMO)" />
                       <TextBlock Width="70" Text="FAVORIT" Classes="overline" FontSize="10"
@@ -1046,9 +1047,9 @@
                                      PlaceholderText="FW_MUSTER" MaxLength="200" AutomationProperties.Name="Name der Funkgruppe" />
                             <WrapPanel Classes="row-extras">
                               <StackPanel Width="110">
-                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="NUMMER" />
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="KURZWAHL" />
                                 <TextBox Margin="0,0,6,0" Text="{Binding Number}"
-                                         AutomationProperties.Name="Nummer der Funkgruppe" />
+                                         AutomationProperties.Name="Kurzwahl der Funkgruppe" />
                               </StackPanel>
                               <StackPanel Width="100">
                                 <TextBlock Classes="overline narrow-label" FontSize="10" Text="ART" />

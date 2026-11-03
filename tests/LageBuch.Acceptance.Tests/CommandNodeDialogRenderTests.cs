@@ -1,9 +1,11 @@
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Controls;
@@ -35,9 +37,9 @@ public class CommandNodeDialogRenderTests
         {
             TalkGroups =
             [
-                new TalkGroup("FW_EMMERING", "1000", TalkGroupKind.Tmo, IsFavorite: true),
+                new TalkGroup("FW_EMMERING", "1000", TalkGroupKind.Tmo, "Einsatzstelle", IsFavorite: true),
                 new TalkGroup("FW_AICH", "1010", TalkGroupKind.Tmo),
-                new TalkGroup("301_F", null, TalkGroupKind.Dmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, "Atemschutzüberwachung"),
             ],
         };
 
@@ -60,6 +62,26 @@ public class CommandNodeDialogRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, name));
+    }
+
+    // A popup renders in its own PopupRoot, so the window's frame lacks it; draw it on top.
+    private static void CaptureWithPopup(Window window, Popup popup, string name)
+    {
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        var popupRoot = TopLevel.GetTopLevel(popup.Child)!;
+        Dispatcher.UIThread.RunJobs();
+        using var windowFrame = window.CaptureRenderedFrame()!;
+        using var popupFrame = popupRoot.CaptureRenderedFrame()!;
+        var offset = popupRoot.PointToScreen(default) - window.PointToScreen(default);
+        using var composite = new RenderTargetBitmap(windowFrame.PixelSize);
+        using (var context = composite.CreateDrawingContext())
+        {
+            context.DrawImage(windowFrame, new Rect(windowFrame.Size));
+            context.DrawImage(popupFrame, new Rect(new Point(offset.X, offset.Y), popupFrame.Size));
+        }
+
+        Directory.CreateDirectory(dir);
+        composite.Save(Path.Join(dir, name), PngBitmapEncoderOptions.Default);
     }
 
     private static CommandNodeDialogViewModel Filled(IIncidentSession session)
@@ -140,7 +162,9 @@ public class CommandNodeDialogRenderTests
         var (window, _) = Show(Filled(Session()), 560, 760);
 
         var box = Find<AutoCompleteBox>(window, "CommandNodeFunkgruppeBox");
-        Assert.Equal(["TMO FW_EMMERING 1000", "DMO 301_F", "TMO FW_AICH 1010"], box.ItemsSource!.Cast<string>());
+        Assert.Equal(
+            ["TMO FW_EMMERING (KW: 1000)", "DMO 301_F", "TMO FW_AICH (KW: 1010)"],
+            box.ItemsSource!.Cast<FunkgruppeOption>().Select(o => o.Text));
     }
 
     [AvaloniaFact]
@@ -175,8 +199,8 @@ public class CommandNodeDialogRenderTests
         var boxes = window.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "FunkgruppeSlotBox").ToList();
         Assert.Equal(["FW_EMMERING 1000", "FW_AICH 1010", "301_F"], boxes.Select(b => b.Text));
         Assert.Equal(["Funkgruppe TMO", "Funkgruppe TMO", "Funkgruppe DMO"], boxes.Select(AutomationProperties.GetName));
-        Assert.Equal(["FW_EMMERING 1000", "FW_AICH 1010"], boxes[0].ItemsSource!.Cast<string>());
-        Assert.Equal(["301_F"], boxes[2].ItemsSource!.Cast<string>());
+        Assert.Equal(["FW_EMMERING (KW: 1000)", "FW_AICH (KW: 1010)"], boxes[0].ItemsSource!.Cast<FunkgruppeOption>().Select(o => o.Text));
+        Assert.Equal(["301_F"], boxes[2].ItemsSource!.Cast<FunkgruppeOption>().Select(o => o.Text));
 
         // The one DMO field has no ×; each of two TMO fields has one.
         var removes = window.GetVisualDescendants().OfType<Button>().Where(b => b.Name == "FunkgruppeSlotRemoveButton").ToList();
@@ -188,6 +212,32 @@ public class CommandNodeDialogRenderTests
         Assert.Equal(3, vm.TmoSlots.Count);
         Assert.False(Find<Button>(window, "CommandNodeAddTmoButton").IsEffectivelyEnabled);
         Assert.True(Find<Button>(window, "CommandNodeAddDmoButton").IsEffectivelyEnabled);
+    }
+
+    // The suggestions say what each group is for: its Kurzwahl in brackets and its Notiz underneath.
+    // Picking one fills in the group alone, never the Notiz.
+    [AvaloniaFact]
+    public void The_funkgruppe_suggestions_show_each_groups_note_and_a_pick_fills_in_the_group_alone()
+    {
+        var (window, vm) = Show(CommandNodeDialogViewModel.ForPost(Session(), MasterData()), 560, 760);
+        var box = window.GetVisualDescendants().OfType<AutoCompleteBox>().First(b => b.Name == "FunkgruppeSlotBox");
+
+        box.Focus();
+        box.Text = string.Empty;
+        box.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var popup = box.GetVisualDescendants().OfType<Popup>().Single();
+        var list = popup.Child!.GetVisualDescendants().OfType<ListBox>().Single();
+        Assert.True(popup.IsOpen);
+        var shown = list.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        Assert.Equal(["FW_EMMERING (KW: 1000)", "Einsatzstelle", "FW_AICH (KW: 1010)"], shown);
+        CaptureWithPopup(window, popup, "einsatzleitung-funkgruppen-auswahl.png");
+
+        box.SelectedItem = vm.TmoOptions[0];
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("FW_EMMERING (KW: 1000)", vm.TmoSlots[0].Text);
     }
 
     [AvaloniaFact]

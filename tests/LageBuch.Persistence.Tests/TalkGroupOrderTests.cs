@@ -28,7 +28,7 @@ public class TalkGroupOrderTests
             new TalkGroup("Zentrale", null, TalkGroupKind.Tmo),
             new TalkGroup("Übung", null, TalkGroupKind.Tmo));
 
-        Assert.Equal(["TMO FW 2", "TMO fw 10", "TMO Übung", "TMO Zentrale"], order);
+        Assert.Equal(["TMO FW (KW: 2)", "TMO fw (KW: 10)", "TMO Übung", "TMO Zentrale"], order);
     }
 
     [Fact]

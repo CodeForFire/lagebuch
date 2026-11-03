@@ -684,7 +684,8 @@ public class MasterDataEditorRenderTests
             .Select(c => c.IsChecked);
         Assert.Equal(new bool?[] { true, false, false, false }, favourites);
         var labels = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
-        Assert.Contains("NUMMER", labels);
+        Assert.Contains("KURZWAHL", labels);
+        Assert.DoesNotContain("NUMMER", labels);
         Assert.Contains("ART", labels);
         Assert.Contains("FAVORIT", labels);
     }
