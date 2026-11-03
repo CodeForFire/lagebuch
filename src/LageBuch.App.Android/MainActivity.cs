@@ -7,6 +7,7 @@ using LageBuch.App.Android.Services;
 using LageBuch.App.Shared;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.Services.Map;
+using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
 
@@ -89,7 +90,7 @@ public class MainActivity : AvaloniaMainActivity
         _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
         _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(AttachmentMimeTypes);
         _store = new IncidentStore();
-        SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
+        SharedApp.CreateMainViewModel = () => KeepScreenOnWhileIncidentOpen(CompositionRoot.CreateMainWindowViewModel(
             _store,
             new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
             new JsonRecentFilesStore(AndroidAppPaths.RecentFilesJsonPath(this)),
@@ -108,7 +109,7 @@ public class MainActivity : AvaloniaMainActivity
             lastConnection: new JsonLastConnectionStore(AndroidAppPaths.LastConnectionJsonPath(this)),
             lastCrashReport: CrashReports.TakePending(FilesDir!.AbsolutePath),
             alarmMute: new AlarmMute(AndroidAppPaths.AlarmMuteJsonPath(this)),
-            mapPacks: new RegionPackLibrary(MapPackHttp, AndroidAppPaths.RegionPacksDir(this)));
+            mapPacks: new RegionPackLibrary(MapPackHttp, AndroidAppPaths.RegionPacksDir(this))));
 
         base.OnCreate(savedInstanceState);
     }
@@ -120,6 +121,36 @@ public class MainActivity : AvaloniaMainActivity
     {
         base.OnPause();
         _ = _store?.FlushAsync();
+    }
+
+    // The Atemschutz countdown and the Rückzugsalarm run on a UI-thread timer, so a device that locks
+    // its screen mid-Einsatz falls asleep and stops them without a sound. Holding the screen on while
+    // an Einsatz is open is what the ELW tablet needs anyway, and unlike a wake lock or a foreground
+    // service it asks for no permission and lapses by itself once the app leaves the foreground. The
+    // flag is cleared again on the way back to the Startseite, so an idle app still lets the device sleep.
+    private MainWindowViewModel KeepScreenOnWhileIncidentOpen(MainWindowViewModel viewModel)
+    {
+        void Apply()
+        {
+            if (viewModel.IsIncidentOpen)
+            {
+                Window?.AddFlags(WindowManagerFlags.KeepScreenOn);
+            }
+            else
+            {
+                Window?.ClearFlags(WindowManagerFlags.KeepScreenOn);
+            }
+        }
+
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainWindowViewModel.IsIncidentOpen))
+            {
+                Apply();
+            }
+        };
+        Apply();
+        return viewModel;
     }
 
     // AndroidX's RegisterForActivityResult takes an IActivityResultCallback, not a delegate, so the
