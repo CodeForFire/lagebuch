@@ -57,7 +57,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsIncidentOpen))]
     private object? _currentView;
+
+    /// <summary>
+    /// Whether an Einsatz is on screen. The Android head keeps the display awake while it is: the
+    /// Atemschutz countdown and its Rückzugsalarm run on a UI-thread timer, and a tablet that locks
+    /// itself mid-Einsatz would stop them without a sound.
+    /// </summary>
+    public bool IsIncidentOpen => CurrentView is IncidentWorkspaceViewModel;
 
     /// <summary>
     /// Whether the shell is laid out for a phone. The command bar is a single fixed row of six

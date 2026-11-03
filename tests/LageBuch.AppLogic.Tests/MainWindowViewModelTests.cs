@@ -97,6 +97,41 @@ public class MainWindowViewModelTests
         Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
     }
 
+    // The Android head keeps the screen on while this is true: the Rückzugsalarm runs on a UI-thread
+    // timer, and a device that sleeps mid-Einsatz stops it without a sound.
+    [Fact]
+    public void An_einsatz_counts_as_open_from_the_workspace_until_the_return_home()
+    {
+        var vm = New();
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        Assert.False(vm.IsIncidentOpen);
+
+        vm.RequestNewIncidentCommand.Execute(null);
+        vm.PendingPrompt!.OperatorName = "Müller";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmOperatorCommand.Execute(null);
+
+        Assert.True(vm.IsIncidentOpen);
+        Assert.Contains(nameof(MainWindowViewModel.IsIncidentOpen), changes);
+    }
+
+    [Fact]
+    public async Task Leaving_an_einsatz_for_home_no_longer_counts_it_as_open()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+        vm.RequestOpenFileCommand.Execute(null);
+        Assert.True(vm.IsIncidentOpen);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsIncidentOpen);
+    }
+
     [Fact]
     public void Cancelling_operator_returns_to_home_without_workspace()
     {
