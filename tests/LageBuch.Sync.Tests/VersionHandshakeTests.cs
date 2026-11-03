@@ -330,7 +330,16 @@ public class VersionHandshakeTests
     {
         // 35 adds adoptFreeTextSection, a command a client may send. A host at 34 has it nowhere in
         // its allowlist and would reject it, so a 34 and a 35 must not connect.
-        Assert.Equal(35, SyncProtocol.ProtocolVersion);
-        Assert.Equal(35, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 35, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 35, int.MaxValue);
+    }
+
+    [Fact]
+    public void Funkgruppen_on_every_fuehrungsstelle_raise_the_protocol_and_the_floor_to_thirty_six()
+    {
+        // 36 lets an Abschnitt carry TMO and DMO Funkgruppen, which a host at 35 refuses, and refuses
+        // the single Funkgruppe a client at 35 sends: a 35 and a 36 must not connect.
+        Assert.Equal(36, SyncProtocol.ProtocolVersion);
+        Assert.Equal(36, SyncProtocol.MinimumProtocolVersion);
     }
 }

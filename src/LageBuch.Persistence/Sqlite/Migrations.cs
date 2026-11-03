@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 40;
+    public const int CurrentVersion = 41;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -283,6 +283,11 @@ public static class Migrations
             ApplyV40(cn, tx);
 
             // Stryker restore all
+        }
+
+        if (version < 41)
+        {
+            ApplyV41(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1101,6 +1106,21 @@ public static class Migrations
         // Stryker restore all
     }
 
+    // TMO and DMO Funkgruppen on every Führungsstelle (#878). The single Funkgruppe an Abschnitt,
+    // Unterabschnitt or Bereitstellung still holds moves into its kind the way V38 moved a partner's,
+    // and is cleared. A row that already has Funkgruppen keeps them: a node never held both.
+    private static void ApplyV41(SqliteConnection cn, SqliteTransaction tx)
+    {
+        if (SchemaHelpers.ColumnExists(cn, tx, "command_nodes", "funkgruppe"))
+        {
+            MoveSingleFunkgruppe(
+                cn,
+                tx,
+                "SELECT id, funkgruppe FROM command_nodes WHERE funkgruppe IS NOT NULL AND funkgruppen IS NULL;",
+                "UPDATE command_nodes SET funkgruppen = $g, funkgruppe = NULL WHERE id = $id;");
+        }
+    }
+
     // The taktisches Zeichen of a unit on the Lagekarte: its Fahrzeugtyp, and how far its sign was
     // moved from the pin. Additive and nullable: an older file's units read back with the bare
     // Kraftfahrzeug sign at its default place, which is all they ever had.
@@ -1117,7 +1137,7 @@ public static class Migrations
     // An Einsatzleitung's TMO and DMO Funkgruppen (#828), our own and each partner's, as the JSON
     // FunkgruppenJson writes. The single Funkgruppe they had moves in, its kind read from the "DMO "
     // or "TMO " the Stammdaten suggestion began with (TMO when it says neither), and is cleared. The
-    // Abschnitte keep theirs. el_funkgruppe stays as a column nothing reads: SchemaGuard never drops.
+    // Abschnitte keep theirs until V41. el_funkgruppe stays as a column nothing reads: SchemaGuard never drops.
     private static void ApplyV38(SqliteConnection cn, SqliteTransaction tx)
     {
         // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
@@ -1148,7 +1168,7 @@ public static class Migrations
     [SuppressMessage(
         "Security",
         "CA2100",
-        Justification = "Audited: both statements are compile-time constants from ApplyV38; values use bound parameters.")]
+        Justification = "Audited: both statements are compile-time constants from ApplyV38 and ApplyV41; values use bound parameters.")]
     private static void MoveSingleFunkgruppe(SqliteConnection cn, SqliteTransaction tx, string select, string update)
     {
         var rows = new List<(string Id, string Value)>();

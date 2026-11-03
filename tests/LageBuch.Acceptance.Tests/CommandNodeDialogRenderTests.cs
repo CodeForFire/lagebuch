@@ -91,7 +91,8 @@ public class CommandNodeDialogRenderTests
         vm.Auftrag = "Brandbekämpfung Nordseite, Riegelstellung zum Stallgebäude.";
         vm.Standort = "Hofeinfahrt Hauptstraße 12, Emmering";
         vm.Fuehrungsfahrzeug = "Florian Aich 10/1";
-        vm.Funkgruppe = "TMO FW_EMMERING 1000";
+        vm.TmoSlots[0].Text = "FW_EMMERING (KW: 1000)";
+        vm.DmoSlots[0].Text = "301_F";
         vm.Rufname = "Florian Emmering 11/1";
         vm.Telefon = "0151 2345678";
         return vm;
@@ -103,7 +104,9 @@ public class CommandNodeDialogRenderTests
         var (window, vm) = Show(Filled(Session()), 560, 760);
 
         Assert.Equal("Abschnitt 1 Nord", Find<TextBox>(window, "CommandNodeNameBox").Text);
-        Assert.Equal("TMO FW_EMMERING 1000", Find<AutoCompleteBox>(window, "CommandNodeFunkgruppeBox").Text);
+        Assert.Equal(
+            ["FW_EMMERING (KW: 1000)", "301_F"],
+            window.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "FunkgruppeSlotBox").Select(b => b.Text));
         Assert.Equal("BILDEN", Find<Button>(window, "CommandNodeSaveButton").Content);
         Assert.Equal("Abschnitt bilden", vm.Title);
         Assert.Equal(200, Find<TextBox>(window, "CommandNodeNameBox").MaxLength);
@@ -157,17 +160,6 @@ public class CommandNodeDialogRenderTests
     }
 
     [AvaloniaFact]
-    public void Funkgruppe_field_lists_the_stammdaten_talk_groups_favourites_first()
-    {
-        var (window, _) = Show(Filled(Session()), 560, 760);
-
-        var box = Find<AutoCompleteBox>(window, "CommandNodeFunkgruppeBox");
-        Assert.Equal(
-            ["TMO FW_EMMERING (KW: 1000)", "DMO 301_F", "TMO FW_AICH (KW: 1010)"],
-            box.ItemsSource!.Cast<FunkgruppeOption>().Select(o => o.Text));
-    }
-
-    [AvaloniaFact]
     public void The_post_dialog_hides_name_and_auftrag()
     {
         var session = Session();
@@ -193,9 +185,6 @@ public class CommandNodeDialogRenderTests
             "Florian Emmering 12/1");
         var (window, vm) = Show(CommandNodeDialogViewModel.ForPost(session, MasterData()), 560, 900);
 
-        Assert.DoesNotContain(
-            window.GetVisualDescendants().OfType<AutoCompleteBox>(),
-            b => b.Name == "CommandNodeFunkgruppeBox" && b.IsEffectivelyVisible);
         var boxes = window.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "FunkgruppeSlotBox").ToList();
         Assert.Equal(["FW_EMMERING 1000", "FW_AICH 1010", "301_F"], boxes.Select(b => b.Text));
         Assert.Equal(["Funkgruppe TMO", "Funkgruppe TMO", "Funkgruppe DMO"], boxes.Select(AutomationProperties.GetName));
@@ -255,13 +244,14 @@ public class CommandNodeDialogRenderTests
     }
 
     [AvaloniaFact]
-    public void An_abschnitt_dialog_keeps_the_single_funkgruppe_field()
+    public void An_abschnitt_dialog_has_the_tmo_and_dmo_fields_with_the_favourites_first()
     {
-        var (window, _) = Show(Filled(Session()), 560, 760);
+        var (window, _) = Show(Filled(Session()), 560, 900);
 
-        Assert.True(Find<AutoCompleteBox>(window, "CommandNodeFunkgruppeBox").IsEffectivelyVisible);
-        Assert.False(Find<HeaderedContentControl>(window, "CommandNodeTmoField").IsVisible);
-        Assert.False(Find<HeaderedContentControl>(window, "CommandNodeDmoField").IsVisible);
+        Assert.True(Find<HeaderedContentControl>(window, "CommandNodeTmoField").IsEffectivelyVisible);
+        Assert.True(Find<HeaderedContentControl>(window, "CommandNodeDmoField").IsEffectivelyVisible);
+        var tmo = window.GetVisualDescendants().OfType<AutoCompleteBox>().First(b => b.Name == "FunkgruppeSlotBox");
+        Assert.Equal(["FW_EMMERING (KW: 1000)", "FW_AICH (KW: 1010)"], tmo.ItemsSource!.Cast<FunkgruppeOption>().Select(o => o.Text));
     }
 
     [AvaloniaFact]

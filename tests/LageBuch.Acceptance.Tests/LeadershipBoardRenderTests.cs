@@ -41,12 +41,10 @@ public class LeadershipBoardRenderTests
         string name,
         Guid? parent = null,
         string? auftrag = null,
-        string? funkgruppe = null,
         Funkgruppen? funkgruppen = null,
         string? fuehrungsfahrzeug = null)
     {
-        session.AddCommandNode(
-            kind, name, parent, auftrag: auftrag, funkgruppe: funkgruppe, funkgruppen: funkgruppen, fuehrungsfahrzeug: fuehrungsfahrzeug);
+        session.AddCommandNode(kind, name, parent, auftrag: auftrag, funkgruppen: funkgruppen, fuehrungsfahrzeug: fuehrungsfahrzeug);
         return session.Incident.CommandNodes[^1].Id;
     }
 
@@ -62,6 +60,13 @@ public class LeadershipBoardRenderTests
 
         return id;
     }
+
+    // The Funkgruppen a card lists under one kind, as shown.
+    private static IEnumerable<string?> Lines(Control view, string name) =>
+        view.GetVisualDescendants().OfType<ItemsControl>()
+            .Where(i => i.Name == name && i.IsEffectivelyVisible)
+            .SelectMany(i => i.GetVisualDescendants().OfType<SelectableTextBlock>())
+            .Select(t => t.Text);
 
     // A Wohnhausbrand in Emmering as the sheet would carry it an hour in.
     private static void Fill(LocalIncidentSession session)
@@ -80,16 +85,18 @@ public class LeadershipBoardRenderTests
             CommandNodeKind.Abschnitt,
             "Abschnitt 1 Nord",
             auftrag: "Brandbekämpfung Wohnhaus, Menschenrettung",
-            funkgruppe: "DMO 301_F",
+            funkgruppen: new Funkgruppen(["FW_EMMERING 1000"], ["301_F"]),
             fuehrungsfahrzeug: "Florian Aich 10/1");
         session.AssignRole("Abschnittsleiter", "Hans Huber", "Florian Aich 1", nodeId: nord, slot: RoleSlot.Leiter);
         session.AssignRole("Melder", "Lena Lehner", nodeId: nord, slot: RoleSlot.Melder);
         AddUnit(session, "FF Emmering", "Florian Emmering 40/1", 9, 4, 1, nord);
         AddUnit(session, "FF Aich", "Florian Aich 44/1", 9, 2, 1, nord);
-        var dach = AddNode(session, CommandNodeKind.Unterabschnitt, "Dach", nord, auftrag: "Riegelstellung Dachstuhl");
+        var dach = AddNode(
+            session, CommandNodeKind.Unterabschnitt, "Dach", nord, auftrag: "Riegelstellung Dachstuhl", funkgruppen: new Funkgruppen(null, ["301_F"]));
         AddUnit(session, "FF Emmering", "Florian Emmering 30/1", 3, 0, 1, dach);
 
-        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", auftrag: "Schutz Nachbargebäude", funkgruppe: "DMO 302_F");
+        var sued = AddNode(
+            session, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", auftrag: "Schutz Nachbargebäude", funkgruppen: new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
         session.AssignRole("Abschnittsleiter", "Josef Bauer", "Florian Aich 2", nodeId: sued, slot: RoleSlot.Leiter);
         AddUnit(session, "FF Aich", "Florian Aich 40/1", 9, 4, 1, sued);
 
@@ -309,6 +316,23 @@ public class LeadershipBoardRenderTests
         Assert.Equal(TextWrapping.Wrap, leiter.TextWrapping);
     }
 
+    // #878: each Funkgruppe on a card carries its mark against the level above, named for a screen
+    // reader; a line whose kind is not checked carries none.
+    [AvaloniaFact]
+    public void Each_funkgruppe_mark_on_a_card_is_named_for_automation()
+    {
+        var board = Show();
+
+        var marks = board.View.GetVisualDescendants().OfType<PathIcon>()
+            .Where(p => p.IsEffectivelyVisible && AutomationProperties.GetName(p) is { Length: > 0 })
+            .Select(AutomationProperties.GetName)
+            .ToList();
+
+        // Nord: TMO shared, DMO not. Dach: DMO shared with Nord. Süd: both shared. RD: neither.
+        Assert.Equal(4, marks.Count(m => m == "gemeinsame Funkgruppe"));
+        Assert.Equal(3, marks.Count(m => m == "keine gemeinsame Funkgruppe"));
+    }
+
     [AvaloniaFact]
     public void The_board_draws_every_part_of_the_sheet()
     {
@@ -325,7 +349,13 @@ public class LeadershipBoardRenderTests
         Assert.Equal(
             ["Florian Aich 10/1"],
             view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "NodeFahrzeug" && t.IsEffectivelyVisible).Select(t => t.Text));
-        Assert.Equal(["RD_FFB 1001"], view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "NodeTmo" && t.IsEffectivelyVisible).Select(t => t.Text));
+        Assert.Equal(
+            ["FW_EMMERING 1000", "FW_EMMERING 1000", "RD_FFB 1001"],
+            Lines(view, "NodeTmo").Order(StringComparer.Ordinal));
+        Assert.Equal(
+            ["Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung", "Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung"],
+            view.GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.Name == "NodeFunkHint" && t.IsEffectivelyVisible).Select(t => t.Text).Order(StringComparer.Ordinal));
         Assert.False(Named<Grid>(view, "ElFurther").IsVisible);
         Assert.Equal("Stufe B", Named<TextBlock>(view, "StufeText").Text);
 

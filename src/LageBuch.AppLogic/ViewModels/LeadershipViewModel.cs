@@ -40,6 +40,9 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     // stay unplaced; the board only shows them in every Bereitstellungsraum card (#825).
     private IReadOnlyList<ForceUnit> _waiting = [];
 
+    // Each live node's Funkgruppen against the level above (#878), as the last refresh found them.
+    private Dictionary<Guid, FunkCheckResult> _funkCheck = [];
+
     /// <summary>
     /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action (title, message,
     /// the action, the confirm button's label); without it the action runs at once, as in tests.
@@ -162,6 +165,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         _incident = incident;
         var line = ReportingLine.Of(incident);
         var hints = FuehrungsspanneHints.For(incident);
+        _funkCheck = FunkCheck.Of(incident).ToDictionary(r => r.NodeId);
         var unplaced = ReportingLine.UnplacedUnits(incident);
         var hasBereitstellung = line.Any(e => e.Kind == ReportingEntryKind.Bereitstellung);
         _waiting = hasBereitstellung ? unplaced.Where(u => IsBereitstellungStatus(u.Status)).ToList() : [];
@@ -268,7 +272,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         Func<CommandNode, IReadOnlyList<(ReportingEntry Entry, CommandNode Node)>> childrenOf)
     {
         var hint = hints.FirstOrDefault(h => h.NodeId == e.Node.Id)?.Text;
-        card.Update(e.Entry, e.Node, hint, BoardNodeCard.BlockedReason(incident, e.Node), IsReadOnly);
+        card.Update(
+            e.Entry, e.Node, hint, BoardNodeCard.BlockedReason(incident, e.Node), IsReadOnly, _funkCheck.GetValueOrDefault(e.Node.Id));
 
         // The Stärke counts the placed units only: a waiting unit stands in every Bereitstellungsraum
         // and would be summed once per card.

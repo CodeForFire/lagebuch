@@ -32,13 +32,13 @@ public class FuehrungsorganisationSectionTests
 
         incident.AddCommandNode(Clock, Op, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz");
         var nord = incident.AddCommandNode(
-            Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung", funkgruppe: "DMO 301_F");
+            Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", auftrag: "Brandbekämpfung", funkgruppen: new Funkgruppen(null, ["301_F"]));
         incident.AssignRole(
             Clock, Op, "Abschnittsleiter", "Hans Huber", callSign: "Florian Aich 1", nodeId: nord.Id, slot: RoleSlot.Leiter);
         incident.AssignRole(Clock, Op, "Lagemelder", "Lena Lehner", nodeId: nord.Id, slot: RoleSlot.Melder);
         incident.AssignRole(Clock, Op, "Gerätewart", "Anton Reiter", nodeId: nord.Id);
         var dach = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Dach", nord.Id);
-        var sued = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", funkgruppe: "DMO 302_F");
+        var sued = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd", funkgruppen: new Funkgruppen(null, ["302_F"]));
         incident.AssignRole(Clock, Op, "Abschnittsleiter", "Josef Bauer", nodeId: sued.Id, slot: RoleSlot.Leiter);
         var rettungsdienst = incident.AddCommandNode(
             Clock, Op, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["RD_FFB 3000"], null));
@@ -107,7 +107,7 @@ public class FuehrungsorganisationSectionTests
         El(incident);
         incident.UpdateLeadershipPost(Clock, Op, null, null, null, new Funkgruppen(["FW_EMMERING 1000"], null), "Florian Emmering 12/1");
         incident.AddCommandNode(
-            Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", funkgruppe: "DMO 301_F", fuehrungsfahrzeug: "Florian Emmering 11/1");
+            Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord", funkgruppen: new Funkgruppen(null, ["301_F"]), fuehrungsfahrzeug: "Florian Emmering 11/1");
         incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2 Süd");
 
         var text = Print(incident);
@@ -116,7 +116,7 @@ public class FuehrungsorganisationSectionTests
             text,
             Heading,
             "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · TMO FW_EMMERING 1000 · Fahrzeug Florian Emmering 12/1",
-            "Abschnitt 1 Nord – Funkgruppe: DMO 301_F – Führungsfahrzeug: Florian Emmering 11/1",
+            "Abschnitt 1 Nord – Funkgruppen: DMO 301_F – Führungsfahrzeug: Florian Emmering 11/1",
             "Abschnitt 2 Süd");
         Assert.Equal(2, text.Split("Führungsfahrzeug:").Length);
     }
@@ -202,12 +202,12 @@ public class FuehrungsorganisationSectionTests
             "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Stufe B · TMO FW_EMMERING 1000 · DMO 307_F",
             "Führungsunterstützung: S2 Lage Erika Musterfrau",
             "Bereitstellung Marktplatz",
-            "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppe: DMO 301_F – Stärke 0/0/9/9, AGT 0",
+            "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppen: DMO 301_F – Stärke 0/0/9/9, AGT 0",
             "Einheiten: Florian Emmering 40/1",
             "Weitere: Gerätewart Anton Reiter",
             "Unterabschnitt Dach – Stärke 0/0/3/3, AGT 0",
             "Einheiten: Florian Emmering 30/1",
-            "Abschnitt 2 Süd – Leiter: Josef Bauer – Funkgruppe: DMO 302_F – Stärke 0/0/4/4, AGT 0",
+            "Abschnitt 2 Süd – Leiter: Josef Bauer – Funkgruppen: DMO 302_F – Stärke 0/0/4/4, AGT 0",
             "Einheiten: Florian Aich 44/1",
             "Einsatzleitung Rettungsdienst – Leiter: Sabine Schmid – Funkgruppen: TMO RD_FFB 3000",
             "Fachberater: Fachberater THW (Peter Maier)",

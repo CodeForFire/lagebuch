@@ -344,7 +344,9 @@ public class AutomationPropertiesTests
         Dispatcher.UIThread.RunJobs();
 
         AssertEveryTextlessControlIsNamed(view);
-        Assert.Equal("Funkgruppe", Name(view.GetControl<AutoCompleteBox>("CommandNodeFunkgruppeBox")));
+        Assert.Equal(
+            ["Funkgruppe TMO", "Funkgruppe DMO"],
+            view.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "FunkgruppeSlotBox").Select(Name));
     }
 
     [AvaloniaFact]

@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// One TMO or DMO field of an Einsatzleitung (#828) in <see cref="CommandNodeDialogViewModel"/>:
+/// One TMO or DMO field of a Führungsstelle (#828, #878) in <see cref="CommandNodeDialogViewModel"/>:
 /// free text with the Stammdaten Funkgruppen of its kind as suggestions. The dialog owns the list
 /// and decides when a slot may go.
 /// </summary>

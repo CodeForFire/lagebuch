@@ -138,12 +138,13 @@ public class LeadershipViewModelRefreshTests
         var card = vm.Sections[0];
         var unit = card.Units[0];
 
-        session.UpdateCommandNode(abschnitt, "Abschnitt 1 Nordost", "Riegelstellung", null, "DMO 302_F", null, null);
+        session.UpdateCommandNode(
+            abschnitt, "Abschnitt 1 Nordost", "Riegelstellung", null, null, null, null, new Funkgruppen(null, ["302_F"]));
 
         Assert.Same(card, vm.Sections[0]);
         Assert.Equal("Abschnitt 1 Nordost", card.Name);
         Assert.Equal("Riegelstellung", card.Auftrag);
-        Assert.Equal("DMO 302_F", card.Funkgruppe);
+        Assert.Equal([new FunkgruppeLine("302_F", null)], card.DmoLines);
         Assert.Same(unit, card.Units[0]);
         Assert.Equal("Abschnitt 1 Nordost", unit.NodeLabel);
     }
@@ -264,5 +265,73 @@ public class LeadershipViewModelRefreshTests
         using var vm = NewVm(NewSession());
 
         Assert.Same(vm.El, Assert.Single(vm.TopRow));
+    }
+
+    [Fact]
+    public void Changing_the_einsatzleitungs_funkgruppen_re_marks_the_same_cards()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], ["301_F"]));
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        session.UpdateCommandNode(nord, "Nord", null, null, null, null, null, new Funkgruppen(["FW 2000"], ["305_F"]));
+        var dach = AddNode(session, CommandNodeKind.Unterabschnitt, "Dach", nord);
+        session.UpdateCommandNode(dach, "Dach", null, null, null, null, null, new Funkgruppen(["FW 1000"], ["305_F"]));
+        using var vm = NewVm(session);
+        var card = vm.Sections[0];
+        var sub = Assert.Single(card.Children);
+
+        Assert.Equal("Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung", card.FunkHint);
+        Assert.Equal("Keine gemeinsame TMO-Funkgruppe mit Abschnitt Nord", sub.FunkHint);
+        Assert.Equal([new FunkgruppeLine("305_F", true)], sub.DmoLines);
+        Assert.True(sub.HasDmo);
+
+        var raised = new List<string?>();
+        card.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 2000"], ["305_F"]));
+
+        Assert.Same(card, vm.Sections[0]);
+        Assert.Null(card.FunkHint);
+        Assert.Equal([new FunkgruppeLine("FW 2000", true)], card.TmoLines);
+        Assert.Equal(
+            [nameof(BoardNodeCard.TmoLines), nameof(BoardNodeCard.HasTmo), nameof(BoardNodeCard.DmoLines), nameof(BoardNodeCard.HasDmo)],
+            raised.Where(p => p is "TmoLines" or "HasTmo" or "DmoLines" or "HasDmo"));
+
+        // The Abschnitt's DMO taken away: the row goes, and the view hears it.
+        raised.Clear();
+        session.UpdateCommandNode(nord, "Nord", null, null, null, null, null, new Funkgruppen(["FW 2000"], null));
+        Assert.True(card.HasTmo);
+        Assert.False(card.HasDmo);
+        Assert.Equal([nameof(BoardNodeCard.DmoLines), nameof(BoardNodeCard.HasDmo)], raised.Where(p => p is "DmoLines" or "HasDmo"));
+
+        // A refresh that changes nothing on the card leaves its lines alone.
+        raised.Clear();
+        session.UpdateLeadershipPost("Feuerwehrhaus", null, null, new Funkgruppen(["FW 2000"], ["305_F"]));
+        Assert.DoesNotContain(nameof(BoardNodeCard.TmoLines), raised);
+        Assert.DoesNotContain(nameof(BoardNodeCard.DmoLines), raised);
+    }
+
+    [Fact]
+    public void The_funk_hint_names_each_kind_without_a_shared_funkgruppe()
+    {
+        var shared = new FunkKindCheck(true, ["FW 1000"]);
+        var none = new FunkKindCheck(true, []);
+        FunkCheckResult Result(FunkKindCheck tmo, FunkKindCheck dmo) => new(Guid.NewGuid(), "Abschnitt Nord", tmo, dmo);
+
+        Assert.Null(BoardNodeCard.FunkHintOf(null));
+        Assert.Null(BoardNodeCard.FunkHintOf(Result(shared, FunkKindCheck.NotChecked)));
+        Assert.Equal("Keine gemeinsame TMO-Funkgruppe mit Abschnitt Nord", BoardNodeCard.FunkHintOf(Result(none, shared)));
+        Assert.Equal("Keine gemeinsame DMO-Funkgruppe mit Abschnitt Nord", BoardNodeCard.FunkHintOf(Result(FunkKindCheck.NotChecked, none)));
+        Assert.Equal("Keine gemeinsame TMO- und DMO-Funkgruppe mit Abschnitt Nord", BoardNodeCard.FunkHintOf(Result(none, none)));
+    }
+
+    [Fact]
+    public void A_funkgruppe_line_names_its_mark_for_a_screen_reader()
+    {
+        Assert.Equal(
+            ["gemeinsame Funkgruppe", "keine gemeinsame Funkgruppe", string.Empty],
+            new bool?[] { true, false, null }.Select(s => new FunkgruppeLine("FW 1000", s).MarkName));
+        Assert.Equal((true, false), (new FunkgruppeLine("FW 1000", true).IsMarkedShared, new FunkgruppeLine("FW 1000", true).IsMarkedNotShared));
+        Assert.Equal((false, true), (new FunkgruppeLine("FW 1000", false).IsMarkedShared, new FunkgruppeLine("FW 1000", false).IsMarkedNotShared));
+        Assert.Equal((false, false), (new FunkgruppeLine("FW 1000", null).IsMarkedShared, new FunkgruppeLine("FW 1000", null).IsMarkedNotShared));
     }
 }

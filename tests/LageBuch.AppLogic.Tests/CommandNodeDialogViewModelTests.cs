@@ -73,7 +73,8 @@ public class CommandNodeDialogViewModelTests
     public void Edit_mode_names_the_dialog_for_the_kind_and_seeds_the_fields(CommandNodeKind kind, string title)
     {
         var session = NewSession();
-        session.AddCommandNode(kind, "Nord", null, "Löschangriff", "Hofeinfahrt", "TMO FW_MUSTER 1000", "Florian Nord", "0151 1234567");
+        session.AddCommandNode(
+            kind, "Nord", null, "Löschangriff", "Hofeinfahrt", null, "Florian Nord", "0151 1234567", new Funkgruppen(["FW_MUSTER 1000"], ["301_F"]));
         var id = session.Incident.CommandNodes[^1].Id;
 
         var vm = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, id);
@@ -83,7 +84,8 @@ public class CommandNodeDialogViewModelTests
         Assert.Equal("Nord", vm.Name);
         Assert.Equal("Löschangriff", vm.Auftrag);
         Assert.Equal("Hofeinfahrt", vm.Standort);
-        Assert.Equal("TMO FW_MUSTER 1000", vm.Funkgruppe);
+        Assert.Equal(["FW_MUSTER 1000"], vm.TmoSlots.Select(s => s.Text));
+        Assert.Equal(["301_F"], vm.DmoSlots.Select(s => s.Text));
         Assert.Equal("Florian Nord", vm.Rufname);
         Assert.Equal("0151 1234567", vm.Telefon);
     }
@@ -101,8 +103,6 @@ public class CommandNodeDialogViewModelTests
         Assert.Equal("SPEICHERN", vm.PrimaryText);
         Assert.False(vm.ShowName);
         Assert.False(vm.ShowAuftrag);
-        Assert.True(vm.ShowFunkgruppen);
-        Assert.False(vm.ShowFunkgruppe);
         Assert.Equal("Feuerwehrhaus", vm.Standort);
         Assert.Equal("Florian Emmering", vm.Rufname);
         Assert.Equal("08141 123", vm.Telefon);
@@ -211,17 +211,11 @@ public class CommandNodeDialogViewModelTests
     }
 
     [Fact]
-    public void A_partner_einsatzleitung_gets_the_tmo_and_dmo_fields_and_an_abschnitt_the_single_one()
+    public void A_partner_einsatzleitung_saves_and_edits_its_tmo_and_dmo_fields()
     {
         var session = NewSession();
 
         var partner = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Partner, null, "Polizei");
-        var abschnitt = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Abschnitt, null, "Nord");
-
-        Assert.True(partner.ShowFunkgruppen);
-        Assert.False(partner.ShowFunkgruppe);
-        Assert.False(abschnitt.ShowFunkgruppen);
-        Assert.True(abschnitt.ShowFunkgruppe);
 
         partner.TmoSlots[0].Text = "POL 1";
         partner.DmoSlots[0].Text = "301_F";
@@ -254,14 +248,6 @@ public class CommandNodeDialogViewModelTests
     }
 
     [Fact]
-    public void Funkgruppe_options_are_the_talk_groups_display_strings()
-    {
-        var vm = CommandNodeDialogViewModel.ForCreate(NewSession(), WithTalkGroups(), CommandNodeKind.Abschnitt, null, "Abschnitt 1");
-
-        Assert.Equal(["DMO 301_F", "TMO FW_MUSTER (KW: 1000)"], vm.FunkgruppeOptions.Select(o => o.Text));
-    }
-
-    [Fact]
     public void Funkgruppe_options_carry_the_note_so_the_picker_says_what_a_group_is_for()
     {
         var master = MasterDataSet.Empty with
@@ -273,10 +259,8 @@ public class CommandNodeDialogViewModelTests
             ],
         };
 
-        var node = CommandNodeDialogViewModel.ForCreate(NewSession(), master, CommandNodeKind.Abschnitt, null, "Abschnitt 1");
         var post = CommandNodeDialogViewModel.ForPost(NewSession(), master);
 
-        Assert.Equal([new FunkgruppeOption("DMO 301_F", null), new FunkgruppeOption("TMO FW_MUSTER (KW: 1000)", "Einsatzstelle")], node.FunkgruppeOptions);
         Assert.Equal([new FunkgruppeOption("FW_MUSTER (KW: 1000)", "Einsatzstelle")], post.TmoOptions);
         Assert.Equal([new FunkgruppeOption("301_F", null)], post.DmoOptions);
     }
@@ -296,12 +280,8 @@ public class CommandNodeDialogViewModelTests
             ],
         };
 
-        var node = CommandNodeDialogViewModel.ForCreate(NewSession(), master, CommandNodeKind.Abschnitt, null, "Abschnitt 1");
         var post = CommandNodeDialogViewModel.ForPost(NewSession(), master);
 
-        Assert.Equal(
-            ["DMO 301_F", "TMO FW_MUSTER (KW: 1000)", "DMO 302_F", "TMO FW_ANDERE (KW: 3000)", "TMO FW_NACHBAR (KW: 2000)"],
-            node.FunkgruppeOptions.Select(o => o.Text));
         Assert.Equal(["FW_MUSTER (KW: 1000)", "FW_ANDERE (KW: 3000)", "FW_NACHBAR (KW: 2000)"], post.TmoOptions.Select(o => o.Text));
         Assert.Equal(["301_F", "302_F"], post.DmoOptions.Select(o => o.Text));
     }
@@ -319,7 +299,8 @@ public class CommandNodeDialogViewModelTests
         vm.Name = " Nord ";
         vm.Auftrag = "Brandbekämpfung";
         vm.Standort = "Hauptstraße";
-        vm.Funkgruppe = "TMO X";
+        vm.TmoSlots[0].Text = "FW X";
+        vm.DmoSlots[0].Text = "305_F";
         vm.Rufname = "Florian Nord";
         vm.Telefon = "0151 1";
         vm.SaveCommand.Execute(null);
@@ -328,7 +309,7 @@ public class CommandNodeDialogViewModelTests
         Assert.Equal(("Nord", CommandNodeKind.Abschnitt), (node.Name, node.Kind));
         Assert.Equal("Brandbekämpfung", node.Auftrag);
         Assert.Equal("Hauptstraße", node.Standort);
-        Assert.Equal("TMO X", node.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["FW X"], ["305_F"]), node.Funkgruppen);
         Assert.Equal("Florian Nord", node.Rufname);
         Assert.Equal("0151 1", node.Telefon);
         Assert.Equal(1, closed);
@@ -604,19 +585,15 @@ public class CommandNodeDialogViewModelTests
     }
 
     [Fact]
-    public void Funkgruppe_is_saved_in_the_catalogues_spelling_and_off_catalogue_text_as_typed()
+    public void An_abschnitts_funkgruppen_save_in_the_catalogues_spelling_and_off_catalogue_text_as_typed()
     {
         var session = NewSession();
         var vm = CommandNodeDialogViewModel.ForCreate(session, WithTalkGroups(), CommandNodeKind.Abschnitt, null, "Nord");
-        vm.Funkgruppe = "tmo fw_muster (kw: 1000)";
+        vm.TmoSlots[0].Text = "fw_muster (kw: 1000)";
+        vm.DmoSlots[0].Text = " Kanal 7 ";
         vm.SaveCommand.Execute(null);
 
-        var other = CommandNodeDialogViewModel.ForCreate(session, WithTalkGroups(), CommandNodeKind.Abschnitt, null, "Süd");
-        other.Funkgruppe = " Kanal 7 ";
-        other.SaveCommand.Execute(null);
-
-        Assert.Equal("TMO FW_MUSTER (KW: 1000)", session.Incident.CommandNodes[0].Funkgruppe);
-        Assert.Equal("Kanal 7", session.Incident.CommandNodes[1].Funkgruppe);
+        Assert.Equal(new Funkgruppen(["FW_MUSTER (KW: 1000)"], ["Kanal 7"]), session.Incident.CommandNodes[0].Funkgruppen);
     }
 
     [Fact]
@@ -707,14 +684,15 @@ public class CommandNodeDialogViewModelTests
         var id = session.Incident.CommandNodes[^1].Id;
         var vm = CommandNodeDialogViewModel.ForEdit(session, WithTalkGroups(), id);
 
-        session.UpdateCommandNode(id, "Nord", "Riegelstellung", "Hofeinfahrt", "TMO FW_MUSTER 1000", "Florian Nord", "0151 1234567");
+        session.UpdateCommandNode(
+            id, "Nord", "Riegelstellung", "Hofeinfahrt", null, "Florian Nord", "0151 1234567", new Funkgruppen(["FW_MUSTER 1000"], null));
         vm.Name = "Nord-West";
         vm.SaveCommand.Execute(null);
 
         var node = session.Incident.CommandNodes.Single();
         Assert.Equal(
             ("Nord-West", "Riegelstellung", "Hofeinfahrt", "TMO FW_MUSTER 1000", "Florian Nord", "0151 1234567"),
-            (node.Name, node.Auftrag, node.Standort, node.Funkgruppe, node.Rufname, node.Telefon));
+            (node.Name, node.Auftrag, node.Standort, node.Funkgruppen.Text, node.Rufname, node.Telefon));
     }
 
     [Fact]
@@ -810,7 +788,8 @@ public class CommandNodeDialogViewModelTests
     public void An_untouched_edit_dialog_does_not_ask_over_a_funkgruppe_spelt_off_catalogue()
     {
         var session = NewSession();
-        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", null, null, null, "tmo fw_muster (kw: 1000)", null, null);
+        session.AddCommandNode(
+            CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, new Funkgruppen(["fw_muster (kw: 1000)"], null));
         var id = session.Incident.CommandNodes[^1].Id;
         var vm = CommandNodeDialogViewModel.ForEdit(session, WithTalkGroups(), id);
 
@@ -819,7 +798,7 @@ public class CommandNodeDialogViewModelTests
         // Once another field changes, the save writes the Funkgruppe in the catalogue's spelling.
         vm.Rufname = "Florian Emmering 11/1";
         vm.SaveCommand.Execute(null);
-        Assert.Equal("TMO FW_MUSTER (KW: 1000)", session.Incident.CommandNodes.Single().Funkgruppe);
+        Assert.Equal(["FW_MUSTER (KW: 1000)"], session.Incident.CommandNodes.Single().Funkgruppen.Tmo);
     }
 
     [Fact]
@@ -908,46 +887,22 @@ public class CommandNodeDialogViewModelTests
         Assert.Equal(("DMO", "Funkgruppe DMO", "z. B. 301_F"), (vm.DmoSlots[0].Kind, vm.DmoSlots[0].AccessibleName, vm.DmoSlots[0].Placeholder));
     }
 
+    // A file from a foreign build may still carry a node with the single Funkgruppe of before #878.
+    // Editing it must not write back the field the domain refuses, and must keep its lists.
     [Fact]
-    public void A_hidden_field_is_never_saved()
+    public void Editing_a_foreign_files_node_drops_its_single_funkgruppe_and_keeps_its_lists()
     {
-        var session = NewSession();
-        var partner = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Partner, null, "Polizei");
-        partner.Funkgruppe = "TMO POL 1";
-        partner.SaveCommand.Execute(null);
-
-        var abschnitt = CommandNodeDialogViewModel.ForCreate(session, MasterDataSet.Empty, CommandNodeKind.Abschnitt, null, "Nord");
-        abschnitt.TmoSlots[0].Text = "FW_MUSTER 1000";
-        abschnitt.SaveCommand.Execute(null);
-
-        Assert.Null(partner.SaveError);
-        Assert.Null(abschnitt.SaveError);
-        var nodes = session.Incident.CommandNodes;
-        Assert.Equal((null, Funkgruppen.Empty), (nodes[0].Funkgruppe, nodes[0].Funkgruppen));
-        Assert.Equal((null, Funkgruppen.Empty), (nodes[1].Funkgruppe, nodes[1].Funkgruppen));
-    }
-
-    // A file from a foreign build may carry a partner with a single Funkgruppe or an Abschnitt with
-    // lists. Editing either must not write back the shape the domain refuses for its kind.
-    [Fact]
-    public void Editing_a_foreign_files_node_drops_the_funkgruppe_its_kind_does_not_have()
-    {
-        var partner = CommandNode.Rehydrate(
-            Guid.NewGuid(), CommandNodeKind.Partner, "Polizei", null, null, null, "TMO POL 1", null, null, null);
         var abschnitt = CommandNode.Rehydrate(
-            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, null, new Funkgruppen(["X"], null));
-        var session = Hostile([partner, abschnitt]);
+            Guid.NewGuid(), CommandNodeKind.Abschnitt, "Nord", null, null, null, "TMO POL 1", null, null, null, new Funkgruppen(["X"], null));
+        var session = Hostile([abschnitt]);
 
-        var editPartner = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, partner.Id);
-        editPartner.Standort = "Kreuzung";
-        editPartner.SaveCommand.Execute(null);
-        var editAbschnitt = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, abschnitt.Id);
-        editAbschnitt.Standort = "Hof";
-        editAbschnitt.SaveCommand.Execute(null);
+        var edit = CommandNodeDialogViewModel.ForEdit(session, MasterDataSet.Empty, abschnitt.Id);
+        edit.Standort = "Hof";
+        edit.SaveCommand.Execute(null);
 
-        Assert.Null(editPartner.SaveError);
-        Assert.Null(editAbschnitt.SaveError);
-        Assert.Null(session.Incident.FindCommandNode(partner.Id)?.Funkgruppe);
-        Assert.Equal(Funkgruppen.Empty, session.Incident.FindCommandNode(abschnitt.Id)?.Funkgruppen);
+        Assert.Null(edit.SaveError);
+        var saved = session.Incident.FindCommandNode(abschnitt.Id);
+        Assert.Null(saved?.Funkgruppe);
+        Assert.Equal(new Funkgruppen(["X"], null), saved?.Funkgruppen);
     }
 }

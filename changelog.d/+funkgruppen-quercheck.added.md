@@ -1,0 +1,1 @@
+Every Abschnitt, Unterabschnitt and Bereitstellung now carries up to three TMO and three DMO Funkgruppen like an Einsatzleitung, and the Führung board marks each one as shared or not with the level above and warns on the card when a kind has none in common (#878).

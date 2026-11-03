@@ -113,9 +113,9 @@ public class LeadershipViewModelTests
             "Abschnitt 1 Nord",
             auftrag: "Brandbekämpfung Wohnhaus",
             standort: "Hauptstraße 12",
-            funkgruppe: "DMO 301_F",
             rufname: "Florian Emmering 11",
             telefon: "0170 1234567",
+            funkgruppen: new Funkgruppen(["FW_EMMERING 1000", "FW_EMMERING 1100"], ["301_F"]),
             fuehrungsfahrzeug: "Florian Emmering 11/1");
         var abschnitt = session.Incident.CommandNodes[^1].Id;
         session.AssignRole("Abschnittsleiter", "Hans Huber", "Florian Aich 1", nodeId: abschnitt, slot: RoleSlot.Leiter);
@@ -158,12 +158,17 @@ public class LeadershipViewModelTests
         Assert.Equal("Bereitstellung Marktplatz", staging.Name);
         Assert.Empty(staging.Units);
         Assert.Empty(staging.Children);
+        Assert.False(staging.HasTmo);
+        Assert.Null(staging.FunkHint);
 
         var card = vm.Sections[1];
         Assert.Equal("Abschnitt", card.KindLabel);
         Assert.Equal("Abschnitt 1 Nord", card.Name);
         Assert.Equal("Brandbekämpfung Wohnhaus", card.Auftrag);
-        Assert.Equal("DMO 301_F", card.Funkgruppe);
+        Assert.Equal(
+            [new FunkgruppeLine("FW_EMMERING 1000", true), new FunkgruppeLine("FW_EMMERING 1100", false)], card.TmoLines);
+        Assert.Equal([new FunkgruppeLine("301_F", false)], card.DmoLines);
+        Assert.Equal("Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung", card.FunkHint);
         Assert.Equal("Hauptstraße 12", card.Standort);
         Assert.Equal("Florian Emmering 11/1", card.Fuehrungsfahrzeug);
         Assert.Null(staging.Fuehrungsfahrzeug);
@@ -197,8 +202,9 @@ public class LeadershipViewModelTests
         Assert.True(vm.HasPartners);
         var partner = Assert.Single(vm.Partners);
         Assert.Equal("Rettungsdienst", partner.Name);
-        Assert.Equal("RD_FFB 3000", partner.Tmo);
-        Assert.Null(partner.Dmo);
+        Assert.Equal([new FunkgruppeLine("RD_FFB 3000", false)], partner.TmoLines);
+        Assert.False(partner.HasDmo);
+        Assert.Equal("Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung", partner.FunkHint);
         Assert.Equal("Einsatzleitung", partner.KindLabel);
         Assert.Equal("Sabine Schmid", partner.Leiter?.PersonName);
 
