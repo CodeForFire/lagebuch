@@ -18,10 +18,11 @@ fail=0
 
 # Pulls the fenced block under the "## <heading>" that starts with $1. Counting blocks
 # instead would hand back the next section's block once a pair of fences went missing,
-# and check it as the wrong field. A block that is never closed yields nothing.
+# and check it as the wrong field. Inside a block a "## " line is text, not a heading;
+# a block that is never closed yields nothing.
 block() {
     awk -v want="$1" '
-        /^## / { insec = index($0, "## " want) == 1; inblock = 0; buf = ""; next }
+        !inblock && /^## / { insec = index($0, "## " want) == 1; inblock = 0; buf = ""; next }
         insec && /^```$/ { if (inblock) { printf "%s", buf; exit } inblock = 1; next }
         insec && inblock { buf = buf $0 "\n" }
     ' "$listing"
@@ -45,11 +46,11 @@ name=$(block "App-Name")
 short=$(block "Kurzbeschreibung")
 full=$(block "Vollständige Beschreibung")
 
-# A section whose fences were edited away yields an empty block, and an empty block
-# passes every length check, so absence is a failure of its own.
+# A section whose fences were edited away yields an empty block, and an empty or
+# blank block passes every length check, so absence is a failure of its own.
 for field in "app name:$name" "short description:$short" "full description:$full"; do
-    if [ -z "${field#*:}" ]; then
-        echo "error: the listing has no ${field%%:*} block — check its \`\`\` fences." >&2
+    if ! [[ "${field#*:}" =~ [^[:space:]] ]]; then
+        echo "error: the listing's ${field%%:*} block is missing or blank — check its \`\`\` fences." >&2
         exit 1
     fi
 done
