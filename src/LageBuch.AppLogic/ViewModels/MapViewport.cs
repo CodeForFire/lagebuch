@@ -14,14 +14,10 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class MapViewport : ObservableObject
 {
-    /// <summary>A whole Landkreis fits at 11.</summary>
+    /// <summary>A whole Landkreis fits at 11; closer than 19 a pack's streets and houses show nothing more.</summary>
     public const int MinZoom = 8;
 
-    /// <summary>
-    /// Close enough to place a sign on one building. Past a pack's deepest zoom its tiles are drawn
-    /// from their ancestor, so this needs no deeper pack; further in, the ancestor's coordinate grid shows.
-    /// </summary>
-    public const int MaxZoom = 21;
+    public const int MaxZoom = 19;
 
     // Closer to north than this, in degrees, the map counts as north up.
     private const double NorthTolerance = 0.5;
