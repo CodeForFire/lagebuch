@@ -35,9 +35,39 @@ public class FunkCheckTests
         Assert.Equal(["FW_MUSTER (KW: 1000)"], result.Tmo.Shared);
         Assert.False(result.Tmo.IsMismatch);
         Assert.True(result.Tmo.IsShared("FW_MUSTER (KW: 1000)"));
-        Assert.False(result.Tmo.IsShared("FW_NORD"));
+        Assert.Null(result.Tmo.IsShared("FW_NORD"));
         Assert.True(result.Dmo.IsMismatch);
         Assert.False(result.Dmo.IsShared("305_F"));
+    }
+
+    [Fact]
+    public void A_second_funkgruppe_of_a_kind_that_already_shares_one_is_not_marked()
+    {
+        // #887: one Funkgruppe in common is enough to talk to the level above, so the other one
+        // of the same kind is neither shared nor a warning.
+        var (incident, clock, op) = NewIncident(new Funkgruppen(["FW 1000"], null));
+        var nord = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 2000", "fw  1000"], null));
+
+        var result = For(incident, nord);
+
+        Assert.False(result.Tmo.IsMismatch);
+        Assert.True(result.Tmo.IsShared("fw  1000"));
+        Assert.Null(result.Tmo.IsShared("FW 2000"));
+    }
+
+    [Fact]
+    public void Every_funkgruppe_of_a_kind_without_one_in_common_is_marked_not_shared()
+    {
+        var (incident, clock, op) = NewIncident(new Funkgruppen(["FW 1000"], null));
+        var nord = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 2000", "FW 3000"], null));
+
+        var result = For(incident, nord);
+
+        Assert.True(result.Tmo.IsMismatch);
+        Assert.False(result.Tmo.IsShared("FW 2000"));
+        Assert.False(result.Tmo.IsShared("FW 3000"));
     }
 
     [Fact]

@@ -1,0 +1,1 @@
+Führung → Organisation no longer marks a second TMO or DMO Funkgruppe orange when the Führungsstelle already shares another Funkgruppe of that kind with the übergeordnete Stelle, because one in common is enough (#887).

@@ -357,6 +357,26 @@ public class LeadershipBoardRenderTests
         Assert.All(lines, t => Assert.True(t.TextLayout.TextLines.Count == 1, $"'{t.Text}' wraps over {t.TextLayout.TextLines.Count} lines"));
     }
 
+    // #887: a second TMO Funkgruppe beside one the Einsatzleitung shares is no warning.
+    [AvaloniaFact]
+    public void A_second_funkgruppe_beside_a_shared_one_carries_no_warning()
+    {
+        var board = Show(more: s => AddNode(
+            s, CommandNodeKind.Abschnitt, "Abschnitt 3 West", funkgruppen: new Funkgruppen(["FW_EMMERING 1000", "FW_WEST 1010"], ["307_F"])));
+        Capture(board.Window, "fuehrung-funkgruppe-second-tmo.png");
+        var west = Card(board.View, "Abschnitt 3 West");
+
+        var marks = west.GetVisualDescendants().OfType<PathIcon>()
+            .Where(p => p.IsEffectivelyVisible && AutomationProperties.GetName(p) is { Length: > 0 })
+            .Select(AutomationProperties.GetName)
+            .ToList();
+
+        Assert.Equal(["gemeinsame Funkgruppe", "gemeinsame Funkgruppe"], marks);
+        Assert.Equal(["FW_EMMERING 1000", "FW_WEST 1010"], Lines(west, "NodeTmo"));
+        Assert.DoesNotContain(
+            west.GetVisualDescendants().OfType<TextBlock>(), t => t.Name == "NodeFunkHint" && t.IsEffectivelyVisible);
+    }
+
     [AvaloniaFact]
     public void The_board_draws_every_part_of_the_sheet()
     {
