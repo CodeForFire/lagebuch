@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  auto_approvals:
+    # CodeRabbit requests changes for blocking findings and approves once its
+    # threads are resolved, the latest commit is reviewed and its checks pass.
+    enabled: true
+    # No "@coderabbitai approve" on your own pull request: a clean review is the
+    # only way to the approval.
+    allow_author_approval: false
