@@ -53,9 +53,9 @@ version_code() {
     local offset
     case "$kind" in
         "")      offset=999 ;;
-        alpha)   offset=$((100 + number)) ;;
-        beta)    offset=$((200 + number)) ;;
-        rc)      offset=$((300 + number)) ;;
+        alpha)   offset=$((100 + 10#$number)) ;;
+        beta)    offset=$((200 + 10#$number)) ;;
+        rc)      offset=$((300 + 10#$number)) ;;
     esac
 
     # 10#  forces base 10: a zero-padded field such as 08 would otherwise be read
@@ -101,6 +101,8 @@ self_test() {
     expect 0.6.0-beta.1  600201
     expect 0.6.0-rc.1    600301
     expect 0.6.0-rc.2    600302
+    expect 1.0.0-rc.010  10000310
+    expect 1.0.0-rc.08   10000308
     expect 0.6.0         600999
     expect 0.6.1-rc.1    601301
     expect 0.6.1         601999
