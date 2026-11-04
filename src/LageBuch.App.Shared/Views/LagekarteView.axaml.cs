@@ -12,9 +12,11 @@ public partial class LagekarteView : UserControl
     // Same slop as the map's own: a mark pressed and let go in place is a tap on the map there.
     private const double TapSlop = 6;
 
-    // The mark under the hand while it is dragged, and where the press began.
+    // The mark under the hand while it is dragged, where the press began, and how far that lay from
+    // the mark's spot: the ESt pin is grabbed by its head, well above its tip (#885).
     private LagekarteMarker? _dragged;
     private Point _pressedAt;
+    private Vector _grabbedOff;
     private bool _moved;
 
     // The sign under the hand while it is dragged, and where it stood from its pin at the press.
@@ -35,6 +37,10 @@ public partial class LagekarteView : UserControl
 
         _dragged = marker;
         _pressedAt = e.GetPosition(Map);
+
+        // MapMarkerPanel centres a mark on its spot, so the mark's centre is where it stands.
+        var spot = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), Map) ?? _pressedAt;
+        _grabbedOff = _pressedAt - spot;
         _moved = false;
         e.Pointer.Capture(control);
         e.Handled = true;
@@ -55,7 +61,7 @@ public partial class LagekarteView : UserControl
         }
 
         _moved = true;
-        if (Map.ScreenToGeo(at) is { } position)
+        if (Map.ScreenToGeo(at - _grabbedOff) is { } position)
         {
             _dragged.Position = position;
         }
@@ -73,7 +79,8 @@ public partial class LagekarteView : UserControl
         _dragged = null;
         e.Pointer.Capture(null);
         e.Handled = true;
-        if (Map.ScreenToGeo(e.GetPosition(Map)) is not { } position)
+        var at = e.GetPosition(Map);
+        if (Map.ScreenToGeo(_moved ? at - _grabbedOff : at) is not { } position)
         {
             return;
         }

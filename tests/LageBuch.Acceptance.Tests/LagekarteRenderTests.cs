@@ -288,6 +288,30 @@ public sealed class LagekarteRenderTests : IDisposable
         frame.SavePng(Path.Join(Shots(), "fuehrung-karte-est-zeichen.png"));
     }
 
+    // #885: the pin is grabbed by its head, well above the spot; the tip moves with the hand, not to it.
+    [AvaloniaFact]
+    public void Dragging_the_ESt_pin_by_its_head_moves_its_tip_as_far_as_the_hand()
+    {
+        var (window, view, vm, session) = Show();
+        session.SetIncidentLocation(Marktplatz);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var text = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "EinsatzortText" && t.IsEffectivelyVisible);
+        var start = MiddleOf(text, window);
+        window.MouseDown(start, MouseButton.Left);
+        window.MouseMove(new Point(start.X + 40, start.Y), RawInputModifiers.LeftMouseButton);
+        window.MouseMove(new Point(start.X + 80, start.Y), RawInputModifiers.LeftMouseButton);
+        window.MouseUp(new Point(start.X + 80, start.Y), MouseButton.Left);
+
+        var moved = session.Incident.Location;
+        Assert.NotNull(moved);
+        var before = MapDrawing.ToScreen(Marktplatz, 17, map.Bounds.Size, Marktplatz, 0);
+        var after = MapDrawing.ToScreen(Marktplatz, 17, map.Bounds.Size, moved, 0);
+        Assert.True(Math.Abs(after.X - before.X - 80) <= 1 && Math.Abs(after.Y - before.Y) <= 1, $"tip moved from {before} to {after}, expected 80 px right");
+    }
+
     [AvaloniaFact]
     public void Fuehrung_has_a_LAGEKARTE_tab_that_shows_the_Lagekarte()
     {
