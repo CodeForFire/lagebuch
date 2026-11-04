@@ -93,6 +93,7 @@ public class MapViewportTests
 
     [Theory]
     [InlineData(2, MapViewport.MinZoom)]
+    [InlineData(21, 21)]
     [InlineData(25, MapViewport.MaxZoom)]
     public void A_zoom_past_what_the_map_can_show_stops_at_its_limit(int requested, int expected)
     {
