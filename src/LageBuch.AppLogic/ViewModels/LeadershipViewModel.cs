@@ -346,6 +346,34 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         return Run(() => UnitPlacement.Move(_session, _masterData.UnitStatus, unitId, nodeId));
     }
 
+    /// <summary>
+    /// Whether <paramref name="unitId"/> may become the Einsatzleitung's Führungsfahrzeug by a drop
+    /// on its card (#888): the Einsatz is open, the unit is known, has a Funkrufname, and is not the
+    /// Führungsfahrzeug already.
+    /// </summary>
+    public bool CanAssignFuehrungsfahrzeug(Guid unitId) =>
+        !IsReadOnly
+        && _incident.Forces.FirstOrDefault(u => u.Id == unitId)?.CallSign is { } callSign
+        && !string.Equals(callSign, _incident.LeadershipPost.Fuehrungsfahrzeug, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Makes the unit's Funkrufname the Einsatzleitung's Führungsfahrzeug, as the post dialog (#829)
+    /// does: the post's other fields are kept, and the unit keeps its place and status. False when
+    /// <see cref="CanAssignFuehrungsfahrzeug"/> says no or the session refuses.
+    /// </summary>
+    public bool AssignFuehrungsfahrzeug(Guid unitId)
+    {
+        ActionError = null;
+        if (!CanAssignFuehrungsfahrzeug(unitId))
+        {
+            return false;
+        }
+
+        var callSign = _incident.Forces.First(u => u.Id == unitId).CallSign;
+        var post = _incident.LeadershipPost;
+        return Run(() => _session.UpdateLeadershipPost(post.Standort, post.Rufname, post.Telefon, post.Funkgruppen, callSign));
+    }
+
     /// <summary>A drag of <paramref name="unitId"/> began; ignored on a read-only Einsatz.</summary>
     public void BeginDrag(Guid unitId)
     {
