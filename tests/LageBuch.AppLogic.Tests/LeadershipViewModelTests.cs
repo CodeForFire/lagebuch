@@ -8,7 +8,7 @@ namespace LageBuch.AppLogic.Tests;
 public class LeadershipViewModelTests
 {
     [Fact]
-    public void An_empty_incident_shows_an_empty_sheet_and_suggests_Stufe_A()
+    public void An_empty_incident_shows_an_empty_sheet()
     {
         using var vm = NewVm(NewSession());
 
@@ -24,9 +24,6 @@ public class LeadershipViewModelTests
         Assert.False(vm.HasFreeTextSections);
         Assert.Null(vm.El.Leiter);
         Assert.Empty(vm.El.Assistants);
-        Assert.Equal("Keine Führungsstufe festgelegt", vm.El.StufeText);
-        Assert.Equal("Vorschlag: Stufe A – keine Abschnitte, keine Einheiten", vm.El.SuggestionText);
-        Assert.False(vm.El.MatchesSuggestion);
         Assert.Equal("ILS", vm.DispatchCentreName);
         Assert.False(vm.IsReadOnly);
     }
@@ -130,7 +127,6 @@ public class LeadershipViewModelTests
         session.AssignRole("Fachberater THW", "Thomas Weber", "Heros Fürstenfeldbruck 10/1", slot: RoleSlot.Fachberater);
         AddUnit(session, "FF Steinhöring", "Florian Steinhöring 40/1");
         session.AssignRole("Abschnittsleiter", "Josef Bauer", section: "Süd", slot: RoleSlot.Leiter);
-        session.SetFuehrungsstufe(Fuehrungsstufe.B);
 
         using var vm = NewVm(session);
 
@@ -146,9 +142,6 @@ public class LeadershipViewModelTests
         Assert.Equal("Max Mustermann · Florian Emmering 1", vm.El.Leiter.Text);
         var assistant = Assert.Single(vm.El.Assistants);
         Assert.Equal("Erika Musterfrau", assistant.Text);
-        Assert.Equal("Stufe B", vm.El.StufeText);
-        Assert.Equal("Vorschlag: Stufe D – Unterabschnitte gebildet", vm.El.SuggestionText);
-        Assert.False(vm.El.MatchesSuggestion);
 
         // Sections in ReportingLine order, the Unterabschnitt nested
         Assert.Equal(new[] { bereitstellung, abschnitt }, vm.Sections.Select(c => c.Id));
@@ -225,19 +218,6 @@ public class LeadershipViewModelTests
         Assert.Equal("Josef Bauer", Assert.Single(freeText.People).PersonName);
 
         Assert.Empty(vm.Hints);
-    }
-
-    [Fact]
-    public void A_set_Stufe_that_matches_the_suggestion_says_so()
-    {
-        var session = NewSession();
-        AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
-        session.SetFuehrungsstufe(Fuehrungsstufe.B);
-
-        using var vm = NewVm(session);
-
-        Assert.Equal("Vorschlag: Stufe B – 1 Abschnitt, keine Einheiten", vm.El.SuggestionText);
-        Assert.True(vm.El.MatchesSuggestion);
     }
 
     [Fact]

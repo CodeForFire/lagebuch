@@ -17,17 +17,10 @@ public class LeadershipKeysTests
             Assert.Equal(slot, LeadershipKeys.SlotFrom(LeadershipKeys.SlotKey(slot)));
         }
 
-        foreach (var stufe in Enum.GetValues<Fuehrungsstufe>())
-        {
-            Assert.Equal(stufe, LeadershipKeys.StufeFrom(LeadershipKeys.StufeKey(stufe)));
-        }
-
         Assert.Equal("unterabschnitt", LeadershipKeys.KindKey(CommandNodeKind.Unterabschnitt));
         Assert.Equal("fuehrungsassistent", LeadershipKeys.SlotKey(RoleSlot.Fuehrungsassistent));
         Assert.Null(LeadershipKeys.SlotKey(RoleSlot.None));
-        Assert.Equal("C", LeadershipKeys.StufeKey(Fuehrungsstufe.C));
         Assert.Equal(CommandNodeKind.Partner, LeadershipKeys.KindFrom(" PARTNER "));
-        Assert.Equal(Fuehrungsstufe.B, LeadershipKeys.StufeFrom("b"));
     }
 
     [Fact]
@@ -42,12 +35,5 @@ public class LeadershipKeysTests
     {
         Assert.Equal(RoleSlot.None, LeadershipKeys.SlotFrom("chef"));
         Assert.Equal(RoleSlot.None, LeadershipKeys.SlotFrom(null));
-    }
-
-    [Fact]
-    public void Unknown_stufe_key_reads_as_null()
-    {
-        Assert.Null(LeadershipKeys.StufeFrom("E"));
-        Assert.Null(LeadershipKeys.StufeFrom(null));
     }
 }

@@ -33,7 +33,6 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
 [JsonDerivedType(typeof(EndRoleAssignmentCommand), "endRoleAssignment")]
 [JsonDerivedType(typeof(AdoptFreeTextSectionCommand), "adoptFreeTextSection")]
-[JsonDerivedType(typeof(SetFuehrungsstufeCommand), "setFuehrungsstufe")]
 [JsonDerivedType(typeof(SetNavVisibilityCommand), "setNavVisibility")]
 [JsonDerivedType(typeof(AddChecklistCommand), "addChecklist")]
 [JsonDerivedType(typeof(UpdateLeadershipPostCommand), "updateLeadershipPost")]
@@ -171,9 +170,6 @@ public sealed record PlaceRoleAssignmentCommand(OperatorDto Operator, Guid Assig
 public sealed record EndRoleAssignmentCommand(OperatorDto Operator, Guid AssignmentId) : SyncCommand;
 
 public sealed record AdoptFreeTextSectionCommand(OperatorDto Operator, string Section) : SyncCommand;
-
-/// <summary>Sets the Führungsstufe; a null Stufe clears it.</summary>
-public sealed record SetFuehrungsstufeCommand(OperatorDto Operator, Fuehrungsstufe? Stufe) : SyncCommand;
 
 /// <summary>Hides or shows one rail entry for this Einsatz; see <c>Incident.SetNavVisibility</c>.</summary>
 public sealed record SetNavVisibilityCommand(OperatorDto Operator, string Key, bool Visible) : SyncCommand;

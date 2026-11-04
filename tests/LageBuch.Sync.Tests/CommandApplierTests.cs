@@ -933,23 +933,16 @@ public class CommandApplierTests
     }
 
     [Fact]
-    public void Fuehrungsstufe_and_leadership_post_over_the_wire_are_set_and_attributed()
+    public void Leadership_post_over_the_wire_is_set_and_attributed()
     {
         var clock = new FixedClock();
         var incident = NewIncident(clock);
         var client = new OperatorDto("Maier", "FFB 2");
 
-        ApplyOverWire(new SetFuehrungsstufeCommand(client, Fuehrungsstufe.C), incident, clock);
-        Assert.Equal(Fuehrungsstufe.C, incident.Fuehrungsstufe);
-        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
-
         ApplyOverWire(new UpdateLeadershipPostCommand(client, "Feuerwehrhaus", "Florian EL", "0172", ["TG 1"], ["301_F"]), incident, clock);
         Assert.Equal("Feuerwehrhaus", incident.LeadershipPost.Standort);
         Assert.Equal(new Funkgruppen(["TG 1"], ["301_F"]), incident.LeadershipPost.Funkgruppen);
         Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
-
-        ApplyOverWire(new SetFuehrungsstufeCommand(client, null), incident, clock);
-        Assert.Null(incident.Fuehrungsstufe);
     }
 
     [Fact]
@@ -1200,7 +1193,6 @@ public class CommandApplierTests
 
     [Theory]
     [InlineData("""{"$type":"addCommandNode","operator":{"name":"M","callSign":null},"kind":99,"name":"Nord","parentId":null}""")]
-    [InlineData("""{"$type":"setFuehrungsstufe","operator":{"name":"M","callSign":null},"stufe":7}""")]
     [InlineData("""{"$type":"assignRole","operator":{"name":"M","callSign":null},"role":"AL","personName":"H","callSign":null,"from":null,"to":null,"section":null,"phone":null,"nodeId":null,"slot":42}""")]
     [InlineData("""{"$type":"placeRoleAssignment","operator":{"name":"M","callSign":null},"assignmentId":"00000000-0000-0000-0000-000000000001","nodeId":null,"slot":42}""")]
     public void A_hostile_peer_sending_an_integer_outside_the_enum_is_refused_and_the_incident_is_unchanged(string json)
@@ -1215,7 +1207,6 @@ public class CommandApplierTests
 
         Assert.Empty(incident.CommandNodes);
         Assert.Empty(incident.Roles);
-        Assert.Null(incident.Fuehrungsstufe);
         Assert.Equal(entries, incident.Journal.Count);
     }
 

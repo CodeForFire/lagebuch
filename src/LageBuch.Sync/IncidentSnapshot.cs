@@ -63,10 +63,9 @@ public sealed record IncidentSnapshot(
     // Defaulted the same way; a snapshot without the key reads as "nothing handed out".
     IReadOnlyList<IssuedItemDto>? IssuedItems = null,
 
-    // Defaulted like InvolvedParties: a snapshot without the keys reads as no Abschnitte, no
-    // Führungsstufe and an empty Einsatzleitung post.
+    // Defaulted like InvolvedParties: a snapshot without the keys reads as no Abschnitte and an
+    // empty Einsatzleitung post.
     IReadOnlyList<CommandNodeDto>? CommandNodes = null,
-    Fuehrungsstufe? Fuehrungsstufe = null,
     string? ElStandort = null,
     string? ElRufname = null,
     string? ElTelefon = null,

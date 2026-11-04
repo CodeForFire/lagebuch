@@ -598,7 +598,7 @@ public class CommandNodeAggregateTests
     }
 
     [Fact]
-    public void Rehydrating_hostile_nodes_stufe_and_slots_repairs_them_and_never_throws()
+    public void Rehydrating_hostile_nodes_and_slots_repairs_them_and_never_throws()
     {
         var (source, _, _) = NewIncident();
         var abschnitt = Guid.NewGuid();
@@ -644,10 +644,8 @@ public class CommandNodeAggregateTests
                 Node(withParent, CommandNodeKind.Partner, abschnitt),
                 Node(unknownKind, (CommandNodeKind)99, abschnitt),
                 Node(good, CommandNodeKind.Unterabschnitt, abschnitt),
-            ],
-            fuehrungsstufe: (Fuehrungsstufe)7);
+            ]);
 
-        Assert.Null(incident.Fuehrungsstufe);
         Assert.Equal(RoleSlot.None, incident.Roles.Single().Slot);
         foreach (var id in new[] { selfParented, orphan, nested, unknownKind })
         {

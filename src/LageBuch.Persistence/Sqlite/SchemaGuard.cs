@@ -112,7 +112,7 @@ internal static class SchemaGuard
         new("incident_meta", "status", "TEXT", false, null),
         new("incident_meta", "closed_at", "TEXT", false, null),
         new("incident_meta", "closed_by", "TEXT", false, null),
-        new("incident_meta", "fuehrungsstufe", "TEXT", false, null),
+        new("incident_meta", "fuehrungsstufe", "TEXT", false, null), // Unused since the Führungsstufe went; kept like el_funkgruppe.
         new("incident_meta", "el_standort", "TEXT", false, null),
         new("incident_meta", "el_rufname", "TEXT", false, null),
         new("incident_meta", "el_telefon", "TEXT", false, null),

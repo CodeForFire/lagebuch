@@ -41,21 +41,4 @@ public static class LeadershipKeys
         "FACHBERATER" => RoleSlot.Fachberater,
         _ => RoleSlot.None,
     };
-
-    public static string StufeKey(Fuehrungsstufe stufe) => stufe switch
-    {
-        Fuehrungsstufe.B => "B",
-        Fuehrungsstufe.C => "C",
-        Fuehrungsstufe.D => "D",
-        _ => "A",
-    };
-
-    public static Fuehrungsstufe? StufeFrom(string? key) => key?.Trim().ToUpperInvariant() switch
-    {
-        "A" => Fuehrungsstufe.A,
-        "B" => Fuehrungsstufe.B,
-        "C" => Fuehrungsstufe.C,
-        "D" => Fuehrungsstufe.D,
-        _ => null,
-    };
 }
