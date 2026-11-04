@@ -165,8 +165,10 @@ public class LeadershipViewModelTests
         Assert.Equal("Abschnitt", card.KindLabel);
         Assert.Equal("Abschnitt 1 Nord", card.Name);
         Assert.Equal("Brandbekämpfung Wohnhaus", card.Auftrag);
+
+        // One TMO Funkgruppe in common is enough: the second one carries no mark (#887).
         Assert.Equal(
-            [new FunkgruppeLine("FW_EMMERING 1000", true), new FunkgruppeLine("FW_EMMERING 1100", false)], card.TmoLines);
+            [new FunkgruppeLine("FW_EMMERING 1000", true), new FunkgruppeLine("FW_EMMERING 1100", null)], card.TmoLines);
         Assert.Equal([new FunkgruppeLine("301_F", false)], card.DmoLines);
         Assert.Equal("Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung", card.FunkHint);
         Assert.Equal("Hauptstraße 12", card.Standort);

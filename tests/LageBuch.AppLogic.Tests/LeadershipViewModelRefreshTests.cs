@@ -311,6 +311,22 @@ public class LeadershipViewModelRefreshTests
     }
 
     [Fact]
+    public void A_card_with_two_tmo_funkgruppen_one_shared_shows_no_warning()
+    {
+        // #887: one Funkgruppe in common with the level above is enough.
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], null));
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        session.UpdateCommandNode(nord, "Nord", null, null, null, null, null, new Funkgruppen(["FW 1000", "FW 2000"], null));
+        using var vm = NewVm(session);
+        var card = vm.Sections[0];
+
+        Assert.Null(card.FunkHint);
+        Assert.Equal([new FunkgruppeLine("FW 1000", true), new FunkgruppeLine("FW 2000", null)], card.TmoLines);
+        Assert.DoesNotContain(card.TmoLines, l => l.IsMarkedNotShared);
+    }
+
+    [Fact]
     public void The_funk_hint_names_each_kind_without_a_shared_funkgruppe()
     {
         var shared = new FunkKindCheck(true, ["FW 1000"]);
