@@ -152,6 +152,15 @@ public class LagekarteViewModelTests
 
         Assert.Equal("Einsatzort", Assert.Single(vm.Markers).AutomationName);
         Assert.Empty(vm.Signs);
+        Assert.Equal(Marktplatz, vm.EinsatzortPosition);
+    }
+
+    [Fact]
+    public void Without_an_Einsatzort_there_is_no_pin_head_to_keep_clear_of()
+    {
+        var (_, vm, _) = Open();
+
+        Assert.Null(vm.EinsatzortPosition);
     }
 
     [Fact]

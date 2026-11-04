@@ -22,7 +22,7 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
     /// <summary>The KRÄFTE tab.</summary>
     public const int ForcesTab = 2;
 
-    /// <summary>The KARTE tab.</summary>
+    /// <summary>The LAGEKARTE tab.</summary>
     public const int MapTab = 3;
 
     public LeadershipTabsViewModel(LeadershipViewModel board, RolesViewModel roles, ForcesViewModel forces, LagekarteViewModel map, int selectedTabIndex = OrganisationTab)
@@ -55,7 +55,7 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
     private bool _isNarrow;
 
     // A Kartenpaket downloaded under Stammdaten while this Einsatz is open shows up the next time
-    // KARTE is opened, not only after the Einsatz is reopened.
+    // LAGEKARTE is opened, not only after the Einsatz is reopened.
     partial void OnSelectedTabIndexChanged(int value)
     {
         if (value == MapTab)

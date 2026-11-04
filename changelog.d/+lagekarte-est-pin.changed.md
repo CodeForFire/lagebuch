@@ -1,0 +1,1 @@
+The Führung tab KARTE is now called LAGEKARTE, and the Einsatzstelle is marked by a pin with "ESt" in its head and its tip on the spot instead of a round "E", with taktische Zeichen placed clear of it (#885).

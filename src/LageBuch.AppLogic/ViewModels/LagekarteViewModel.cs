@@ -10,7 +10,7 @@ using LageBuch.Sync;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// The KARTE tab in Führung: the Einsatzort and the units on an offline map. Placing works by
+/// The LAGEKARTE tab in Führung: the Einsatzort and the units on an offline map. Placing works by
 /// picking what to place and then tapping the map, the same on a desk and on a tablet; a marker
 /// already on the map is dragged to move it. Positions live in the incident, so they sync and
 /// survive another device's Kartenpaket -- the packs are only the backdrop, and every pack on
@@ -74,6 +74,10 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>Where every pin stands, the Einsatzort's included: what a sign placed by the map keeps clear of.</summary>
     [ObservableProperty]
     private IReadOnlyList<GeoPoint> _pinPositions = [];
+
+    /// <summary>The Einsatzort, if marked: its ESt pin stands above the spot, and signs keep clear of its head too (#885).</summary>
+    [ObservableProperty]
+    private GeoPoint? _einsatzortPosition;
 
     /// <summary>
     /// The taktische Zeichen of the placed units: the same markers as their pins, drawn beneath
@@ -359,7 +363,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             return;
         }
 
-        // A pack downloaded since the KARTE tab was last open counts too.
+        // A pack downloaded since the LAGEKARTE tab was last open counts too.
         ReloadPacks();
         var incident = _session.Incident;
         AddressQuery = RecordedAddress(incident);
@@ -477,6 +481,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
 
         PinPositions = Markers.Select(m => m.Position).ToList();
+        EinsatzortPosition = incident.Location;
 
         // A unit that left the Einsatz while it was picked cannot be placed any more.
         if (Placing is { UnitId: { } picked } && units.All(u => u.Id != picked))

@@ -21,6 +21,31 @@ public class SignPlacementTests
         Assert.False(box.Intersects(SignPlacement.PinBox(Pin)));
     }
 
+    // #885: the ESt pin's head stands above the Einsatzstelle, its tip on it.
+    [Fact]
+    public void The_Einsatzort_pin_box_stands_above_the_spot_centred_on_it()
+    {
+        var box = SignPlacement.EinsatzortPinBox(Pin);
+
+        Assert.Equal(new Rect(480, 352, 40, 48), box);
+    }
+
+    [Fact]
+    public void A_sign_left_only_the_place_above_keeps_clear_of_the_Einsatzort_pin_s_head()
+    {
+        // Right, left and below are taken, so straight above is the first place left, and it
+        // covers the head of the ESt pin unless that head is kept clear.
+        Rect[] crowd = [SignPlacement.PinBox(Pin), new Rect(Pin.X + 30, 0, 1000, 1000), new Rect(0, 0, Pin.X - 30, 1000), new Rect(0, Pin.Y + 5, 2000, 1000)];
+        var head = SignPlacement.EinsatzortPinBox(Pin);
+        var blind = SignPlacement.Box(Pin, SignPlacement.Choose(Pin, SignSize, Anchor, crowd, []), SignSize, Anchor);
+        Assert.True(blind.Intersects(head), $"{blind} would not reach the ESt pin anyway");
+
+        var box = SignPlacement.Box(Pin, SignPlacement.Choose(Pin, SignSize, Anchor, [.. crowd, head], []), SignSize, Anchor);
+
+        Assert.False(box.Intersects(head), $"{box} covers the ESt pin");
+        Assert.True(box.Bottom < head.Top, $"{box} is not above the ESt pin");
+    }
+
     [Fact]
     public void A_sign_on_the_left_keeps_its_whole_width_clear_of_its_pin()
     {
