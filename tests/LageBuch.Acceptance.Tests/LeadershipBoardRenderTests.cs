@@ -366,13 +366,15 @@ public class LeadershipBoardRenderTests
         Capture(board.Window, "fuehrung-funkgruppe-second-tmo.png");
         var west = Card(board.View, "Abschnitt 3 West");
 
-        var marks = west.GetVisualDescendants().OfType<PathIcon>()
-            .Where(p => p.IsEffectivelyVisible && AutomationProperties.GetName(p) is { Length: > 0 })
-            .Select(AutomationProperties.GetName)
+        // Each TMO line with the mark it shows, so a mark on the wrong line cannot pass.
+        var tmo = west.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "NodeTmo")
+            .GetVisualDescendants().OfType<Grid>()
+            .Select(line => (
+                Text: line.GetVisualChildren().OfType<SelectableTextBlock>().Single().Text,
+                Mark: line.GetVisualChildren().OfType<PathIcon>().Where(p => p.IsEffectivelyVisible).Select(AutomationProperties.GetName).SingleOrDefault()))
             .ToList();
 
-        Assert.Equal(["gemeinsame Funkgruppe", "gemeinsame Funkgruppe"], marks);
-        Assert.Equal(["FW_EMMERING 1000", "FW_WEST 1010"], Lines(west, "NodeTmo"));
+        Assert.Equal<(string?, string?)>([("FW_EMMERING 1000", "gemeinsame Funkgruppe"), ("FW_WEST 1010", null)], tmo);
         Assert.DoesNotContain(
             west.GetVisualDescendants().OfType<TextBlock>(), t => t.Name == "NodeFunkHint" && t.IsEffectivelyVisible);
     }
