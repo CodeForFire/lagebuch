@@ -66,6 +66,53 @@ public class LeadershipBoardCommandTests
         Assert.Null(vm.ActionError);
     }
 
+    // #888: a Fahrzeug dropped on the Einsatzleitung becomes its Führungsfahrzeug, as the dialog
+    // (#829) makes it: only the post changes, the unit keeps its place and status.
+    [Fact]
+    public void A_unit_assigned_to_the_einsatzleitung_becomes_its_fuehrungsfahrzeug_and_stays_where_it_is()
+    {
+        var session = NewSession();
+        var funk = new Funkgruppen(["FW 1000"], ["307_F"]);
+        session.UpdateLeadershipPost("Feuerwehrhaus", "Florian Emmering 1", "08141 40123", funk, "Florian Emmering 12/1");
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
+        var unit = AddUnit(session, "FF Emmering", "Florian Emmering 11/1", nord);
+        session.UpdateForceUnit(unit, "Im Einsatz", null);
+        using var vm = NewVm(session);
+
+        Assert.True(vm.CanAssignFuehrungsfahrzeug(unit));
+        Assert.True(vm.AssignFuehrungsfahrzeug(unit));
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal("Florian Emmering 11/1", post.Fuehrungsfahrzeug);
+        Assert.Equal(("Feuerwehrhaus", "Florian Emmering 1", "08141 40123"), (post.Standort, post.Rufname, post.Telefon));
+        Assert.Equal(funk, post.Funkgruppen);
+        var placed = session.Incident.Forces.Single();
+        Assert.Equal(nord, placed.NodeId);
+        Assert.Equal("Im Einsatz", placed.Status);
+        Assert.Equal("Florian Emmering 11/1", vm.El.Fuehrungsfahrzeug);
+        Assert.False(vm.CanAssignFuehrungsfahrzeug(unit)); // already it
+    }
+
+    [Fact]
+    public void A_unit_without_a_funkrufname_an_unknown_unit_or_a_read_only_einsatz_assigns_no_fuehrungsfahrzeug()
+    {
+        var session = NewSession();
+        var nameless = AddUnit(session, "FF Aich", null);
+        using var vm = NewVm(session);
+
+        Assert.False(vm.CanAssignFuehrungsfahrzeug(nameless));
+        Assert.False(vm.CanAssignFuehrungsfahrzeug(Guid.NewGuid()));
+        Assert.False(vm.AssignFuehrungsfahrzeug(nameless));
+        Assert.Null(session.Incident.LeadershipPost.Fuehrungsfahrzeug);
+
+        Guid unit = default;
+        var readOnly = ReadOnlySession(s => unit = AddUnit(s, "FF Emmering", "Florian Emmering 11/1"));
+        using var readOnlyVm = NewVm(readOnly);
+        Assert.False(readOnlyVm.CanAssignFuehrungsfahrzeug(unit));
+        Assert.False(readOnlyVm.AssignFuehrungsfahrzeug(unit));
+        Assert.Null(readOnlyVm.ActionError);
+    }
+
     [Fact]
     public void An_unknown_unit_cannot_be_moved()
     {

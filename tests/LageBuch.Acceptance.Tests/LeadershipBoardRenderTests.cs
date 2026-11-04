@@ -740,6 +740,59 @@ public class LeadershipBoardRenderTests
         Assert.Contains(board.Vm.UnplacedUnits, u => u.Id == unit);
     }
 
+    // #888: a Fahrzeug from the Nicht-zugeordnet strip dropped on the Einsatzleitung becomes its
+    // Führungsfahrzeug, as the dialog makes it, and stays where it was.
+    [AvaloniaFact]
+    public void Dropping_a_unit_on_the_einsatzleitung_makes_it_the_fuehrungsfahrzeug()
+    {
+        var board = Show();
+        var session = board.Session!;
+        var unit = UnitId(board, "Florian Emmering 11/2");
+        var el = board.View.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ElCard");
+        var target = Named<TextBlock>(board.View, "ElFahrzeug");
+        using var transfer = Dragging(unit);
+        board.Vm.BeginDrag(unit);
+        Dispatcher.UIThread.RunJobs();
+
+        var over = Over(transfer, target);
+        Capture(board.Window, "fuehrung-el-drag.png");
+
+        Assert.Equal(DragDropEffects.Move, over.DragEffects);
+        Assert.Contains("drop-target", el.Classes);
+
+        Drop(transfer, target);
+        board.Vm.EndDrag();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Florian Emmering 11/2", session.Incident.LeadershipPost.Fuehrungsfahrzeug);
+        Assert.Equal("Florian Emmering 11/2", Named<TextBlock>(board.View, "ElFahrzeug").Text);
+        Assert.Null(NodeOfUnit(session, unit));
+        Assert.Contains(board.Vm.UnplacedUnits, u => u.Id == unit);
+        Assert.DoesNotContain("drop-target", el.Classes);
+        Capture(board.Window, "fuehrung-el-dropped.png");
+    }
+
+    [AvaloniaFact]
+    public void The_einsatzleitung_refuses_its_own_fuehrungsfahrzeug_and_a_dragged_card()
+    {
+        var board = Show();
+        var session = board.Session!;
+        session.AddForceUnit("FF Emmering", 3, "Florian Emmering 12/1", scbaCount: 0, officerCount: 1);
+        Dispatcher.UIThread.RunJobs();
+        var el = board.View.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ElCard");
+        var target = Named<TextBlock>(board.View, "ElFahrzeug");
+
+        using var same = Dragging(UnitId(board, "Florian Emmering 12/1"));
+        Assert.Equal(DragDropEffects.None, Over(same, target).DragEffects);
+        Assert.DoesNotContain("drop-target", el.Classes);
+
+        using var card = DraggingNode(NodeId(session, "Abschnitt 2 Süd"));
+        Assert.Equal(DragDropEffects.None, Over(card, target).DragEffects);
+        Drop(card, target);
+        Assert.DoesNotContain("drop-target", el.Classes);
+        Assert.Equal("Florian Emmering 12/1", session.Incident.LeadershipPost.Fuehrungsfahrzeug);
+    }
+
     [AvaloniaFact]
     public void A_partner_card_refuses_a_unit_and_nothing_moves()
     {

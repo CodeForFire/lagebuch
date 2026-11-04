@@ -29,7 +29,8 @@ public partial class LeadershipView : UserControl
         _autoScroll = new DragAutoScroll(BoardScroll, ChartScroll);
 
         // Drag and drop of units between the cards. DragDrop's events are routed events, not bindable
-        // commands, so they are forwarded from here; CanMoveUnit and MoveUnit decide.
+        // commands, so they are forwarded from here; CanMoveUnit and MoveUnit decide, and on the
+        // Einsatzleitung CanAssignFuehrungsfahrzeug and AssignFuehrungsfahrzeug.
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
         BoardRoot.AddHandler(DragDrop.DragOverEvent, OnDragOver);
         BoardRoot.AddHandler(DragDrop.DragLeaveEvent, (_, _) => EndDragFeedback());
@@ -141,12 +142,23 @@ public partial class LeadershipView : UserControl
         return false;
     }
 
+    // The Einsatzleitung's card under the pointer: a unit dropped there becomes its Führungsfahrzeug
+    // (#888) rather than moving anywhere. It is no node, so TryTargetUnder never finds it.
+    private static Border? EinsatzleitungUnder(DragEventArgs e) =>
+        ((e.Source as Control)?.GetSelfAndVisualAncestors() ?? []).OfType<Border>()
+            .FirstOrDefault(b => b.Name == "ElCard" && b.DataContext is ElCard);
+
     private void OnDragOver(object? sender, DragEventArgs e)
     {
         // Before the target check: the way to a valid target leads over ones that refuse the drop.
         _autoScroll.Update(e);
         Border? highlight = null;
-        if (DraggedId(e) is { } dragged
+        if (DraggedId(e) is { } toEl
+            && EinsatzleitungUnder(e) is { } el)
+        {
+            highlight = ViewModel?.CanAssignFuehrungsfahrzeug(toEl) == true ? el : null;
+        }
+        else if (DraggedId(e) is { } dragged
             && TryTargetUnder(e, out var target, out var nodeId)
             && ViewModel?.CanMoveUnit(dragged, nodeId) == true)
         {
@@ -167,7 +179,11 @@ public partial class LeadershipView : UserControl
     private void OnDrop(object? sender, DragEventArgs e)
     {
         EndDragFeedback();
-        if (DraggedId(e) is { } dragged && TryTargetUnder(e, out _, out var nodeId))
+        if (DraggedId(e) is { } toEl && EinsatzleitungUnder(e) is not null)
+        {
+            ViewModel?.AssignFuehrungsfahrzeug(toEl);
+        }
+        else if (DraggedId(e) is { } dragged && TryTargetUnder(e, out _, out var nodeId))
         {
             ViewModel?.MoveUnit(dragged, nodeId);
         }
