@@ -367,8 +367,8 @@ public class LeadershipBoardRenderTests
         Assert.Equal("ILS", badge.GetVisualDescendants().OfType<TextBlock>().Single().Text);
         Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(view, "ElLeiterText").Text);
         Assert.Equal("Lukas Brandl", Named<TextBlock>(view, "ElMelderText").Text);
-        Assert.Equal("FW_EMMERING 1000", Named<TextBlock>(view, "ElTmo").Text);
-        Assert.Equal("307_F", Named<TextBlock>(view, "ElDmo").Text);
+        Assert.Equal(["FW_EMMERING 1000"], Lines(view, "ElTmo"));
+        Assert.Equal(["307_F"], Lines(view, "ElDmo"));
         Assert.Equal("Florian Emmering 12/1", Named<TextBlock>(view, "ElFahrzeug").Text);
         Assert.Equal(
             ["Florian Aich 10/1"],
@@ -1196,6 +1196,47 @@ public class LeadershipBoardRenderTests
         Drop(transfer, strip);
 
         Assert.Null(session.Incident.FindCommandNode(nord)!.ParentId);
+    }
+
+    // The Funkgruppen chips on the board, lit or not.
+    private static List<Border> FunkChips(Visual root) =>
+        root.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("funk-chip") && b.IsEffectivelyVisible).ToList();
+
+    // "FW_EMMERING 1000" is the TMO of the Einsatzleitung, Abschnitt 1 Nord and Abschnitt 2 Süd: the
+    // pointer on the Einsatzleitung's lights all three and no DMO, and leaving turns them off again.
+    [AvaloniaFact]
+    public void Hovering_a_funkgruppe_lights_up_every_card_that_has_it()
+    {
+        var board = Show();
+        Capture(board.Window, "funkgruppe-before.png");
+        var elTmo = FunkChips(Named<ItemsControl>(board.View, "ElTmo")).Single();
+
+        var centre = elTmo.TranslatePoint(new Point(elTmo.Bounds.Width / 2, elTmo.Bounds.Height / 2), board.Window)!.Value;
+        board.Window.MouseMove(centre);
+        Dispatcher.UIThread.RunJobs();
+
+        // The fade runs on the wall clock, not on render ticks: let it finish before the screenshot,
+        // as ContactsTabRenderTests does. Screenshot path only, so no assertion waits on it.
+        if (Environment.GetEnvironmentVariable("RENDER_OUT") is not null)
+        {
+            var settle = System.Diagnostics.Stopwatch.StartNew();
+            while (settle.ElapsedMilliseconds < 550)
+            {
+                AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+                Dispatcher.UIThread.RunJobs();
+            }
+        }
+
+        Capture(board.Window, "funkgruppe-after.png");
+
+        var lit = FunkChips(board.View).Where(b => b.Classes.Contains("linked")).ToList();
+        Assert.Equal(3, lit.Count);
+        Assert.All(lit, b => Assert.Equal("FW_EMMERING 1000", ((FunkgruppeLine)b.DataContext!).Text));
+        Assert.Contains(elTmo, lit);
+
+        board.Window.MouseMove(new Point(2, 2));
+        Dispatcher.UIThread.RunJobs();
+        Assert.DoesNotContain(FunkChips(board.View), b => b.Classes.Contains("linked"));
     }
 
     private static void Capture(Window window, string name)

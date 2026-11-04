@@ -213,6 +213,17 @@ public partial class LeadershipView : UserControl
         _dropTarget?.Classes.Set("drop-target", true);
     }
 
+    // A Funkgruppe under the pointer: which lines light up with it is the view model's.
+    private void OnFunkgruppePointerEntered(object? sender, PointerEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is FunkgruppeLine line)
+        {
+            ViewModel?.HighlightFunkgruppe(line);
+        }
+    }
+
+    private void OnFunkgruppePointerExited(object? sender, PointerEventArgs e) => ViewModel?.ClearFunkgruppeHighlight();
+
     // A Button inside a Flyout does not dismiss it; the command itself runs from the Button. The
     // Stufe button lives in the El card's template, so it is looked up rather than named here.
     // Closed only once the click is over: Button runs its command after raising Click, and the

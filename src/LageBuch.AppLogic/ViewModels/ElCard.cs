@@ -94,6 +94,12 @@ public sealed partial class ElCard : ObservableObject
 
     public ObservableCollection<BoardPersonRow> Assistants { get; } = [];
 
+    /// <summary>The TMO Funkgruppen one per line, unmarked: the Einsatzleitung is the level the others are checked against.</summary>
+    public IReadOnlyList<FunkgruppeLine> TmoLines { get; private set; } = [];
+
+    /// <summary>The DMO Funkgruppen one per line, as <see cref="TmoLines"/>.</summary>
+    public IReadOnlyList<FunkgruppeLine> DmoLines { get; private set; } = [];
+
     /// <summary>
     /// Further Leiter and Melder at the Einsatzleitung beyond the posts (an EAL typed on FUNKTIONEN
     /// without an Abschnitt): shown under "Weitere", so nobody the Bericht prints is missing here.
@@ -119,6 +125,18 @@ public sealed partial class ElCard : ObservableObject
         Telefon = post.Telefon;
         Tmo = Lines(post.Funkgruppen.Tmo);
         Dmo = Lines(post.Funkgruppen.Dmo);
+        if (FunkgruppeLine.Changed(TmoLines, FunkgruppeLine.Of(post.Funkgruppen.Tmo, null)) is { } tmo)
+        {
+            TmoLines = tmo;
+            OnPropertyChanged(nameof(TmoLines));
+        }
+
+        if (FunkgruppeLine.Changed(DmoLines, FunkgruppeLine.Of(post.Funkgruppen.Dmo, null)) is { } dmo)
+        {
+            DmoLines = dmo;
+            OnPropertyChanged(nameof(DmoLines));
+        }
+
         Leiter = BoardPersonRow.Follow(Leiter, entry.Leiter);
         Melder = BoardPersonRow.Follow(Melder, entry.Melder);
         BoardPersonRow.Reconcile(Assistants, entry.Others, _onAssistant);

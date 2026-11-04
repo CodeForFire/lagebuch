@@ -24,6 +24,21 @@ public sealed record FunkgruppeLine(string Text, bool? IsShared)
         : IsMarkedNotShared ? "keine gemeinsame Funkgruppe"
         : string.Empty;
 
+    /// <summary>
+    /// Lit while the pointer rests on the same Funkgruppe on another card. Not part of the line's
+    /// value: a refresh that brings the same lines keeps the shown ones, highlight and all (#294).
+    /// </summary>
+    public HighlightMark Highlight { get; } = new();
+
+    public bool Equals(FunkgruppeLine? other) =>
+        other is not null && string.Equals(Text, other.Text, StringComparison.Ordinal) && IsShared == other.IsShared;
+
+    public override int GetHashCode() => HashCode.Combine(Text, IsShared);
+
+    /// <summary>The new lines when they differ from <paramref name="shown"/>, else null, so an unchanged list is not rebuilt.</summary>
+    internal static FunkgruppeLine[]? Changed(IReadOnlyList<FunkgruppeLine> shown, FunkgruppeLine[] lines) =>
+        shown.SequenceEqual(lines) ? null : lines;
+
     /// <summary>The lines for <paramref name="groups"/>, each marked by <paramref name="check"/> (unmarked when null).</summary>
     internal static FunkgruppeLine[] Of(IReadOnlyList<string> groups, FunkKindCheck? check) =>
         [.. groups.Select(g => new FunkgruppeLine(g, check?.IsShared(g)))];

@@ -249,14 +249,14 @@ public sealed partial class BoardNodeCard : ObservableObject
         ParentId = node.ParentId;
         Name = node.Name;
         Auftrag = node.Auftrag;
-        if (ChangedLines(TmoLines, FunkgruppeLine.Of(node.Funkgruppen.Tmo, funkCheck?.Tmo)) is { } tmo)
+        if (FunkgruppeLine.Changed(TmoLines, FunkgruppeLine.Of(node.Funkgruppen.Tmo, funkCheck?.Tmo)) is { } tmo)
         {
             TmoLines = tmo;
             OnPropertyChanged(nameof(TmoLines));
             OnPropertyChanged(nameof(HasTmo));
         }
 
-        if (ChangedLines(DmoLines, FunkgruppeLine.Of(node.Funkgruppen.Dmo, funkCheck?.Dmo)) is { } dmo)
+        if (FunkgruppeLine.Changed(DmoLines, FunkgruppeLine.Of(node.Funkgruppen.Dmo, funkCheck?.Dmo)) is { } dmo)
         {
             DmoLines = dmo;
             OnPropertyChanged(nameof(DmoLines));
@@ -280,9 +280,4 @@ public sealed partial class BoardNodeCard : ObservableObject
         SetMelderCommand.NotifyCanExecuteChanged();
         AddMemberCommand.NotifyCanExecuteChanged();
     }
-
-    // The new lines when they differ from what the card shows, else null: a refresh that changed
-    // nothing raises nothing, so the list is not rebuilt under the Lagebuchführer's eyes (#294).
-    private static FunkgruppeLine[]? ChangedLines(IReadOnlyList<FunkgruppeLine> shown, FunkgruppeLine[] lines) =>
-        shown.SequenceEqual(lines) ? null : lines;
 }

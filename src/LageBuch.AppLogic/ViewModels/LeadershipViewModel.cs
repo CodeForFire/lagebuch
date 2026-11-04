@@ -36,6 +36,9 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     // The incident as the last refresh showed it: the move guard judges against what the board offers.
     private Incident _incident;
 
+    // The Funkgruppe under the pointer, by kind and text; null while none is.
+    private (TalkGroupKind Kind, string Text)? _highlightedFunkgruppe;
+
     // The unplaced units whose status says Bereitstellungsraum, as the last refresh found them. They
     // stay unplaced; the board only shows them in every Bereitstellungsraum card (#825).
     private IReadOnlyList<ForceUnit> _waiting = [];
@@ -225,6 +228,9 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         RowReconciler.Reconcile(TopRow, top, r => r, i => i, i => i, (_, _) => { });
         HasUnplacedUnits = UnplacedUnits.Count > 0;
         HasFreeTextSections = FreeTextSections.Count > 0;
+
+        // A card a refresh added mid-hover (a peer formed an Abschnitt) takes the highlight too.
+        ApplyFunkgruppeHighlight();
     }
 
     // The reporting-line rows that stand for a command node, paired with it so no caller has to
@@ -428,6 +434,61 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     }
 
     public void EndNodeDrag() => DraggingNodeId = null;
+
+    /// <summary>
+    /// Lights up every line on the board with the same Funkgruppe as <paramref name="line"/>: same
+    /// kind, same text, compared as <see cref="FunkCheck"/> does. Only when it is shown at least
+    /// twice, since one that appears once has nowhere else to point to. A line no card shows turns
+    /// the highlight off.
+    /// </summary>
+    public void HighlightFunkgruppe(FunkgruppeLine line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        _highlightedFunkgruppe = null;
+        foreach (var (kind, shown) in AllFunkgruppeLines())
+        {
+            if (ReferenceEquals(shown, line))
+            {
+                _highlightedFunkgruppe = (kind, line.Text);
+                break;
+            }
+        }
+
+        ApplyFunkgruppeHighlight();
+    }
+
+    /// <summary>Turns the highlight off, as the pointer leaves a Funkgruppe.</summary>
+    public void ClearFunkgruppeHighlight()
+    {
+        _highlightedFunkgruppe = null;
+        ApplyFunkgruppeHighlight();
+    }
+
+    private void ApplyFunkgruppeHighlight()
+    {
+        var lines = AllFunkgruppeLines().ToList();
+        var key = _highlightedFunkgruppe;
+        bool Matches((TalkGroupKind Kind, FunkgruppeLine Line) l) =>
+            key is { } k && l.Kind == k.Kind && string.Equals(l.Line.Text, k.Text, StringComparison.Ordinal);
+
+        var lit = lines.Count(Matches) >= 2;
+        foreach (var l in lines)
+        {
+            l.Line.Highlight.IsHighlighted = lit && Matches(l);
+        }
+    }
+
+    // Every Funkgruppe line on the board with its kind: the Einsatzleitung's, then every card's,
+    // Partners and Unterabschnitte included.
+    private IEnumerable<(TalkGroupKind Kind, FunkgruppeLine Line)> AllFunkgruppeLines() =>
+        Tagged(El.TmoLines, El.DmoLines).Concat(Sections.Concat(Partners).SelectMany(CardLines));
+
+    private static IEnumerable<(TalkGroupKind Kind, FunkgruppeLine Line)> CardLines(BoardNodeCard card) =>
+        Tagged(card.TmoLines, card.DmoLines).Concat(card.Children.SelectMany(CardLines));
+
+    private static IEnumerable<(TalkGroupKind Kind, FunkgruppeLine Line)> Tagged(
+        IEnumerable<FunkgruppeLine> tmo, IEnumerable<FunkgruppeLine> dmo) =>
+        tmo.Select(l => (TalkGroupKind.Tmo, l)).Concat(dmo.Select(l => (TalkGroupKind.Dmo, l)));
 
     private bool CanAdd => !IsReadOnly;
 

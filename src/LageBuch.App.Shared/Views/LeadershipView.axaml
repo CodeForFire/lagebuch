@@ -167,6 +167,48 @@
       <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
     </Style>
 
+    <!-- A Funkgruppe: with the pointer on it, every other card that has the same one lights up
+         violet (LinkBrush) and fades back out. At rest the chip is the same size in LinkFaded, its
+         padding given back by the margin, so lighting up moves nothing. Which lines light is the
+         view model's (LeadershipViewModel.HighlightFunkgruppe). -->
+    <Style Selector="Border.funk-chip">
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Background" Value="{StaticResource LinkFadedBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource LinkFadedBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="Padding" Value="3,1" />
+      <Setter Property="Margin" Value="-4,-2" />
+      <Setter Property="BoxShadow" Value="{StaticResource LinkGlowOff}" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.28" Easing="CubicEaseOut" />
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.28" Easing="CubicEaseOut" />
+          <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.45" Easing="CubicEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <!-- An ItemsControl clips to its bounds, which cut the chip's outset border and glow off. -->
+    <Style Selector="ItemsControl.funk-lines">
+      <Setter Property="ClipToBounds" Value="False" />
+    </Style>
+    <Style Selector="Border.funk-chip > SelectableTextBlock">
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Foreground" Duration="0:0:0.28" Easing="CubicEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.funk-chip.linked">
+      <Setter Property="Background" Value="{StaticResource LinkWashBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource LinkBrush}" />
+      <Setter Property="BoxShadow" Value="{StaticResource LinkGlow}" />
+    </Style>
+    <!-- After the not-shared amber: while lit, a line reads in the link colour like the others. -->
+    <Style Selector="Border.funk-chip.linked > SelectableTextBlock">
+      <Setter Property="Foreground" Value="{StaticResource LinkInkBrush}" />
+    </Style>
+
     <Style Selector="Button.board-action">
       <Setter Property="Height" Value="28" />
       <Setter Property="Padding" Value="10,0" />
@@ -298,6 +340,13 @@
     <!-- One Funkgruppe of a node, marked against the level above (#878): a check when that level
          has it too, an amber x when it does not, nothing while the kind is not checked. The mark
          takes the first column so a long group still wraps. -->
+    <DataTemplate x:Key="FunkgruppeChipTemplate" x:DataType="vm:FunkgruppeLine">
+      <Border Classes="funk-chip" Classes.linked="{Binding Highlight.IsHighlighted}"
+              PointerEntered="OnFunkgruppePointerEntered" PointerExited="OnFunkgruppePointerExited">
+        <SelectableTextBlock Classes="field-value" Classes.not-shared="{Binding IsMarkedNotShared}"
+                             Text="{Binding Text}" />
+      </Border>
+    </DataTemplate>
     <DataTemplate x:Key="FunkgruppeLineTemplate" x:DataType="vm:FunkgruppeLine">
       <Grid ColumnDefinitions="14,*" ColumnSpacing="4">
         <PathIcon Grid.Column="0" Width="11" Height="11" VerticalAlignment="Center"
@@ -308,8 +357,7 @@
                   Foreground="{StaticResource AmberBrush}" IsVisible="{Binding IsMarkedNotShared}"
                   AutomationProperties.Name="{Binding MarkName}"
                   Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-        <SelectableTextBlock Grid.Column="1" Classes="field-value" Classes.not-shared="{Binding IsMarkedNotShared}"
-                             Text="{Binding Text}" />
+        <ContentControl Grid.Column="1" ClipToBounds="False" Content="{Binding}" ContentTemplate="{StaticResource FunkgruppeChipTemplate}" />
       </Grid>
     </DataTemplate>
     <DataTemplate x:Key="PersonRowTemplate" x:DataType="vm:BoardPersonRow">
@@ -408,9 +456,13 @@
             <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="field-value" Text="{Binding Telefon, TargetNullValue='—'}" />
             <!-- One Funkgruppe per line (#828): up to three of each kind. -->
             <TextBlock Grid.Row="4" Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
-            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="field-value" x:Name="ElTmo" Text="{Binding Tmo, TargetNullValue='—'}" />
+            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="field-value" Text="—" IsVisible="{Binding !TmoLines.Count}" />
+            <ItemsControl Grid.Row="4" Grid.Column="1" x:Name="ElTmo" Classes="funk-lines" ItemsSource="{Binding TmoLines}"
+                          ItemTemplate="{StaticResource FunkgruppeChipTemplate}" />
             <TextBlock Grid.Row="5" Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
-            <SelectableTextBlock Grid.Row="5" Grid.Column="1" Classes="field-value" x:Name="ElDmo" Text="{Binding Dmo, TargetNullValue='—'}" />
+            <SelectableTextBlock Grid.Row="5" Grid.Column="1" Classes="field-value" Text="—" IsVisible="{Binding !DmoLines.Count}" />
+            <ItemsControl Grid.Row="5" Grid.Column="1" x:Name="ElDmo" Classes="funk-lines" ItemsSource="{Binding DmoLines}"
+                          ItemTemplate="{StaticResource FunkgruppeChipTemplate}" />
           </Grid>
 
           <!-- The Führungsstufe: a flyout of commands, the NodeChoicePicker idiom, closed on select. -->
@@ -511,12 +563,12 @@
                not beside it: beside it the value column was too narrow for "FW_FFB (KW: 2062)". -->
           <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasTmo}">
             <TextBlock Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
-            <ItemsControl Grid.Column="1" x:Name="NodeTmo" ItemsSource="{Binding TmoLines}"
+            <ItemsControl Grid.Column="1" x:Name="NodeTmo" Classes="funk-lines" ItemsSource="{Binding TmoLines}"
                           ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
           </Grid>
           <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasDmo}">
             <TextBlock Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
-            <ItemsControl Grid.Column="1" x:Name="NodeDmo" ItemsSource="{Binding DmoLines}"
+            <ItemsControl Grid.Column="1" x:Name="NodeDmo" Classes="funk-lines" ItemsSource="{Binding DmoLines}"
                           ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
           </Grid>
           <TextBlock x:Name="NodeFunkHint" Classes="board-hint" Margin="0,3,0,0" Text="{Binding FunkHint}"

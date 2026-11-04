@@ -59,6 +59,13 @@
 
   <Color x:Key="ActiveColor">#37D17C</Color>
   <Color x:Key="IncomingColor">#52ABFF</Color>
+  <!-- The same Funkgruppe elsewhere on the Führung board, lit while the pointer rests on one.
+       Violet, the one hue no state has claimed: it must not read as alarm, hint, focus or active.
+       LinkFadedColor is its zero-alpha stop, so the fade never passes through grey. -->
+  <Color x:Key="LinkColor">#B794FF</Color>
+  <Color x:Key="LinkWashColor">#2B2148</Color>
+  <Color x:Key="LinkInkColor">#E4D8FF</Color>
+  <Color x:Key="LinkFadedColor">#00B794FF</Color>
 
   <!-- Brushes -->
 
@@ -87,6 +94,10 @@
   <SolidColorBrush x:Key="ActiveBrush" Color="{StaticResource ActiveColor}" />
   <SolidColorBrush x:Key="IncomingBrush" Color="{StaticResource IncomingColor}" />
   <SolidColorBrush x:Key="FocusBrush" Color="{StaticResource FocusColor}" />
+  <SolidColorBrush x:Key="LinkBrush" Color="{StaticResource LinkColor}" />
+  <SolidColorBrush x:Key="LinkWashBrush" Color="{StaticResource LinkWashColor}" />
+  <SolidColorBrush x:Key="LinkInkBrush" Color="{StaticResource LinkInkColor}" />
+  <SolidColorBrush x:Key="LinkFadedBrush" Color="{StaticResource LinkFadedColor}" />
 
   <!-- Fluent draws its focus adorner on every control that is :focus-visible (keyboard focus,
        never a click or a touch): a 2px ring on the control's edge with a 1px line inside it.
@@ -138,5 +149,8 @@
 
   <BoxShadows x:Key="PanelShadow">0 8 28 -8 #99000000</BoxShadows>
   <BoxShadows x:Key="OverlayShadow">0 24 60 -12 #CC000000</BoxShadows>
+  <!-- LinkGlowOff is LinkGlow at zero alpha, the shadow the glow fades from and back to. -->
+  <BoxShadows x:Key="LinkGlow">0 0 14 0 #73B794FF</BoxShadows>
+  <BoxShadows x:Key="LinkGlowOff">0 0 14 0 #00B794FF</BoxShadows>
 
 </ResourceDictionary>
