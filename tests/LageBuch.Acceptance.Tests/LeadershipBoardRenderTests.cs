@@ -333,6 +333,30 @@ public class LeadershipBoardRenderTests
         Assert.Equal(3, marks.Count(m => m == "keine gemeinsame Funkgruppe"));
     }
 
+    // A Funkgruppe with its Kurzwahl reads as one line on a card, not "FW_FFB (KW:" over "2062)":
+    // the rows used to share the card's width with AUFLÖSEN.
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_funkgruppe_with_its_kurzwahl_stays_on_one_line_on_a_card(bool narrow)
+    {
+        var board = Show(narrow: narrow, more: s => AddNode(
+            s,
+            CommandNodeKind.Abschnitt,
+            "Ost",
+            auftrag: "Brandbekämpfung Ostflanke",
+            funkgruppen: new Funkgruppen(["FW_FFB (KW: 2062)", "BR_DAH (KW: 2054)"], ["307_F* (KW: 307)", "310_F* (KW: 310)"])));
+
+        var lines = board.View.GetVisualDescendants().OfType<ItemsControl>()
+            .Where(i => i.Name is "NodeTmo" or "NodeDmo" && i.IsEffectivelyVisible)
+            .SelectMany(i => i.GetVisualDescendants().OfType<SelectableTextBlock>())
+            .Where(t => t.Text?.Contains("(KW:", StringComparison.Ordinal) == true)
+            .ToList();
+
+        Assert.Equal(4, lines.Count);
+        Assert.All(lines, t => Assert.True(t.TextLayout.TextLines.Count == 1, $"'{t.Text}' wraps over {t.TextLayout.TextLines.Count} lines"));
+    }
+
     [AvaloniaFact]
     public void The_board_draws_every_part_of_the_sheet()
     {

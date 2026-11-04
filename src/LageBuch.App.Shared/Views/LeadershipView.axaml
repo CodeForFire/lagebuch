@@ -491,6 +491,7 @@
             <PathIcon Width="9" Height="14" Foreground="{StaticResource TextSecondaryBrush}"
                       Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
           </Border>
+          <StackPanel Spacing="1">
           <!-- Auflösen sits apart from the other actions, at the card's head: it ends the node. -->
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <StackPanel Grid.Column="0" Spacing="1">
@@ -498,49 +499,51 @@
               <SelectableTextBlock Classes="card-name" x:Name="NodeCardName" Text="{Binding Name}" />
               <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap" Text="{Binding Auftrag}"
                          IsVisible="{Binding Auftrag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <!-- The node's Funkgruppen (#828, #878), one per line, each marked against the level
-                   above; the hint says which kind has none in common. -->
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasTmo}">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
-                <ItemsControl Grid.Column="1" x:Name="NodeTmo" ItemsSource="{Binding TmoLines}"
-                              ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
-              </Grid>
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasDmo}">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
-                <ItemsControl Grid.Column="1" x:Name="NodeDmo" ItemsSource="{Binding DmoLines}"
-                              ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
-              </Grid>
-              <TextBlock x:Name="NodeFunkHint" Classes="board-hint" Margin="0,3,0,0" Text="{Binding FunkHint}"
-                         IsVisible="{Binding FunkHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
-                    IsVisible="{Binding Rufname, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="RUFNAME" />
-                <SelectableTextBlock Grid.Column="1" Classes="field-value" Text="{Binding Rufname}" />
-              </Grid>
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
-                    IsVisible="{Binding Standort, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="STANDORT" />
-                <SelectableTextBlock Grid.Column="1" Classes="field-value" Text="{Binding Standort}" />
-              </Grid>
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
-                    IsVisible="{Binding Fuehrungsfahrzeug, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="FAHRZEUG" />
-                <SelectableTextBlock Grid.Column="1" Classes="field-value" x:Name="NodeFahrzeug" Text="{Binding Fuehrungsfahrzeug}" />
-              </Grid>
-              <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
-                    IsVisible="{Binding Telefon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Grid.Column="0" Classes="field-label" Text="TELEFON" />
-                <SelectableTextBlock Grid.Column="1" Classes="field-value" Text="{Binding Telefon}" />
-              </Grid>
             </StackPanel>
             <Button Grid.Column="1" Classes="board-action" Content="AUFLÖSEN" VerticalAlignment="Top"
                     Command="{Binding DissolveCommand}"
                     ToolTip.Tip="{Binding DissolveBlockedReason}" ToolTip.ShowOnDisabled="True" />
           </Grid>
+          <TextBlock x:Name="DissolveBlockedText" Classes="dissolve-reason" Margin="0,2,0,0" Text="{Binding DissolveBlockedReason}"
+                     Classes.blocked="{Binding DissolveBlockedReason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <!-- The node's Funkgruppen (#828, #878), one per line, each marked against the level
+               above; the hint says which kind has none in common. These rows sit below AUFLÖSEN,
+               not beside it: beside it the value column was too narrow for "FW_FFB (KW: 2062)". -->
+          <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasTmo}">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
+            <ItemsControl Grid.Column="1" x:Name="NodeTmo" ItemsSource="{Binding TmoLines}"
+                          ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
+          </Grid>
+          <Grid ColumnDefinitions="76,*" Margin="0,3,0,0" IsVisible="{Binding HasDmo}">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
+            <ItemsControl Grid.Column="1" x:Name="NodeDmo" ItemsSource="{Binding DmoLines}"
+                          ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
+          </Grid>
+          <TextBlock x:Name="NodeFunkHint" Classes="board-hint" Margin="0,3,0,0" Text="{Binding FunkHint}"
+                     IsVisible="{Binding FunkHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                IsVisible="{Binding Rufname, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="RUFNAME" />
+            <SelectableTextBlock Grid.Column="1" Classes="field-value" Text="{Binding Rufname}" />
+          </Grid>
+          <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                IsVisible="{Binding Standort, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="STANDORT" />
+            <SelectableTextBlock Grid.Column="1" Classes="field-value" Text="{Binding Standort}" />
+          </Grid>
+          <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                IsVisible="{Binding Fuehrungsfahrzeug, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="FAHRZEUG" />
+            <SelectableTextBlock Grid.Column="1" Classes="field-value" x:Name="NodeFahrzeug" Text="{Binding Fuehrungsfahrzeug}" />
+          </Grid>
+          <Grid ColumnDefinitions="76,*" Margin="0,3,0,0"
+                IsVisible="{Binding Telefon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Grid.Column="0" Classes="field-label" Text="TELEFON" />
+            <SelectableTextBlock Grid.Column="1" Classes="field-value" Text="{Binding Telefon}" />
+          </Grid>
+          </StackPanel>
           </DockPanel>
           </Border>
-          <TextBlock x:Name="DissolveBlockedText" Classes="dissolve-reason" Text="{Binding DissolveBlockedReason}"
-                     Classes.blocked="{Binding DissolveBlockedReason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
 
           <Grid ColumnDefinitions="76,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6">
