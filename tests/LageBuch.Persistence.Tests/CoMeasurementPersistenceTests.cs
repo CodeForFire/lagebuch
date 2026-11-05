@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Time;
@@ -296,6 +297,48 @@ public class CoMeasurementPersistenceTests : IDisposable
         Assert.Equal(40m, dwelling.ValueOf(IncidentGas.LegacyCoId));
         Assert.Equal(new decimal?[] { 120, 40 }, dwelling.Readings.Select(r => r.Value));
         Assert.All(dwelling.Readings, r => Assert.Equal(IncidentGas.LegacyCoId, r.GasId));
+    }
+
+    // A parallel branch's build can leave a pre-#410 file without the legacy columns V42 backfills
+    // from. The step must not fail on them -- SchemaGuard repairs columns only after migrating --
+    // and the Messreihe keeps its rows on the CO gas, without the values the file no longer holds.
+    [Fact]
+    public void A_file_from_before_the_gas_list_without_its_legacy_value_columns_still_opens()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 120);
+        IncidentRepository.Save(_path, incident);
+        RollBackToV35(incident.Gases[0].Id);
+        DropColumns(("co_dwellings", "co_value"), ("co_readings", "value"));
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(IncidentGas.LegacyCo, Assert.Single(loaded.Gases));
+        var dwelling = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Null(dwelling.ValueOf(IncidentGas.LegacyCoId));
+        var reading = Assert.Single(dwelling.Readings);
+        Assert.Equal(IncidentGas.LegacyCoId, reading.GasId);
+        Assert.Null(reading.Value);
+    }
+
+    [SuppressMessage("Security", "CA2100", Justification = "Test-only: table and column are this test's own constants.")]
+    private void DropColumns(params (string Table, string Column)[] columns)
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            foreach (var (table, column) in columns)
+            {
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = $"ALTER TABLE {table} DROP COLUMN {column};";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        SqliteConnection.ClearAllPools();
     }
 
     // The V35 shape: no gas table, the integer co_value and reading value, no gas ids.

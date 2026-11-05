@@ -7,7 +7,7 @@ namespace LageBuch.AppLogic.Tests;
 
 // #410: the Gasmessung with several gases -- the tile shows the worst one, the sidebar one input
 // per gas, FERTIG one ETB entry for all of them.
-public class GasmessungViewModelTests
+public sealed class GasmessungViewModelTests
 {
     private static readonly FixedClock Clock = new(new DateTimeOffset(2026, 10, 27, 8, 14, 0, TimeSpan.Zero));
 
@@ -38,7 +38,8 @@ public class GasmessungViewModelTests
     private static DwellingEditorViewModel OpenEditor(CoMessprotokollViewModel vm, int floor, int apartment)
     {
         Cell(vm, floor, apartment).OpenEditorCommand.Execute(null);
-        return vm.Editor!;
+        Assert.NotNull(vm.Editor);
+        return vm.Editor;
     }
 
     [Fact]

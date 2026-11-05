@@ -2680,8 +2680,6 @@ public sealed class Incident
             $"CO-Struktur geändert: {building.Name}, {CoMeasurementLabels.FloorLabel(floorOrdinal)} jetzt {survivors.Count} Wohnungen, entfernt: {string.Join(", ", removedLabels)}");
     }
 
-    /// <summary>What a Wohnung was carrying, for the ETB line that records its removal (#419) --
-    /// the point being that the log says what was lost, not just how many.</summary>
     // A file or snapshot hands its gas list over as stored, so it is sanitised and capped like any
     // other outside input. A file with Häuser but no gases is one whose gas table went missing:
     // its readings carry the legacy CO id, so that gas is what it gets back.
@@ -2709,6 +2707,8 @@ public sealed class Incident
         return result;
     }
 
+    /// <summary>What a Wohnung was carrying, for the ETB line that records its removal (#419) --
+    /// the point being that the log says what was lost, not just how many.</summary>
     private static string DwellingContentSuffix(Dwelling dwelling, List<IncidentGas> gases)
     {
         var carried = new List<string>();

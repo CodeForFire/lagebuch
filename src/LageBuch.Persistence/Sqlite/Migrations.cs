@@ -1282,19 +1282,27 @@ public static class Migrations
             """;
         const string legacyValues = "UPDATE co_dwellings SET gas_values = json_object($id, CAST(co_value AS TEXT)) WHERE co_value IS NOT NULL;";
         const string legacyReadings = "UPDATE co_readings SET gas_id = $id, measured_value = CAST(value AS TEXT) WHERE gas_id IS NULL;";
+        const string legacyReadingsWithoutValue = "UPDATE co_readings SET gas_id = $id WHERE gas_id IS NULL;";
         if (SchemaHelpers.TableExists(cn, tx, "co_buildings"))
         {
             ExecWithLegacyCoId(cn, tx, legacyGas);
         }
 
-        if (SchemaHelpers.TableExists(cn, tx, "co_dwellings"))
+        // A source column a parallel branch's build left out has nothing to move, and SchemaGuard
+        // only repairs it after this step has run: reading it here would fail the whole open.
+        if (SchemaHelpers.ColumnExists(cn, tx, "co_dwellings", "co_value"))
         {
             ExecWithLegacyCoId(cn, tx, legacyValues);
         }
 
         if (SchemaHelpers.TableExists(cn, tx, "co_readings"))
         {
-            ExecWithLegacyCoId(cn, tx, legacyReadings);
+            // Without its value a reading still belongs to the CO gas; one without a gas id would be
+            // dropped on load.
+            ExecWithLegacyCoId(
+                cn,
+                tx,
+                SchemaHelpers.ColumnExists(cn, tx, "co_readings", "value") ? legacyReadings : legacyReadingsWithoutValue);
         }
     }
 
