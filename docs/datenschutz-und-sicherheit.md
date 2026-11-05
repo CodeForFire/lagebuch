@@ -49,6 +49,7 @@ einzelne Datei gespeichert wird.
 | Beteiligte | **Name, Telefonnummer, Notiz und Aufenthaltsort** (z. B. „im RTW …“, mit Uhrzeit) von Personen außerhalb der Feuerwehr (z. B. Eigentümer, Fahrzeughalter, Polizei), die Wohnung, in der sie angetroffen wurden, „angelegt von“ | Einsatzdatei |
 | Ausgabeliste | Gerät, **Name und Telefonnummer der Person, die es erhalten hat**, Organisation oder weitere Kontaktangaben (Freitext), Bemerkung, Ausgabe- und Rückgabezeit, „ausgegeben von“, „zurückgenommen von“ | Einsatzdatei |
 | Dateien und Anhänge | Fotos und PDFs, deren Originaldateiname und „hinzugefügt von“ | Einsatzdatei |
+| Kartenebenen | importierte GeoJSON-Dateien (z. B. eine Ausbreitungsprognose), unverändert als Datei, mit Name, Prognosezeiten und „importiert von“ | Einsatzdatei |
 | Änderungsprotokoll | wer wann welche Aktion ausgeführt hat | Einsatzdatei |
 
 Drei Punkte verdienen besondere Aufmerksamkeit:

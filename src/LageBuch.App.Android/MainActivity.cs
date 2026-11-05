@@ -44,8 +44,13 @@ public class MainActivity : AvaloniaMainActivity
     private static readonly string[] AttachmentMimeTypes =
         ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
 
+    // A .geojson often arrives typed as octet-stream: few providers know the extension.
+    private static readonly string[] MapOverlayMimeTypes =
+        ["application/geo+json", "application/json", "application/zip", "application/octet-stream"];
+
     private ActivityResultLauncher? _importLauncher;
     private ActivityResultLauncher? _attachmentLauncher;
+    private ActivityResultLauncher? _mapOverlayLauncher;
     private AndroidFileDialogService? _dialogs;
     private IncidentStore? _store;
 
@@ -85,10 +90,14 @@ public class MainActivity : AvaloniaMainActivity
         _attachmentLauncher = RegisterForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             new ImportCallback(uri => _dialogs?.CompleteAttachment(uri)));
+        _mapOverlayLauncher = RegisterForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            new ImportCallback(uri => _dialogs?.CompleteMapOverlay(uri)));
 
         _dialogs = new AndroidFileDialogService(this);
         _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
         _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(AttachmentMimeTypes);
+        _dialogs.OnLaunchMapOverlayPicker = () => _mapOverlayLauncher!.Launch(MapOverlayMimeTypes);
         _store = new IncidentStore();
         SharedApp.CreateMainViewModel = () => KeepScreenOnWhileIncidentOpen(CompositionRoot.CreateMainWindowViewModel(
             _store,

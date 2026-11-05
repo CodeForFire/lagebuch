@@ -392,6 +392,40 @@ public class MapCanvasControlTests
     public void A_twist_is_measured_the_short_way_round(double start, double angle, double twist) =>
         Assert.Equal(twist, MapCanvasControl.TwistBetween(start, angle), precision: 9);
 
+    [AvaloniaFact]
+    public void A_Kartenebene_s_area_is_filled_around_its_hole_and_the_hole_stays_open()
+    {
+        var (window, control, _) = Show(null);
+        static GeoPoint At(double dLat, double dLon) => new(Fuerstenfeldbruck.Latitude + dLat, Fuerstenfeldbruck.Longitude + dLon);
+        IReadOnlyList<GeoPoint> outer = [At(-0.02, -0.02), At(-0.02, 0.02), At(0.02, 0.02), At(0.02, -0.02), At(-0.02, -0.02)];
+        IReadOnlyList<GeoPoint> hole = [At(-0.005, -0.005), At(-0.005, 0.005), At(0.005, 0.005), At(0.005, -0.005), At(-0.005, -0.005)];
+        control.Overlays =
+        [
+            new OverlayShape(OverlayShapeKind.Area, [outer, hole], new OverlayStyle(0xCCFF0000, 0xFFFF0000, 2), null, GeoBounds.Of(outer)),
+        ];
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        // About 60 px east of the centre lies inside the area, the centre inside its hole.
+        var filled = PixelAt(frame, 260, 150);
+        Assert.True(filled.R > 0xE0 && filled.G < 0x60, $"area pixel {filled}");
+        Assert.Equal(Color.FromRgb(0xE5, 0xE3, 0xDF), PixelAt(frame, 200, 150));
+    }
+
+    [AvaloniaFact]
+    public void A_Kartenebene_off_screen_draws_nothing()
+    {
+        var (window, control, _) = Show(null);
+        IReadOnlyList<GeoPoint> far = [new(52.0, 13.0), new(52.0, 13.1), new(52.1, 13.1), new(52.0, 13.0)];
+        control.Overlays = [new OverlayShape(OverlayShapeKind.Area, [far], new OverlayStyle(0xCCFF0000, 0xFFFF0000, 2), null, GeoBounds.Of(far))];
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(Color.FromRgb(0xE5, 0xE3, 0xDF), PixelAt(frame, 200, 150));
+    }
+
     private static (Window Window, MapCanvasControl Control, MapViewport Viewport) Show(IMapTileSource? tiles)
     {
         var viewport = new MapViewport { TileSource = tiles, Center = Fuerstenfeldbruck, Zoom = 13 };

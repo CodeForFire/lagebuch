@@ -214,15 +214,20 @@ public static class SyncProtocol
     /// snapshot drops <c>fuehrungsstufe</c>. A host at 37 refuses the command a client at 36 may still
     /// send, so the floor rises to 37.
     /// </para>
+    /// <para>
+    /// 38: Kartenebenen. A client may send <c>addMapOverlay</c> and <c>removeMapOverlay</c>, which a
+    /// host at 37 does not know, so the floor rises to 38. The snapshot carries the Ebenen as
+    /// <c>mapOverlays</c>; their files travel over <c>/files</c> like any attachment.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 37;
+    public const int ProtocolVersion = 38;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 37;
+    public const int MinimumProtocolVersion = 38;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

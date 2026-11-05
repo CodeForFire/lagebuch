@@ -38,6 +38,20 @@ public sealed record IncidentFile
     public static readonly IReadOnlySet<string> AllowedContentTypes =
         new HashSet<string>(MimeTypesByExtension.Values, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The file types a Kartenebene may be imported from. Kept apart from
+    /// <see cref="MimeTypesByExtension"/> on purpose: that table is also what ÖFFNEN may hand to the
+    /// OS, and an archive is not something a peer's file should be able to launch. A Kartenebene
+    /// is only ever read by the Lagekarte, so only <see cref="CreateMapOverlay"/> accepts these.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> MapOverlayMimeTypesByExtension =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".geojson"] = "application/geo+json",
+            [".json"] = "application/geo+json",
+            [".zip"] = "application/zip",
+        };
+
     /// <summary>The generic fallback used where "unknown" should still mean a concrete, valid MIME
     /// type rather than Android's wildcard intent type — see <see cref="GetMimeType"/>.</summary>
     public const string DefaultMimeType = "application/octet-stream";
@@ -79,14 +93,32 @@ public sealed record IncidentFile
     /// follows, before the domain has ever seen this file.
     /// </summary>
     public static IncidentFile Create(
-        Guid id, string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy)
+        Guid id, string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy) =>
+        Create(id, fileName, contentType, sizeBytes, addedAt, addedBy, MimeTypesByExtension);
+
+    /// <summary>
+    /// The file behind a Kartenebene: the same rules as <see cref="Create(Guid, string, string, long, DateTimeOffset, string)"/>,
+    /// checked against <see cref="MapOverlayMimeTypesByExtension"/> instead.
+    /// </summary>
+    public static IncidentFile CreateMapOverlay(
+        Guid id, string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy) =>
+        Create(id, fileName, contentType, sizeBytes, addedAt, addedBy, MapOverlayMimeTypesByExtension);
+
+    private static IncidentFile Create(
+        Guid id,
+        string fileName,
+        string contentType,
+        long sizeBytes,
+        DateTimeOffset addedAt,
+        string addedBy,
+        IReadOnlyDictionary<string, string> mimeTypesByExtension)
     {
         if (string.IsNullOrWhiteSpace(fileName))
         {
             throw new ArgumentException("Dateiname darf nicht leer sein.", nameof(fileName));
         }
 
-        if (!AllowedContentTypes.Contains(contentType))
+        if (!mimeTypesByExtension.Values.Contains(contentType, StringComparer.OrdinalIgnoreCase))
         {
             throw new ArgumentException($"Dateityp '{contentType}' wird nicht unterstützt.", nameof(contentType));
         }
@@ -110,7 +142,7 @@ public sealed record IncidentFile
         // presses ÖFFNEN, so the two must agree and the extension must be one we allow. Otherwise a
         // client could declare "Lageplan.hta" as image/png and have every peer feed the bytes to
         // mshta (.js/.wsf/.lnk/.vbs likewise, .desktop on Linux).
-        if (!MimeTypesByExtension.TryGetValue(Path.GetExtension(safeName), out var mappedType)
+        if (!mimeTypesByExtension.TryGetValue(Path.GetExtension(safeName), out var mappedType)
             || !string.Equals(mappedType, contentType, StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException(

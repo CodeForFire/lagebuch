@@ -541,6 +541,15 @@ sequenceDiagram
   **500** even though the removal landed; see §18. The host's Dateien tab says
   so (`LocalIncidentSession.FileBytesNotWiped`, #762), and the bytes are wiped
   when the Einsatz is next opened (#761).
+- A **Kartenebene** rides the same path: `addMapOverlay` registers the Ebene
+  and its file in one command, and the bytes follow as `PUT /files/{fileId}`.
+  Unlike a photo, an Ebene is drawn from its file at once, so every device goes
+  looking for the bytes when the snapshot names it, which is before the upload
+  has arrived. After an Ebene's upload the host therefore raises `Changed`
+  once more (`SaveExternalChange`), and that broadcast is what makes every
+  device fetch the file again. A plain attachment's upload stays off the UI
+  dispatcher and announces nothing. `removeMapOverlay` wipes the bytes like
+  `removeFile`.
 
 ## 11. Stammdaten over sync
 

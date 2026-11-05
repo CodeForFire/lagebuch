@@ -1476,6 +1476,13 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default) =>
         _inner.RemoveFileAsync(fileId, cancellationToken);
 
+    public Task AddMapOverlayAsync(
+        string fileName, string contentType, byte[] bytes, LageBuch.Domain.Map.MapOverlaySummary summary, CancellationToken cancellationToken = default) =>
+        _inner.AddMapOverlayAsync(fileName, contentType, bytes, summary, cancellationToken);
+
+    public Task RemoveMapOverlayAsync(Guid overlayId, CancellationToken cancellationToken = default) =>
+        _inner.RemoveMapOverlayAsync(overlayId, cancellationToken);
+
     public void AddCoBuilding(
         string name,
         int floorCount,

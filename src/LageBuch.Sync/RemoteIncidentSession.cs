@@ -10,6 +10,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -874,6 +875,42 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // file — so the caller can catch a rejection (closed incident, unknown id) and surface it.
     public Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default) =>
         SendAsync(new RemoveFileCommand(Op(), fileId), cancellationToken);
+
+    // The AddFileAsync split: metadata as a command, then the bytes as a PUT to the file id the
+    // command registered.
+    public async Task AddMapOverlayAsync(
+        string fileName, string contentType, byte[] bytes, MapOverlaySummary summary, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(summary);
+        if (bytes.LongLength > IncidentFile.MaxSizeBytes)
+        {
+            throw new ArgumentException(IncidentFile.TooLargeMessage, nameof(bytes));
+        }
+
+        var fileId = Guid.NewGuid();
+        await SendAsync(
+            new AddMapOverlayCommand(
+                Op(),
+                Guid.NewGuid(),
+                fileId,
+                fileName,
+                contentType,
+                bytes.LongLength,
+                summary.Name,
+                summary.FrameCount,
+                summary.FirstTime,
+                summary.LastTime),
+            cancellationToken);
+
+        using var content = new ByteArrayContent(bytes);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        var response = await _http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public Task RemoveMapOverlayAsync(Guid overlayId, CancellationToken cancellationToken = default) =>
+        SendAsync(new RemoveMapOverlayCommand(Op(), overlayId), cancellationToken);
 
     public void AddCoBuilding(
         string name,

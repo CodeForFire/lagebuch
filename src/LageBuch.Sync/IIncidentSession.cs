@@ -4,6 +4,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 
@@ -311,6 +312,18 @@ public interface IIncidentSession
     /// delete is worth surfacing a failure for.
     /// </summary>
     Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Imports a Kartenebene: the file's bytes go in as an attachment and the Ebene points at it.
+    /// Awaited like <see cref="AddFileAsync"/>, for the same reasons. The caller has parsed the file
+    /// already; <paramref name="summary"/> is what it read.
+    /// </summary>
+    Task AddMapOverlayAsync(
+        string fileName, string contentType, byte[] bytes, MapOverlaySummary summary, CancellationToken cancellationToken = default);
+
+    /// <summary>Takes a Kartenebene off the Lagekarte and its file out of the Einsatz, bytes included.
+    /// Awaited like <see cref="RemoveFileAsync"/>.</summary>
+    Task RemoveMapOverlayAsync(Guid overlayId, CancellationToken cancellationToken = default);
 
     void AddCoBuilding(
         string name,

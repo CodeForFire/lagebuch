@@ -146,6 +146,58 @@
           </Button>
         </Grid>
 
+        <!-- Kartenebenen: imported GeoJSON, such as a DWD Ausbreitungsprognose. Which one is
+             shown belongs to this screen; the Ebenen themselves are the Einsatz's. -->
+        <StackPanel DockPanel.Dock="Top" x:Name="OverlayPanel" Margin="0,0,0,14" Spacing="6">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="EBENEN" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+            <Button Grid.Column="1" x:Name="ImportOverlayButton" Classes="ghost" Content="IMPORTIEREN"
+                    ToolTip.Tip="GeoJSON oder ZIP als Kartenebene importieren"
+                    IsVisible="{Binding Overlays.CanImport}"
+                    IsEnabled="{Binding !Overlays.IsImporting}"
+                    Command="{Binding Overlays.ImportCommand}" />
+          </Grid>
+          <TextBlock x:Name="NoOverlaysHint" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     Text="Keine Ebenen. GeoJSON importieren, z. B. eine Ausbreitungsprognose."
+                     IsVisible="{Binding !Overlays.HasItems}" />
+          <TextBlock x:Name="OverlayErrorText" Text="{Binding Overlays.Error}" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{StaticResource ErrorBrush}"
+                     IsVisible="{Binding Overlays.Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <ScrollViewer MaxHeight="180" IsVisible="{Binding Overlays.HasItems}">
+            <ItemsControl x:Name="OverlayList" ItemsSource="{Binding Overlays.Items}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MapOverlayItem">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,8">
+                    <CheckBox Grid.RowSpan="2" VerticalAlignment="Top" IsChecked="{Binding IsVisible}"
+                              AutomationProperties.Name="{Binding VisibilityAutomationName}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Detail}" FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="2" Grid.RowSpan="2" Classes="icon-btn" Margin="4,0,0,0" VerticalAlignment="Top"
+                            ToolTip.Tip="Auf der Karte zeigen" AutomationProperties.Name="{Binding ShowAutomationName}"
+                            IsEnabled="{Binding Data, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            Command="{Binding ShowCommand}">
+                      <PathIcon Data="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />
+                    </Button>
+                    <!-- ReflectionBinding: CanEdit lives on the view's DataContext, object-typed here. -->
+                    <Button Grid.Column="3" Grid.RowSpan="2" Classes="icon-btn" Margin="4,0,0,0" VerticalAlignment="Top"
+                            ToolTip.Tip="Ebene entfernen" AutomationProperties.Name="{Binding RemoveAutomationName}"
+                            IsVisible="{ReflectionBinding $parent[UserControl].DataContext.CanEdit}"
+                            Command="{Binding RemoveCommand}">
+                      <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </Button>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding LoadError}" FontSize="12"
+                               TextWrapping="Wrap" Foreground="{StaticResource ErrorBrush}"
+                               IsVisible="{Binding LoadError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </StackPanel>
+
         <TextBlock DockPanel.Dock="Top" Text="EINHEITEN" Classes="overline" FontSize="10" Margin="0,0,0,6" />
         <TextBlock DockPanel.Dock="Top" x:Name="NoUnitsHint" TextWrapping="Wrap"
                    Foreground="{StaticResource TextSecondaryBrush}"
@@ -199,6 +251,7 @@
                             Elevation="{Binding Terrain.Elevation}"
                             TerrainStyle="{Binding Terrain.Style}"
                             SelectedWaterPoint="{Binding SelectedWaterPoint}"
+                            Overlays="{Binding Overlays.VisibleShapes}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
                             Rotation="{Binding Map.Rotation}"

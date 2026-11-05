@@ -344,7 +344,7 @@ public sealed class IncidentHost : IAsyncDisposable
             // client's banner reads as if the host refused the change, and the bytes may remain
             // unwiped in the incident file until it is next opened. The host's Lagebuchführer is
             // told through LocalIncidentSession.FileBytesNotWiped (#762).
-            if (command is RemoveFileCommand && removedFile is not null)
+            if (command is RemoveFileCommand or RemoveMapOverlayCommand && removedFile is not null)
             {
                 try
                 {
@@ -421,6 +421,21 @@ public sealed class IncidentHost : IAsyncDisposable
             // The attachment was removed while its body was still arriving (#761). The store kept
             // none of it, so the answer is the one a request for an unknown id gets.
             return Results.NotFound();
+        }
+
+        // A Kartenebene is drawn from its file, and every device, this one included, went looking
+        // for it the moment the snapshot named it -- before these bytes had arrived. Announcing the
+        // upload is what makes them look again. A plain attachment is fetched when it is opened, so
+        // it needs no second announcement.
+        // Looked up off the UI thread like the file itself above, so a plain attachment's upload
+        // still never waits on the UI dispatcher; only the announcement goes through it.
+        if (_session.Incident.MapOverlays.Any(o => o.FileId == id))
+        {
+            await _ui.InvokeAsync(() =>
+            {
+                _session.SaveExternalChange();
+                return true;
+            });
         }
 
         return Results.NoContent();

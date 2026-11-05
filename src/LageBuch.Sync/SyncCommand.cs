@@ -30,6 +30,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(PlaceForceUnitCommand), "placeForceUnit")]
 [JsonDerivedType(typeof(SetForceUnitVehicleTypeCommand), "setForceUnitVehicleType")]
 [JsonDerivedType(typeof(MoveForceUnitLabelCommand), "moveForceUnitLabel")]
+[JsonDerivedType(typeof(AddMapOverlayCommand), "addMapOverlay")]
+[JsonDerivedType(typeof(RemoveMapOverlayCommand), "removeMapOverlay")]
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
 [JsonDerivedType(typeof(EndRoleAssignmentCommand), "endRoleAssignment")]
 [JsonDerivedType(typeof(AdoptFreeTextSectionCommand), "adoptFreeTextSection")]
@@ -163,6 +165,23 @@ public sealed record PlaceForceUnitCommand(OperatorDto Operator, Guid UnitId, do
 public sealed record SetForceUnitVehicleTypeCommand(OperatorDto Operator, Guid UnitId, string? VehicleType) : SyncCommand;
 
 public sealed record MoveForceUnitLabelCommand(OperatorDto Operator, Guid UnitId, double? Dx, double? Dy) : SyncCommand;
+
+// Protocol 38: Kartenebenen. Metadata only, like AddFileCommand: the client PUTs the file's bytes to
+// SyncProtocol.FilesPath(FileId) afterwards. Name and times are what the client read from the file;
+// the host checks their shape (MapOverlay.Create), and every device draws from the file itself.
+public sealed record AddMapOverlayCommand(
+    OperatorDto Operator,
+    Guid OverlayId,
+    Guid FileId,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    string Name,
+    int FrameCount,
+    DateTimeOffset? FirstTime,
+    DateTimeOffset? LastTime) : SyncCommand;
+
+public sealed record RemoveMapOverlayCommand(OperatorDto Operator, Guid OverlayId) : SyncCommand;
 
 /// <summary>Places a running Funktion in a node and board slot; a null NodeId is the Einsatzleitung.</summary>
 public sealed record PlaceRoleAssignmentCommand(OperatorDto Operator, Guid AssignmentId, Guid? NodeId, RoleSlot Slot) : SyncCommand;

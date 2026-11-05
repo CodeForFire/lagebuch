@@ -3,6 +3,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 
@@ -23,7 +24,8 @@ public static class CommandApplier
     /// <param name="clock">The host's clock — authoritative timestamps for every applied command.</param>
     /// <returns>
     /// The newly recorded <see cref="IncidentFile"/> for an <see cref="AddFileCommand"/>, or the
-    /// just-removed one for a <see cref="RemoveFileCommand"/> — both informational, since the
+    /// just-removed one for a <see cref="RemoveFileCommand"/> or <see cref="RemoveMapOverlayCommand"/>
+    /// (and the new one for an <see cref="AddMapOverlayCommand"/>) — all informational, since the
     /// attachment's bytes never travel through either command (issue #167 P1 #2: they ride
     /// <see cref="SyncProtocol.FilesPath"/> as a separate request, keyed by the id the command
     /// already carries). Callers use the returned <see cref="IncidentFile.FileName"/> to add or
@@ -222,6 +224,19 @@ public static class CommandApplier
                 break;
             case RemoveFileCommand c:
                 return incident.RemoveFile(clock, Operator(c.Operator), c.FileId);
+            case AddMapOverlayCommand c:
+                incident.AddMapOverlay(
+                    clock,
+                    Operator(c.Operator),
+                    c.OverlayId,
+                    c.FileId,
+                    c.FileName,
+                    c.ContentType,
+                    c.SizeBytes,
+                    new MapOverlaySummary(c.Name, c.FrameCount, c.FirstTime, c.LastTime));
+                return incident.Files.First(f => f.Id == c.FileId);
+            case RemoveMapOverlayCommand c:
+                return incident.RemoveMapOverlay(clock, Operator(c.Operator), c.OverlayId);
             case AddTaskCommand c:
                 incident.AddTask(
                     clock,

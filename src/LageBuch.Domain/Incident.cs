@@ -5,6 +5,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
@@ -19,6 +20,10 @@ public sealed class Incident
 
     /// <summary>The most distinct rail overrides an Einsatz holds.</summary>
     public const int MaxNavOverrides = 64;
+
+    /// <summary>The most Kartenebenen one Einsatz holds. A long Gefahrgut-Einsatz takes a new
+    /// Ausbreitungsprognose every hour or so; this leaves room for days of them.</summary>
+    public const int MaxMapOverlays = 100;
 
     /// <summary>
     /// Why <see cref="MoveForceUnit"/> refuses a partner's Einsatzleitung, in German. The Führung
@@ -42,6 +47,7 @@ public sealed class Incident
     private readonly List<SituationReport> _situationReports = new();
     private readonly List<IssuedItem> _issuedItems = new();
     private readonly List<CommandNode> _commandNodes = new();
+    private readonly List<MapOverlay> _mapOverlays = new();
 
     private Incident()
     {
@@ -100,6 +106,9 @@ public sealed class Incident
     public IReadOnlyList<IncidentTimerState> Timers => _timers;
 
     public IReadOnlyList<IncidentFile> Files => _files;
+
+    /// <summary>The Ebenen imported onto the Lagekarte, oldest first.</summary>
+    public IReadOnlyList<MapOverlay> MapOverlays => _mapOverlays;
 
     /// <summary>Operational to-dos (#88), in creation order. Sorting for display lives in the
     /// view layer — the aggregate keeps insertion order, like every other list here.</summary>
@@ -206,7 +215,8 @@ public sealed class Incident
         IEnumerable<CommandNode>? commandNodes = null,
         LeadershipPost? leadershipPost = null,
         GeoPoint? location = null,
-        IReadOnlyDictionary<string, bool>? navOverrides = null)
+        IReadOnlyDictionary<string, bool>? navOverrides = null,
+        IEnumerable<MapOverlay>? mapOverlays = null)
     {
         var incident = new Incident
         {
@@ -250,6 +260,7 @@ public sealed class Incident
         incident._situationReports.AddRange(situationReports ?? []);
         incident._issuedItems.AddRange(issuedItems ?? []);
         incident._commandNodes.AddRange(CommandNodeRepair.Resolve(commandNodes ?? Enumerable.Empty<CommandNode>()));
+        incident._mapOverlays.AddRange((mapOverlays ?? []).DistinctBy(o => o.Id).Take(MaxMapOverlays));
         return incident;
     }
 
@@ -1882,7 +1893,97 @@ public sealed class Incident
         var file = _files[index];
         _files.RemoveAt(index);
         AppendSystemEntry(clock, op, $"Datei entfernt: {file.FileName}");
+
+        // A Kartenebene without its file has nothing left to draw, so it goes with it.
+        foreach (var overlay in _mapOverlays.Where(o => o.FileId == fileId).ToList())
+        {
+            _mapOverlays.Remove(overlay);
+            AppendMeasurementEntry(clock, op, $"Kartenebene entfernt: {overlay.Name}");
+        }
+
         return file;
+    }
+
+    /// <summary>
+    /// Imports a Kartenebene: its file (the GeoJSON or zip, unchanged) joins the Einsatz's files,
+    /// and the Ebene points at it. The ETB records the import as a professional record, not
+    /// bookkeeping — an Ausbreitungsprognose is what the Einsatzleitung decided on — so it stays
+    /// visible with Systemmeldungen hidden. The importing device generates both ids, the way
+    /// <see cref="AddFile(IClock, SessionOperator, Guid, string, string, long)"/> takes the file's.
+    /// </summary>
+    public MapOverlay AddMapOverlay(
+        IClock clock,
+        SessionOperator op,
+        Guid overlayId,
+        Guid fileId,
+        string fileName,
+        string contentType,
+        long sizeBytes,
+        MapOverlaySummary summary)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ArgumentNullException.ThrowIfNull(summary);
+        if (_mapOverlays.Count >= MaxMapOverlays)
+        {
+            throw new InvalidOperationException($"Ein Einsatz hat höchstens {MaxMapOverlays} Kartenebenen.");
+        }
+
+        if (_mapOverlays.Any(o => o.Id == overlayId) || _files.Any(f => f.Id == fileId))
+        {
+            throw new ArgumentException("Diese Kartenebene ist schon im Einsatz.", nameof(overlayId));
+        }
+
+        var file = IncidentFile.CreateMapOverlay(fileId, fileName, contentType, sizeBytes, clock.Now, op.Display);
+        var overlay = MapOverlay.Create(overlayId, file.Id, summary, clock.Now, op.Display);
+        _files.Add(file);
+        _mapOverlays.Add(overlay);
+        AppendMeasurementEntry(clock, op, $"Kartenebene importiert: {overlay.Name}{TimeSpanText(overlay, clock)}");
+        return overlay;
+    }
+
+    /// <summary>
+    /// Takes a Kartenebene off the Lagekarte, and its file out of the Einsatz. Returns the removed
+    /// file, or null when it was already gone, so the caller can wipe the bytes the way it does
+    /// after <see cref="RemoveFile"/>.
+    /// </summary>
+    public IncidentFile? RemoveMapOverlay(IClock clock, SessionOperator op, Guid overlayId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var overlay = _mapOverlays.Find(o => o.Id == overlayId)
+            ?? throw new KeyNotFoundException($"Kartenebene {overlayId} nicht gefunden.");
+        _mapOverlays.Remove(overlay);
+        var fileIndex = _files.FindIndex(f => f.Id == overlay.FileId);
+        IncidentFile? file = null;
+        if (fileIndex >= 0)
+        {
+            file = _files[fileIndex];
+            _files.RemoveAt(fileIndex);
+        }
+
+        AppendMeasurementEntry(clock, op, $"Kartenebene entfernt: {overlay.Name}");
+        return file;
+    }
+
+    // The forecast times as the Lagebuchführer reads them: in the Einsatz's own time zone, which is
+    // the clock's, not the UTC a DWD file carries.
+    private static string TimeSpanText(MapOverlay overlay, IClock clock)
+    {
+        if (overlay.FirstTime is not { } first || overlay.LastTime is not { } last)
+        {
+            return string.Empty;
+        }
+
+        var offset = clock.Now.Offset;
+        var from = Formatting.TimeOfDay(first.ToOffset(offset));
+        var to = Formatting.TimeOfDay(last.ToOffset(offset));
+        return overlay.IsTimeSeries
+            ? $" ({overlay.FrameCount} Zeitpunkte, {from}–{to} Uhr)"
+            : $" (Stand {from} Uhr)";
     }
 
     /// <summary>

@@ -28,6 +28,9 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     private static readonly FilePickerFileType Attachment =
         new("Bild oder PDF") { Patterns = new[] { "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp", "*.pdf" } };
 
+    private static readonly FilePickerFileType MapOverlay =
+        new("GeoJSON oder ZIP") { Patterns = new[] { "*.geojson", "*.json", "*.zip" } };
+
     private readonly Func<TopLevel?> _topLevel;
 
     public StorageProviderFileDialogService(Func<TopLevel?> topLevel) => _topLevel = topLevel;
@@ -157,6 +160,23 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
             Title = "Datei anhängen",
             AllowMultiple = false,
             FileTypeFilter = new[] { Attachment },
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<string?> PickMapOverlayAsync()
+    {
+        var top = _topLevel();
+        if (top is null)
+        {
+            return null;
+        }
+
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Kartenebene importieren",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { MapOverlay },
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }

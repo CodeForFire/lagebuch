@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 41;
+    public const int CurrentVersion = 42;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -288,6 +288,11 @@ public static class Migrations
         if (version < 41)
         {
             ApplyV41(cn, tx);
+        }
+
+        if (version < 42)
+        {
+            ApplyV42(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1149,6 +1154,27 @@ public static class Migrations
             write.Parameters.AddWithValue("$id", id);
             write.ExecuteNonQuery();
         }
+    }
+
+    // Kartenebenen: GeoJSON files imported onto the Lagekarte. The geometry stays in the file, which
+    // is an ordinary incident_files row; this table only says which file is an Ebene and what its
+    // import recorded. An older file has no Ebenen, which is what it had.
+    private static void ApplyV42(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql42 = """
+            CREATE TABLE IF NOT EXISTS map_overlays (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                file_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                imported_at TEXT NOT NULL,
+                imported_by TEXT NOT NULL,
+                frame_count INTEGER NOT NULL DEFAULT 1,
+                first_time TEXT,
+                last_time TEXT
+            );
+            """;
+        Exec(cn, tx, sql42);
     }
 
     // The taktisches Zeichen of a unit on the Lagekarte: its Fahrzeugtyp, and how far its sign was
