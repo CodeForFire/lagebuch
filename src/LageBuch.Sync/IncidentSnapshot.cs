@@ -273,7 +273,7 @@ public sealed record DwellingDto(
     Guid Id, Guid BuildingId, int FloorOrdinal, int ApartmentNumber,
     string? ResidentName, DwellingStatus Status, bool? KeyAvailable,
 
-    // Protocol 26 (#410): the current value per gas, keyed by the Einsatz's own gas id. Replaced
+    // Protocol 39 (#410): the current value per gas, keyed by the Einsatz's own gas id. Replaced
     // the single CoValue, which is why the floor rose with it.
     IReadOnlyDictionary<Guid, decimal>? Values,
 
