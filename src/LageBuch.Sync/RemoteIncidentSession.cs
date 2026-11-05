@@ -888,11 +888,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             throw new ArgumentException(IncidentFile.TooLargeMessage, nameof(bytes));
         }
 
+        var overlayId = Guid.NewGuid();
         var fileId = Guid.NewGuid();
         await SendAsync(
             new AddMapOverlayCommand(
                 Op(),
-                Guid.NewGuid(),
+                overlayId,
                 fileId,
                 fileName,
                 contentType,
@@ -903,10 +904,35 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 summary.LastTime),
             cancellationToken);
 
-        using var content = new ByteArrayContent(bytes);
-        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        var response = await _http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        try
+        {
+            using var content = new ByteArrayContent(bytes);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            using var response = await _http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        {
+            // The Ebene is in the Einsatz now, with its ETB line, but without the file it is drawn
+            // from. Take it back out, so the import failed as a whole and can simply be repeated.
+            await TakeBackMapOverlayAsync(overlayId);
+            throw;
+        }
+    }
+
+    // Best effort, and deliberately not cancellable: the import's own token may be what failed. If
+    // the host cannot be reached for this either, every device shows the Ebene as "noch nicht
+    // verfügbar" with its remove button, which is where the Lagebuchführer finishes the job.
+    private async Task TakeBackMapOverlayAsync(Guid overlayId)
+    {
+        try
+        {
+            await SendAsync(new RemoveMapOverlayCommand(Op(), overlayId), CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or CommandRejectedException)
+        {
+            // Surfaces on the Ebene's row as described above; the upload's own failure is rethrown.
+        }
     }
 
     public Task RemoveMapOverlayAsync(Guid overlayId, CancellationToken cancellationToken = default) =>

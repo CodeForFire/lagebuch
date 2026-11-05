@@ -159,7 +159,7 @@ public static class OverlayGeoJson
             return null;
         }
 
-        return label.Length > MaxLabelLength ? label[..MaxLabelLength] : label;
+        return label[..Math.Min(label.Length, MaxLabelLength)];
     }
 
     private static DateTimeOffset? TimeOf(JsonElement properties)
@@ -199,7 +199,7 @@ public static class OverlayGeoJson
 
         public string? ReadZip(byte[] bytes)
         {
-            using var stream = new MemoryStream(bytes, writable: false);
+            using var stream = new MemoryStream(bytes);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             if (archive.Entries.Count > MaxEntries)
             {
@@ -207,7 +207,7 @@ public static class OverlayGeoJson
             }
 
             long budget = MaxUnpackedBytes;
-            var read = 0;
+            var found = false;
 
             // Entry names only choose which entries to read, and in what order; none is ever a path.
             foreach (var entry in archive.Entries.OrderBy(e => e.FullName, StringComparer.Ordinal))
@@ -225,14 +225,14 @@ public static class OverlayGeoJson
                 }
 
                 budget -= buffer.Length;
-                read++;
+                found = true;
                 if (ReadDocument(buffer.GetBuffer().AsMemory(0, (int)buffer.Length)) is { } error)
                 {
                     return error;
                 }
             }
 
-            return read == 0 ? NoGeoJsonInZipMessage : null;
+            return found ? null : NoGeoJsonInZipMessage;
         }
 
         public string? ReadDocument(ReadOnlyMemory<byte> json)
@@ -244,13 +244,9 @@ public static class OverlayGeoJson
                 json = json[Utf8Bom.Length..];
             }
 
+            // Anything but an object falls through to ReadGeometry below, which refuses it.
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return InvalidMessage;
-            }
-
             if (!IsWgs84(root))
             {
                 return CrsMessage;
@@ -333,7 +329,8 @@ public static class OverlayGeoJson
                 return InvalidMessage;
             }
 
-            var properties = feature.TryGetProperty("properties", out var p) && p.ValueKind == JsonValueKind.Object ? p : default;
+            // Whatever kind it is: every reader of the properties checks for an object first.
+            var properties = feature.TryGetProperty("properties", out var p) ? p : default;
 
             // A Feature may carry no geometry at all; it has nothing to draw, which is not an error.
             if (!feature.TryGetProperty("geometry", out var geometry) || geometry.ValueKind == JsonValueKind.Null)

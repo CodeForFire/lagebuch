@@ -34,6 +34,9 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     // Every row's load since the last settle, for a caller that has to wait on the files being read.
     private readonly List<Task> _pending = [];
 
+    // Counts Refresh calls, so a fetch can tell whether the Einsatz changed while it was looking.
+    private int _changes;
+
     public MapOverlaysViewModel(
         IIncidentSession session,
         Action onChanged,
@@ -74,32 +77,41 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     [ObservableProperty]
     private string? _error;
 
-    /// <summary>Brings the list in line with the Einsatz, keeping what this screen shows of each Ebene.</summary>
+    /// <summary>
+    /// Brings the list in line with the Einsatz, keeping what this screen shows of each Ebene. Runs
+    /// on every change of the Einsatz, so the list is only rebuilt when its Ebenen changed.
+    /// </summary>
     public void Refresh()
     {
+        _changes++;
         var overlays = _session.Incident.MapOverlays;
+        if (!overlays.Select(o => o.Id).SequenceEqual(Items.Select(i => i.Id)))
+        {
+            Rebuild(overlays);
+        }
+
+        // A file not there yet -- a peer's upload still under way -- is looked for again on every
+        // change, the upload's own announcement included.
+        foreach (var item in Items.Where(i => i.IsMissing))
+        {
+            Track(LoadAsync(item));
+        }
+    }
+
+    private void Rebuild(IReadOnlyList<MapOverlay> overlays)
+    {
         var known = Items.ToDictionary(i => i.Id);
         var first = Items.Count == 0;
         Items.Clear();
         foreach (var overlay in overlays)
         {
-            if (known.TryGetValue(overlay.Id, out var item))
+            if (!known.TryGetValue(overlay.Id, out var item))
             {
-                Items.Add(item);
-
-                // A file not there yet -- a peer's upload still under way -- is looked for again on
-                // every change, the upload's own announcement included.
-                if (item.IsMissing)
-                {
-                    Track(LoadAsync(item));
-                }
-
-                continue;
+                item = new MapOverlayItem(overlay, this);
+                Track(LoadAsync(item));
             }
 
-            item = new MapOverlayItem(overlay, this);
             Items.Add(item);
-            Track(LoadAsync(item));
         }
 
         // The newest Ebene is shown when it arrives, here or from another device, and hides the
@@ -108,7 +120,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         {
             foreach (var item in Items)
             {
-                item.SetVisibleQuietly(ReferenceEquals(item, Items[^1]));
+                item.IsVisible = ReferenceEquals(item, Items[^1]);
             }
         }
 
@@ -118,6 +130,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
 
     private void Track(Task load)
     {
+        // Stryker disable once Statement : only keeps the list short; SettledAsync waits on finished loads at no cost.
         _pending.RemoveAll(t => t.IsCompleted);
         _pending.Add(load);
     }
@@ -133,8 +146,16 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         }
     }
 
-    internal void UpdateVisibleShapes() =>
-        VisibleShapes = Items.Where(i => i.IsVisible).SelectMany(i => i.CurrentShapes).ToList();
+    // The map is redrawn only when what it shows changed: the shapes are the parser's own
+    // instances, so the same frame yields the same references.
+    internal void UpdateVisibleShapes()
+    {
+        var shapes = Items.Where(i => i.IsVisible).SelectMany(i => i.CurrentShapes).ToList();
+        if (!shapes.SequenceEqual(VisibleShapes, ReferenceEqualityComparer.Instance))
+        {
+            VisibleShapes = shapes;
+        }
+    }
 
     [SuppressMessage(
         "Design",
@@ -258,28 +279,40 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     private async Task LoadAsync(MapOverlayItem item)
     {
         var fileId = item.FileId;
-        if (!_loads.TryGetValue(fileId, out var load))
-        {
-            load = Fetch(fileId);
-            _loads[fileId] = load;
-        }
-
+        bool missing;
+        bool again;
         (OverlayData? Data, string? Error, bool Parsed) result;
-        try
+        do
         {
-            result = await load;
-        }
-        catch (Exception ex)
-        {
-            result = (null, ex.Message, false);
-        }
+            var changesAtStart = _changes;
+            if (!_loads.TryGetValue(fileId, out var load))
+            {
+                load = Fetch(fileId);
+                _loads[fileId] = load;
+            }
 
-        // A file that could not be fetched is tried again; one that was read, or will never parse, stays.
-        var missing = result.Data is null && !result.Parsed;
-        if (missing && _loads.TryGetValue(fileId, out var cached) && ReferenceEquals(cached, load))
-        {
-            _loads.Remove(fileId);
+            try
+            {
+                result = await load;
+            }
+            catch (Exception ex)
+            {
+                result = (null, ex.Message, false);
+            }
+
+            // A file that could not be fetched is tried again; one that was read, or will never parse, stays.
+            missing = result.Data is null && !result.Parsed;
+            if (missing && _loads.TryGetValue(fileId, out var cached) && ReferenceEquals(cached, load))
+            {
+                _loads.Remove(fileId);
+            }
+
+            // A change that arrived while this was looking may be the upload's own announcement,
+            // and Refresh skipped this row then, because it was not missing yet: look again now,
+            // or the Ebene would wait for the next unrelated edit.
+            again = missing && _changes != changesAtStart;
         }
+        while (again);
 
         item.Loaded(result.Data, result.Error, missing, _clock.Now);
         UpdateVisibleShapes();
@@ -305,7 +338,6 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
 public sealed partial class MapOverlayItem : ObservableObject
 {
     private readonly MapOverlaysViewModel _owner;
-    private bool _quiet;
 
     internal MapOverlayItem(MapOverlay overlay, MapOverlaysViewModel owner)
     {
@@ -352,13 +384,6 @@ public sealed partial class MapOverlayItem : ObservableObject
     public IReadOnlyList<OverlayShape> CurrentShapes =>
         Data is { } data ? data.Frames[Math.Clamp(FrameIndex, 0, data.Frames.Count - 1)].Shapes : [];
 
-    internal void SetVisibleQuietly(bool visible)
-    {
-        _quiet = true;
-        IsVisible = visible;
-        _quiet = false;
-    }
-
     /// <summary>The file was not there to read; it is looked for again on the next change.</summary>
     public bool IsMissing { get; private set; }
 
@@ -372,13 +397,7 @@ public sealed partial class MapOverlayItem : ObservableObject
         OnPropertyChanged(nameof(IsLoading));
     }
 
-    partial void OnIsVisibleChanged(bool value)
-    {
-        if (!_quiet)
-        {
-            _owner.UpdateVisibleShapes();
-        }
-    }
+    partial void OnIsVisibleChanged(bool value) => _owner.UpdateVisibleShapes();
 
     partial void OnFrameIndexChanged(int value)
     {

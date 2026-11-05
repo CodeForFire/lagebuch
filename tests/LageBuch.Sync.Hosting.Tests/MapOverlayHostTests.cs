@@ -99,6 +99,29 @@ public class MapOverlayHostTests
     }
 
     [Fact]
+    public async Task An_Ebene_whose_upload_fails_is_taken_back_out_so_the_import_can_be_repeated()
+    {
+        var clock = new FixedClock();
+        var hostSession = TestSession.StartNew(
+            new DelayedFileWriteStore(Task.FromException(new IOException("Datenträger voll."))),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+        await using var client = await Join(port, "A");
+
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.AddMapOverlayAsync("messpunkt.geojson", "application/geo+json", Bytes, new MapOverlaySummary("messpunkt", 1, null, null)));
+
+        Assert.Empty(hostSession.Incident.MapOverlays);
+        Assert.Empty(hostSession.Incident.Files);
+        Assert.Equal("Kartenebene entfernt: messpunkt", hostSession.Incident.Journal[^1].Text);
+    }
+
+    [Fact]
     public async Task A_client_cannot_slip_an_archive_in_as_a_plain_attachment()
     {
         var clock = new FixedClock();

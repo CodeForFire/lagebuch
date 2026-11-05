@@ -23,6 +23,14 @@
       <Setter Property="MaxHeight" Value="260" />
       <Setter Property="Margin" Value="0,12,0,0" />
     </Style>
+    <!-- The EBENEN list shares the panel with EINHEITEN. On a phone the panel is 260 px tall, so
+         the list gives up all but about one Ebene and scrolls; EINHEITEN keeps room for its own. -->
+    <Style Selector="ScrollViewer#OverlayScroll">
+      <Setter Property="MaxHeight" Value="180" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ScrollViewer#OverlayScroll">
+      <Setter Property="MaxHeight" Value="64" />
+    </Style>
     <!-- A unit's pin: the exact spot it stands on. Small to see past, with a finger-sized grip
          around it (the transparent Panel), so a tablet can still drag it. -->
     <Style Selector="Panel.unit-pin">
@@ -164,7 +172,7 @@
           <TextBlock x:Name="OverlayErrorText" Text="{Binding Overlays.Error}" TextWrapping="Wrap" FontSize="12"
                      Foreground="{StaticResource ErrorBrush}"
                      IsVisible="{Binding Overlays.Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <ScrollViewer MaxHeight="180" IsVisible="{Binding Overlays.HasItems}">
+          <ScrollViewer x:Name="OverlayScroll" IsVisible="{Binding Overlays.HasItems}">
             <ItemsControl x:Name="OverlayList" ItemsSource="{Binding Overlays.Items}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:MapOverlayItem">

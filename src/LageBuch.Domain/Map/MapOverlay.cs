@@ -15,29 +15,45 @@ public sealed record MapOverlay
     /// <summary>The most forecast times one Ebene may carry.</summary>
     public const int MaxFrames = 500;
 
-    private MapOverlay()
+    private MapOverlay(
+        Guid id,
+        Guid fileId,
+        string name,
+        DateTimeOffset importedAt,
+        string importedBy,
+        int frameCount,
+        DateTimeOffset? firstTime,
+        DateTimeOffset? lastTime)
     {
+        Id = id;
+        FileId = fileId;
+        Name = name;
+        ImportedAt = importedAt;
+        ImportedBy = importedBy;
+        FrameCount = frameCount;
+        FirstTime = firstTime;
+        LastTime = lastTime;
     }
 
-    public Guid Id { get; private init; }
+    public Guid Id { get; }
 
     /// <summary>The imported file, as it came in. A reference inside the Einsatz, never into the Stammdaten.</summary>
-    public Guid FileId { get; private init; }
+    public Guid FileId { get; }
 
-    public string Name { get; private init; } = string.Empty;
+    public string Name { get; }
 
-    public DateTimeOffset ImportedAt { get; private init; }
+    public DateTimeOffset ImportedAt { get; }
 
-    public string ImportedBy { get; private init; } = string.Empty;
+    public string ImportedBy { get; }
 
     /// <summary>How many points in time the file holds; 1 for a plain Ebene.</summary>
-    public int FrameCount { get; private init; } = 1;
+    public int FrameCount { get; }
 
     /// <summary>The first forecast time, or null when the file carries none.</summary>
-    public DateTimeOffset? FirstTime { get; private init; }
+    public DateTimeOffset? FirstTime { get; }
 
     /// <summary>The last forecast time, or null when the file carries none.</summary>
-    public DateTimeOffset? LastTime { get; private init; }
+    public DateTimeOffset? LastTime { get; }
 
     /// <summary>True when the Ebene steps through several points in time.</summary>
     public bool IsTimeSeries => FrameCount > 1;
@@ -65,17 +81,7 @@ public sealed record MapOverlay
             throw new ArgumentException("Die Zeitpunkte der Kartenebene passen nicht zusammen.", nameof(summary));
         }
 
-        return new MapOverlay
-        {
-            Id = id,
-            FileId = fileId,
-            Name = name,
-            ImportedAt = importedAt,
-            ImportedBy = importedBy,
-            FrameCount = summary.FrameCount,
-            FirstTime = summary.FirstTime,
-            LastTime = summary.LastTime,
-        };
+        return new MapOverlay(id, fileId, name, importedAt, importedBy, summary.FrameCount, summary.FirstTime, summary.LastTime);
     }
 
     /// <summary>
@@ -94,17 +100,15 @@ public sealed record MapOverlay
         DateTimeOffset? lastTime)
     {
         var timesValid = firstTime is { } first && lastTime is { } last && first <= last;
-        return new MapOverlay
-        {
-            Id = id,
-            FileId = fileId,
-            Name = Trimmed(name) ?? "Kartenebene",
-            ImportedAt = importedAt,
-            ImportedBy = importedBy ?? string.Empty,
-            FrameCount = Math.Clamp(frameCount, 1, MaxFrames),
-            FirstTime = timesValid ? firstTime : null,
-            LastTime = timesValid ? lastTime : null,
-        };
+        return new MapOverlay(
+            id,
+            fileId,
+            Trimmed(name) ?? "Kartenebene",
+            importedAt,
+            importedBy ?? string.Empty,
+            Math.Clamp(frameCount, 1, MaxFrames),
+            timesValid ? firstTime : null,
+            timesValid ? lastTime : null);
     }
 
     private static string? Trimmed(string? value)
@@ -115,6 +119,6 @@ public sealed record MapOverlay
             return null;
         }
 
-        return trimmed.Length > MaxNameLength ? trimmed[..MaxNameLength].TrimEnd() : trimmed;
+        return trimmed[..Math.Min(trimmed.Length, MaxNameLength)].TrimEnd();
     }
 }
