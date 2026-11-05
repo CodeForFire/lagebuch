@@ -25,6 +25,10 @@ public static class WaterPointMarkers
     // How wide the Ring/Stich sign after the DN is.
     private const double NetworkWidth = 14;
 
+    // The zoom-15 disc: the class ring's radius, and how far its white contour reaches.
+    private const double DiscRing = 5.5;
+    private const double DiscReach = 7.5;
+
     private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
     private static readonly IImmutableBrush Ink = new ImmutableSolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21));
     private static readonly IImmutableBrush UnitInk = new ImmutableSolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x78));
@@ -162,19 +166,20 @@ public static class WaterPointMarkers
         }
     }
 
-    // A disc in the class colour with the glyph, and around it a ring filled in proportion to the
-    // class: what the colour says, said a second time for an eye that cannot tell red from green.
+    // A dot in the class colour, and around it a ring filled in proportion to the class: what the
+    // colour says, said a second time for an eye that cannot tell red from green. No glyph: at
+    // zoom 15 a town's hydrants stand a few pixels apart, and a glyph this small reads as a smudge.
     private static void DrawDisc(DrawingContext context, Marker marker, IPen selected)
     {
-        const double disc = 6.5;
-        const double ring = 9;
+        const double disc = 3.5;
+        var ring = DiscRing;
         var at = marker.At;
-        context.DrawEllipse(Brushes.White, null, at, ring + 2.5, ring + 2.5);
-        context.DrawEllipse(null, new ImmutablePen(Track, 2.5), at, ring, ring);
+        context.DrawEllipse(Brushes.White, null, at, DiscReach, DiscReach);
+        context.DrawEllipse(null, new ImmutablePen(Track, 2), at, ring, ring);
         var share = (double)marker.FlowClass / (double)FlowClass.Ab3200;
         if (share >= 1)
         {
-            context.DrawEllipse(null, new ImmutablePen(marker.Colour, 2.5), at, ring, ring);
+            context.DrawEllipse(null, new ImmutablePen(marker.Colour, 2), at, ring, ring);
         }
         else if (share > 0)
         {
@@ -188,14 +193,13 @@ public static class WaterPointMarkers
                 path.EndFigure(isClosed: false);
             }
 
-            context.DrawGeometry(null, new ImmutablePen(marker.Colour, 2.5, lineCap: PenLineCap.Flat), arc);
+            context.DrawGeometry(null, new ImmutablePen(marker.Colour, 2, lineCap: PenLineCap.Flat), arc);
         }
 
         context.DrawEllipse(marker.Colour, null, at, disc, disc);
-        DrawGlyph(context, marker.Point.Symbol, new Rect(at.X - 4.5, at.Y - 4.5, 9, 9));
         if (marker.IsSelected)
         {
-            context.DrawEllipse(null, selected, at, ring + 5, ring + 5);
+            context.DrawEllipse(null, selected, at, DiscReach + 2, DiscReach + 2);
         }
     }
 
@@ -312,7 +316,7 @@ public static class WaterPointMarkers
             {
                 if (!HasText)
                 {
-                    var reach = 11.5 + (IsSelected ? 6 : 0);
+                    var reach = DiscReach + (IsSelected ? 3.5 : 0);
                     return new Rect(At.X - reach, At.Y - reach, 2 * reach, 2 * reach);
                 }
 

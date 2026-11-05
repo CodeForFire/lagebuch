@@ -237,12 +237,12 @@ public class MapCanvasControlTests
 
         using var frame = window.CaptureRenderedFrame()!;
 
-        AssertNear(Green, PixelAt(frame, 200, 144));
+        AssertNear(Green, PixelAt(frame, 200, 148));
 
         // Four classes of five: from twelve o'clock clockwise past nine, the last fifth left grey.
-        AssertNear(Green, PixelAt(frame, 209, 150));
-        AssertNear(Green, PixelAt(frame, 190, 150));
-        AssertNear(Color.FromRgb(0xD5, 0xD9, 0xDD), PixelAt(frame, 195, 142));
+        AssertNear(Green, PixelAt(frame, 205, 150));
+        AssertNear(Green, PixelAt(frame, 194, 150));
+        AssertNear(Color.FromRgb(0xD5, 0xD9, 0xDD), PixelAt(frame, 197, 145));
 
         // No flag.
         Assert.Equal(Land, PixelAt(frame, 215, 125));

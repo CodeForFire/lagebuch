@@ -31,7 +31,7 @@ public enum FlowClass
 /// <summary>How much of a water point its map marker shows, by the map's zoom.</summary>
 public enum WaterPointDetailLevel
 {
-    /// <summary>A small disc: glyph, and a ring filled by the class.</summary>
+    /// <summary>A small dot in the class colour, in a ring filled by the class.</summary>
     Punkt,
 
     /// <summary>A flag with the glyph and the flow.</summary>
