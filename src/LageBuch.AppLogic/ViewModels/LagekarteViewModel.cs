@@ -38,6 +38,11 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     private (double X, double Y) _markerGrabbedOffset;
     private bool _markerMoved;
 
+    private LagekarteMarker? _draggedSign;
+    private (double X, double Y) _signPressedAt;
+    private LabelOffset _offsetAtPress = new(0, 0);
+    private bool _signMoved;
+
     // Counts water point loads, so a slow read for an older set of packs cannot overwrite a newer one.
     private int _waterLoad;
 
@@ -326,6 +331,75 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
 
         _draggedMarker = null;
+    }
+
+    /// <summary>Starts a sign drag from its stored or map-resolved offset.</summary>
+    public void BeginSignDrag(LagekarteMarker marker, (double X, double Y) at, LabelOffset resolvedOffset)
+    {
+        ArgumentNullException.ThrowIfNull(marker);
+        ArgumentNullException.ThrowIfNull(resolvedOffset);
+        _draggedSign = marker;
+        _offsetAtPress = marker.LabelOffset ?? resolvedOffset;
+        _signPressedAt = at;
+        _signMoved = false;
+    }
+
+    /// <summary>Updates the sign's preview after the pointer has moved past tap slop.</summary>
+    public bool UpdateSignDrag((double X, double Y) at)
+    {
+        if (_draggedSign is not { } marker || !CanEdit || !HasMoved(at))
+        {
+            return false;
+        }
+
+        marker.LabelOffset = new LabelOffset(
+            Math.Clamp(_offsetAtPress.Dx + at.X - _signPressedAt.X, -LabelOffset.MaxPixels, LabelOffset.MaxPixels),
+            Math.Clamp(_offsetAtPress.Dy + at.Y - _signPressedAt.Y, -LabelOffset.MaxPixels, LabelOffset.MaxPixels));
+        return true;
+    }
+
+    /// <summary>Stores a moved sign or treats an unmoved release as a map tap.</summary>
+    public bool EndSignDrag((double X, double Y) at, Func<double, double, GeoPoint?> screenToGeo)
+    {
+        ArgumentNullException.ThrowIfNull(screenToGeo);
+        if (_draggedSign is not { } marker)
+        {
+            return false;
+        }
+
+        _draggedSign = null;
+        if (_signMoved && marker.LabelOffset is { } offset)
+        {
+            MoveLabel(marker, offset);
+        }
+        else if (screenToGeo(at.X, at.Y) is { } position && MapTappedCommand.CanExecute(position))
+        {
+            MapTappedCommand.Execute(position);
+        }
+
+        return true;
+    }
+
+    /// <summary>Restores a sign preview when pointer capture is lost.</summary>
+    public void CancelSignDrag()
+    {
+        if (_draggedSign is not null && _signMoved)
+        {
+            RestoreMarkers();
+        }
+
+        _draggedSign = null;
+    }
+
+    private bool HasMoved((double X, double Y) at)
+    {
+        if (!_signMoved && Math.Abs(at.X - _signPressedAt.X) < MarkerTapSlop && Math.Abs(at.Y - _signPressedAt.Y) < MarkerTapSlop)
+        {
+            return false;
+        }
+
+        _signMoved = true;
+        return true;
     }
 
     /// <summary>A marker dragged to a new spot.</summary>

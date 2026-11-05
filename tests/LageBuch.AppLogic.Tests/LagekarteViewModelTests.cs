@@ -168,6 +168,80 @@ public class LagekarteViewModelTests
     private static GeoPoint ToGeo(double x, double y) => new(y, x);
 
     [Fact]
+    public void Dragging_a_pin_preserves_the_grab_offset_in_preview_and_on_release()
+    {
+        var (session, vm, _) = Open();
+        vm.PlaceEinsatzortCommand.Execute(null);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        var marker = vm.Markers.Single();
+        static GeoPoint Convert(double x, double y) => new(y, x);
+
+        vm.BeginMarkerDrag(marker, (20, 10), (20, 30));
+        Assert.False(vm.ContinueMarkerDrag((25, 15), Convert));
+        Assert.Equal(Marktplatz, marker.Position);
+        Assert.True(vm.ContinueMarkerDrag((26, 10), Convert));
+        Assert.Equal(new GeoPoint(30, 26), marker.Position);
+        Assert.Equal(Marktplatz, session.Incident.Location);
+        Assert.True(vm.EndMarkerDrag((30, 12), Convert));
+
+        Assert.Equal(new GeoPoint(32, 30), session.Incident.Location);
+        Assert.False(vm.EndMarkerDrag((30, 12), Convert));
+    }
+
+    [Fact]
+    public void Releasing_an_unmoved_pin_taps_at_the_pointer_not_the_pin_spot()
+    {
+        var (session, vm, _) = Open();
+        vm.PlaceEinsatzortCommand.Execute(null);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        vm.PlaceEinsatzortCommand.Execute(null);
+        vm.BeginMarkerDrag(vm.Markers.Single(), (20, 10), (20, 30));
+        Assert.False(vm.ContinueMarkerDrag((25, 15), (x, y) => new GeoPoint(y, x)));
+
+        vm.EndMarkerDrag((25, 15), (x, y) => new GeoPoint(y, x));
+
+        Assert.Equal(new GeoPoint(15, 25), session.Incident.Location);
+    }
+
+    [Fact]
+    public void Losing_capture_restores_a_pin_preview_and_discards_the_drag()
+    {
+        var (session, vm, _) = Open();
+        vm.PlaceEinsatzortCommand.Execute(null);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        vm.BeginMarkerDrag(vm.Markers.Single(), (20, 10), (20, 30));
+        vm.ContinueMarkerDrag((30, 10), (_, _) => Amperbruecke);
+
+        vm.CancelMarkerDrag();
+
+        Assert.Equal(Marktplatz, vm.Markers.Single().Position);
+        Assert.Equal(Marktplatz, session.Incident.Location);
+        Assert.False(vm.EndMarkerDrag((30, 10), (_, _) => Amperbruecke));
+    }
+
+    [Fact]
+    public void Sign_drag_uses_the_resolved_offset_and_restores_an_abandoned_preview()
+    {
+        var (session, vm, _) = Open(units: ["LF 10/1"]);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        vm.BeginSignDrag(vm.Signs.Single(), (20, 20), new LabelOffset(-80, 30));
+        Assert.False(vm.UpdateSignDrag((25, 25)));
+        Assert.True(vm.UpdateSignDrag((30, 26)));
+        Assert.Equal(new LabelOffset(-70, 36), vm.Signs.Single().LabelOffset);
+        vm.CancelSignDrag();
+        Assert.Null(vm.Signs.Single().LabelOffset);
+        Assert.False(vm.EndSignDrag((30, 26), (_, _) => Amperbruecke));
+
+        vm.BeginSignDrag(vm.Signs.Single(), (20, 20), new LabelOffset(-80, 30));
+        vm.UpdateSignDrag((30, 26));
+        vm.EndSignDrag((30, 26), (_, _) => Amperbruecke);
+
+        Assert.Equal(new LabelOffset(-70, 36), session.Incident.Forces.Single().LabelOffset);
+        Assert.Equal(Marktplatz, session.Incident.Forces.Single().Position);
+    }
+
+    [Fact]
     public void An_abandoned_drag_puts_the_marker_back()
     {
         var (_, vm, _) = Open();
