@@ -104,6 +104,7 @@ public class FocusEdgeTests
             view.GetControl<ComboBox>("VehicleBox"),
             view.GetControl<TextBox>("BrigadeBox"),
             view.GetControl<TextBox>("CallSignBox"),
+            view.GetControl<ComboBox>("VehicleTypeBox"),
             view.GetControl<TextBox>("ZugfuehrerBox"),
             view.GetControl<TextBox>("OfficerBox"),
             view.GetControl<TextBox>("MannschaftBox"),

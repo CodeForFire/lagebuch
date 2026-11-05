@@ -377,7 +377,7 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
-    public void A_closed_Einsatz_takes_no_sign_move_or_vehicle_type()
+    public void A_closed_Einsatz_takes_no_sign_move()
     {
         var (session, vm, _) = Open(units: ["LF 10/1"]);
         vm.PlaceUnitCommand.Execute(vm.Units[0]);
@@ -386,55 +386,8 @@ public class LagekarteViewModelTests
         using var closed = new LagekarteViewModel(session, () => { });
 
         closed.MoveLabel(closed.Signs.Single(), new LabelOffset(-80, 30));
-        closed.Units.Single().SelectedVehicleType = "DLK";
 
         Assert.Null(session.Incident.Forces.Single().LabelOffset);
-        Assert.Null(session.Incident.Forces.Single().VehicleType);
-    }
-
-    [Fact]
-    public void Picking_a_vehicle_type_beside_a_unit_records_it()
-    {
-        var (session, vm, changes) = Open(units: ["LF 10/1"]);
-        var row = Assert.Single(vm.Units);
-        Assert.Equal(LagekarteUnitRow.NoVehicleType, row.SelectedVehicleType);
-        Assert.Equal(LagekarteUnitRow.NoVehicleType, row.VehicleTypeOptions[0]);
-        Assert.Equal("Fahrzeugtyp von LF 10/1", row.VehicleTypeAutomationName);
-
-        row.SelectedVehicleType = "DLK";
-
-        Assert.Equal("DLK", session.Incident.Forces.Single().VehicleType);
-        Assert.Equal("DLK", vm.Units.Single().SelectedVehicleType);
-        Assert.Equal(1, changes());
-
-        vm.Units.Single().SelectedVehicleType = LagekarteUnitRow.NoVehicleType;
-        Assert.Null(session.Incident.Forces.Single().VehicleType);
-    }
-
-    [Fact]
-    public void Picking_the_same_vehicle_type_again_records_nothing()
-    {
-        var (session, vm, changes) = Open(units: ["LF 10/1"]);
-        session.SetForceUnitVehicleType(session.Incident.Forces[0].Id, "DLK");
-        var entries = session.Incident.Journal.Count;
-
-        vm.Units.Single().SelectedVehicleType = "DLK";
-
-        Assert.Equal(entries, session.Incident.Journal.Count);
-        Assert.Equal(0, changes());
-    }
-
-    [Fact]
-    public void A_vehicle_type_the_catalogue_lacks_is_offered_so_the_picker_shows_it()
-    {
-        var (session, vm, _) = Open(units: ["LF 10/1"]);
-        session.SetForceUnitVehicleType(session.Incident.Forces[0].Id, "TLF 4000");
-
-        var row = vm.Units.Single();
-
-        Assert.Equal("TLF 4000", row.SelectedVehicleType);
-        Assert.Equal(["ohne Typ", "TLF 4000"], row.VehicleTypeOptions.Take(2));
-        Assert.Equal(VehicleTypes.All.Count + 2, row.VehicleTypeOptions.Count);
     }
 
     [Fact]

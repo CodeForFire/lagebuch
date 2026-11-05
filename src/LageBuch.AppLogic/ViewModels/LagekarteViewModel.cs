@@ -570,15 +570,6 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
     }
 
-    // The Fahrzeugtyp picked beside a unit: for a vehicle the Stammdaten did not know.
-    private void SetVehicleType(Guid unitId, string? vehicleType)
-    {
-        if (CanEdit)
-        {
-            Run(() => _session.SetForceUnitVehicleType(unitId, vehicleType));
-        }
-    }
-
     private bool Place(Guid? unitId, GeoPoint position)
     {
         return unitId is { } id
@@ -613,7 +604,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         Units.Clear();
         foreach (var unit in units)
         {
-            Units.Add(new LagekarteUnitRow(unit, SetVehicleType));
+            Units.Add(new LagekarteUnitRow(unit));
         }
 
         Markers.Clear();
@@ -764,27 +755,12 @@ public sealed record LagekarteTarget(Guid? UnitId, string Label);
 /// <summary>A unit in the list beside the map.</summary>
 public sealed class LagekarteUnitRow
 {
-    /// <summary>The picker's entry for a unit without a Fahrzeugtyp: the bare Kraftfahrzeug sign.</summary>
-    public const string NoVehicleType = "ohne Typ";
-
     private readonly ForceUnit _unit;
-    private readonly Action<Guid, string?> _setVehicleType;
 
-    public LagekarteUnitRow(ForceUnit unit, Action<Guid, string?>? setVehicleType = null)
+    public LagekarteUnitRow(ForceUnit unit)
     {
         ArgumentNullException.ThrowIfNull(unit);
         _unit = unit;
-        _setVehicleType = setVehicleType ?? ((_, _) => { });
-
-        // A type the catalogue lacks -- an old file, another Feuerwehr's Stammdaten -- is offered
-        // too, so the picker shows what is recorded instead of going blank.
-        var codes = VehicleTypes.All.Select(t => t.Code).ToList();
-        if (unit.VehicleType is { } recorded && VehicleTypes.Find(recorded) is null)
-        {
-            codes.Insert(0, recorded);
-        }
-
-        VehicleTypeOptions = [NoVehicleType, .. codes];
     }
 
     public Guid UnitId => _unit.Id;
@@ -799,28 +775,6 @@ public sealed class LagekarteUnitRow
     public bool IsPlaced => Position is not null;
 
     public string PlaceLabel => IsPlaced ? "VERSETZEN" : "AUF KARTE";
-
-    /// <summary>The catalogue's Fahrzeugtypen, after the entry for none.</summary>
-    public IReadOnlyList<string> VehicleTypeOptions { get; }
-
-    public string VehicleTypeAutomationName => $"Fahrzeugtyp von {Title}";
-
-    /// <summary>
-    /// The Fahrzeugtyp the unit's sign shows, as the picker's entry. Picking another one records
-    /// it in the Einsatz; the list is built anew from the incident afterwards.
-    /// </summary>
-    public string SelectedVehicleType
-    {
-        get => _unit.VehicleType ?? NoVehicleType;
-        set
-        {
-            var type = value is null or NoVehicleType ? null : value;
-            if (!string.Equals(type, _unit.VehicleType, StringComparison.Ordinal))
-            {
-                _setVehicleType(_unit.Id, type);
-            }
-        }
-    }
 }
 
 /// <summary>A mark on the map: the Einsatzort, or a unit when <see cref="UnitId"/> is set.</summary>

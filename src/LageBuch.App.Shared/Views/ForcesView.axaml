@@ -221,6 +221,15 @@
                      PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                      Text="{Binding NewCallSign}" />
           </HeaderedContentControl>
+          <!-- The taktisches Zeichen on the Lagekarte (#886), in the grid's order: after the
+               Funkrufname. The picked Fahrzeug fills it in from the Stammdaten, a unit typed in by
+               hand gets it here. Stays open while a Fahrzeug is picked, since the Stammdaten may
+               not name a type for it. -->
+          <HeaderedContentControl Classes="field" Header="FAHRZEUGTYP">
+            <ComboBox x:Name="VehicleTypeBox" MinWidth="110"
+                      ToolTip.Tip="Fahrzeugtyp für das taktische Zeichen"
+                      ItemsSource="{Binding NewVehicleTypeOptions}" SelectedItem="{Binding NewVehicleType}" />
+          </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN"
                                   ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft"
                                   Classes.invalid="{Binding NewStrengthError, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -283,6 +292,20 @@
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
+          <!-- The Fahrzeugtyp its taktisches Zeichen on the Lagekarte shows (#886). Changed here,
+               not beside the map: the map shows the Lage, the Kräfte list holds the units. -->
+          <DataGridTemplateColumn Header="TYP" ClipboardContentBinding="{Binding VehicleTypeChoice}" Width="150">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <ComboBox Margin="6,4" HorizontalAlignment="Stretch"
+                          AutomationProperties.Name="{Binding VehicleTypeAutomationName}"
+                          ToolTip.Tip="Fahrzeugtyp für das taktische Zeichen"
+                          ItemsSource="{Binding VehicleTypeOptions}"
+                          SelectedItem="{Binding VehicleTypeChoice}"
+                          IsEnabled="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTemplateColumn Header="ABSCHNITT" ClipboardContentBinding="{Binding NodeCellLabel}" Width="170">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
@@ -476,6 +499,14 @@
                     <TextBlock Grid.Column="0" Text="ABSCHNITT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
                     <ctrl:NodeChoicePicker Grid.Column="1" Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}"
                                            IsEnabled="{Binding !IsReadOnly}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <TextBlock Grid.Column="0" Text="TYP" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                              AutomationProperties.Name="{Binding VehicleTypeAutomationName}"
+                              ItemsSource="{Binding VehicleTypeOptions}"
+                              SelectedItem="{Binding VehicleTypeChoice}"
+                              IsEnabled="{Binding !IsReadOnly}" />
                   </Grid>
                   <ComboBox HorizontalAlignment="Stretch"
                             ItemsSource="{Binding StatusOptions}"

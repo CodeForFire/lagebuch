@@ -60,6 +60,9 @@ public class TabOrderTests
         Assert.True(view.GetControl<TextBox>("CallSignBox").IsKeyboardFocusWithin);
 
         window.Tab();
+        Assert.True(view.GetControl<ComboBox>("VehicleTypeBox").IsKeyboardFocusWithin);
+
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("ZugfuehrerBox").IsKeyboardFocusWithin);
 
         window.Tab();

@@ -271,14 +271,24 @@ public class ForcesTabRenderTests
         var abschnittButton = grid.GetVisualDescendants().OfType<Button>()
             .Single(b => AutomationProperties.GetName(b) == "Abschnitt wählen");
 
+        var typeBox = grid.GetVisualDescendants().OfType<ComboBox>()
+            .Single(c => AutomationProperties.GetName(c) == "Fahrzeugtyp von FFB 11/1");
+
         grid.Focus();
         Dispatcher.UIThread.RunJobs();
         window.Press(PhysicalKey.Tab);
 
-        // The ABSCHNITT picker sits left of the Stärke column, so it is the first stop in the row.
+        // The TYP picker sits right after the Funkrufname (#886), so it is the first stop in the row.
+        Assert.True(
+            typeBox.IsKeyboardFocusWithin,
+            "Tab from the Forces grid no longer reaches the Fahrzeugtyp picker in one press.");
+
+        window.Press(PhysicalKey.Tab);
+
+        // The ABSCHNITT picker sits left of the Stärke column.
         Assert.True(
             abschnittButton.IsKeyboardFocusWithin,
-            "Tab from the Forces grid no longer reaches the Abschnitt picker in one press.");
+            "Tab from the Fahrzeugtyp picker no longer reaches the Abschnitt picker in one press.");
 
         window.Press(PhysicalKey.Tab);
 

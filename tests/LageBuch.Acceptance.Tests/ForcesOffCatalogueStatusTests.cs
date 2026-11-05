@@ -48,6 +48,7 @@ public class ForcesOffCatalogueStatusTests
     private static string? StatusCellText(ForcesView view) =>
         view.GetVisualDescendants()
             .OfType<ComboBox>()
+            .Where(cb => cb.DataContext is ForceRow row && ReferenceEquals(cb.ItemsSource, row.StatusOptions))
             .Select(cb => cb.SelectionBoxItem as string)
             .FirstOrDefault(text => text is not null);
 
