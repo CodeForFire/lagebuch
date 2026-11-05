@@ -296,6 +296,26 @@
       "tasks": true
     }
   ],
+  "gases": [
+    {
+      "name": "CO",
+      "unit": "ppm",
+      "direction": "steigend",
+      "elevated": 30,
+      "dangerous": 200,
+      "lethal": 800,
+      "plausibleUpTo": 2000
+    },
+    {
+      "name": "O2",
+      "unit": "Vol-%",
+      "direction": "fallend",
+      "elevated": 19.5,
+      "dangerous": 17,
+      "lethal": 10,
+      "plausibleUpTo": 25
+    }
+  ],
   "premises": [
     {
       "name": "Wohnanlage Mühlbach",

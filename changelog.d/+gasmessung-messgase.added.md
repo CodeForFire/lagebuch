@@ -1,0 +1,1 @@
+Gasmessung: the former CO-Messung records up to eight gases per Wohnung, each with its own unit and bands taken from a new Messgase list in the Stammdaten and copied into the Einsatz, so CO₂, H₂S, CH₄ and a falling O₂ reach the matrix, the ETB and the PDF, the tile shows the worst gas, and an Einsatz without Messgase keeps measuring CO exactly as before (#410).

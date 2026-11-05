@@ -18,7 +18,7 @@ public static class ModuleLabels
             [NavModules.InvolvedParties] = "BETEILIGTE",
             [NavModules.IssuedItems] = "AUSGABE",
             [NavModules.Scba] = "ATEMSCHUTZ",
-            [NavModules.Co] = "CO-MESSUNG",
+            [NavModules.Co] = "GASMESSUNG",
             [NavModules.Files] = "DATEIEN",
             [NavModules.Links] = "LINKS",
             [NavModules.Contacts] = "KONTAKTE",

@@ -348,7 +348,16 @@ public class VersionHandshakeTests
     {
         // 37 removes setFuehrungsstufe from the allowlist. A host at 37 refuses the command a client
         // at 36 may still send: a 36 and a 37 must not connect.
-        Assert.Equal(37, SyncProtocol.ProtocolVersion);
-        Assert.Equal(37, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 37, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 37, int.MaxValue);
+    }
+
+    [Fact]
+    public void Several_gases_raise_the_protocol_and_the_floor_to_thirty_eight()
+    {
+        // 38 replaces recordCoValue with recordGasValues and the snapshot's coValue with per-gas
+        // values (#410). A peer at 37 can neither send nor read a value, so the floor rises with it.
+        Assert.Equal(38, SyncProtocol.ProtocolVersion);
+        Assert.Equal(38, SyncProtocol.MinimumProtocolVersion);
     }
 }
