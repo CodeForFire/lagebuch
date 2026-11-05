@@ -818,7 +818,11 @@ public sealed class LagekarteUnitRow
     /// <summary>The Funkrufname, or the Feuerwehr for a unit without one.</summary>
     public string Title => _unit.CallSign ?? _unit.Brigade;
 
-    public string Detail => _unit.CallSign is null ? _unit.Status ?? string.Empty : string.Join(" · ", new[] { _unit.Brigade, _unit.Status }.OfType<string>());
+    /// <summary>
+    /// The Status alone. The Feuerwehr is not repeated: the Funkrufname already names it, and a
+    /// unit without one has the Feuerwehr as its <see cref="Title"/>.
+    /// </summary>
+    public string Detail => _unit.Status ?? string.Empty;
 
     public GeoPoint? Position => _unit.Position;
 
