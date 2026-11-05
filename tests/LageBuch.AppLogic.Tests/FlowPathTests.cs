@@ -29,6 +29,30 @@ public sealed class FlowPathTests : IDisposable
         Assert.InRange(route.DropMetres, 88, 91);
     }
 
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(-1, 0)]
+    [InlineData(0, 1)]
+    [InlineData(0, -1)]
+    [InlineData(1, 1)]
+    [InlineData(1, -1)]
+    [InlineData(-1, 1)]
+    [InlineData(-1, -1)]
+    public void Water_takes_each_of_the_eight_directions_a_plane_falls_in(int east, int north)
+    {
+        var elevation = Terrain((e, n) => 600 - (((east * (e - Origin.East)) + (north * (n - Origin.North))) / 10));
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(0, 0)));
+
+        var (first, second) = (Utm32.FromGeo(route.Points[0]), Utm32.FromGeo(route.Points[1]));
+        Assert.Equal(east * 5.0, second.Easting - first.Easting, precision: 3);
+        Assert.Equal(north * 5.0, second.Northing - first.Northing, precision: 3);
+
+        // A diagonal step is √2 cells long.
+        var step = east != 0 && north != 0 ? 5 * Math.Sqrt(2) : 5;
+        Assert.Equal((route.Points.Count - 1) * step, route.LengthMetres, precision: 3);
+    }
+
     [Fact]
     public void Down_a_slope_into_a_valley_the_water_turns_along_the_valley_floor()
     {

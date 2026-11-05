@@ -252,7 +252,54 @@ public sealed class TerrainOverlayTests : IDisposable
     }
 
     [Fact]
-    public async Task A_trace_for_an_Einsatzort_moved_away_meanwhile_is_dropped()
+    public async Task A_trace_for_an_Einsatzort_that_moved_meanwhile_is_dropped()
+    {
+        using var first = new ManualResetEventSlim();
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at) =>
+            {
+                if (Equals(at, TerrainFixture.Marktplatz))
+                {
+                    first.Wait(TimeSpan.FromSeconds(10));
+                }
+
+                return FlowPath.Trace(elevation, at);
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var stale = terrain.FlowSettled;
+
+        // Moved to where there are no heights: the new trace finds nothing, the old one must not win.
+        terrain.Einsatzort = new GeoPoint(52.52, 13.40);
+        await terrain.FlowSettled;
+        first.Set();
+        await stale;
+
+        Assert.Null(terrain.FlowRoute);
+        Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task A_trace_that_fails_says_so_in_the_key()
+    {
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (_, _) => throw new InvalidOperationException("broken"));
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        Assert.Null(terrain.FlowRoute);
+        Assert.False(terrain.IsTracingFlow);
+        Assert.Equal("Der Fließweg ließ sich nicht berechnen.", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task Leaving_the_layer_while_tracing_drops_the_result()
     {
         var terrain = Shown();
         terrain.Einsatzort = TerrainFixture.Marktplatz;

@@ -23,6 +23,7 @@ public sealed partial class TerrainOverlay : ObservableObject
     private const double RangeRecomputeDistance = 512;
 
     private readonly MapViewport _map;
+    private readonly Func<ElevationSet, GeoPoint, FlowRoute?> _traceFlow;
     private (double Low, double High)? _range;
     private (ElevationSet Elevation, GeoPoint? Einsatzort)? _flowFor;
 
@@ -32,10 +33,13 @@ public sealed partial class TerrainOverlay : ObservableObject
     private bool _flowFailed;
     private (GeoPoint Center, int Zoom)? _rangeAt;
 
-    public TerrainOverlay(MapViewport map)
+    /// <param name="map">The map whose view the colour range follows.</param>
+    /// <param name="traceFlow">Traces the Fließweg; <see cref="FlowPath.Trace"/> unless a test says otherwise.</param>
+    public TerrainOverlay(MapViewport map, Func<ElevationSet, GeoPoint, FlowRoute?>? traceFlow = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         _map = map;
+        _traceFlow = traceFlow ?? FlowPath.Trace;
         Choices =
         [
             new TerrainChoice(this, TerrainLayer.None, "Aus"),
@@ -209,7 +213,6 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             FlowRoute = null;
             _flowFor = null;
-            _flowGeneration++;
             IsTracingFlow = false;
         }
 
@@ -234,7 +237,8 @@ public sealed partial class TerrainOverlay : ObservableObject
 
         _flowFor = (elevation, Einsatzort);
         FlowRoute = null;
-        _flowFailed = false;
+
+        // Stryker disable once Update : any change to the generation drops the older trace.
         var generation = ++_flowGeneration;
         if (Einsatzort is { } at)
         {
@@ -252,7 +256,7 @@ public sealed partial class TerrainOverlay : ObservableObject
         var failed = false;
         try
         {
-            route = await Task.Run(() => FlowPath.Trace(elevation, at));
+            route = await Task.Run(() => _traceFlow(elevation, at));
         }
         catch (Exception)
         {
