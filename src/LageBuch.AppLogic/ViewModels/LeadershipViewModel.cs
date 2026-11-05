@@ -465,12 +465,14 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     /// <summary>
     /// Whether <paramref name="unitId"/> may drop on <paramref name="nodeId"/>, as <see cref="CanMoveUnit"/>
     /// says, and why not in <see cref="DropRefusal"/>. Only a partner's Einsatzleitung has a reason
-    /// to give; the unit's own card refuses in silence, since nothing would change.
+    /// to give; the unit's own card refuses in silence, since nothing would change, and so does a
+    /// unit a peer removed mid-drag, which has no partner rule left to explain.
     /// </summary>
     public bool PreviewUnitDrop(Guid unitId, Guid? nodeId)
     {
         var can = CanMoveUnit(unitId, nodeId);
         DropRefusal = !can && !IsReadOnly
+            && _incident.Forces.Any(u => u.Id == unitId)
             && nodeId is { } id && _incident.FindCommandNode(id) is { Kind: CommandNodeKind.Partner }
             ? Incident.PartnerLeadsNoUnits
             : null;

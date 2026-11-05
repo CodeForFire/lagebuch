@@ -120,6 +120,19 @@ public class LeadershipBoardDragFeedbackTests
     }
 
     [Fact]
+    public void An_unknown_unit_over_a_partner_explains_nothing()
+    {
+        // A peer may remove the unit while it is held; there is no partner rule left to explain.
+        var session = NewSession();
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        using var vm = NewVm(session);
+
+        Assert.False(vm.PreviewUnitDrop(Guid.NewGuid(), rd));
+
+        Assert.Null(vm.DropRefusal);
+    }
+
+    [Fact]
     public void An_unplaced_unit_and_an_unterabschnitt_are_marked_too()
     {
         var session = NewSession();
