@@ -266,9 +266,8 @@
         <!-- The Funkrufname is the unit's name on the sheet: never trimmed, wrapped if it must. -->
         <SelectableTextBlock Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitTitle" Classes="unit-title"
                    Text="{Binding Title}" ToolTip.Tip="{Binding Title}" />
-        <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="secondary" FontSize="11" VerticalAlignment="Center"
-                   TextTrimming="CharacterEllipsis" Text="{Binding Brigade}" ToolTip.Tip="{Binding Brigade}"
-                   IsVisible="{Binding CallSign, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <!-- No Wache under it: the Funkrufname already names the Wache ("FFB 1/40/1"). The strength
+             keeps its own line, so a long Funkrufname above it still fits on one. -->
         <TextBlock Grid.Row="1" Grid.Column="2" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
                    Text="{Binding StrengthText}" ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt" />
         <TextBlock Grid.Row="1" Grid.Column="3" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
