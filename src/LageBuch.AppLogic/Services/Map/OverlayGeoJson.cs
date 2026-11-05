@@ -44,6 +44,9 @@ public static class OverlayGeoJson
     /// <summary>The longest label kept; a longer one is cut.</summary>
     public const int MaxLabelLength = 200;
 
+    /// <summary>The most colours a legend lists.</summary>
+    public const int MaxLegendEntries = 12;
+
     public const string InvalidMessage = "Die Datei ist kein gültiges GeoJSON.";
     public const string CrsMessage = "Koordinatensystem nicht unterstützt – bitte als WGS84 (GeoJSON-Standard) exportieren.";
     public const string TooLargeMessage = "Die Datei ist zu groß für eine Kartenebene.";
@@ -275,10 +278,33 @@ public static class OverlayGeoJson
                 || name.Equals("EPSG:4326", StringComparison.OrdinalIgnoreCase));
     }
 
+    // A DWD Ausbreitungsprognose: each feature says which concentration class it is (pixelvalue)
+    // at which forecast time. Class 0 is the computed area with the plume cut out of it, white:
+    // drawn, it would veil 90 by 160 km of map, so it is left out.
+    private static bool IsDwdFeature(JsonElement properties) =>
+        properties.ValueKind == JsonValueKind.Object
+        && properties.TryGetProperty("pixelvalue", out var v) && v.ValueKind == JsonValueKind.Number
+        && Text(properties, "ftime") is not null;
+
+    private static bool IsDwdBackground(JsonElement properties) =>
+        properties.TryGetProperty("pixelvalue", out var v) && v.TryGetInt32(out var value) && value == 0;
+
+    // "stoff" with 1e-08 ppm reads „Stoff > 1e-08 ppm“; an AEGL class the same way.
+    private static string DwdLabel(JsonElement properties)
+    {
+        var aegl = Text(properties, "aegl")?.Trim();
+        var name = string.IsNullOrEmpty(aegl) ? "Konzentration" : char.ToUpperInvariant(aegl[0]) + aegl[1..];
+        var threshold = Text(properties, "thr_ppm")?.Trim() ?? Number(properties, "thr_ppm")?.ToString(CultureInfo.InvariantCulture);
+        var label = string.IsNullOrEmpty(threshold) ? name : $"{name} > {threshold} ppm";
+        return label.Length > MaxLabelLength ? label[..MaxLabelLength] : label;
+    }
+
     private sealed class Reader
     {
         private readonly List<(DateTimeOffset? Time, OverlayShape Shape)> _shapes = [];
+        private readonly Dictionary<uint, string> _legend = [];
         private int _points;
+        private bool _isDwd;
 
         public string? ReadZip(byte[] bytes)
         {
@@ -393,7 +419,11 @@ public static class OverlayGeoJson
                     .ToList();
 
             var bounds = _shapes.Select(s => s.Shape.Bounds).Aggregate((a, b) => a.Union(b));
-            data = new OverlayData(frames, bounds);
+            data = new OverlayData(frames, bounds)
+            {
+                IsDwdForecast = _isDwd,
+                Legend = _legend.Select(e => new OverlayLegendEntry(e.Key, e.Value)).ToList(),
+            };
             error = null;
             return true;
         }
@@ -429,6 +459,21 @@ public static class OverlayGeoJson
             if (!feature.TryGetProperty("geometry", out var geometry) || geometry.ValueKind == JsonValueKind.Null)
             {
                 return null;
+            }
+
+            if (IsDwdFeature(properties))
+            {
+                _isDwd = true;
+                if (IsDwdBackground(properties))
+                {
+                    return null;
+                }
+
+                var fill = StyleOf(properties, OverlayShapeKind.Area).FillArgb;
+                if (_legend.Count < MaxLegendEntries)
+                {
+                    _legend.TryAdd(fill, DwdLabel(properties));
+                }
             }
 
             return ReadGeometry(geometry, properties, TimeOf(properties), depth: 0);

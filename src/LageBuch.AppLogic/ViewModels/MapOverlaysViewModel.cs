@@ -28,6 +28,10 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     private readonly IClock _clock;
     private readonly Action<GeoBounds> _showBounds;
 
+    // Where the forecast times are read: a DWD file carries them in UTC, and a forecast reopened
+    // after the clocks changed must still say the hour it said on the day.
+    private readonly TimeZoneInfo _timeZone;
+
     // Read and parsed once per file and session: the file never changes, only whether it is shown.
     private readonly Dictionary<Guid, Task<(OverlayData? Data, string? Error, bool Parsed)>> _loads = [];
 
@@ -43,7 +47,8 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         IFileDialogService? dialogs,
         Action<string, string, Action>? requestConfirm,
         IClock clock,
-        Action<GeoBounds> showBounds)
+        Action<GeoBounds> showBounds,
+        TimeZoneInfo? timeZone = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -55,6 +60,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         _requestConfirm = requestConfirm;
         _clock = clock;
         _showBounds = showBounds;
+        _timeZone = timeZone ?? TimeZoneInfo.Local;
         Refresh();
     }
 
@@ -107,7 +113,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         {
             if (!known.TryGetValue(overlay.Id, out var item))
             {
-                item = new MapOverlayItem(overlay, this);
+                item = new MapOverlayItem(overlay, this, _timeZone);
                 Track(LoadAsync(item));
             }
 
@@ -223,11 +229,18 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             return error;
         }
 
-        await _session.AddMapOverlayAsync(fileName, contentType, bytes, data.Summary(Path.GetFileNameWithoutExtension(fileName)));
+        await _session.AddMapOverlayAsync(fileName, contentType, bytes, data.Summary(NameFor(data, fileName)));
         _onChanged();
         _showBounds(data.Bounds);
         return null;
     }
+
+    // A DWD Ausbreitungsprognose is named for when it starts, in the Einsatz's time: its file name
+    // is a run id nobody can read. Anything else keeps its file's name.
+    private string NameFor(OverlayData data, string fileName) =>
+        data.IsDwdForecast && data.Frames[0].Time is { } first
+            ? $"Ausbreitungsprognose DWD {Formatting.Timestamp(TimeZoneInfo.ConvertTime(first, _timeZone))}"
+            : Path.GetFileNameWithoutExtension(fileName);
 
     internal void ConfirmRemove(MapOverlayItem item)
     {
@@ -338,9 +351,11 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
 public sealed partial class MapOverlayItem : ObservableObject
 {
     private readonly MapOverlaysViewModel _owner;
+    private readonly TimeZoneInfo _timeZone;
 
-    internal MapOverlayItem(MapOverlay overlay, MapOverlaysViewModel owner)
+    internal MapOverlayItem(MapOverlay overlay, MapOverlaysViewModel owner, TimeZoneInfo timeZone)
     {
+        _timeZone = timeZone;
         Id = overlay.Id;
         FileId = overlay.FileId;
         Name = overlay.Name;
@@ -363,6 +378,12 @@ public sealed partial class MapOverlayItem : ObservableObject
 
     public string ShowAutomationName => $"{Name}: auf der Karte anzeigen";
 
+    public string TimelineAutomationName => $"{Name}: Prognosezeitpunkt";
+
+    public string PreviousAutomationName => $"{Name}: früherer Zeitpunkt";
+
+    public string NextAutomationName => $"{Name}: späterer Zeitpunkt";
+
     /// <summary>Null while the file is still being read, and when it could not be.</summary>
     public OverlayData? Data { get; private set; }
 
@@ -374,11 +395,49 @@ public sealed partial class MapOverlayItem : ObservableObject
     private string? _loadError;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsTimeline))]
+    [NotifyPropertyChangedFor(nameof(ShowsLegend))]
     private bool _isVisible;
 
     /// <summary>Which point in time is shown, for an Ebene that has several.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FramePosition))]
+    [NotifyPropertyChangedFor(nameof(FrameLabel))]
+    [NotifyCanExecuteChangedFor(nameof(PreviousFrameCommand))]
+    [NotifyCanExecuteChangedFor(nameof(NextFrameCommand))]
     private int _frameIndex;
+
+    /// <summary>The Ebene steps through several points in time.</summary>
+    public bool IsTimeSeries => Data is { Frames.Count: > 1 };
+
+    /// <summary>The Zeitleiste shows under a shown Ebene that has several points in time.</summary>
+    public bool ShowsTimeline => IsVisible && IsTimeSeries;
+
+    public int MaxFrameIndex => Data is { } data ? data.Frames.Count - 1 : 0;
+
+    /// <summary><see cref="FrameIndex"/> as the Zeitleiste's slider moves it.</summary>
+    public double FramePosition
+    {
+        get => FrameIndex;
+        set
+        {
+            if (double.IsFinite(value))
+            {
+                FrameIndex = Math.Clamp((int)Math.Round(value), 0, MaxFrameIndex);
+            }
+        }
+    }
+
+    /// <summary>„Prognose 16:15 Uhr“, in the Einsatz's time; null for an Ebene without times.</summary>
+    public string? FrameLabel =>
+        Data?.Frames[Math.Clamp(FrameIndex, 0, MaxFrameIndex)].Time is { } time
+            ? $"Prognose {Formatting.TimeOfDay(TimeZoneInfo.ConvertTime(time, _timeZone))} Uhr"
+            : null;
+
+    /// <summary>What the Ebene's colours mean, for a DWD Ausbreitungsprognose.</summary>
+    public IReadOnlyList<OverlayLegendEntry> Legend => Data?.Legend ?? [];
+
+    public bool ShowsLegend => IsVisible && Legend.Count > 0;
 
     /// <summary>The shapes of the shown frame; none until the file is read.</summary>
     public IReadOnlyList<OverlayShape> CurrentShapes =>
@@ -386,6 +445,10 @@ public sealed partial class MapOverlayItem : ObservableObject
 
     /// <summary>The file was not there to read; it is looked for again on the next change.</summary>
     public bool IsMissing { get; private set; }
+
+    private bool CanStepBack => FrameIndex > 0;
+
+    private bool CanStepForward => FrameIndex < MaxFrameIndex;
 
     internal void Loaded(OverlayData? data, string? error, bool missing, DateTimeOffset now)
     {
@@ -395,6 +458,15 @@ public sealed partial class MapOverlayItem : ObservableObject
         LoadError = data is null ? $"Ebene konnte nicht gelesen werden: {error}" : null;
         OnPropertyChanged(nameof(Data));
         OnPropertyChanged(nameof(IsLoading));
+        OnPropertyChanged(nameof(IsTimeSeries));
+        OnPropertyChanged(nameof(ShowsTimeline));
+        OnPropertyChanged(nameof(MaxFrameIndex));
+        OnPropertyChanged(nameof(FramePosition));
+        OnPropertyChanged(nameof(FrameLabel));
+        OnPropertyChanged(nameof(Legend));
+        OnPropertyChanged(nameof(ShowsLegend));
+        PreviousFrameCommand.NotifyCanExecuteChanged();
+        NextFrameCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsVisibleChanged(bool value) => _owner.UpdateVisibleShapes();
@@ -406,6 +478,12 @@ public sealed partial class MapOverlayItem : ObservableObject
             _owner.UpdateVisibleShapes();
         }
     }
+
+    [RelayCommand(CanExecute = nameof(CanStepBack))]
+    private void PreviousFrame() => FrameIndex--;
+
+    [RelayCommand(CanExecute = nameof(CanStepForward))]
+    private void NextFrame() => FrameIndex++;
 
     [RelayCommand]
     private void Remove() => _owner.ConfirmRemove(this);

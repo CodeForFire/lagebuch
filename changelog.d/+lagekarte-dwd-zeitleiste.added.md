@@ -1,0 +1,1 @@
+A DWD Ausbreitungsprognose on the Lagekarte is named for its first forecast time, leaves out the empty frame of the computed area, explains its colours by substance and threshold, and gets a Zeitleiste to step through its forecast times.

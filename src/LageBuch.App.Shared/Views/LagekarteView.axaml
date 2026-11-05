@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:c="clr-namespace:LageBuch.App.Shared.Controls"
              xmlns:map="clr-namespace:LageBuch.AppLogic.Services.Map;assembly=LageBuch.AppLogic"
+             xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
              x:Class="LageBuch.App.Shared.Views.LagekarteView"
              x:DataType="vm:LagekarteViewModel">
   <UserControl.KeyBindings>
@@ -176,7 +177,7 @@
             <ItemsControl x:Name="OverlayList" ItemsSource="{Binding Overlays.Items}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:MapOverlayItem">
-                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,8">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
                     <CheckBox Grid.RowSpan="2" VerticalAlignment="Top" IsChecked="{Binding IsVisible}"
                               AutomationProperties.Name="{Binding VisibilityAutomationName}" />
                     <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"
@@ -199,6 +200,39 @@
                     <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding LoadError}" FontSize="12"
                                TextWrapping="Wrap" Foreground="{StaticResource ErrorBrush}"
                                IsVisible="{Binding LoadError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <!-- Zeitleiste: one step per forecast time, stepped by hand. -->
+                    <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,6,0,0" Spacing="2"
+                                IsVisible="{Binding ShowsTimeline}">
+                      <TextBlock Text="{Binding FrameLabel}" FontWeight="SemiBold" FontSize="12" />
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Button Classes="icon-btn" ToolTip.Tip="Früherer Zeitpunkt"
+                                AutomationProperties.Name="{Binding PreviousAutomationName}"
+                                Command="{Binding PreviousFrameCommand}">
+                          <PathIcon Data="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                        </Button>
+                        <Slider Grid.Column="1" Margin="6,0" Minimum="0" Maximum="{Binding MaxFrameIndex}"
+                                TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="BottomRight"
+                                AutomationProperties.Name="{Binding TimelineAutomationName}"
+                                Value="{Binding FramePosition}" />
+                        <Button Grid.Column="2" Classes="icon-btn" ToolTip.Tip="Späterer Zeitpunkt"
+                                AutomationProperties.Name="{Binding NextAutomationName}"
+                                Command="{Binding NextFrameCommand}">
+                          <PathIcon Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                        </Button>
+                      </Grid>
+                    </StackPanel>
+                    <ItemsControl Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,4,0,0"
+                                  ItemsSource="{Binding Legend}" IsVisible="{Binding ShowsLegend}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="map:OverlayLegendEntry">
+                          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,1">
+                            <Rectangle Width="12" Height="12" VerticalAlignment="Center"
+                                       Fill="{Binding FillArgb, Converter={x:Static conv:ArgbBrushConverter.Instance}}" />
+                            <TextBlock Text="{Binding Label}" FontSize="12" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                   </Grid>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
