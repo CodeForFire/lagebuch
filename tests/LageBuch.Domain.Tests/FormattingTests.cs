@@ -10,6 +10,15 @@ public class FormattingTests
     public void Metres_are_whole_and_ungrouped_as_a_map_labels_them(double value, string expected) =>
         Assert.Equal(expected, Formatting.Metres(value));
 
+    [Theory]
+    [InlineData(515.4, "515 m")]
+    [InlineData(999.4, "999 m")]
+    [InlineData(999.5, "1,0 km")]
+    [InlineData(1449, "1,4 km")]
+    [InlineData(3000, "3,0 km")]
+    public void A_distance_switches_to_kilometres_at_one(double metres, string expected) =>
+        Assert.Equal(expected, Formatting.Distance(metres));
+
     [Fact]
     public void A_height_has_one_decimal_with_a_German_comma() =>
         Assert.Equal("554,6 m", Formatting.Height(554.62));

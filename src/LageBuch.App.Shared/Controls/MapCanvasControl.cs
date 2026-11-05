@@ -66,6 +66,10 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<IReadOnlyList<OverlayShape>?> OverlaysProperty =
         AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<OverlayShape>?>(nameof(Overlays));
 
+    /// <summary>The Fließweg from the Einsatzort, start first; null draws none.</summary>
+    public static readonly StyledProperty<IReadOnlyList<GeoPoint>?> FlowPathProperty =
+        AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<GeoPoint>?>(nameof(FlowPath));
+
     public static readonly StyledProperty<ICommand?> TappedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(TappedCommand));
 
@@ -98,7 +102,7 @@ public sealed class MapCanvasControl : Control
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty, IsNightProperty, OverlaysProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty, IsNightProperty, OverlaysProperty, FlowPathProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
@@ -157,6 +161,12 @@ public sealed class MapCanvasControl : Control
     {
         get => GetValue(TerrainStyleProperty);
         set => SetValue(TerrainStyleProperty, value);
+    }
+
+    public IReadOnlyList<GeoPoint>? FlowPath
+    {
+        get => GetValue(FlowPathProperty);
+        set => SetValue(FlowPathProperty, value);
     }
 
     /// <summary>Whether terrain tiles are still being worked out; the map redraws as each is ready.</summary>
@@ -221,7 +231,7 @@ public sealed class MapCanvasControl : Control
         // Missing tiles are painted too, so the whole control stays hit-testable for a drag.
         _tiles.Use(TileSource);
         _terrain.Use(Elevation, TerrainStyle);
-        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint, _terrain, Overlays);
+        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint, _terrain, Overlays, FlowPath);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

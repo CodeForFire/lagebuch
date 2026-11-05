@@ -66,6 +66,7 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
     [InlineData(TerrainLayer.Hoehenschichten, "lagekarte-gelaende-hoehenschichten.png")]
     [InlineData(TerrainLayer.Hangneigung, "lagekarte-gelaende-hangneigung.png")]
     [InlineData(TerrainLayer.RelativZumEinsatzort, "lagekarte-gelaende-relativ.png")]
+    [InlineData(TerrainLayer.Fliessweg, "lagekarte-gelaende-fliessweg.png")]
     public void Each_layer_shows_with_its_key(TerrainLayer layer, string shot)
     {
         var (window, view, vm) = Show(einsatzort: true);
@@ -78,6 +79,8 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
         var text = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "TerrainLegendText");
         Assert.Equal(vm.Terrain.LegendText, text.Text);
         Assert.NotNull(vm.Terrain.Style);
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        Assert.Equal(layer == TerrainLayer.Fliessweg, map.FlowPath is { Count: > 1 });
 
         using var frame = Assert.IsType<WriteableBitmap>(window.CaptureRenderedFrame());
         frame.SavePng(Path.Join(Shots(), shot));

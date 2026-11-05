@@ -1,0 +1,1 @@
+The Lagekarte's GELÄNDE picker now shows the Fließweg from the Einsatzort: where Löschwasser or a spilled Gefahrstoff runs downhill on the DGM5, how far and how steeply, and whether it collects in a Senke.

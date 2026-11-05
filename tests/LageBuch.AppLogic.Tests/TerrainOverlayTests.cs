@@ -16,7 +16,7 @@ public sealed class TerrainOverlayTests : IDisposable
         var terrain = new TerrainOverlay(new MapViewport());
 
         Assert.Equal(
-            ["Aus", "Schummerung", "Höhenlinien", "Höhenschichten", "Hangneigung", "Höhe zum Einsatzort"],
+            ["Aus", "Schummerung", "Höhenlinien", "Höhenschichten", "Hangneigung", "Höhe zum Einsatzort", "Fließweg vom Einsatzort"],
             terrain.Choices.Select(c => c.Label));
         Assert.Equal(TerrainLayer.None, terrain.Layer);
         Assert.True(terrain.Choices[0].IsSelected);
@@ -58,7 +58,7 @@ public sealed class TerrainOverlayTests : IDisposable
         terrain.Choices[1].IsSelected = true;
 
         Assert.Equal(TerrainLayer.Schummerung, terrain.Layer);
-        Assert.Equal([false, true, false, false, false, false], terrain.Choices.Select(c => c.IsSelected));
+        Assert.Equal([false, true, false, false, false, false, false], terrain.Choices.Select(c => c.IsSelected));
         Assert.Equal(new TerrainStyle(TerrainLayer.Schummerung), terrain.Style);
 
         terrain.Choices[0].IsSelected = true;
@@ -188,6 +188,83 @@ public sealed class TerrainOverlayTests : IDisposable
         map.ChangeViewCommand.Execute(new MapViewChange(Shift(TerrainFixture.Marktplatz, 90, 15), 15));
         Assert.DoesNotContain(nameof(TerrainOverlay.ShowsRampKey), raised);
         Assert.DoesNotContain(nameof(TerrainOverlay.ShowsLegend), raised);
+    }
+
+    [Fact]
+    public void The_Fliessweg_waits_for_an_Einsatzort_then_runs_from_it()
+    {
+        var terrain = Shown();
+        terrain.Layer = TerrainLayer.Fliessweg;
+
+        Assert.Null(terrain.FlowPoints);
+        Assert.Equal("Für den Fließweg erst den Einsatzort setzen.", terrain.LegendText);
+        Assert.False(terrain.ShowsFlowKey);
+
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        var points = Assert.IsAssignableFrom<IReadOnlyList<GeoPoint>>(terrain.FlowPoints);
+        Assert.True(points.Count > 10);
+        Assert.Equal(TerrainFixture.Marktplatz.Latitude, points[0].Latitude, precision: 4);
+        Assert.Equal(TerrainFixture.Marktplatz.Longitude, points[0].Longitude, precision: 4);
+        Assert.StartsWith("Fließweg ", terrain.LegendText, StringComparison.Ordinal);
+        Assert.True(terrain.ShowsFlowKey);
+        Assert.Equal(new TerrainStyle(TerrainLayer.Fliessweg), terrain.Style);
+    }
+
+    [Fact]
+    public void The_Fliessweg_is_traced_once_per_Einsatzort_not_on_every_pan()
+    {
+        var map = new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz };
+        var terrain = Shown(map);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var first = terrain.FlowRoute;
+
+        map.ChangeViewCommand.Execute(new MapViewChange(Shift(TerrainFixture.Marktplatz, 300, 15), 15));
+        Assert.Same(first, terrain.FlowRoute);
+
+        terrain.Einsatzort = Shift(TerrainFixture.Marktplatz, 100, 15);
+        Assert.NotSame(first, terrain.FlowRoute);
+    }
+
+    [Fact]
+    public void Leaving_the_Fliessweg_takes_the_line_off_the_map_and_coming_back_draws_it_again()
+    {
+        var terrain = Shown();
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+
+        terrain.Layer = TerrainLayer.Schummerung;
+        Assert.Null(terrain.FlowPoints);
+        Assert.False(terrain.ShowsFlowKey);
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        Assert.NotNull(terrain.FlowPoints);
+    }
+
+    [Fact]
+    public void The_Fliessweg_is_a_line_and_shows_even_too_far_out_for_relief()
+    {
+        var map = new MapViewport { Zoom = TerrainSampler.MinZoom - 1, Center = TerrainFixture.Marktplatz };
+        var terrain = Shown(map);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+
+        Assert.NotNull(terrain.FlowPoints);
+        Assert.StartsWith("Fließweg ", terrain.LegendText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_heights_under_the_Einsatzort_the_key_says_so()
+    {
+        var terrain = Shown();
+        terrain.Einsatzort = new GeoPoint(52.52, 13.40);
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+
+        Assert.Null(terrain.FlowPoints);
+        Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
     }
 
     private TerrainOverlay Shown(MapViewport? map = null)

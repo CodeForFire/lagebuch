@@ -23,6 +23,7 @@ public sealed partial class TerrainOverlay : ObservableObject
 
     private readonly MapViewport _map;
     private (double Low, double High)? _range;
+    private (ElevationSet Elevation, GeoPoint? Einsatzort)? _flowFor;
     private (GeoPoint Center, int Zoom)? _rangeAt;
 
     public TerrainOverlay(MapViewport map)
@@ -37,6 +38,7 @@ public sealed partial class TerrainOverlay : ObservableObject
             new TerrainChoice(this, TerrainLayer.Hoehenschichten, "Höhenschichten"),
             new TerrainChoice(this, TerrainLayer.Hangneigung, "Hangneigung"),
             new TerrainChoice(this, TerrainLayer.RelativZumEinsatzort, "Höhe zum Einsatzort"),
+            new TerrainChoice(this, TerrainLayer.Fliessweg, "Fließweg vom Einsatzort"),
         ];
         _map.PropertyChanged += OnMapChanged;
     }
@@ -58,6 +60,14 @@ public sealed partial class TerrainOverlay : ObservableObject
     [ObservableProperty]
     private TerrainStyle? _style;
 
+    /// <summary>
+    /// The way water runs from the Einsatzort while <see cref="TerrainLayer.Fliessweg"/> is shown;
+    /// null otherwise, without an Einsatzort, or where there are no heights under it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FlowPoints))]
+    private FlowRoute? _flowRoute;
+
     /// <summary>Why a pack's heights are missing, in German; the map works on without them.</summary>
     [ObservableProperty]
     private string? _error;
@@ -78,6 +88,11 @@ public sealed partial class TerrainOverlay : ObservableObject
     public bool ShowsRelativeKey { get; private set; }
 
     public bool ShowsRampKey { get; private set; }
+
+    public bool ShowsFlowKey { get; private set; }
+
+    /// <summary>What the map draws of <see cref="FlowRoute"/>: its points, start first.</summary>
+    public IReadOnlyList<GeoPoint>? FlowPoints => FlowRoute?.Points;
 
     /// <summary>
     /// Opens the heights of <paramref name="packs"/>. A pack without an elevation file is left out
@@ -164,12 +179,23 @@ public sealed partial class TerrainOverlay : ObservableObject
                     legend = "Relief überhöht dargestellt";
                     style = new TerrainStyle(Layer);
                     break;
+                case TerrainLayer.Fliessweg:
+                    legend = FlowLegend(FlowFor(elevation));
+                    style = new TerrainStyle(Layer);
+                    break;
             }
 
-            if (tooFar)
+            // The Fließweg is a line, drawn at any zoom; only its relief needs the map closer.
+            if (tooFar && Layer != TerrainLayer.Fliessweg)
             {
                 legend = "Gelände: näher heranzoomen.";
             }
+        }
+
+        if (Layer != TerrainLayer.Fliessweg || Elevation is null)
+        {
+            FlowRoute = null;
+            _flowFor = null;
         }
 
         Style = style;
@@ -178,7 +204,42 @@ public sealed partial class TerrainOverlay : ObservableObject
             legend,
             slope: reachable && Layer == TerrainLayer.Hangneigung,
             relative: reachable && Layer == TerrainLayer.RelativZumEinsatzort,
-            ramp: reachable && Layer == TerrainLayer.Hoehenschichten);
+            ramp: reachable && Layer == TerrainLayer.Hoehenschichten,
+            flow: FlowRoute is not null);
+    }
+
+    // Traced again only when the Einsatzort or the heights change, never on a pan.
+    private FlowRoute? FlowFor(ElevationSet elevation)
+    {
+        if (_flowFor is { } done && ReferenceEquals(done.Elevation, elevation) && Equals(done.Einsatzort, Einsatzort))
+        {
+            return FlowRoute;
+        }
+
+        _flowFor = (elevation, Einsatzort);
+        FlowRoute = Einsatzort is { } at ? FlowPath.Trace(elevation, at) : null;
+        return FlowRoute;
+    }
+
+    private string FlowLegend(FlowRoute? route)
+    {
+        if (Einsatzort is null)
+        {
+            return "Für den Fließweg erst den Einsatzort setzen.";
+        }
+
+        if (route is null)
+        {
+            return "Am Einsatzort gibt es keine Höhendaten.";
+        }
+
+        var end = route.End switch
+        {
+            FlowPathEnd.Senke => "sammelt sich in einer Senke",
+            FlowPathEnd.Kartenrand => "läuft aus dem Kartenpaket hinaus",
+            _ => $"nach {Formatting.Distance(FlowPath.MaxLength)} nicht weiter verfolgt",
+        };
+        return $"Fließweg {Formatting.Distance(route.LengthMetres)}, {Formatting.Metres(route.DropMetres)} Gefälle, {end}";
     }
 
     private (double Low, double High)? RangeFor(ElevationSet elevation)
@@ -207,7 +268,7 @@ public sealed partial class TerrainOverlay : ObservableObject
     }
 
     // Each part of the key tells the view only when it changed: Update runs on every pan.
-    private void SetLegend(string? text, bool slope, bool relative, bool ramp)
+    private void SetLegend(string? text, bool slope, bool relative, bool ramp, bool flow)
     {
         var wasShown = ShowsLegend;
         if (!string.Equals(LegendText, text, StringComparison.Ordinal))
@@ -237,6 +298,12 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             ShowsRampKey = ramp;
             OnPropertyChanged(nameof(ShowsRampKey));
+        }
+
+        if (ShowsFlowKey != flow)
+        {
+            ShowsFlowKey = flow;
+            OnPropertyChanged(nameof(ShowsFlowKey));
         }
     }
 }
