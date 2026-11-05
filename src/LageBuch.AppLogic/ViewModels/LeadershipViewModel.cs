@@ -461,7 +461,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         var lines = AllFunkgruppeLines().ToList();
         var key = _highlightedFunkgruppe;
         bool Matches((TalkGroupKind Kind, FunkgruppeLine Line) l) =>
-            key is { } k && l.Kind == k.Kind && string.Equals(l.Line.Text, k.Text, StringComparison.Ordinal);
+            key is { } k && l.Kind == k.Kind && FunkCheck.SameGroup(l.Line.Text, k.Text);
 
         var lit = lines.Count(Matches) >= 2;
         foreach (var l in lines)

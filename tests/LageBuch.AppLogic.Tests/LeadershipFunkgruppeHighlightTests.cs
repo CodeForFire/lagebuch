@@ -61,6 +61,22 @@ public sealed class LeadershipFunkgruppeHighlightTests
         Assert.False(vm.El.DmoLines.Single().Highlight.IsHighlighted);
     }
 
+    // FunkCheck marks "FW 1000" and "fw  1000" shared, so hovering one lights the other.
+    [Fact]
+    public void A_funkgruppe_written_differently_lights_up_as_funkcheck_reads_it()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], null), null);
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["fw  1000"], null));
+        using var vm = NewVm(session);
+        Assert.True(Card(vm, "Nord").TmoLines.Single().IsShared); // the check agrees they are one
+
+        vm.HighlightFunkgruppe(vm.El.TmoLines.Single());
+
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(Card(vm, "Nord").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
     [Fact]
     public void A_funkgruppe_shown_only_once_is_not_highlighted()
     {
