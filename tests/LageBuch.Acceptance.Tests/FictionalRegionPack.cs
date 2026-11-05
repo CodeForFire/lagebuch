@@ -1,6 +1,7 @@
 using System.Text.Json;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Map.Elevation;
 using LageBuch.Persistence.Map.Vector;
 using LageBuch.Persistence.Sqlite;
 using LageBuch.Persistence.Tests;
@@ -21,7 +22,11 @@ internal static class FictionalRegionPack
     /// <summary>Where the made-up Musterstraße 1 lies: the middle of the Marktplatz.</summary>
     public static readonly GeoPoint Musterstrasse1 = new(48.1785, 11.2555);
 
-    public static void Install(string root)
+    /// <summary>
+    /// Installs the pack under <paramref name="root"/>; <paramref name="withElevation"/> adds the
+    /// made-up terrain, as a pack built before the DGM5 was part of it would lack it.
+    /// </summary>
+    public static void Install(string root, bool withElevation = true)
     {
         var folder = Directory.CreateDirectory(Path.Join(root, "ffb")).FullName;
         var info = new RegionPackInfo("Landkreis Fürstenfeldbruck", "ffb", 1, "https://example.org/ffb-v1.zip", 52_731_904, new string('a', 64), 10.9527, 48.0607, 11.4532, 48.3237, 0, 15, "2026-10-27T20:15:49Z", Attribution);
@@ -30,6 +35,10 @@ internal static class FictionalRegionPack
         File.WriteAllText(Path.Join(folder, InstalledRegionPack.WaterFileName), WaterPoints);
         WriteAddresses(Path.Join(folder, InstalledRegionPack.AddressesFileName));
         File.WriteAllBytes(Path.Join(folder, InstalledRegionPack.VectorTilesFileName), VectorMap());
+        if (withElevation)
+        {
+            File.WriteAllBytes(Path.Join(folder, InstalledRegionPack.ElevationFileName), Elevation.Value);
+        }
     }
 
     private const string WaterPoints = """
@@ -124,4 +133,20 @@ internal static class FictionalRegionPack
                 (VectorGeometryType.Point, [("kind", "bench")], [[At(48.1790, 11.2580)]])),
         ];
     }
+
+    // Made-up terrain, built once per test run: the Marktplatz at 530 m in a valley running east
+    // to west along the Musterbach, ground rising gently to the north, and the "Musterberg", 45 m
+    // high, half a kilometre north-east of it. A 10 m grid 6 km square.
+    private static readonly Lazy<byte[]> Elevation = new(() =>
+    {
+        var (e0, n0) = Utm32.FromGeo(Musterstrasse1);
+        var grid = new GeoTiffFixtures.Grid((Math.Floor(e0 / 10) * 10) - 3000, (Math.Floor(n0 / 10) * 10) + 3000, 10, 600, 600);
+        return GeoTiffFixtures.Build(grid, (e, n) =>
+        {
+            var hill = 45 * Math.Exp(-((((e - e0 - 600) * (e - e0 - 600)) + ((n - n0 - 450) * (n - n0 - 450))) / (2 * 380.0 * 380.0)));
+            var valley = -12 * Math.Exp(-((n - n0 + 120) * (n - n0 + 120)) / (2 * 260.0 * 260.0));
+            var ridge = 18 * Math.Exp(-(((e - e0 + 1300) * (e - e0 + 1300)) / (2 * 300.0 * 300.0))) * Math.Exp(-(((n - n0 + 900) * (n - n0 + 900)) / (2 * 900.0 * 900.0)));
+            return (float)(530 + ((n - n0) * 0.006) + hill + valley + ridge);
+        });
+    });
 }

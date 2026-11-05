@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using LageBuch.App.Shared.Controls;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
@@ -12,6 +14,11 @@ public partial class LagekarteView : UserControl
     public LagekarteView() => InitializeComponent();
 
     private LagekarteViewModel? ViewModel => DataContext as LagekarteViewModel;
+
+    // A choice in a Flyout does not dismiss it (#832); one pick is all the GELÄNDE picker is for.
+    // Closed once the click is over, as in ScbaView, so the radio button's binding has written first.
+    private void OnTerrainPicked(object? sender, RoutedEventArgs e) =>
+        Dispatcher.UIThread.Post(() => TerrainButton.Flyout?.Hide());
 
     private void OnMarkerPressed(object? sender, PointerPressedEventArgs e)
     {

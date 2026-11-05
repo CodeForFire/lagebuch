@@ -55,6 +55,14 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         IsReadOnly = session.IsReadOnly;
         _library = mapPacks;
         _addressQuery = session.Incident.Location is null ? RecordedAddress(session.Incident) : string.Empty;
+        Terrain = new TerrainOverlay(Map);
+        Terrain.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(TerrainOverlay.ShowsLegend))
+            {
+                OnPropertyChanged(nameof(ShowsLegend));
+            }
+        };
         Refresh();
         ShowPacks(InstalledPacks(mapPacks), centerOnPacks: true);
         if (session.Incident.Location is { } location)
@@ -77,6 +85,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     public void Dispose() => _session.Changed -= Refresh;
 
     public MapViewport Map { get; } = new();
+
+    /// <summary>The GELÄNDE picker: the packs' DGM5 heights laid over the map.</summary>
+    public TerrainOverlay Terrain { get; }
 
     /// <summary>Every unit of the Einsatz, by Funkrufname, each saying whether it is on the map.</summary>
     public ObservableCollection<LagekarteUnitRow> Units { get; } = new();
@@ -157,8 +168,8 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>The POI colours' key, from the zoom the map names Feuerwachen, Schulen and the like.</summary>
     public bool ShowsPoiLegend => Map.TileSource is not null && Map.Zoom >= PoiLayer.MinZoom;
 
-    /// <summary>Whether the key shows at all: for the water symbols, the POI colours, or both.</summary>
-    public bool ShowsLegend => ShowsWaterLegend || ShowsPoiLegend;
+    /// <summary>Whether the key shows at all: for the water symbols, the POI colours, the terrain layer.</summary>
+    public bool ShowsLegend => ShowsWaterLegend || ShowsPoiLegend || Terrain.ShowsLegend;
 
     partial void OnShowWaterPointsChanged(bool value)
     {
@@ -623,6 +634,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
         PinPositions = Markers.Select(m => m.Position).ToList();
         EinsatzortPosition = incident.Location;
+        Terrain.Einsatzort = incident.Location;
 
         // A unit that left the Einsatz while it was picked cannot be placed any more.
         if (Placing is { UnitId: { } picked } && units.All(u => u.Id != picked))
@@ -644,6 +656,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     {
         _packs = packs;
         Map.ShowAll(packs, centerOnPacks);
+        Terrain.Show(packs);
         OnPropertyChanged(nameof(HasNoMap));
         OnPropertyChanged(nameof(CanSearchAddresses));
 

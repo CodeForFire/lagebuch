@@ -28,9 +28,10 @@ public static class MapDrawing
     /// <paramref name="rotation"/> degrees about the middle of <paramref name="size"/>. Names are
     /// laid over it upright, a street's name along its street, and the
     /// <paramref name="waterPoints"/> over those: a name that would run under a water point's
-    /// label is left out, since the label is what the crew is looking for.
+    /// label is left out, since the label is what the crew is looking for. The
+    /// <paramref name="terrain"/> layer lies between the tiles and the names.
     /// </summary>
-    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null)
+    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null, TerrainTileCache? terrain = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(tiles);
@@ -52,6 +53,11 @@ public static class MapDrawing
             foreach (var layer in layers)
             {
                 DrawLayer(context, tiles, layer, center, zoom, size, turn, labels);
+            }
+
+            if (terrain is not null && zoom >= TerrainSampler.MinZoom)
+            {
+                DrawTerrain(context, terrain, center, zoom, size, turn, rotation);
             }
 
             // The names of every vector tile, over all tiles and unclipped, so none is cut at a tile's
@@ -172,6 +178,120 @@ public static class MapDrawing
                     {
                         context.DrawImage(bitmap, target);
                         labels.AddRange(tiles.Labels(layer, zoom, tx, ty).Select(l => (l, turn.Transform(target.TopLeft + l.Anchor))));
+                    }
+                }
+            }
+        }
+    }
+
+    // Brown like a topographic map's contours; the relative layer's lines in grey, its Einsatzort line black.
+    private static readonly IPen ContourPen = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0xD9, 0x9A, 0x6B, 0x3F)), 0.7);
+    private static readonly IPen ZaehllinienPen = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromRgb(0x7A, 0x4A, 0x1F)), 1.4);
+    private static readonly IPen RelativePen = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0x99, 0x33, 0x33, 0x33)), 0.6);
+    private static readonly IPen ReferencePen = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21)), 1.6);
+    private static readonly IBrush ContourLabelBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x5D, 0x37, 0x17));
+    private static readonly IBrush RelativeLabelBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x21, 0x21, 0x21));
+    private static readonly IPen ContourLabelHalo = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF)), 3, lineJoin: PenLineJoin.Round);
+
+    // The terrain tiles over the map's, turned with it: first every image, then the lines, then the
+    // lines' labels -- so a neighbouring tile's image never covers a line or a label. Past
+    // TerrainSampler.MaxZoom a tile of that zoom is drawn enlarged: finer than the DGM's 5 m cells,
+    // a finer tile would only show the cells' edges.
+    private static void DrawTerrain(DrawingContext context, TerrainTileCache terrain, GeoPoint center, int zoom, Size size, Matrix turn, double rotation)
+    {
+        if (terrain.Style is not { } style)
+        {
+            return;
+        }
+
+        var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
+        var left = centerX - (size.Width / 2);
+        var top = centerY - (size.Height / 2);
+        var shown = turn.TryInvert(out var back) ? new Rect(size).TransformToAABB(back) : new Rect(size);
+        var (firstX, firstY) = WebMercator.ToTileIndex(left + shown.Left, top + shown.Top);
+        var (lastX, lastY) = WebMercator.ToTileIndex(left + shown.Right, top + shown.Bottom);
+        var sourceZoom = Math.Min(zoom, TerrainSampler.MaxZoom);
+        var levels = zoom - sourceZoom;
+        var scale = (double)(1 << levels);
+        var side = WebMercator.TileSizePixels * scale;
+        var tilesPerSide = 1 << sourceZoom;
+        var (fromX, toX) = (Math.Max(firstX >> levels, 0), Math.Min(lastX >> levels, tilesPerSide - 1));
+        var (fromY, toY) = (Math.Max(firstY >> levels, 0), Math.Min(lastY >> levels, tilesPerSide - 1));
+        terrain.Reserve(Math.Max(0, toX - fromX + 1) * Math.Max(0, toY - fromY + 1));
+        var drawn = new List<(Point Origin, DrawnTerrainTile Tile)>();
+        for (var tx = fromX; tx <= toX; tx++)
+        {
+            for (var ty = fromY; ty <= toY; ty++)
+            {
+                if (terrain.Get(sourceZoom, tx, ty) is { } tile)
+                {
+                    drawn.Add((new Point((tx * side) - left, (ty * side) - top), tile));
+                }
+            }
+        }
+
+        var relative = style.Layer == TerrainLayer.RelativZumEinsatzort;
+
+        // The lines are drawn through the enlargement, so their pens are made thinner by as much.
+        IPen Thin(IPen pen) => levels == 0 ? pen : new ImmutablePen((IImmutableBrush?)pen.Brush, pen.Thickness / scale);
+        var pens = (Reference: Thin(ReferencePen), Relative: Thin(RelativePen), Zaehllinie: Thin(ZaehllinienPen), Contour: Thin(ContourPen));
+
+        // Smoothed only when enlarged: at 1:1 a filter blends each tile's edge with the nothing beyond it, and draws a seam.
+        using (context.PushTransform(turn))
+        using (context.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = levels == 0 ? Avalonia.Media.Imaging.BitmapInterpolationMode.None : Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality }))
+        {
+            foreach (var (origin, tile) in drawn)
+            {
+                if (tile.Image is { } image)
+                {
+                    context.DrawImage(image, new Rect(origin, new Size(side, side)));
+                }
+            }
+
+            foreach (var (origin, tile) in drawn)
+            {
+                using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(origin.X, origin.Y)))
+                {
+                    foreach (var line in tile.Contours)
+                    {
+                        var pen = (relative, line.IsMajor) switch
+                        {
+                            (true, true) => pens.Reference,
+                            (true, false) => pens.Relative,
+                            (false, true) => pens.Zaehllinie,
+                            _ => pens.Contour,
+                        };
+                        context.DrawGeometry(null, pen, line.Lines);
+                    }
+                }
+            }
+
+            // A label that would touch one already drawn is left out; the line still shows.
+            var taken = new List<Rect>();
+            foreach (var (origin, tile) in drawn)
+            {
+                foreach (var label in tile.Contours.Select(c => c.Label).OfType<TerrainLabel>())
+                {
+                    // Along its line, but never upside down on the turned map.
+                    var angle = label.Angle;
+                    var onScreen = Math.IEEERemainder(angle + (rotation * Math.PI / 180), 2 * Math.PI);
+                    if (onScreen is > Math.PI / 2 or < -Math.PI / 2)
+                    {
+                        angle += Math.PI;
+                    }
+
+                    var at = Matrix.CreateRotation(angle) * Matrix.CreateTranslation(origin.X + (label.At.X * scale), origin.Y + (label.At.Y * scale));
+                    var bounds = label.Outline.Bounds.TransformToAABB(at).Inflate(4);
+                    if (taken.Exists(t => t.Intersects(bounds)))
+                    {
+                        continue;
+                    }
+
+                    taken.Add(bounds);
+                    using (context.PushTransform(at))
+                    {
+                        context.DrawGeometry(null, ContourLabelHalo, label.Outline);
+                        context.DrawGeometry(relative ? RelativeLabelBrush : ContourLabelBrush, null, label.Outline);
                     }
                 }
             }

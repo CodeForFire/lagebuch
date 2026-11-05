@@ -6,6 +6,7 @@ using Avalonia.Media;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map;
+using LageBuch.Persistence.Map.Elevation;
 
 namespace LageBuch.App.Shared.Controls;
 
@@ -49,6 +50,14 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<WaterPoint?> SelectedWaterPointProperty =
         AvaloniaProperty.Register<MapCanvasControl, WaterPoint?>(nameof(SelectedWaterPoint));
 
+    /// <summary>The Kartenpakete' heights; null draws no terrain.</summary>
+    public static readonly StyledProperty<ElevationSet?> ElevationProperty =
+        AvaloniaProperty.Register<MapCanvasControl, ElevationSet?>(nameof(Elevation));
+
+    /// <summary>Which terrain layer to lay over the tiles, and how; null draws none.</summary>
+    public static readonly StyledProperty<TerrainStyle?> TerrainStyleProperty =
+        AvaloniaProperty.Register<MapCanvasControl, TerrainStyle?>(nameof(TerrainStyle));
+
     public static readonly StyledProperty<ICommand?> TappedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(TappedCommand));
 
@@ -65,6 +74,7 @@ public sealed class MapCanvasControl : Control
     private const double TwistSlop = 10;
 
     private readonly MapTileCache _tiles = new();
+    private readonly TerrainTileCache _terrain;
 
     // Where a drag started, on screen and on the map; null while no drag is under way.
     private Point? _dragStart;
@@ -80,13 +90,14 @@ public sealed class MapCanvasControl : Control
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
 
     public MapCanvasControl()
     {
+        _terrain = new TerrainTileCache(InvalidateVisual);
         GestureRecognizers.Add(new PinchGestureRecognizer());
         AddHandler(PinchEvent, OnPinch);
         AddHandler(PinchEndedEvent, OnPinchEnded);
@@ -127,6 +138,21 @@ public sealed class MapCanvasControl : Control
         get => GetValue(SelectedWaterPointProperty);
         set => SetValue(SelectedWaterPointProperty, value);
     }
+
+    public ElevationSet? Elevation
+    {
+        get => GetValue(ElevationProperty);
+        set => SetValue(ElevationProperty, value);
+    }
+
+    public TerrainStyle? TerrainStyle
+    {
+        get => GetValue(TerrainStyleProperty);
+        set => SetValue(TerrainStyleProperty, value);
+    }
+
+    /// <summary>Whether terrain tiles are still being worked out; the map redraws as each is ready.</summary>
+    public bool IsTerrainBusy => _terrain.IsBusy;
 
     public bool WheelZoomNeedsControl
     {
@@ -174,13 +200,15 @@ public sealed class MapCanvasControl : Control
 
         // Missing tiles are painted too, so the whole control stays hit-testable for a drag.
         _tiles.Use(TileSource);
-        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint);
+        _terrain.Use(Elevation, TerrainStyle);
+        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint, _terrain);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
         _tiles.Clear();
+        _terrain.Clear();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -193,6 +221,11 @@ public sealed class MapCanvasControl : Control
         if (change.Property == TileSourceProperty)
         {
             _tiles.Use(TileSource);
+        }
+
+        if (change.Property == ElevationProperty || change.Property == TerrainStyleProperty)
+        {
+            _terrain.Use(Elevation, TerrainStyle);
         }
     }
 

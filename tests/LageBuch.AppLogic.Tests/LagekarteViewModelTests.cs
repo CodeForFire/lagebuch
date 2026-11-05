@@ -1038,6 +1038,48 @@ public class LagekarteViewModelTests
         Assert.Empty(library.Searches);
     }
 
+    [Fact]
+    public void A_pack_with_heights_offers_the_terrain_and_its_key_joins_the_map_s_legend()
+    {
+        var root = Directory.CreateTempSubdirectory("lagebuch-terrain-").FullName;
+        try
+        {
+            var library = new FakeRegionPackLibrary();
+            library.Preinstall(TerrainFixture.Pack(root));
+            var (session, _, _) = Open();
+            using var vm = new LagekarteViewModel(session, () => { }, library);
+            vm.Map.ChangeViewCommand.Execute(new MapViewChange(TerrainFixture.Marktplatz, 15));
+            var raised = new List<string?>();
+            vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+            Assert.True(vm.Terrain.HasElevation);
+            vm.Terrain.Layer = TerrainLayer.Hangneigung;
+
+            Assert.True(vm.ShowsLegend);
+            Assert.Contains(nameof(LagekarteViewModel.ShowsLegend), raised);
+
+            raised.Clear();
+            vm.Terrain.Layer = TerrainLayer.Hoehenlinien;
+            Assert.DoesNotContain(nameof(LagekarteViewModel.ShowsLegend), raised);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void The_terrain_measures_from_the_Einsatzort_as_it_is_marked_and_moved()
+    {
+        var (session, vm, _) = Open();
+
+        Assert.Null(vm.Terrain.Einsatzort);
+        session.SetIncidentLocation(Marktplatz);
+        Assert.Equal(Marktplatz, vm.Terrain.Einsatzort);
+        session.SetIncidentLocation(Amperbruecke);
+        Assert.Equal(Amperbruecke, vm.Terrain.Einsatzort);
+    }
+
     private static FakeRegionPackLibrary FfbLibrary()
     {
         var library = new FakeRegionPackLibrary();

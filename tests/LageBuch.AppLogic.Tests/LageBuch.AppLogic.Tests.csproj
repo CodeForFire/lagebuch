@@ -29,6 +29,8 @@
   <ItemGroup>
     <!-- The byte-level PMTiles/MVT builder, so a viewport test can show a real archive. -->
     <Compile Include="..\LageBuch.Persistence.Tests\VectorTileFixtures.cs" Link="VectorTileFixtures.cs" />
+    <!-- The GeoTIFF writer, so terrain is drawn from made-up heights, never from real DGM data. -->
+    <Compile Include="..\LageBuch.Persistence.Tests\GeoTiffFixtures.cs" Link="GeoTiffFixtures.cs" />
   </ItemGroup>
 
   <ItemGroup>
