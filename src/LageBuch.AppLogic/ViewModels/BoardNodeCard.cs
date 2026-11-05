@@ -175,7 +175,7 @@ public sealed partial class BoardNodeCard : ObservableObject
     /// <summary>What the card says the node is; a partner's node is an Einsatzleitung.</summary>
     public string KindLabel => CommandNodeKindLabels.Of(Kind);
 
-    /// <summary>The Leiter row's label, as said for this kind of node: EAL, UAL, EL or LEITER.</summary>
+    /// <summary>The Leiter row's label, as said for this kind of node: EAL, UEAL, EL or LEITER.</summary>
     public string LeiterLabel => LeiterLabels.Of(Kind).ToUpperInvariant();
 
     /// <summary>The Leiter button's tooltip and automation name, e.g. "EAL festlegen".</summary>

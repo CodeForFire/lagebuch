@@ -42,7 +42,7 @@ public class LeadershipViewModelTests
         var abschnitt = vm.Sections.Single(c => c.Kind == CommandNodeKind.Abschnitt);
         Assert.Equal(("EAL", "EAL festlegen"), (abschnitt.LeiterLabel, abschnitt.SetLeiterTip));
         var unterabschnitt = abschnitt.Children.Single();
-        Assert.Equal(("UAL", "UAL festlegen"), (unterabschnitt.LeiterLabel, unterabschnitt.SetLeiterTip));
+        Assert.Equal(("UEAL", "UEAL festlegen"), (unterabschnitt.LeiterLabel, unterabschnitt.SetLeiterTip));
         var bereitstellung = vm.Sections.Single(c => c.Kind == CommandNodeKind.Bereitstellung);
         Assert.Equal(("LEITER", "Leiter festlegen"), (bereitstellung.LeiterLabel, bereitstellung.SetLeiterTip));
         var partner = vm.Partners.Single();

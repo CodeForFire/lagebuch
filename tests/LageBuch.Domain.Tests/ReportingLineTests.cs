@@ -293,7 +293,7 @@ public class ReportingLineTests
         var sub = CommandNode.Rehydrate(
             Guid.NewGuid(), CommandNodeKind.Unterabschnitt, "Dach", parent.Id, null, null, null, null, null, null);
         var unit = ForceUnit.Rehydrate(Guid.NewGuid(), "Aich", null, 6, 0, null, null, 0, nodeId: sub.Id);
-        var leiter = RoleAssignment.Create("UAL", "Huber", nodeId: sub.Id, slot: RoleSlot.Leiter);
+        var leiter = RoleAssignment.Create("UEAL", "Huber", nodeId: sub.Id, slot: RoleSlot.Leiter);
         var incident = Rehydrated([parent, sub], roles: [leiter], forces: [unit]);
 
         var entry = ReportingLine.Of(incident).Single(e => e.Node?.Id == sub.Id);

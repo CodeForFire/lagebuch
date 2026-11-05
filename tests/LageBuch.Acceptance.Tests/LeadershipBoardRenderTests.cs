@@ -1220,7 +1220,7 @@ public class LeadershipBoardRenderTests
         var moved = session.Incident.FindCommandNode(sued)!;
         Assert.Equal((CommandNodeKind.Unterabschnitt, NodeId(session, "Abschnitt 1 Nord")), (moved.Kind, moved.ParentId));
         var card = Card(board.View, "Abschnitt 2 Süd");
-        Assert.Contains("UAL", card.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("field-label")).Select(t => t.Text));
+        Assert.Contains("UEAL", card.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("field-label")).Select(t => t.Text));
     }
 
     [AvaloniaFact]
