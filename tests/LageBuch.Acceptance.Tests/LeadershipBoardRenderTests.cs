@@ -606,6 +606,12 @@ public class LeadershipBoardRenderTests
             view.GetVisualDescendants().OfType<NodeChoicePicker>().ToList(),
             p => Assert.True(p.IsEffectivelyVisible && p.IsEffectivelyEnabled));
 
+        // The phone's only way to move a unit stays a thumb target, icon or not.
+        var touch = (double)Application.Current!.FindResource("ControlHeightTouch")!;
+        Assert.All(
+            view.GetVisualDescendants().OfType<NodeChoicePicker>().Select(p => p.GetControl<Button>("PickerButton")).ToList(),
+            b => Assert.True(b.Bounds.Width >= touch - 1 && b.Bounds.Height >= touch - 1, $"{b.Bounds.Size} below {touch}"));
+
         // A phone has no hover: the reason AUFLÖSEN is off stands on the card, only where it is off.
         TextBlock Reason(string name) => Card(view, name).GetVisualDescendants().OfType<TextBlock>()
             .First(t => t.Name == "DissolveBlockedText");
@@ -905,6 +911,36 @@ public class LeadershipBoardRenderTests
 
         Assert.Equal(NodeId(session, "Dach"), NodeOfUnit(session, unit));
         Assert.Contains(board.Vm.Sections.Single(c => c.Name == "Abschnitt 1 Nord").Children.Single().Units, u => u.Id == unit);
+    }
+
+    // The card already names where a unit sits, so the picker repeating it cost every unit a line
+    // of its own. It is an icon at the end of the strength line now; its tooltip still names it.
+    [AvaloniaFact]
+    public void A_unit_row_moves_through_an_icon_beside_its_strength_not_a_line_of_its_own()
+    {
+        var board = Show();
+        var rows = board.View.GetVisualDescendants().OfType<Grid>()
+            .Where(g => g.DataContext is BoardUnitRow && g.Children.OfType<NodeChoicePicker>().Any())
+            .ToList();
+        Assert.NotEmpty(rows);
+
+        foreach (var row in rows)
+        {
+            var picker = row.Children.OfType<NodeChoicePicker>().Single();
+            var strength = row.Children.OfType<TextBlock>().Single(t => t.Name == "UnitStrength");
+            var button = picker.GetControl<Button>("PickerButton");
+            Assert.True(button.IsEffectivelyVisible);
+            Assert.DoesNotContain(button.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible);
+            Assert.Contains(button.GetVisualDescendants().OfType<PathIcon>(), i => i.IsEffectivelyVisible);
+            Assert.Equal(((BoardUnitRow)row.DataContext!).NodeLabel, ToolTip.GetTip(button));
+
+            // Same line: the strength's vertical middle lies within the button.
+            var top = button.TranslatePoint(default, row)!.Value.Y;
+            var middle = strength.TranslatePoint(default, row)!.Value.Y + (strength.Bounds.Height / 2);
+            Assert.True(
+                middle >= top && middle <= top + button.Bounds.Height,
+                $"strength middle {middle} outside the picker's {top}..{top + button.Bounds.Height}");
+        }
     }
 
     [AvaloniaFact]

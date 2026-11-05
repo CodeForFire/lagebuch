@@ -135,6 +135,11 @@ public class CommandNodeDialogRenderTests
         Assert.True(position.IsEffectivelyVisible);
         Assert.Equal(CommandNodeDialogViewModel.OwnAbschnittLabel, parent.Label);
         Assert.Equal("Bereitstellung Marktplatz", position.Label);
+
+        // Here the label is the information: the dialog's pickers say it, not an icon as the board does.
+        Assert.Contains(
+            position.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.IsEffectivelyVisible && t.Text == "Bereitstellung Marktplatz");
         Assert.Equal("Liegt in", AutomationProperties.GetName(parent.GetVisualDescendants().OfType<Button>().First()));
         Assert.True(Find<Border>(window, "CommandNodeDialogCard").Bounds.Width <= width - 32 + 1);
         Capture(window, shot);
