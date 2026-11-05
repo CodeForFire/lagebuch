@@ -81,15 +81,21 @@ internal sealed class FakeStore : IIncidentStore
 
 internal sealed class FakeDialogs : IFileDialogService
 {
+    /// <summary>What the Stammdaten Import picker hands back; null, as if cancelled, by default.</summary>
+    public string? ImportJsonPath { get; init; }
+
+    /// <summary>What the Stammdaten Export picker hands back; null, as if cancelled, by default.</summary>
+    public string? ExportJsonPath { get; init; }
+
     public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
 
-    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickImportJsonAsync() => Task.FromResult(ImportJsonPath);
 
-    public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+    public Task<string?> PickExportJsonAsync(string s) => Task.FromResult(ExportJsonPath);
 
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
 

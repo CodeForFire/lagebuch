@@ -3,6 +3,7 @@ using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
+using LageBuch.TestFixtures;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -1294,5 +1295,40 @@ public class MasterDataEditorViewModelTests
 
         Assert.Same(karten, vm.Sections.OfType<MapPacksSection>().Single());
         Assert.False(vm.IsDirty);
+    }
+
+    // The editor's leg of the import/export round trip, with nothing faked but the file pickers:
+    // the real file service reads the fixture, every section's ToValues builds what SPEICHERN
+    // writes into a real masterdata.db, and a fresh editor exports it again. The rendered editor
+    // repeats this in MasterDataRoundTripTests; if only that one fails, the loss is in the view.
+    [Fact]
+    public async Task Importing_saving_and_exporting_the_full_fixture_gives_back_the_same_file()
+    {
+        var dir = Path.Join(Path.GetTempPath(), $"md-vm-roundtrip-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var provider = new MasterDataProvider(Path.Join(dir, "masterdata.db"));
+            var exportPath = Path.Join(dir, "export.json");
+            var dialogs = new FakeDialogs { ImportPath = StammdatenFixture.Path, ExportPath = exportPath };
+
+            var importer = Vm(provider, dialogs, new MasterDataFileService());
+            await importer.ImportCommand.ExecuteAsync(null);
+            Assert.Null(importer.FileError);
+            importer.SaveCommand.Execute(null);
+            Assert.False(importer.IsDirty);
+
+            var exporter = Vm(new MasterDataProvider(Path.Join(dir, "masterdata.db")), dialogs, new MasterDataFileService());
+            Assert.False(exporter.IsDirty);
+            await exporter.ExportCommand.ExecuteAsync(null);
+            Assert.Null(exporter.FileError);
+
+            Assert.Equal(StammdatenFixture.Json, StammdatenFixture.Canonical(await File.ReadAllTextAsync(exportPath)));
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(dir, recursive: true);
+        }
     }
 }

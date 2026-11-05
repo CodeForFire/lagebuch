@@ -23,4 +23,10 @@
     <ProjectReference Include="..\..\src\LageBuch.Persistence\LageBuch.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The fictional all-fields Stammdaten file the import/export round-trip tests share. -->
+    <Compile Include="..\Fixtures\StammdatenFixture.cs" Link="Fixtures\StammdatenFixture.cs" />
+    <None Include="..\Fixtures\stammdaten-vollstaendig.json" Link="Fixtures\stammdaten-vollstaendig.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,333 @@
+{
+  "roles": [
+    {
+      "name": "Einsatzleiter",
+      "uniqueness": "uniquePerIncident",
+      "slot": "leiter"
+    },
+    {
+      "name": "Einsatzabschnittsleiter",
+      "uniqueness": "uniquePerSection",
+      "slot": "leiter"
+    },
+    {
+      "name": "Melder",
+      "uniqueness": "multiple",
+      "slot": "melder"
+    },
+    {
+      "name": "Führungsassistent",
+      "uniqueness": "multiple",
+      "slot": "fuehrungsassistent"
+    },
+    {
+      "name": "Fachberater Gefahrgut",
+      "uniqueness": "multiple",
+      "slot": "fachberater"
+    },
+    {
+      "name": "Gruppenführer",
+      "uniqueness": "multiple",
+      "slot": null
+    }
+  ],
+  "unitStatus": [
+    "Alarmiert",
+    "Auf Anfahrt",
+    "Im Einsatz / Übergabe"
+  ],
+  "keywords": [
+    "B3 Person",
+    "THL Öl auf Gewässer"
+  ],
+  "devices": [
+    {
+      "name": "Mobilteil 2",
+      "count": 1
+    },
+    {
+      "name": "Mobilteil 10",
+      "count": 3
+    },
+    {
+      "name": "Sonstiges (siehe Bemerkung)",
+      "count": 0
+    },
+    {
+      "name": "Weste Einsatzleiter",
+      "count": 2
+    }
+  ],
+  "districts": [
+    "Musterhausen",
+    "Beispielried"
+  ],
+  "streets": [
+    {
+      "name": "Hauptstraße",
+      "district": "Musterhausen",
+      "postalCode": "82256",
+      "place": "Fürstenfeldbruck"
+    },
+    {
+      "name": "Am Mühlbach",
+      "district": "",
+      "postalCode": "",
+      "place": ""
+    }
+  ],
+  "truppTypes": [
+    {
+      "name": "Angriffstrupp",
+      "memberCount": 2,
+      "maxDurationMinutes": 30
+    },
+    {
+      "name": "CSA-Trupp",
+      "memberCount": 3,
+      "maxDurationMinutes": 20
+    },
+    {
+      "name": "Langzeit-Trupp",
+      "memberCount": 2,
+      "maxDurationMinutes": 240
+    }
+  ],
+  "checklists": [
+    {
+      "id": "00000000-0000-4000-8000-00000000a001",
+      "title": "Aufbau ELW",
+      "items": [
+        {
+          "text": "Aufstellort ELW frei / gesichert?",
+          "mandatory": true
+        },
+        {
+          "text": "Kennleuchte ein, Blaulicht aus?",
+          "mandatory": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-00000000a002",
+      "title": "Übergabe",
+      "items": [
+        {
+          "text": "Lage an Nachfolger übergeben",
+          "mandatory": false
+        }
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "module": "checklist",
+      "checklistId": "00000000-0000-4000-8000-00000000a001",
+      "visible": true
+    },
+    {
+      "module": "etb",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "tasks",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "leadership",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "involved",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "scba",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "co",
+      "checklistId": null,
+      "visible": false
+    },
+    {
+      "module": "files",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "links",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "contacts",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "issued",
+      "checklistId": null,
+      "visible": true
+    },
+    {
+      "module": "checklist",
+      "checklistId": "00000000-0000-4000-8000-00000000a002",
+      "visible": false
+    }
+  ],
+  "links": [
+    {
+      "name": "Wetterdienst",
+      "url": "https://example.org/wetter",
+      "group": ""
+    },
+    {
+      "name": "Gefahrstoffdatenbank Ä/Ö/Ü",
+      "url": "https://example.org/gefahrstoffe?q=ä&x=1",
+      "group": "Gefahrgut"
+    }
+  ],
+  "vehicles": [
+    {
+      "wache": "FF Musterhausen",
+      "callSign": "Florian Musterhausen 11/1",
+      "seats": 3,
+      "hasZugfuehrer": true,
+      "isOwn": true,
+      "phone": "0170 0000001",
+      "email": "elw@example.org",
+      "vehicleType": "ELW 1"
+    },
+    {
+      "wache": "FF Musterhausen",
+      "callSign": "Florian Musterhausen 40/1",
+      "seats": 9,
+      "hasZugfuehrer": false,
+      "isOwn": true,
+      "phone": null,
+      "email": null,
+      "vehicleType": "HLF"
+    },
+    {
+      "wache": "FF Beispielried",
+      "callSign": "Florian Beispielried 44/1",
+      "seats": 6,
+      "hasZugfuehrer": false,
+      "isOwn": false,
+      "phone": null,
+      "email": null,
+      "vehicleType": null
+    }
+  ],
+  "talkGroups": [
+    {
+      "name": "FW_MUSTER",
+      "number": "1000",
+      "kind": "tmo",
+      "note": "Einsatzstelle",
+      "favorite": true
+    },
+    {
+      "name": "301_F",
+      "number": null,
+      "kind": "dmo",
+      "note": "Atemschutzüberwachung",
+      "favorite": false
+    },
+    {
+      "name": "RD_MUSTER",
+      "number": "1001",
+      "kind": "tmo",
+      "note": null,
+      "favorite": false
+    }
+  ],
+  "personnel": [
+    {
+      "lastName": "Beispiel",
+      "firstName": "Bernd",
+      "role": null,
+      "callSign": null,
+      "phone": null,
+      "isOwn": false,
+      "email": null,
+      "note": null
+    },
+    {
+      "lastName": "Musterfrau",
+      "firstName": "Erika",
+      "role": "Gruppenführer",
+      "callSign": "Land 2",
+      "phone": "0170 0000003",
+      "isOwn": true,
+      "email": "erika@example.org",
+      "note": "Fachberaterin Gefahrgut, Atemschutzgerätewartin"
+    },
+    {
+      "lastName": "Mustermann",
+      "firstName": "Max",
+      "role": "Einsatzleiter",
+      "callSign": "Land 1",
+      "phone": "0170 0000002",
+      "isOwn": true,
+      "email": "max@example.org",
+      "note": null
+    }
+  ],
+  "textSnippets": [
+    {
+      "shortcut": "stl",
+      "text": "Stromleitung beschädigt, Bereich abgesperrt, EVU alarmiert",
+      "category": "Sonderfall",
+      "etb": true,
+      "tasks": false
+    },
+    {
+      "shortcut": "kon",
+      "text": "[X] kontrollieren",
+      "category": "",
+      "etb": false,
+      "tasks": true
+    }
+  ],
+  "premises": [
+    {
+      "name": "Wohnanlage Mühlbach",
+      "street": "Am Mühlbach",
+      "houseNumber": "5a",
+      "postalCode": "82256",
+      "place": "Fürstenfeldbruck",
+      "floors": 3,
+      "apartmentsPerFloor": 4,
+      "undergroundFloors": 1,
+      "apartmentLabels": {
+        "0:1": "Hausmeister",
+        "2:3": "Müller / Schmidt"
+      }
+    },
+    {
+      "name": "Bauhof",
+      "street": "",
+      "houseNumber": "",
+      "postalCode": "",
+      "place": "",
+      "floors": 1,
+      "apartmentsPerFloor": 1,
+      "undergroundFloors": 0,
+      "apartmentLabels": {}
+    }
+  ],
+  "settings": {
+    "ilsReminderIntervalMinutes": 20,
+    "ilsReminderFollowUpIntervalMinutes": 45,
+    "returnPressureBar": 60,
+    "dispatchCentreName": "Integrierte Leitstelle Muster",
+    "incidentNumberFormat": "{A} 1.2 {JJMMTT} {NNNN}"
+  }
+}
