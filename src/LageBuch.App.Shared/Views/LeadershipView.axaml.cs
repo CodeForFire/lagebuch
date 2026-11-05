@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -22,9 +21,6 @@ public partial class LeadershipView : UserControl
 
     // The card or strip a drop would land in, for the highlight only; whether it may is the view model's.
     private Border? _dropTarget;
-
-    // The Funkgruppe chip under the pointer, so a refresh that takes it away can end its highlight.
-    private Control? _hoveredFunkgruppe;
 
     public LeadershipView()
     {
@@ -219,27 +215,11 @@ public partial class LeadershipView : UserControl
     // A Funkgruppe under the pointer: which lines light up with it is the view model's.
     private void OnFunkgruppePointerEntered(object? sender, PointerEventArgs e)
     {
-        if (sender is Control { DataContext: FunkgruppeLine line } chip)
+        if ((sender as Control)?.DataContext is FunkgruppeLine line)
         {
-            _hoveredFunkgruppe = chip;
             ViewModel?.HighlightFunkgruppe(line);
         }
     }
 
-    private void OnFunkgruppePointerExited(object? sender, PointerEventArgs e)
-    {
-        _hoveredFunkgruppe = null;
-        ViewModel?.ClearFunkgruppeHighlight();
-    }
-
-    // A refresh that replaces or removes the chip under a resting pointer raises no PointerExited
-    // on it, so the lines it lit would stay lit with nothing hovered.
-    private void OnFunkgruppeDetached(object? sender, VisualTreeAttachmentEventArgs e)
-    {
-        if (ReferenceEquals(sender, _hoveredFunkgruppe))
-        {
-            _hoveredFunkgruppe = null;
-            ViewModel?.ClearFunkgruppeHighlight();
-        }
-    }
+    private void OnFunkgruppePointerExited(object? sender, PointerEventArgs e) => ViewModel?.ClearFunkgruppeHighlight();
 }

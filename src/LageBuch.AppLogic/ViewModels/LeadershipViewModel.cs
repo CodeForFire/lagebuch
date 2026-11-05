@@ -36,8 +36,10 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     // The incident as the last refresh showed it: the move guard judges against what the board offers.
     private Incident _incident;
 
-    // The Funkgruppe under the pointer, by kind and text; null while none is.
-    private (TalkGroupKind Kind, string Text)? _highlightedFunkgruppe;
+    // The Funkgruppe line under the pointer; null while none is. Held as the line itself, not its
+    // text: a refresh that takes the line off the board takes its chip too, which gets no
+    // PointerExited, so the highlight has to end with the line.
+    private FunkgruppeLine? _hoveredFunkgruppe;
 
     // The unplaced units whose status says Bereitstellungsraum, as the last refresh found them. They
     // stay unplaced; the board only shows them in every Bereitstellungsraum card (#825).
@@ -439,29 +441,30 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     /// Lights up every line on the board with the same Funkgruppe as <paramref name="line"/>: same
     /// kind, same text, compared as <see cref="FunkCheck"/> does. Only when it is shown at least
     /// twice, since one that appears once has nowhere else to point to. A line no card shows turns
-    /// the highlight off.
+    /// the highlight off, and so does a refresh that takes <paramref name="line"/> off the board.
     /// </summary>
     public void HighlightFunkgruppe(FunkgruppeLine line)
     {
         ArgumentNullException.ThrowIfNull(line);
-        var shown = AllFunkgruppeLines().FirstOrDefault(l => ReferenceEquals(l.Line, line));
-        _highlightedFunkgruppe = shown.Line is null ? null : (shown.Kind, line.Text);
+        _hoveredFunkgruppe = line;
         ApplyFunkgruppeHighlight();
     }
 
     /// <summary>Turns the highlight off, as the pointer leaves a Funkgruppe.</summary>
     public void ClearFunkgruppeHighlight()
     {
-        _highlightedFunkgruppe = null;
+        _hoveredFunkgruppe = null;
         ApplyFunkgruppeHighlight();
     }
 
     private void ApplyFunkgruppeHighlight()
     {
         var lines = AllFunkgruppeLines().ToList();
-        var key = _highlightedFunkgruppe;
+
+        // The hovered line as the board shows it now; default (no line) once a refresh took it away.
+        var hovered = lines.FirstOrDefault(l => ReferenceEquals(l.Line, _hoveredFunkgruppe));
         bool Matches((TalkGroupKind Kind, FunkgruppeLine Line) l) =>
-            key is { } k && l.Kind == k.Kind && FunkCheck.SameGroup(l.Line.Text, k.Text);
+            hovered.Line is { } h && l.Kind == hovered.Kind && FunkCheck.SameGroup(l.Line.Text, h.Text);
 
         var lit = lines.Count(Matches) >= 2;
         foreach (var l in lines)

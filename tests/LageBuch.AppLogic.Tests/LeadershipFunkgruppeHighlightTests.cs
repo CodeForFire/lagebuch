@@ -115,6 +115,36 @@ public sealed class LeadershipFunkgruppeHighlightTests
         Assert.True(Card(vm, "Nord").TmoLines.Single().Highlight.IsHighlighted);
     }
 
+    // The chip under the pointer goes with its line and gets no PointerExited: the others go dark.
+    [Fact]
+    public void A_refresh_that_takes_the_hovered_line_away_turns_the_highlight_off()
+    {
+        var session = TwoAbschnitte();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "West", funkgruppen: new Funkgruppen(["FW 1000"], null));
+        using var vm = NewVm(session);
+        vm.HighlightFunkgruppe(Card(vm, "Nord").TmoLines.Single());
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+
+        var nord = session.Incident.CommandNodes.Single(n => n.Name == "Nord");
+        session.UpdateCommandNode(nord.Id, nord.Name, null, null, null, null, null, new Funkgruppen(["FW 3000"], ["301_F"]));
+
+        Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(Card(vm, "West").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_refresh_that_keeps_the_hovered_line_keeps_the_highlight()
+    {
+        var session = TwoAbschnitte();
+        using var vm = NewVm(session);
+        vm.HighlightFunkgruppe(Card(vm, "Nord").TmoLines.Single());
+
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "West", funkgruppen: new Funkgruppen(["FW 1000"], null));
+
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(Card(vm, "West").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
     [Fact]
     public void A_line_from_no_card_on_the_board_highlights_nothing()
     {
