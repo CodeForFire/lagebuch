@@ -70,13 +70,13 @@
       <Setter Property="Margin" Value="0,8,0,0" />
       <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
-    <!-- The icon-btn look for the one toggle; Button.icon-btn does not reach a ToggleButton. -->
-    <Style Selector="ToggleButton#WaterPointsToggle">
+    <!-- The icon-btn look for the map's toggles; Button.icon-btn does not reach a ToggleButton. -->
+    <Style Selector="ToggleButton.map-toggle">
       <Setter Property="Width" Value="28" />
       <Setter Property="Height" Value="28" />
       <Setter Property="Padding" Value="0" />
     </Style>
-    <Style Selector="ToggleButton#WaterPointsToggle PathIcon">
+    <Style Selector="ToggleButton.map-toggle PathIcon">
       <Setter Property="Width" Value="14" />
       <Setter Property="Height" Value="14" />
     </Style>
@@ -90,6 +90,25 @@
     <!-- On a phone the key wraps, leaving the attribution its corner. -->
     <Style Selector="Panel#WorkspaceRoot.narrow Border#WaterLegend">
       <Setter Property="MaxWidth" Value="180" />
+    </Style>
+    <!-- What floats over the map in the map's own colours: light by day, dark with NACHTKARTE. -->
+    <Style Selector="Border#WaterLegend">
+      <Setter Property="Background" Value="#E6FFFFFF" />
+    </Style>
+    <Style Selector="Grid#MapArea.night Border#WaterLegend">
+      <Setter Property="Background" Value="#E61E2023" />
+    </Style>
+    <Style Selector="Border#Attribution">
+      <Setter Property="Background" Value="#CCFFFFFF" />
+    </Style>
+    <Style Selector="Grid#MapArea.night Border#Attribution">
+      <Setter Property="Background" Value="#CC1E2023" />
+    </Style>
+    <Style Selector="Border#Attribution TextBlock">
+      <Setter Property="Foreground" Value="#FF333333" />
+    </Style>
+    <Style Selector="Grid#MapArea.night Border#Attribution TextBlock">
+      <Setter Property="Foreground" Value="#FFB0B0B0" />
     </Style>
     <Style Selector="Border.map-banner">
       <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
@@ -171,9 +190,10 @@
     <!-- The map, its marks, and what floats over it. -->
     <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <Grid x:Name="MapArea">
+      <Grid x:Name="MapArea" Classes.night="{Binding IsNightMap}">
         <c:MapCanvasControl x:Name="Map"
                             AutomationProperties.Name="Lagekarte"
+                            IsNight="{Binding IsNightMap}"
                             TileSource="{Binding Map.TileSource}"
                             WaterPoints="{Binding VisibleWaterPoints}"
                             Elevation="{Binding Terrain.Elevation}"
@@ -362,7 +382,7 @@
                   IsVisible="{Binding Map.IsRotated}" Command="{Binding Map.FaceNorthCommand}">
             <c:CompassNeedle Angle="{Binding Map.Rotation}" />
           </Button>
-          <ToggleButton x:Name="WaterPointsToggle" Classes="icon-btn" ToolTip.Tip="Hydranten zeigen"
+          <ToggleButton x:Name="WaterPointsToggle" Classes="icon-btn map-toggle" ToolTip.Tip="Hydranten zeigen"
                         AutomationProperties.Name="Hydranten zeigen"
                         IsVisible="{Binding HasWaterPoints}" IsChecked="{Binding ShowWaterPoints}">
             <PathIcon Data="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
@@ -388,12 +408,18 @@
               </Flyout>
             </Button.Flyout>
           </Button>
+          <!-- Dark map colours for a dark ELW; kept on this device for the next Einsatz. -->
+          <ToggleButton x:Name="NightMapToggle" Classes="icon-btn map-toggle" ToolTip.Tip="Nachtkarte"
+                        AutomationProperties.Name="Nachtkarte"
+                        IsChecked="{Binding IsNightMap}">
+            <PathIcon Data="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z" />
+          </ToggleButton>
         </StackPanel>
 
         <!-- What the water symbols and the POI dots mean, whenever they are on the map. Drawn like
              MapDrawing and VectorTileRenderer draw them. -->
         <Border x:Name="WaterLegend" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8"
-                Background="#E6FFFFFF" CornerRadius="{StaticResource RadiusSm}" Padding="8,4"
+                CornerRadius="{StaticResource RadiusSm}" Padding="8,4"
                 IsVisible="{Binding ShowsLegend}">
           <StackPanel Spacing="2">
             <StackPanel.Styles>
@@ -403,11 +429,45 @@
                 <Setter Property="VerticalAlignment" Value="Center" />
                 <Setter Property="Margin" Value="4,0,10,0" />
               </Style>
+              <Style Selector="Grid#MapArea.night TextBlock">
+                <Setter Property="Foreground" Value="#FFE4E4E4" />
+              </Style>
               <Style Selector="Ellipse.poi">
                 <Setter Property="Width" Value="8" />
                 <Setter Property="Height" Value="8" />
                 <Setter Property="Stroke" Value="White" />
                 <Setter Property="StrokeThickness" Value="1" />
+              </Style>
+              <!-- MapStyle's POI inks, day and night. -->
+              <Style Selector="Ellipse.fire">
+                <Setter Property="Fill" Value="#FFE65100" />
+              </Style>
+              <Style Selector="Ellipse.help">
+                <Setter Property="Fill" Value="#FF6A1B9A" />
+              </Style>
+              <Style Selector="Ellipse.people">
+                <Setter Property="Fill" Value="#FFAD1457" />
+              </Style>
+              <Style Selector="Ellipse.office">
+                <Setter Property="Fill" Value="#FF455A64" />
+              </Style>
+              <Style Selector="Ellipse.fuel">
+                <Setter Property="Fill" Value="#FF795548" />
+              </Style>
+              <Style Selector="Grid#MapArea.night Ellipse.fire">
+                <Setter Property="Fill" Value="#FFFF8A3D" />
+              </Style>
+              <Style Selector="Grid#MapArea.night Ellipse.help">
+                <Setter Property="Fill" Value="#FFB585DD" />
+              </Style>
+              <Style Selector="Grid#MapArea.night Ellipse.people">
+                <Setter Property="Fill" Value="#FFE8709F" />
+              </Style>
+              <Style Selector="Grid#MapArea.night Ellipse.office">
+                <Setter Property="Fill" Value="#FF9AAEB8" />
+              </Style>
+              <Style Selector="Grid#MapArea.night Ellipse.fuel">
+                <Setter Property="Fill" Value="#FFB8968A" />
               </Style>
             </StackPanel.Styles>
             <WrapPanel x:Name="WaterPointKey" IsVisible="{Binding ShowsWaterLegend}">
@@ -451,26 +511,26 @@
               <TextBlock x:Name="TerrainLegendText" Text="{Binding Terrain.LegendText}" />
             </WrapPanel>
             <WrapPanel x:Name="PoiKey" IsVisible="{Binding ShowsPoiLegend}">
-              <Ellipse Classes="poi" Fill="#FFE65100" />
+              <Ellipse Classes="poi fire" />
               <TextBlock Text="Feuerwehr" />
-              <Ellipse Classes="poi" Fill="#FF6A1B9A" />
+              <Ellipse Classes="poi help" />
               <TextBlock Text="Krankenhaus · Polizei" />
-              <Ellipse Classes="poi" Fill="#FFAD1457" />
+              <Ellipse Classes="poi people" />
               <TextBlock Text="Schule · Kita · Pflegeheim" />
-              <Ellipse Classes="poi" Fill="#FF455A64" />
+              <Ellipse Classes="poi office" />
               <TextBlock Text="Rathaus · Apotheke" />
-              <Ellipse Classes="poi" Fill="#FF795548" />
+              <Ellipse Classes="poi fuel" />
               <TextBlock Text="Tankstelle" />
             </WrapPanel>
           </StackPanel>
         </Border>
 
         <!-- ODbL: every map drawn from OSM data names its source. -->
-        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#CCFFFFFF" Padding="4,1"
+        <Border x:Name="Attribution" HorizontalAlignment="Right" VerticalAlignment="Bottom" Padding="4,1"
                 IsVisible="{Binding Map.Attribution, Converter={x:Static ObjectConverters.IsNotNull}}">
           <StackPanel>
-            <TextBlock Text="{Binding Map.Attribution}" FontSize="10" Foreground="#FF333333" TextWrapping="Wrap" />
-            <TextBlock x:Name="WaterPointsNote" Text="{Binding WaterPointsNote}" FontSize="10" Foreground="#FF333333"
+            <TextBlock Text="{Binding Map.Attribution}" FontSize="10" TextWrapping="Wrap" />
+            <TextBlock x:Name="WaterPointsNote" Text="{Binding WaterPointsNote}" FontSize="10"
                        IsVisible="{Binding WaterPointsNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>
         </Border>

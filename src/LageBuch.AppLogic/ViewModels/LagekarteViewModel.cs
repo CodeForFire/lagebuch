@@ -30,6 +30,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly IRegionPackLibrary? _library;
+    private readonly MapNightMode _nightMode;
     private IReadOnlyList<InstalledRegionPack> _packs = [];
 
     // Screen coordinates stay independent of the view's UI toolkit.
@@ -46,7 +47,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     // Counts water point loads, so a slow read for an older set of packs cannot overwrite a newer one.
     private int _waterLoad;
 
-    public LagekarteViewModel(IIncidentSession session, Action onChanged, IRegionPackLibrary? mapPacks = null)
+    public LagekarteViewModel(IIncidentSession session, Action onChanged, IRegionPackLibrary? mapPacks = null, MapNightMode? nightMode = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -54,6 +55,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
         _library = mapPacks;
+        _nightMode = nightMode ?? new MapNightMode();
         _addressQuery = session.Incident.Location is null ? RecordedAddress(session.Incident) : string.Empty;
         Terrain = new TerrainOverlay(Map);
         Terrain.PropertyChanged += (_, e) =>
@@ -71,6 +73,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
 
         _session.Changed += Refresh;
+        _nightMode.Changed += OnNightModeChanged;
         Map.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(MapViewport.Zoom) or nameof(MapViewport.TileSource))
@@ -82,7 +85,11 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         };
     }
 
-    public void Dispose() => _session.Changed -= Refresh;
+    public void Dispose()
+    {
+        _session.Changed -= Refresh;
+        _nightMode.Changed -= OnNightModeChanged;
+    }
 
     public MapViewport Map { get; } = new();
 
@@ -170,6 +177,36 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
     /// <summary>Whether the key shows at all: for the water symbols, the POI colours, the terrain layer.</summary>
     public bool ShowsLegend => ShowsWaterLegend || ShowsPoiLegend || Terrain.ShowsLegend;
+
+    /// <summary>
+    /// The NACHTKARTE switch: the map in dark colours, for a dark ELW. Belongs to this device, so
+    /// every map open on it follows; a switch that cannot be saved stays as it was and says so in
+    /// <see cref="ActionError"/>.
+    /// </summary>
+    public bool IsNightMap
+    {
+        get => _nightMode.IsNight;
+        set
+        {
+            if (value == _nightMode.IsNight)
+            {
+                return;
+            }
+
+            try
+            {
+                _nightMode.Set(value);
+                ActionError = null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ActionError = $"Nachtkarte nicht gespeichert: {ex.Message}";
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private void OnNightModeChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(IsNightMap));
 
     partial void OnShowWaterPointsChanged(bool value)
     {

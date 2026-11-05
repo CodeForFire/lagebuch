@@ -34,6 +34,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IAlarmService _alarm;
     private readonly AlarmMute? _alarmMute;
     private readonly IRegionPackLibrary? _mapPacks;
+    private readonly MapNightMode? _mapNightMode;
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly ILastPdfExportStore? _lastPdfExportStore;
@@ -57,10 +58,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly Dictionary<Guid, ChecklistViewModel> _checklists = new();
     private bool _disposed;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _mapPacks = mapPacks;
+        _mapNightMode = mapNightMode;
         _session = session;
         _local = session as LocalIncidentSession;
         _clock = clock;
@@ -1122,7 +1124,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OpenRoleAssignmentDialog,
             OfferUndo);
 
-        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks);
+        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode);
 
         LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, Lagekarte, reopenTab);
 

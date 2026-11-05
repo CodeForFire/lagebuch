@@ -29,6 +29,25 @@ public sealed class MapTileCache
 
     public IMapTileSource? Source { get; private set; }
 
+    /// <summary>The colours the tiles are rendered in.</summary>
+    public MapStyle Style { get; private set; } = MapStyle.Day;
+
+    /// <summary>
+    /// Renders from now on in <paramref name="style"/>, dropping the tiles rendered in the previous
+    /// one. The decoded vector tiles stay, so switching does not read the pack again.
+    /// </summary>
+    public void UseStyle(MapStyle style)
+    {
+        ArgumentNullException.ThrowIfNull(style);
+        if (ReferenceEquals(style, Style))
+        {
+            return;
+        }
+
+        DropRendered();
+        Style = style;
+    }
+
     /// <summary>Points the cache at <paramref name="source"/>, dropping every tile of the previous one.</summary>
     public void Use(IMapTileSource? source)
     {
@@ -85,6 +104,13 @@ public sealed class MapTileCache
 
     public void Clear()
     {
+        DropRendered();
+        _vectors.Clear();
+        _vectorOrder.Clear();
+    }
+
+    private void DropRendered()
+    {
         foreach (var entry in _recent)
         {
             entry.Bitmap?.Dispose();
@@ -92,8 +118,6 @@ public sealed class MapTileCache
 
         _recent.Clear();
         _entries.Clear();
-        _vectors.Clear();
-        _vectorOrder.Clear();
     }
 
     // Past the archive's deepest zoom, the tile is the matching part of its ancestor, rendered at
@@ -126,8 +150,8 @@ public sealed class MapTileCache
         }
 
         var (subX, subY) = (x - (key.X << levels), y - (key.Y << levels));
-        labels = VectorTileRenderer.Labels(layers, zoom, levels, subX, subY);
-        return VectorTileRenderer.Render(layers, zoom, levels, subX, subY);
+        labels = VectorTileRenderer.Labels(layers, zoom, levels, subX, subY, Style);
+        return VectorTileRenderer.Render(layers, zoom, levels, subX, subY, Style);
     }
 
     private static IReadOnlyList<VectorLayer>? DecodeVector(byte[]? bytes)

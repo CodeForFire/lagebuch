@@ -26,6 +26,9 @@ internal static class AndroidAppPaths
     public static string AlarmMuteJsonPath(Context context) =>
         System.IO.Path.Join(context.FilesDir!.AbsolutePath, "alarm-mute.json");
 
+    public static string MapNightJsonPath(Context context) =>
+        System.IO.Path.Join(context.FilesDir!.AbsolutePath, "map-night.json");
+
     public static string RegionPacksDir(Context context) =>
         System.IO.Path.Join(context.FilesDir!.AbsolutePath, "regions");
 

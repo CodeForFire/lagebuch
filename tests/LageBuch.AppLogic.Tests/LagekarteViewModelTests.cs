@@ -168,6 +168,83 @@ public class LagekarteViewModelTests
     private static GeoPoint ToGeo(double x, double y) => new(y, x);
 
     [Fact]
+    public void The_night_map_switch_is_the_devices_and_every_open_map_follows_it()
+    {
+        var (session, vm, changes) = Open();
+        var night = new MapNightMode();
+        using var first = new LagekarteViewModel(session, () => { }, nightMode: night);
+        using var second = new LagekarteViewModel(session, () => { }, nightMode: night);
+        var raised = new List<string?>();
+        second.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        first.IsNightMap = true;
+
+        Assert.True(night.IsNight);
+        Assert.True(second.IsNightMap);
+        Assert.Contains(nameof(LagekarteViewModel.IsNightMap), raised);
+        Assert.False(vm.IsNightMap);
+        Assert.Equal(0, changes());
+    }
+
+    [Fact]
+    public void A_night_map_that_cannot_be_saved_stays_as_it_was_and_says_so()
+    {
+        var (session, _, _) = Open();
+        var unwritable = Path.Join(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}", "map-night.json");
+        using var vm = new LagekarteViewModel(session, () => { }, nightMode: new MapNightMode(unwritable));
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.IsNightMap = true;
+
+        Assert.False(vm.IsNightMap);
+        Assert.StartsWith("Nachtkarte nicht gespeichert:", vm.ActionError, StringComparison.Ordinal);
+        Assert.Contains(nameof(LagekarteViewModel.IsNightMap), raised);
+
+        // The toggle snapping back writes the unchanged value; that saves nothing, so the error stays.
+        vm.IsNightMap = false;
+        Assert.NotNull(vm.ActionError);
+    }
+
+    [Fact]
+    public void Once_the_night_map_can_be_saved_again_the_error_goes()
+    {
+        var (session, _, _) = Open();
+        var folder = Path.Join(Path.GetTempPath(), $"night-{Guid.NewGuid():N}");
+        using var vm = new LagekarteViewModel(session, () => { }, nightMode: new MapNightMode(Path.Join(folder, "map-night.json")));
+        vm.IsNightMap = true;
+        Assert.NotNull(vm.ActionError);
+        Directory.CreateDirectory(folder);
+
+        try
+        {
+            vm.IsNightMap = true;
+
+            Assert.True(vm.IsNightMap);
+            Assert.Null(vm.ActionError);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void A_closed_map_no_longer_follows_the_night_switch()
+    {
+        var (session, _, _) = Open();
+        var night = new MapNightMode();
+        var vm = new LagekarteViewModel(session, () => { }, nightMode: night);
+        var raised = 0;
+        vm.PropertyChanged += (_, _) => raised++;
+        vm.Dispose();
+
+        night.Set(true);
+
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
     public void Dragging_a_pin_preserves_the_grab_offset_in_preview_and_on_release()
     {
         var (session, vm, _) = Open();

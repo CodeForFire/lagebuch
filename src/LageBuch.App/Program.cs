@@ -104,7 +104,8 @@ internal static class Program
             mailComposer: new OsMailComposer(),
             lastCrashReport: CrashReports.TakePending(AppPaths.Root),
             alarmMute: new AlarmMute(AppPaths.AlarmMuteJsonPath),
-            mapPacks: new RegionPackLibrary(http, AppPaths.RegionPacksDir));
+            mapPacks: new RegionPackLibrary(http, AppPaths.RegionPacksDir),
+            mapNightMode: new MapNightMode(AppPaths.MapNightJsonPath));
         OpenLaunchedFile(mainViewModel);
         return mainViewModel;
     }
