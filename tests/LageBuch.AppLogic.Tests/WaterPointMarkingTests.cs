@@ -48,6 +48,14 @@ public class WaterPointMarkingTests
         Assert.Equal(expected, WaterPointMarking.DiameterText(Hydrant with { NominalDiameter = dn }));
 
     [Theory]
+    [InlineData(1600, 100, "1600")]
+    [InlineData(null, 100, "DN 100")]
+    [InlineData(null, null, "?")]
+    [InlineData(800, null, "800")]
+    public void A_medium_flag_shows_the_flow_or_without_one_the_dn(int? litresPerMinute, int? dn, string expected) =>
+        Assert.Equal(expected, WaterPointMarking.MediumText(Hydrant with { FlowLitresPerMinute = litresPerMinute, NominalDiameter = dn }));
+
+    [Theory]
     [InlineData(WaterPointKind.Hydrant, WaterPointSymbol.Unterflurhydrant)]
     [InlineData(WaterPointKind.Saugstelle, WaterPointSymbol.Saugstelle)]
     [InlineData(WaterPointKind.Loeschwasserbehaelter, WaterPointSymbol.Zisterne)]

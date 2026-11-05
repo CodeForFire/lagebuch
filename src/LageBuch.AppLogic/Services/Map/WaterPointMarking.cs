@@ -79,6 +79,18 @@ public static class WaterPointMarking
         return point.IsEstimated ? $"({text})" : text;
     }
 
+    /// <summary>
+    /// The one line a <see cref="WaterPointDetailLevel.Mittel"/> flag has room for: the flow, or,
+    /// where nobody recorded one, the DN rather than a "?". OpenStreetMap knows the DN of most
+    /// hydrants and the flow of almost none, and the DN is what the Hinweisschild says too. The
+    /// colour stays grey, so the DN is never mistaken for a flow.
+    /// </summary>
+    public static string MediumText(WaterPoint point)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        return point.FlowLitresPerMinute is null && point.NominalDiameter is not null ? DiameterText(point) : FlowText(point);
+    }
+
     /// <summary>"DN 100", or "DN ?" when the Nennweite is unknown.</summary>
     public static string DiameterText(WaterPoint point)
     {

@@ -335,7 +335,7 @@ public static class WaterPointMarkers
             double textWidth;
             if (level == WaterPointDetailLevel.Mittel)
             {
-                flow = Text(WaterPointMarking.FlowText(point), 13, Ink);
+                flow = Text(WaterPointMarking.MediumText(point), 13, Ink);
                 textWidth = flow.Width;
             }
             else
