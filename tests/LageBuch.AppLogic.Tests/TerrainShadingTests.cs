@@ -294,7 +294,7 @@ public sealed class TerrainShadingTests
     public void The_contours_of_a_cone_are_closed_rings_at_the_right_radius()
     {
         // 600 m at the tile's middle, falling 0.5 m per pixel: the 575 m line is a circle of 50 px.
-        var tile = Render(TerrainLayer.Hoehenlinien, (x, y) => (float)(600 - (0.5 * Math.Sqrt(((x - 130) * (x - 130)) + ((y - 130) * (y - 130))))), zoom: 15);
+        var tile = Render(TerrainLayer.Hoehenlinien, (x, y) => (float)(600 - (0.5 * Math.Sqrt(((x - 130.0) * (x - 130.0)) + ((y - 130.0) * (y - 130.0))))), zoom: 15);
         var ring = Assert.Single(tile.Contours, c => Math.Abs(c.Height - 575) < 1e-9);
 
         // Every end is shared with exactly one other piece: the line never breaks.
