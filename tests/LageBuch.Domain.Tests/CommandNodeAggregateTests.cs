@@ -667,10 +667,10 @@ public class CommandNodeAggregateTests
         var two = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Abschnitt 2");
         var nordOne = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord", one.Id);
         var nordTwo = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord", two.Id);
-        var holder = incident.AssignRole(clock, op, "UAL", "Huber", section: "Nord", nodeId: nordOne.Id);
+        var holder = incident.AssignRole(clock, op, "UEAL", "Huber", section: "Nord", nodeId: nordOne.Id);
 
-        Assert.Same(holder, incident.FindRunningRoleHolder("UAL", "Nord", nordOne.Id));
-        Assert.Null(incident.FindRunningRoleHolder("UAL", "Nord", nordTwo.Id));
+        Assert.Same(holder, incident.FindRunningRoleHolder("UEAL", "Nord", nordOne.Id));
+        Assert.Null(incident.FindRunningRoleHolder("UEAL", "Nord", nordTwo.Id));
     }
 
     [Fact]

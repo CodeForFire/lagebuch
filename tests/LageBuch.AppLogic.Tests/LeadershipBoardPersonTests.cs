@@ -47,7 +47,7 @@ public class LeadershipBoardPersonTests
 
         vm.Sections.Single().Children.Single().SetLeiterCommand.Execute(null);
 
-        Assert.Equal("UAL festlegen – Dach", opened.Single().Title);
+        Assert.Equal("UEAL festlegen – Dach", opened.Single().Title);
     }
 
     [Fact]

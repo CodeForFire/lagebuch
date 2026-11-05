@@ -14,7 +14,7 @@ internal static class LeiterLabels
     {
         null or CommandNodeKind.Partner => "EL",
         CommandNodeKind.Abschnitt => "EAL",
-        CommandNodeKind.Unterabschnitt => "UAL",
+        CommandNodeKind.Unterabschnitt => "UEAL",
         _ => "Leiter",
     };
 }

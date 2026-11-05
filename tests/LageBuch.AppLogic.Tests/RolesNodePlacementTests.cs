@@ -23,7 +23,7 @@ public class RolesNodePlacementTests
                 "/x.fwincident",
                 Array.Empty<(string, bool)>(),
                 Array.Empty<(string, bool)>());
-            Md = MasterDataSet.Empty with { Roles = new[] { new Role("UAL", uniqueness), new Role("ZF") } };
+            Md = MasterDataSet.Empty with { Roles = new[] { new Role("UEAL", uniqueness), new Role("ZF") } };
         }
 
         public static SessionOperator Op { get; } = new("Müller");
@@ -41,7 +41,7 @@ public class RolesNodePlacementTests
         }
 
         public void Place(string person, Guid? nodeId, string? section = null) =>
-            Session.Incident.AssignRole(Clock, Op, "UAL", person, from: T0, section: section, nodeId: nodeId, slot: nodeId is null ? RoleSlot.None : RoleSlot.Leiter);
+            Session.Incident.AssignRole(Clock, Op, "UEAL", person, from: T0, section: section, nodeId: nodeId, slot: nodeId is null ? RoleSlot.None : RoleSlot.Leiter);
 
         public RolesViewModel Vm() => new(Session, Clock, Md, () => { });
     }
@@ -57,7 +57,7 @@ public class RolesNodePlacementTests
 
         using var vm = f.Vm();
 
-        var placed = vm.Roles.Single(r => r.Role == "UAL");
+        var placed = vm.Roles.Single(r => r.Role == "UEAL");
         var typed = vm.Roles.Single(r => r.Role == "ZF");
         Assert.Equal("Abschnitt 1 / Nord", placed.SectionLabel);
         Assert.True(placed.IsPlaced);
@@ -72,7 +72,7 @@ public class RolesNodePlacementTests
     {
         var f = new Fixture(RoleUniqueness.Multiple);
         var nord = f.Node(CommandNodeKind.Abschnitt, "Nord");
-        f.Session.Incident.AssignRole(f.Clock, Fixture.Op, "UAL", "Mustermann, Max", from: T0);
+        f.Session.Incident.AssignRole(f.Clock, Fixture.Op, "UEAL", "Mustermann, Max", from: T0);
         using var vm = f.Vm();
         var row = vm.Roles.Single();
         Assert.Null(row.SectionLabel);
@@ -207,7 +207,7 @@ public class RolesNodePlacementTests
         var abschnitt = f.Node(CommandNodeKind.Abschnitt, "Abschnitt 1");
         var nord = f.Node(CommandNodeKind.Unterabschnitt, "Nord", abschnitt);
         using var vm = f.Vm();
-        vm.NewRole = "UAL";
+        vm.NewRole = "UEAL";
         vm.NewPersonName = "Mustermann, Max";
         vm.NewSection = typed;
 
@@ -249,7 +249,7 @@ public class RolesNodePlacementTests
         f.Node(CommandNodeKind.Unterabschnitt, "Nord", f.Node(CommandNodeKind.Abschnitt, "Abschnitt 2"));
         f.Place("Mustermann, Max", nord1);
         using var vm = f.Vm();
-        vm.NewRole = "UAL";
+        vm.NewRole = "UEAL";
 
         vm.NewSection = "Abschnitt 2 / Nord";
         Assert.Null(vm.ConflictingRow);

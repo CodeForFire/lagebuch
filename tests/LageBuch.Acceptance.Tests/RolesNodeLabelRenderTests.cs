@@ -31,12 +31,12 @@ public class RolesNodeLabelRenderTests
         var abschnitt = session.Incident.CommandNodes[^1].Id;
         session.AddCommandNode(CommandNodeKind.Unterabschnitt, "Nord", abschnitt);
         var nord = session.Incident.CommandNodes[^1].Id;
-        session.AssignRole("UAL", "Mustermann, Max", "Florian Emmering 11/1", from: clock.Now, nodeId: nord, slot: RoleSlot.Leiter);
+        session.AssignRole("UEAL", "Mustermann, Max", "Florian Emmering 11/1", from: clock.Now, nodeId: nord, slot: RoleSlot.Leiter);
         session.AssignRole("ZF", "Musterfrau, Erika", "Florian Aich 40/1", from: clock.Now, section: "Wache Süd");
 
         var md = MasterDataSet.Empty with
         {
-            Roles = new[] { new Role("UAL", RoleUniqueness.UniquePerSection, RoleSlot.Leiter), new Role("ZF") },
+            Roles = new[] { new Role("UEAL", RoleUniqueness.UniquePerSection, RoleSlot.Leiter), new Role("ZF") },
         };
         var vm = new IncidentWorkspaceViewModel(
             session, clock, new NoopTicker(), md, new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());

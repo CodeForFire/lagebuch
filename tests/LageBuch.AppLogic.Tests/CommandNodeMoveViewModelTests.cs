@@ -165,7 +165,7 @@ public class CommandNodeMoveViewModelTests
 
         Assert.Null(vm.DraggingNodeId);
         var child = Assert.Single(vm.Sections.Single().Children);
-        Assert.Equal((sued, "UAL"), (child.Id, child.LeiterLabel));
+        Assert.Equal((sued, "UEAL"), (child.Id, child.LeiterLabel));
     }
 
     [Fact]

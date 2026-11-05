@@ -16,7 +16,7 @@ public class LeadershipPersonDialogViewModelTests
         [
             new Role("Abschnittsleiter", RoleUniqueness.Multiple, RoleSlot.Leiter),
             new Role("EL", RoleUniqueness.UniquePerIncident, RoleSlot.Leiter),
-            new Role("UAL", RoleUniqueness.UniquePerSection, RoleSlot.Leiter),
+            new Role("UEAL", RoleUniqueness.UniquePerSection, RoleSlot.Leiter),
             new Role("Melder", RoleUniqueness.Multiple, RoleSlot.Melder),
             new Role("S1 Personal", RoleUniqueness.Multiple, RoleSlot.Fuehrungsassistent),
             new Role("S2 Lage", RoleUniqueness.Multiple, RoleSlot.Fuehrungsassistent),
@@ -61,7 +61,7 @@ public class LeadershipPersonDialogViewModelTests
     }
 
     [Theory]
-    [InlineData(CommandNodeKind.Unterabschnitt, "UAL festlegen – Dach")]
+    [InlineData(CommandNodeKind.Unterabschnitt, "UEAL festlegen – Dach")]
     [InlineData(CommandNodeKind.Partner, "EL festlegen – Dach")]
     [InlineData(CommandNodeKind.Bereitstellung, "Leiter festlegen – Dach")]
     public void The_leiter_title_uses_the_short_form_for_the_kind_of_node(CommandNodeKind kind, string title)
@@ -106,7 +106,7 @@ public class LeadershipPersonDialogViewModelTests
         var session = NewSession();
         var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
 
-        Assert.Equal(["Abschnittsleiter", "EL", "UAL"], Open(session, nord, RoleSlot.Leiter).RoleOptions);
+        Assert.Equal(["Abschnittsleiter", "EL", "UEAL"], Open(session, nord, RoleSlot.Leiter).RoleOptions);
         Assert.Equal(["Melder"], Open(session, nord, RoleSlot.Melder).RoleOptions);
         Assert.Equal(["S1 Personal", "S2 Lage"], Open(session, null, RoleSlot.Fuehrungsassistent).RoleOptions);
         Assert.Equal(MasterData.Roles.Select(r => r.Name), Open(session, nord, RoleSlot.None).RoleOptions);
@@ -148,7 +148,7 @@ public class LeadershipPersonDialogViewModelTests
         var session = NewSession();
         var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
 
-        Assert.Equal("UAL", Open(session, nord, RoleSlot.Leiter).Role);
+        Assert.Equal("UEAL", Open(session, nord, RoleSlot.Leiter).Role);
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public class LeadershipPersonDialogViewModelTests
         vm.SaveCommand.Execute(null);
 
         var r = Assert.Single(session.Incident.Roles);
-        Assert.Equal(("UAL", "Mustermann, Max", nord, RoleSlot.Leiter, "Nord"), (r.Role, r.PersonName, r.NodeId, r.Slot, r.Section));
+        Assert.Equal(("UEAL", "Mustermann, Max", nord, RoleSlot.Leiter, "Nord"), (r.Role, r.PersonName, r.NodeId, r.Slot, r.Section));
         Assert.Equal("Florian Emmering 11/1", r.CallSign);
         Assert.Equal("0151 1111111", r.Phone);
         Assert.Equal(T0, r.From);
@@ -216,7 +216,7 @@ public class LeadershipPersonDialogViewModelTests
         var vm = Open(session, nord, RoleSlot.Leiter);
 
         // The handover keeps the holder's Funktion, so the field shows it and is locked, rather than
-        // offering the preselected "UAL" that the save would silently drop.
+        // offering the preselected "UEAL" that the save would silently drop.
         Assert.Equal("Abschnittsleiter", vm.Role);
         Assert.False(vm.IsRoleEditable);
         Assert.Equal("Übergabe: Musterfrau, Erika → neu", vm.HandoverText);
@@ -504,7 +504,7 @@ public class LeadershipPersonDialogViewModelTests
         var raised = new List<string?>();
         vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
-        session.AssignRole("UAL", "Musterfrau, Erika", nodeId: nord, slot: RoleSlot.Leiter);
+        session.AssignRole("UEAL", "Musterfrau, Erika", nodeId: nord, slot: RoleSlot.Leiter);
 
         Assert.Contains(nameof(vm.HandoverText), raised);
         Assert.Equal("Übergabe: Musterfrau, Erika → neu", vm.HandoverText);
