@@ -101,6 +101,92 @@ public class LeadershipBoardUndoTests
     }
 
     [Fact]
+    public void A_move_that_keeps_the_status_does_not_name_it_and_its_undo_leaves_the_status_alone()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt Nord");
+        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt Süd");
+        var unit = AddUnit(session, "FF Emmering", "Florian Emmering 40/1", nord);
+        session.UpdateForceUnit(unit, "Im Einsatz", null);
+        var offered = new List<(string Message, Action Undo)>();
+        using var vm = NewVmOffering(session, offered, Statuses);
+
+        Assert.True(vm.MoveUnit(unit, sued));
+
+        var (message, undo) = Assert.Single(offered);
+        Assert.Equal("„Florian Emmering 40/1“ in „Abschnitt Süd“ eingeordnet.", message);
+
+        // A peer sets a new status in the seconds before RÜCKGÄNGIG: the move did not touch the
+        // status, so taking the move back must not either.
+        session.UpdateForceUnit(unit, "Alarmiert", null);
+        undo();
+
+        var back = session.Incident.Forces.Single();
+        Assert.Equal((nord, "Alarmiert"), (back.NodeId, back.Status));
+    }
+
+    [Fact]
+    public void Undoing_taking_a_unit_out_takes_back_only_the_place()
+    {
+        var session = NewSession();
+        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt Süd");
+        var unit = AddUnit(session, "FF Emmering", "Florian Emmering 40/1", sued);
+        session.UpdateForceUnit(unit, "Im Einsatz", null);
+        var offered = new List<(string Message, Action Undo)>();
+        using var vm = NewVmOffering(session, offered, Statuses);
+
+        // Taking a unit out leaves its status alone, so its undo has no status to put back either,
+        // and a status a peer set meanwhile stays.
+        Assert.True(vm.MoveUnit(unit, null));
+        session.UpdateForceUnit(unit, "Alarmiert", null);
+        offered.Single().Undo();
+
+        var back = session.Incident.Forces.Single();
+        Assert.Equal((sued, "Alarmiert"), (back.NodeId, back.Status));
+    }
+
+    [Fact]
+    public void Undoing_a_status_change_keeps_notes_written_since_the_move()
+    {
+        var session = NewSession();
+        var br = AddNode(session, CommandNodeKind.Bereitstellung, "BR Nord");
+        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Abschnitt Süd");
+        var other = AddUnit(session, "FF Grafrath", "Florian Grafrath 40/1", br);
+        session.UpdateForceUnit(other, "Bereitstellungsraum", "Atemschutz-Reserve");
+        var unit = AddUnit(session, "FF Emmering", "Florian Emmering 40/1", br);
+        session.UpdateForceUnit(unit, "Bereitstellungsraum", "Schlauchreserve");
+        var offered = new List<(string Message, Action Undo)>();
+        using var vm = NewVmOffering(session, offered, Statuses);
+
+        Assert.True(vm.MoveUnit(unit, sued));
+        session.UpdateForceUnit(unit, "Im Einsatz", "Schlauchreserve, 2 B-Längen abgegeben");
+        offered.Single().Undo();
+
+        var back = session.Incident.Forces.Single(u => u.Id == unit);
+        Assert.Equal(("Bereitstellungsraum", "Schlauchreserve, 2 B-Längen abgegeben"), (back.Status, back.Notes));
+    }
+
+    [Fact]
+    public void A_change_the_session_refuses_after_the_board_allowed_it_offers_nothing_back()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Süd");
+        var unit = AddUnit(session, "FF Emmering", "Florian Emmering 11/1");
+        var offered = new List<(string Message, Action Undo)>();
+        using var vm = NewVmOffering(session, offered);
+
+        // The board still reads as editable, but the Einsatz is closed under it.
+        session.Close();
+
+        Assert.False(vm.AssignFuehrungsfahrzeug(unit));
+        Assert.NotNull(vm.ActionError);
+        Assert.False(vm.MoveNode(sued, nord, null));
+        Assert.NotNull(vm.ActionError);
+        Assert.Empty(offered);
+    }
+
+    [Fact]
     public void A_refused_move_offers_nothing_back()
     {
         var session = NewSession();

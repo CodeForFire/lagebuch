@@ -350,6 +350,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         }
 
         // Read before the move: a joined client's Incident may not show it yet afterwards.
+        // Stryker disable once Linq : CanMoveUnit already found the unit, so First and FirstOrDefault agree.
         var unit = _incident.Forces.First(u => u.Id == unitId);
         var (fromNodeId, fromStatus) = (unit.NodeId, unit.Status);
         var title = string.IsNullOrWhiteSpace(unit.CallSign) ? unit.Brigade : unit.CallSign;
@@ -375,7 +376,10 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             _session.MoveForceUnit(unitId, fromNodeId);
             if (statusChanged)
             {
-                var notes = _session.Incident.Forces.FirstOrDefault(u => u.Id == unitId)?.Notes ?? unit.Notes;
+                // The notes as they stand now, so a peer's edit since the move stays. MoveForceUnit
+                // has just found the unit, or thrown into Run; a gone unit throws here into Run too.
+                // Stryker disable once Linq : the unit is there, so First and FirstOrDefault agree.
+                var notes = _session.Incident.Forces.First(u => u.Id == unitId).Notes;
                 _session.UpdateForceUnit(unitId, fromStatus, notes);
             }
         }));

@@ -169,8 +169,22 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // an unrelated change from another device would then wipe the notice before anyone had read it, and
     // an input that silently did not take effect is the thing being fixed here, not something to
     // half-report.
-    private void OnRemoteCommandRejected(string reason) =>
+    //
+    // It also withdraws the undo offer. On a joined client a change returns once it is queued, so the
+    // offer went up before the host answered; if the refused command was the offered one, RÜCKGÄNGIG
+    // would put back a state the host never left, over a peer's change. The refusal does not say which
+    // command it was, so any refusal withdraws the offer: losing one undo costs less than overwriting.
+    //
+    // Stryker disable all : only a RemoteIncidentSession raises this, so Sync.Hosting's
+    // WorkspaceCollaborationTests cover it; Stryker runs LageBuch.AppLogic.Tests alone.
+    private void OnRemoteCommandRejected(string reason)
+    {
+        // Withdrawn first, so whoever reacts to the banner never sees it beside the offer.
+        CloseUndoNotice();
         CommandRejected = $"Änderung nicht übernommen: {reason}";
+
+        // Stryker restore all
+    }
 
     private void MarkSynced()
     {

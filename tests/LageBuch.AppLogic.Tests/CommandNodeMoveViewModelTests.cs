@@ -169,6 +169,21 @@ public class CommandNodeMoveViewModelTests
     }
 
     [Fact]
+    public void Among_its_siblings_a_node_moves_anywhere_but_where_it_already_stands()
+    {
+        var session = NewSession();
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        var sued = AddNode(session, CommandNodeKind.Abschnitt, "Süd");
+        var west = AddNode(session, CommandNodeKind.Abschnitt, "West");
+        using var vm = NewVm(session);
+
+        Assert.True(vm.CanMoveNode(nord, null, west));
+        Assert.True(vm.CanMoveNode(nord, null, null));
+        Assert.False(vm.CanMoveNode(nord, null, sued), "Nord already stands before Süd");
+        Assert.False(vm.CanMoveNode(sued, null, sued), "before itself is where it is");
+    }
+
+    [Fact]
     public void A_read_only_board_moves_nothing()
     {
         var store = new FakeStore();
