@@ -211,4 +211,15 @@ public partial class LeadershipView : UserControl
         _dropTarget = target;
         _dropTarget?.Classes.Set("drop-target", true);
     }
+
+    // A Funkgruppe under the pointer: which lines light up with it is the view model's.
+    private void OnFunkgruppePointerEntered(object? sender, PointerEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is FunkgruppeLine line)
+        {
+            ViewModel?.HighlightFunkgruppe(line);
+        }
+    }
+
+    private void OnFunkgruppePointerExited(object? sender, PointerEventArgs e) => ViewModel?.ClearFunkgruppeHighlight();
 }

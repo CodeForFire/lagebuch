@@ -1,0 +1,208 @@
+using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain.Leadership;
+using static LageBuch.AppLogic.Tests.LeadershipBoard;
+
+namespace LageBuch.AppLogic.Tests;
+
+/// <summary>Hovering a TMO or DMO Funkgruppe on the Führung board lights up every other card that has it.</summary>
+public sealed class LeadershipFunkgruppeHighlightTests
+{
+    private static LocalIncidentSession TwoAbschnitte()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], ["307_F"]), null);
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 1000"], ["301_F"]));
+        var nord = session.Incident.CommandNodes[^1].Id;
+        session.AddCommandNode(CommandNodeKind.Unterabschnitt, "Dach", nord, funkgruppen: new Funkgruppen(null, ["301_F"]));
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Süd", funkgruppen: new Funkgruppen(["FW 2000"], ["307_F"]));
+        return session;
+    }
+
+    private static BoardNodeCard Card(LeadershipViewModel vm, string name) =>
+        vm.Sections.Concat(vm.Sections.SelectMany(s => s.Children)).Single(c => c.Name == name);
+
+    [Fact]
+    public void Hovering_a_dmo_lights_up_the_same_dmo_on_every_card_and_nothing_else()
+    {
+        using var vm = NewVm(TwoAbschnitte());
+        var nord = Card(vm, "Nord");
+
+        vm.HighlightFunkgruppe(nord.DmoLines.Single());
+
+        Assert.True(nord.DmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(Card(vm, "Dach").DmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(vm.El.DmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(Card(vm, "Süd").DmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(nord.TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void Hovering_the_einsatzleitungs_tmo_lights_up_the_abschnitt_that_shares_it()
+    {
+        using var vm = NewVm(TwoAbschnitte());
+
+        vm.HighlightFunkgruppe(vm.El.TmoLines.Single());
+
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(Card(vm, "Nord").TmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(Card(vm, "Süd").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_tmo_and_a_dmo_of_the_same_name_are_not_the_same_funkgruppe()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["X 1"], ["X 1"]), null);
+        using var vm = NewVm(session);
+
+        vm.HighlightFunkgruppe(vm.El.TmoLines.Single());
+
+        Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(vm.El.DmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    // FunkCheck marks "FW 1000" and "fw  1000" shared, so hovering one lights the other.
+    [Fact]
+    public void A_funkgruppe_written_differently_lights_up_as_funkcheck_reads_it()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], null), null);
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["fw  1000"], null));
+        using var vm = NewVm(session);
+        Assert.True(Card(vm, "Nord").TmoLines.Single().IsShared); // the check agrees they are one
+
+        vm.HighlightFunkgruppe(vm.El.TmoLines.Single());
+
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(Card(vm, "Nord").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_funkgruppe_shown_only_once_is_not_highlighted()
+    {
+        using var vm = NewVm(TwoAbschnitte());
+        var sued = Card(vm, "Süd");
+
+        vm.HighlightFunkgruppe(sued.TmoLines.Single());
+
+        Assert.False(sued.TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void Clearing_the_highlight_turns_every_line_off()
+    {
+        using var vm = NewVm(TwoAbschnitte());
+        vm.HighlightFunkgruppe(vm.El.DmoLines.Single());
+
+        vm.ClearFunkgruppeHighlight();
+
+        Assert.False(vm.El.DmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(Card(vm, "Süd").DmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_card_added_by_a_refresh_takes_the_current_highlight()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], null), null);
+        using var vm = NewVm(session);
+        vm.HighlightFunkgruppe(vm.El.TmoLines.Single());
+        Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted); // alone so far
+
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 1000"], null));
+
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(Card(vm, "Nord").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    // The chip under the pointer goes with its line and gets no PointerExited: the others go dark.
+    [Fact]
+    public void A_refresh_that_takes_the_hovered_line_away_turns_the_highlight_off()
+    {
+        var session = TwoAbschnitte();
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "West", funkgruppen: new Funkgruppen(["FW 1000"], null));
+        using var vm = NewVm(session);
+        vm.HighlightFunkgruppe(Card(vm, "Nord").TmoLines.Single());
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+
+        var nord = session.Incident.CommandNodes.Single(n => n.Name == "Nord");
+        session.UpdateCommandNode(nord.Id, nord.Name, null, null, null, null, null, new Funkgruppen(["FW 3000"], ["301_F"]));
+
+        Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(Card(vm, "West").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_refresh_that_keeps_the_hovered_line_keeps_the_highlight()
+    {
+        var session = TwoAbschnitte();
+        using var vm = NewVm(session);
+        vm.HighlightFunkgruppe(Card(vm, "Nord").TmoLines.Single());
+
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "West", funkgruppen: new Funkgruppen(["FW 1000"], null));
+
+        Assert.True(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(Card(vm, "West").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_line_from_no_card_on_the_board_highlights_nothing()
+    {
+        using var vm = NewVm(TwoAbschnitte());
+
+        vm.HighlightFunkgruppe(new FunkgruppeLine("FW 1000", null));
+
+        Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void Hovering_a_line_from_no_card_turns_off_what_was_lit()
+    {
+        using var vm = NewVm(TwoAbschnitte());
+        vm.HighlightFunkgruppe(vm.El.TmoLines.Single());
+
+        vm.HighlightFunkgruppe(new FunkgruppeLine("FW 1000", null));
+
+        Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(Card(vm, "Nord").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_partner_with_the_same_funkgruppe_lights_up_with_the_abschnitt()
+    {
+        var session = TwoAbschnitte();
+        session.AddCommandNode(CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["FW 2000"], null));
+        using var vm = NewVm(session);
+        var partner = vm.Partners.Single();
+
+        vm.HighlightFunkgruppe(Card(vm, "Süd").TmoLines.Single());
+
+        Assert.True(Card(vm, "Süd").TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(partner.TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void The_einsatzleitung_card_announces_new_funkgruppen_lines()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        var changed = new List<string?>();
+        vm.El.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], ["307_F"]), null);
+
+        Assert.Contains(nameof(ElCard.TmoLines), changed);
+        Assert.Contains(nameof(ElCard.DmoLines), changed);
+        Assert.Equal([new FunkgruppeLine("FW 1000", null)], vm.El.TmoLines);
+    }
+
+    [Fact]
+    public void Two_funkgruppe_lines_are_equal_only_with_the_same_text_and_mark()
+    {
+        var line = new FunkgruppeLine("FW 1000", true);
+
+        Assert.Equal(new FunkgruppeLine("FW 1000", true), line);
+        Assert.NotEqual(new FunkgruppeLine("FW 2000", true), line);
+        Assert.NotEqual(new FunkgruppeLine("FW 1000", false), line);
+    }
+}

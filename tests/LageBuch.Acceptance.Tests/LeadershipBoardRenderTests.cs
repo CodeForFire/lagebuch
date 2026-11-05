@@ -369,7 +369,7 @@ public class LeadershipBoardRenderTests
         var tmo = west.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "NodeTmo")
             .GetVisualDescendants().OfType<Grid>()
             .Select(line => (
-                Text: line.GetVisualChildren().OfType<SelectableTextBlock>().Single().Text,
+                Text: line.GetVisualDescendants().OfType<SelectableTextBlock>().Single().Text,
                 Mark: line.GetVisualChildren().OfType<PathIcon>().Where(p => p.IsEffectivelyVisible).Select(AutomationProperties.GetName).SingleOrDefault()))
             .ToList();
 
@@ -388,8 +388,8 @@ public class LeadershipBoardRenderTests
         Assert.Equal("ILS", badge.GetVisualDescendants().OfType<TextBlock>().Single().Text);
         Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(view, "ElLeiterText").Text);
         Assert.Equal("Lukas Brandl", Named<TextBlock>(view, "ElMelderText").Text);
-        Assert.Equal("FW_EMMERING 1000", Named<TextBlock>(view, "ElTmo").Text);
-        Assert.Equal("307_F", Named<TextBlock>(view, "ElDmo").Text);
+        Assert.Equal(["FW_EMMERING 1000"], Lines(view, "ElTmo"));
+        Assert.Equal(["307_F"], Lines(view, "ElDmo"));
         Assert.Equal("Florian Emmering 12/1", Named<TextBlock>(view, "ElFahrzeug").Text);
         Assert.Equal(
             ["Florian Aich 10/1"],
@@ -1259,6 +1259,76 @@ public class LeadershipBoardRenderTests
         Drop(transfer, strip);
 
         Assert.Null(session.Incident.FindCommandNode(nord)!.ParentId);
+    }
+
+    // The Funkgruppen chips on the board, lit or not.
+    private static List<Border> FunkChips(Visual root) =>
+        root.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("funk-chip") && b.IsEffectivelyVisible).ToList();
+
+    // "FW_EMMERING 1000" is the TMO of the Einsatzleitung, Abschnitt 1 Nord and Abschnitt 2 Süd: the
+    // pointer on the Einsatzleitung's lights all three and no DMO, and leaving turns them off again.
+    [AvaloniaFact]
+    public void Hovering_a_funkgruppe_lights_up_every_card_that_has_it()
+    {
+        var board = Show();
+        Capture(board.Window, "funkgruppe-before.png");
+        var elTmo = FunkChips(Named<ItemsControl>(board.View, "ElTmo")).Single();
+
+        Hover(board.Window, elTmo);
+
+        // The fade runs on the wall clock, not on render ticks: let it finish before the screenshot,
+        // as ContactsTabRenderTests does. Screenshot path only, so no assertion waits on it.
+        if (Environment.GetEnvironmentVariable("RENDER_OUT") is not null)
+        {
+            var settle = System.Diagnostics.Stopwatch.StartNew();
+            while (settle.ElapsedMilliseconds < 550)
+            {
+                AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+                Dispatcher.UIThread.RunJobs();
+            }
+        }
+
+        Capture(board.Window, "funkgruppe-after.png");
+
+        var lit = FunkChips(board.View).Where(b => b.Classes.Contains("linked")).ToList();
+        Assert.Equal(3, lit.Count);
+        Assert.All(lit, b => Assert.Equal("FW_EMMERING 1000", Assert.IsType<FunkgruppeLine>(b.DataContext).Text));
+        Assert.Contains(elTmo, lit);
+
+        board.Window.MouseMove(new Point(2, 2));
+        Dispatcher.UIThread.RunJobs();
+        Assert.DoesNotContain(FunkChips(board.View), b => b.Classes.Contains("linked"));
+    }
+
+    // The chip under the pointer goes away without the pointer moving (a peer renames the
+    // Abschnitt's TMO): the one hovered is gone, so the others that shared it go dark too.
+    // Nord, well inside the window, keeps its place, so whatever lies under the pointer
+    // afterwards is its new line, shown once and lit by nothing.
+    [AvaloniaFact]
+    public void A_hovered_funkgruppe_removed_by_a_refresh_turns_the_highlight_off()
+    {
+        var board = Show();
+        var nordCard = Card(board.View, "Abschnitt 1 Nord");
+        Hover(board.Window, FunkChips(nordCard).Single(b => b.DataContext is FunkgruppeLine { Text: "FW_EMMERING 1000" }));
+        Assert.Equal(3, FunkChips(board.View).Count(b => b.Classes.Contains("linked")));
+
+        var session = Assert.IsType<LocalIncidentSession>(board.Session);
+        var nord = session.Incident.CommandNodes.Single(n => n.Name == "Abschnitt 1 Nord");
+        var renamed = new Funkgruppen(["FW_NORD 1001"], nord.Funkgruppen.Dmo);
+        session.UpdateCommandNode(
+            nord.Id, nord.Name, nord.Auftrag, nord.Standort, nord.Funkgruppe, nord.Rufname, nord.Telefon, renamed, nord.Fuehrungsfahrzeug);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, FunkChips(board.View).Count(b => b.DataContext is FunkgruppeLine { Text: "FW_EMMERING 1000" }));
+        Assert.DoesNotContain(FunkChips(board.View), b => b.Classes.Contains("linked"));
+    }
+
+    // The pointer moved onto the centre of the control, as a mouse resting on it.
+    private static void Hover(Window window, Control control)
+    {
+        var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window);
+        window.MouseMove(Assert.NotNull(centre));
+        Dispatcher.UIThread.RunJobs();
     }
 
     private static void Capture(Window window, string name)
