@@ -1299,6 +1299,20 @@ public class LeadershipBoardRenderTests
     }
 
     [AvaloniaFact]
+    public void A_cards_grip_fills_its_head_however_tall_the_head_grows()
+    {
+        var board = Show();
+        var card = Card(board.View, "Abschnitt 1 Nord");
+        var header = HeaderOf(card);
+        var grip = header.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeGrip");
+
+        Assert.True(header.Bounds.Height > 30, $"the head holds more than one line: {header.Bounds.Height}");
+        Assert.True(
+            Math.Abs(grip.Bounds.Height + grip.Margin.Top + grip.Margin.Bottom - header.Bounds.Height) <= 1.0,
+            $"grip {grip.Bounds.Height} in a head of {header.Bounds.Height}");
+    }
+
+    [AvaloniaFact]
     public void Every_card_but_a_partners_has_a_grip_to_move_it()
     {
         var board = Show();
