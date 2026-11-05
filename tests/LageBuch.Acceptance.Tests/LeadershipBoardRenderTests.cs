@@ -108,7 +108,6 @@ public class LeadershipBoardRenderTests
 
         AddUnit(session, "FF Emmering", "Florian Emmering 11/2", 6, 0, 0, null);
         session.AssignRole("ZF", "Maria Musterfrau", section: "Wache Süd");
-        session.SetFuehrungsstufe(Fuehrungsstufe.B);
     }
 
     private sealed record Board(
@@ -403,13 +402,11 @@ public class LeadershipBoardRenderTests
             view.GetVisualDescendants().OfType<TextBlock>()
                 .Where(t => t.Name == "NodeFunkHint" && t.IsEffectivelyVisible).Select(t => t.Text).Order(StringComparer.Ordinal));
         Assert.False(Named<Grid>(view, "ElFurther").IsVisible);
-        Assert.Equal("Stufe B", Named<TextBlock>(view, "StufeText").Text);
 
         // On the desktop the reason AUFLÖSEN is off is the button's tooltip, not a line on the card.
         Assert.All(
             view.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == "DissolveBlockedText"),
             t => Assert.False(t.IsVisible));
-        Assert.Contains("mismatch", Named<TextBlock>(view, "StufeSuggestionText").Classes);
 
         // The sections stand in one row of equal width below the Einsatzleitung, as on the sheet; the
         // Unterabschnitt hangs below its Abschnitt as a card of its own, not inside it.
@@ -920,25 +917,17 @@ public class LeadershipBoardRenderTests
         Assert.Equal(before, board.Vm.Sections.Single(c => c.Name == "Abschnitt 2 Süd").Units.Single().NodeLabel);
     }
 
-    // Real presses, not Command.Execute plus a raised Click: the flyout used to close in the Click
-    // event, which detached the entries before Button ran their command, so a click chose nothing.
+    // The Führungsstufe was dropped: the Einsatzleitung card carries neither a picker nor a Vorschlag.
     [AvaloniaFact]
-    public void Picking_a_fuehrungsstufe_sets_it_and_closes_the_flyout()
+    public void The_einsatzleitung_card_offers_no_fuehrungsstufe()
     {
         var board = Show();
-        var stufe = Named<Button>(board.View, "StufeButton");
+        var card = Named<Border>(board.View, "ElCard");
 
-        Press(stufe);
-        Assert.True(stufe.Flyout!.IsOpen);
-        var content = ((Flyout)stufe.Flyout).Content as Control;
-        var pick = content!.GetVisualDescendants().OfType<Button>()
-            .Single(b => b.DataContext is StufeChoice { Label: "Stufe D" });
-        Press(pick);
-
-        Assert.Equal(Fuehrungsstufe.D, board.Session!.Incident.Fuehrungsstufe);
-        Assert.Equal("Stufe D", Named<TextBlock>(board.View, "StufeText").Text);
-        Assert.DoesNotContain("mismatch", Named<TextBlock>(board.View, "StufeSuggestionText").Classes);
-        Assert.False(((Flyout)stufe.Flyout).IsOpen);
+        Assert.DoesNotContain(
+            card.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Text is { } text && text.Contains("STUFE", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(card.GetVisualDescendants().OfType<Button>(), b => b.Name == "StufeButton");
     }
 
     private static DataTransfer DraggingNode(Guid id)

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
@@ -34,8 +35,6 @@ public class CommandSerializationTests
         new PlaceForceUnitCommand(Op, Guid.NewGuid(), null, null),
         new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), Guid.NewGuid(), RoleSlot.Leiter),
         new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), null, RoleSlot.None),
-        new SetFuehrungsstufeCommand(Op, Fuehrungsstufe.C),
-        new SetFuehrungsstufeCommand(Op, null),
         new SetNavVisibilityCommand(Op, "lagekarte", false),
         new AddChecklistCommand(Op, Guid.NewGuid(), "Lagemeldung", [new ChecklistSeedItemDto("Punkt", true)]),
         new UpdateLeadershipPostCommand(Op, "Feuerwehrhaus", "Florian EL", "0172", ["TG 1"], ["301_F", "302_F"]),
@@ -128,6 +127,16 @@ public class CommandSerializationTests
 
         // Re-serialize (records with list members lack structural equality, so compare the wire form).
         Assert.Equal(json, SyncJson.Serialize(back));
+    }
+
+    // The Führungsstufe was dropped at protocol 37. A client below that floor is refused at the
+    // handshake, but should its command still arrive, it is outside the closed allowlist.
+    [Fact]
+    public void A_setFuehrungsstufe_command_from_an_old_client_is_rejected()
+    {
+        const string json = """{"$type":"setFuehrungsstufe","operator":{"name":"M","callSign":null},"stufe":"C"}""";
+
+        Assert.ThrowsAny<JsonException>(() => SyncJson.Deserialize<SyncCommand>(json));
     }
 
     // The discriminator is a wire contract between joined devices, and this one carries a list --
@@ -415,7 +424,6 @@ public class CommandSerializationTests
         Assert.Contains("\"$type\":\"placeRoleAssignment\"", SyncJson.Serialize<SyncCommand>(new PlaceRoleAssignmentCommand(Op, Guid.NewGuid(), null, RoleSlot.Leiter)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"endRoleAssignment\"", SyncJson.Serialize<SyncCommand>(new EndRoleAssignmentCommand(Op, Guid.NewGuid())), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"adoptFreeTextSection\"", SyncJson.Serialize<SyncCommand>(new AdoptFreeTextSectionCommand(Op, "Nord")), StringComparison.Ordinal);
-        Assert.Contains("\"$type\":\"setFuehrungsstufe\"", SyncJson.Serialize<SyncCommand>(new SetFuehrungsstufeCommand(Op, Fuehrungsstufe.B)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"setNavVisibility\"", SyncJson.Serialize<SyncCommand>(new SetNavVisibilityCommand(Op, "lagekarte", true)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"addChecklist\"", SyncJson.Serialize<SyncCommand>(new AddChecklistCommand(Op, Guid.NewGuid(), "T", [])), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"updateLeadershipPost\"", SyncJson.Serialize<SyncCommand>(new UpdateLeadershipPostCommand(Op, null, null, null, null, null)), StringComparison.Ordinal);

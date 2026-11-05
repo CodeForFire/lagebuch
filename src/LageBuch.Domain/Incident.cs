@@ -121,9 +121,6 @@ public sealed class Incident
     /// <summary>Abschnitte, Unterabschnitte, Bereitstellungen and partner Einsatzleitungen in creation order, dissolved ones included.</summary>
     public IReadOnlyList<CommandNode> CommandNodes => _commandNodes;
 
-    /// <summary>The Führungsstufe of the Einsatz, or null while none is set.</summary>
-    public Fuehrungsstufe? Fuehrungsstufe { get; private set; }
-
     /// <summary>How the Einsatzleitung can be reached. Never null; <see cref="LeadershipPost.Empty"/> until filled.</summary>
     public LeadershipPost LeadershipPost { get; private set; } = LeadershipPost.Empty;
 
@@ -201,7 +198,6 @@ public sealed class Incident
         IEnumerable<SituationReport>? situationReports = null,
         IEnumerable<IssuedItem>? issuedItems = null,
         IEnumerable<CommandNode>? commandNodes = null,
-        Fuehrungsstufe? fuehrungsstufe = null,
         LeadershipPost? leadershipPost = null,
         GeoPoint? location = null,
         IReadOnlyDictionary<string, bool>? navOverrides = null)
@@ -221,7 +217,6 @@ public sealed class Incident
             Status = status,
             ClosedAt = closedAt,
             ClosedBy = closedBy,
-            Fuehrungsstufe = fuehrungsstufe is { } stufe && Enum.IsDefined(stufe) ? stufe : null,
             LeadershipPost = leadershipPost ?? LeadershipPost.Empty,
             Location = location,
         };
@@ -1004,30 +999,6 @@ public sealed class Incident
         _navOverrides[key] = true;
         AppendSystemEntry(clock, op, $"Checkliste „{list.Title}“ hinzugefügt");
         return list;
-    }
-
-    /// <summary>Sets or clears the Führungsstufe. A no-op when unchanged.</summary>
-    public void SetFuehrungsstufe(IClock clock, SessionOperator op, Fuehrungsstufe? stufe)
-    {
-        EnsureOpen();
-        ArgumentNullException.ThrowIfNull(clock);
-        ArgumentNullException.ThrowIfNull(op);
-
-        if (stufe is { } given && !Enum.IsDefined(given))
-        {
-            throw new ArgumentOutOfRangeException(nameof(stufe), given, "Unbekannte Führungsstufe.");
-        }
-
-        if (Fuehrungsstufe == stufe)
-        {
-            return;
-        }
-
-        Fuehrungsstufe = stufe;
-        AppendSystemEntry(
-            clock,
-            op,
-            stufe is { } value ? $"Führungsstufe {value} festgelegt" : "Führungsstufe aufgehoben");
     }
 
     /// <summary>

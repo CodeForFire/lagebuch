@@ -16,7 +16,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// Bereitstellung and Abschnitt (Unterabschnitte nested), and the units nobody has placed yet.
 /// </summary>
 /// <remarks>
-/// Everything shown is derived by <see cref="ReportingLine"/>, <see cref="FuehrungsstufeAdvisor"/> and
+/// Everything shown is derived by <see cref="ReportingLine"/> and
 /// <see cref="FuehrungsspanneHints"/>; this view model never decides placement itself. Each change
 /// re-reads <see cref="IIncidentSession.Incident"/> (a joined device rebuilds the aggregate per
 /// snapshot) and reconciles every collection by id, so the cards stay put under the user (#294).
@@ -76,7 +76,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         _clock = clock;
         _incident = session.Incident;
         IsReadOnly = session.IsReadOnly;
-        El = new ElCard(SelectStufe, EditPost, !IsReadOnly, slot => OpenPerson(null, slot), OpenAssignment);
+        El = new ElCard(EditPost, !IsReadOnly, slot => OpenPerson(null, slot), OpenAssignment);
         DispatchCentreName = masterData.Settings.DispatchCentreName;
         _fachberaterGroup = new FachberaterGroup(Fachberater);
         Refresh();
@@ -172,7 +172,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
         if (line.FirstOrDefault(e => e.Kind == ReportingEntryKind.Einsatzleitung) is { } el)
         {
-            El.Update(el, incident.LeadershipPost, incident.Fuehrungsstufe, FuehrungsstufeAdvisor.Suggest(incident));
+            El.Update(el, incident.LeadershipPost);
         }
 
         var children = NodeEntries(line, e => e.Depth == 2);
@@ -522,17 +522,6 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             $"„{card.Name}“ wird aufgelöst. Das Einsatztagebuch behält den Eintrag.",
             Dissolve,
             "AUFLÖSEN");
-    }
-
-    private void SelectStufe(Fuehrungsstufe? stufe)
-    {
-        ActionError = null;
-        if (IsReadOnly || stufe == _incident.Fuehrungsstufe)
-        {
-            return;
-        }
-
-        Run(() => _session.SetFuehrungsstufe(stufe));
     }
 
     // Runs a session command and tells the host. The Domain's refusals are German sentences about a

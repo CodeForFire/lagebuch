@@ -550,9 +550,6 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         // Stryker restore all
     }
 
-    public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
-        Send(new SetFuehrungsstufeCommand(Op(), stufe));
-
     public void UpdateLeadershipPost(
         string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
         Send(new UpdateLeadershipPostCommand(Op(), standort, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo, fuehrungsfahrzeug));

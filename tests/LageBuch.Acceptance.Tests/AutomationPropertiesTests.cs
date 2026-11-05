@@ -392,7 +392,6 @@ public class AutomationPropertiesTests
         Assert.All(unitGrips, g => Assert.Equal("Einheit verschieben", Name(g)));
         Assert.Equal(3, cardGrips.Count);
         Assert.All(cardGrips, g => Assert.Equal("Abschnitt verschieben", Name(g)));
-        Assert.Equal("Führungsstufe wählen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "StufeButton")));
         Assert.Equal("EL festlegen", Name(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "LeadershipSetElButton")));
         Assert.Equal(
             "Melder der Einsatzleitung festlegen",

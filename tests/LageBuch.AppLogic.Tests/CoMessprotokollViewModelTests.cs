@@ -1347,8 +1347,6 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void AddChecklist(ChecklistSeed seed) => RailEdit(() => _inner.AddChecklist(seed));
 
-    public void SetFuehrungsstufe(Fuehrungsstufe? stufe) => _inner.SetFuehrungsstufe(stufe);
-
     public void UpdateLeadershipPost(
         string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
         _inner.UpdateLeadershipPost(standort, rufname, telefon, funkgruppen, fuehrungsfahrzeug);

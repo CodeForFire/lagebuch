@@ -146,9 +146,6 @@ public interface IIncidentSession
     /// <summary>Takes a Freitext-Abschnitt into the Führung structure. See <c>Incident.AdoptFreeTextSection</c>.</summary>
     void AdoptFreeTextSection(string section);
 
-    /// <summary>Sets the Führungsstufe; null clears it.</summary>
-    void SetFuehrungsstufe(Fuehrungsstufe? stufe);
-
     /// <summary>Hides or shows one rail entry for this Einsatz. See <c>Incident.SetNavVisibility</c>.</summary>
     void SetNavVisibility(string key, bool visible);
 
