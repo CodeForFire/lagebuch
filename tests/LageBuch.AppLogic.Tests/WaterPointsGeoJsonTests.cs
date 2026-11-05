@@ -91,6 +91,69 @@ public class WaterPointsGeoJsonTests
     public void Each_kind_has_its_card_title(string emergency, string title) =>
         Assert.Equal(title, Assert.Single(Points(Hydrant.Replace("fire_hydrant\", \"fire_hydrant:type\": \"underground\"", emergency + "\"", StringComparison.Ordinal))).Title);
 
+    [Theory]
+    [InlineData("fire_hydrant", "\"fire_hydrant:type\": \"underground\"", WaterPointSymbol.Unterflurhydrant)]
+    [InlineData("fire_hydrant", "\"fire_hydrant:type\": \"pillar\"", WaterPointSymbol.Ueberflurhydrant)]
+    [InlineData("fire_hydrant", "\"fire_hydrant:type\": \"wall\"", WaterPointSymbol.Wandhydrant)]
+    [InlineData("fire_hydrant", "\"fire_hydrant:type\": \"pipe\"", WaterPointSymbol.Unterflurhydrant)]
+    [InlineData("fire_hydrant", "\"osm\": \"node/1\"", WaterPointSymbol.Unterflurhydrant)]
+    [InlineData("suction_point", "\"water_source\": \"river\"", WaterPointSymbol.Saugstelle)]
+    [InlineData("suction_point", "\"water_source\": \"groundwater\"", WaterPointSymbol.Loeschwasserbrunnen)]
+    [InlineData("water_tank", "\"osm\": \"node/1\"", WaterPointSymbol.Zisterne)]
+    [InlineData("fire_water_pond", "\"osm\": \"node/1\"", WaterPointSymbol.OffenesGewaesser)]
+    public void Each_kind_gets_the_glyph_of_what_OSM_says_it_is(string emergency, string properties, WaterPointSymbol symbol) =>
+        Assert.Equal(symbol, Assert.Single(Points(Feature(emergency, properties))).Symbol);
+
+    [Theory]
+    [InlineData("1600", 1600)]
+    [InlineData("1600 l/min", 1600)]
+    [InlineData("1600l/min", 1600)]
+    [InlineData("96 m3/h", 1600)]
+    [InlineData("96 m³/h", 1600)]
+    [InlineData("48,5 m3/h", 808)]
+    public void A_flow_rate_is_read_in_litres_per_minute(string flowRate, int litresPerMinute) =>
+        Assert.Equal(litresPerMinute, Assert.Single(Points(Feature("fire_hydrant", $"\"flow_rate\": \"{flowRate}\""))).FlowLitresPerMinute);
+
+    [Theory]
+    [InlineData("1.600 l/min")]
+    [InlineData("viel")]
+    [InlineData("0")]
+    [InlineData("999999")]
+    [InlineData("1600 bar")]
+    public void A_flow_rate_that_is_no_sure_figure_reads_as_unknown_and_stays_on_the_card(string flowRate)
+    {
+        var point = Assert.Single(Points(Feature("fire_hydrant", $"\"flow_rate\": \"{flowRate}\"")));
+
+        Assert.Null(point.FlowLitresPerMinute);
+        Assert.Contains(new WaterPointDetail("Förderleistung", flowRate), point.Details);
+    }
+
+    [Theory]
+    [InlineData("100", 100)]
+    [InlineData("DN 100", 100)]
+    [InlineData("DN100", 100)]
+    [InlineData("150 mm", 150)]
+    [InlineData("dn 80", 80)]
+    public void A_diameter_is_read_as_its_nennweite(string diameter, int dn) =>
+        Assert.Equal(dn, Assert.Single(Points(Feature("fire_hydrant", $"\"fire_hydrant:diameter\": \"{diameter}\""))).NominalDiameter);
+
+    [Theory]
+    [InlineData("4\\\"")]
+    [InlineData("100/80")]
+    [InlineData("5")]
+    public void A_diameter_spelled_any_other_way_reads_as_unknown(string diameter) =>
+        Assert.Null(Assert.Single(Points(Feature("fire_hydrant", $"\"fire_hydrant:diameter\": \"{diameter}\""))).NominalDiameter);
+
+    [Fact]
+    public void A_packs_point_is_never_estimated_out_of_service_or_on_a_known_network()
+    {
+        var point = Assert.Single(Points(Hydrant));
+
+        Assert.False(point.IsEstimated);
+        Assert.False(point.IsOutOfService);
+        Assert.Null(point.Network);
+    }
+
     [Fact]
     public void A_label_part_longer_than_its_cap_is_cut()
     {
@@ -134,6 +197,10 @@ public class WaterPointsGeoJsonTests
 
         Assert.Equal(WaterPointsGeoJson.MaxFeatures, points.Count);
     }
+
+    private static string Feature(string emergency, string properties) =>
+        "{\"type\": \"Feature\", \"geometry\": {\"type\": \"Point\", \"coordinates\": [11.2, 48.1]}, "
+        + $"\"properties\": {{\"emergency\": \"{emergency}\", {properties}}}}}";
 
     private static IReadOnlyList<WaterPoint> Points(params string[] features) =>
         WaterPointsGeoJson.Parse(Encoding.UTF8.GetBytes($$"""{"type": "FeatureCollection", "features": [{{string.Join(',', features)}}]}"""))

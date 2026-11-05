@@ -86,9 +86,64 @@ public static partial class WaterPointsGeoJson
             return false;
         }
 
-        point = new WaterPoint(position, k, Label(k, properties)) { Details = Details(properties) };
+        point = new WaterPoint(position, k, Label(k, properties))
+        {
+            Details = Details(properties),
+            Symbol = Symbol(k, properties),
+            FlowLitresPerMinute = FlowRate(Text(properties, "flow_rate")),
+            NominalDiameter = Diameter(Text(properties, "fire_hydrant:diameter")),
+        };
         return true;
     }
+
+    // The marker's glyph. A hydrant of no known Bauart, or a Steigrohr, gets the Unterflurhydrant's,
+    // the commonest; its card still says only "Hydrant".
+    private static WaterPointSymbol Symbol(WaterPointKind kind, JsonElement properties) => kind switch
+    {
+        WaterPointKind.Hydrant => Text(properties, "fire_hydrant:type") switch
+        {
+            "pillar" => WaterPointSymbol.Ueberflurhydrant,
+            "wall" => WaterPointSymbol.Wandhydrant,
+            _ => WaterPointSymbol.Unterflurhydrant,
+        },
+        WaterPointKind.Saugstelle => Text(properties, "water_source") == "groundwater" ? WaterPointSymbol.Loeschwasserbrunnen : WaterPointSymbol.Saugstelle,
+        WaterPointKind.Loeschwasserbehaelter => WaterPointSymbol.Zisterne,
+        _ => WaterPointSymbol.OffenesGewaesser,
+    };
+
+    // OSM's flow_rate in l/min: "1600" or "1600 l/min", or "96 m3/h" converted. A thousands point
+    // ("1.600") is no l/min figure anyone can be sure of, and nothing beyond a fire boat's is a
+    // hydrant's: either reads as unknown, and the card still shows the text as it is.
+    private static int? FlowRate(string? value)
+    {
+        const int plausible = 100_000;
+        if (value is null || FlowRateValue().Match(value) is not { Success: true } match)
+        {
+            return null;
+        }
+
+        var number = match.Groups["number"].Value.Replace(',', '.');
+        if (!double.TryParse(number, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount))
+        {
+            return null;
+        }
+
+        var perHour = match.Groups["unit"].Value.StartsWith('m') || match.Groups["unit"].Value.StartsWith('M');
+        if (!perHour && number.Contains('.', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var litres = perHour ? amount * 1000 / 60 : amount;
+        return litres is > 0 and <= plausible ? (int)Math.Round(litres, MidpointRounding.AwayFromZero) : null;
+    }
+
+    // The Nennweite from "100", "DN 100", "DN100" or "100 mm"; anything else is unknown.
+    private static int? Diameter(string? value) =>
+        value is not null && DiameterValue().Match(value) is { Success: true } match
+            && int.TryParse(match.Groups["dn"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var dn)
+            ? dn
+            : null;
 
     // "UH 100" for an Unterflurhydrant DN 100, the way it is written on the Hinweisschild; for
     // anything else its name or Nummer. A value OSM spells some other way is shown as it is.
@@ -194,4 +249,10 @@ public static partial class WaterPointsGeoJson
 
     [GeneratedRegex(@"\A(?:node|way|relation)/[0-9]{1,15}\z", RegexOptions.CultureInvariant)]
     private static partial Regex OsmId();
+
+    [GeneratedRegex(@"\A(?<number>[0-9]{1,6}(?:[.,][0-9]{1,3})?)\s*(?<unit>l/min|m3/h|m³/h)?\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
+    private static partial Regex FlowRateValue();
+
+    [GeneratedRegex(@"\A(?:DN\s*)?(?<dn>[0-9]{2,4})(?:\s*mm)?\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
+    private static partial Regex DiameterValue();
 }

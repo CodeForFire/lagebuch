@@ -597,15 +597,53 @@
               <Style Selector="Grid#MapArea.night Ellipse.fuel">
                 <Setter Property="Fill" Value="#FFB8968A" />
               </Style>
+              <!-- A marker's coloured field, with the glyph WaterPointMarkers draws into it: the
+                   same on a day and a night map, as the markers are. -->
+              <Style Selector="Border.water-field">
+                <Setter Property="Width" Value="16" />
+                <Setter Property="Height" Value="16" />
+                <Setter Property="CornerRadius" Value="2" />
+                <Setter Property="Padding" Value="2" />
+                <Setter Property="Background" Value="{x:Static c:WaterPointMarkers.UnbekanntBrush}" />
+              </Style>
+              <Style Selector="Border.water-field > Path">
+                <Setter Property="Stroke" Value="White" />
+                <Setter Property="StrokeThickness" Value="1.4" />
+                <Setter Property="StrokeLineCap" Value="Round" />
+                <Setter Property="StrokeJoin" Value="Round" />
+              </Style>
             </StackPanel.Styles>
+            <!-- What the colour says: the flow class, in l/min. -->
+            <WrapPanel x:Name="WaterFlowKey" IsVisible="{Binding ShowsWaterLegend}">
+              <TextBlock Text="l/min" FontWeight="SemiBold" />
+              <Border Classes="water-field" />
+              <TextBlock Text="unbekannt" />
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Unter400Brush}" />
+              <TextBlock Text="&lt; 400" />
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Bis799Brush}" />
+              <TextBlock Text="400–799" />
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Bis1599Brush}" />
+              <TextBlock Text="800–1.599" />
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Bis3199Brush}" />
+              <TextBlock Text="1.600–3.199" />
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Ab3200Brush}" />
+              <TextBlock Text="ab 3.200" />
+            </WrapPanel>
+            <!-- What the glyph says: the kind of Entnahmestelle. -->
             <WrapPanel x:Name="WaterPointKey" IsVisible="{Binding ShowsWaterLegend}">
-              <Ellipse Width="11" Height="11" Fill="#FFD32F2F" Stroke="White" StrokeThickness="1.5" />
-              <TextBlock Text="Hydrant" />
-              <Ellipse Width="11" Height="11" Fill="White" Stroke="#FF1565C0" StrokeThickness="3" />
+              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.UnterflurhydrantGlyph}" /></Border>
+              <TextBlock Text="Unterflurhydrant" />
+              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.UeberflurhydrantGlyph}" /></Border>
+              <TextBlock Text="Überflurhydrant" />
+              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.WandhydrantGlyph}" /></Border>
+              <TextBlock Text="Wandhydrant" />
+              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.SaugstelleGlyph}" /></Border>
               <TextBlock Text="Saugstelle" />
-              <Rectangle Width="11" Height="11" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" />
-              <TextBlock Text="Löschwasserbehälter" />
-              <Path Data="M 6,0 L 12,6 L 6,12 L 0,6 Z" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" VerticalAlignment="Center" />
+              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.LoeschwasserbrunnenGlyph}" /></Border>
+              <TextBlock Text="Brunnen" />
+              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.ZisterneGlyph}" /></Border>
+              <TextBlock Text="Zisterne" />
+              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.OffenesGewaesserGlyph}" /></Border>
               <TextBlock Text="Löschteich" />
             </WrapPanel>
             <!-- The terrain layer's key, coloured as TerrainShading paints it. -->

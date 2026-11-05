@@ -43,10 +43,11 @@ internal static class FictionalRegionPack
 
     private const string WaterPoints = """
         {"type": "FeatureCollection", "features": [
-          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2549, 48.1788]}, "properties": {"emergency": "fire_hydrant", "fire_hydrant:type": "underground", "fire_hydrant:diameter": "100"}},
-          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2566, 48.1781]}, "properties": {"emergency": "fire_hydrant", "fire_hydrant:type": "pillar", "fire_hydrant:diameter": "150"}},
-          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2537, 48.1776]}, "properties": {"emergency": "fire_hydrant", "fire_hydrant:type": "underground", "fire_hydrant:diameter": "80"}},
-          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2581, 48.1774]}, "properties": {"emergency": "suction_point", "name": "Musterbach"}}
+          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2549, 48.1788]}, "properties": {"emergency": "fire_hydrant", "fire_hydrant:type": "underground", "fire_hydrant:diameter": "100", "flow_rate": "1600"}},
+          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2566, 48.1781]}, "properties": {"emergency": "fire_hydrant", "fire_hydrant:type": "pillar", "fire_hydrant:diameter": "150", "flow_rate": "192 m3/h"}},
+          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2537, 48.1776]}, "properties": {"emergency": "fire_hydrant", "fire_hydrant:type": "underground", "fire_hydrant:diameter": "80", "flow_rate": "600 l/min"}},
+          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2581, 48.1774]}, "properties": {"emergency": "suction_point", "name": "Musterbach"}},
+          {"type": "Feature", "geometry": {"type": "Point", "coordinates": [11.2560, 48.1792]}, "properties": {"emergency": "suction_point", "water_source": "groundwater", "name": "Brunnen Marktplatz"}}
         ]}
         """;
 

@@ -43,7 +43,7 @@ public static class MapDrawing
 
         var style = tiles.Style;
         context.FillRectangle(style.Background, new Rect(size));
-        var marks = waterPoints is null ? [] : LayOutWaterPoints(waterPoints, center, zoom, size, selected, rotation, style);
+        var marks = waterPoints is null ? [] : WaterPointMarkers.LayOut(waterPoints, center, zoom, size, selected, rotation);
         var labels = new List<(MapLabel Label, Point At)>();
         if (tiles.Source is { } source)
         {
@@ -79,8 +79,8 @@ public static class MapDrawing
         if (labels.Count > 0)
         {
             // The names of every vector tile, over all tiles and unclipped, so none is cut at a tile's
-            // edge. Only a labelled water point keeps names away: a bare dot is drawn over the name.
-            var reserved = marks.Where(m => m.Text is not null).Select(m => m.Bounds).ToList();
+            // edge. Only a water point's flag keeps names away: a bare disc is drawn over the name.
+            var reserved = marks.Where(m => m.HasText).Select(m => m.Bounds).ToList();
             foreach (var (label, placement) in PlaceLabels(labels, size, rotation, reserved))
             {
                 using (context.PushTransform(placement))
@@ -97,7 +97,7 @@ public static class MapDrawing
 
         foreach (var mark in marks)
         {
-            DrawWaterPoint(context, mark, style);
+            WaterPointMarkers.Draw(context, mark, style.SelectedRing);
         }
     }
 
@@ -438,119 +438,7 @@ public static class MapDrawing
         context.DrawEllipse(FlowEnd, FlowCasing, points[^1], 6, 6);
     }
 
-    // DIN 14090 colours: hydrants red, open water and tanks blue.
-    private static readonly IBrush HydrantBrush = new ImmutableSolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F));
-    private static readonly IBrush OpenWaterBrush = new ImmutableSolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
-    private static readonly IPen WaterOutline = new ImmutablePen(Brushes.White, 1.5);
-    private static readonly IPen SaugstelleRing = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)), 3);
     private static readonly CultureInfo LabelCulture = CultureInfo.GetCultureInfo("de-DE");
-
-    // The water points inside the visible map, one symbol per kind -- a red dot for a hydrant, a
-    // blue ring for a Saugstelle, a blue square for a Löschwasserbehälter, a blue diamond for a
-    // Löschteich -- and from WaterPointLayer.LabelsMinZoom their label. A ring marks `selected`.
-    // Nothing below WaterPointLayer.MinZoom.
-    private static List<WaterPointMark> LayOutWaterPoints(IReadOnlyList<WaterPoint> points, GeoPoint center, int zoom, Size size, WaterPoint? selected, double rotation, MapStyle style)
-    {
-        var marks = new List<WaterPointMark>();
-        if (zoom < WaterPointLayer.MinZoom)
-        {
-            return marks;
-        }
-
-        // Compared in degrees first: thousands of points, a few dozen of them on screen. On a
-        // turned map the screen's corners are no longer north-west and south-east, so take all four.
-        const double margin = 40;
-        Point[] corners = [new(-margin, -margin), new(size.Width + margin, -margin), new(-margin, size.Height + margin), new(size.Width + margin, size.Height + margin)];
-        var reach = corners.Select(c => ToGeo(center, zoom, size, c, rotation)).ToList();
-        var (north, south) = (reach.Max(g => g.Latitude), reach.Min(g => g.Latitude));
-        var (west, east) = (reach.Min(g => g.Longitude), reach.Max(g => g.Longitude));
-        var radius = zoom >= WaterPointLayer.LabelsMinZoom ? 7.0 : 5.0;
-        var typeface = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
-        foreach (var point in points)
-        {
-            var p = point.Position;
-            if (p.Latitude > north || p.Latitude < south || p.Longitude < west || p.Longitude > east)
-            {
-                continue;
-            }
-
-            var at = ToScreen(center, zoom, size, p, rotation);
-            var isSelected = ReferenceEquals(point, selected);
-            FormattedText? text = null;
-            var origin = default(Point);
-            if (zoom >= WaterPointLayer.LabelsMinZoom && point.Label.Length > 0)
-            {
-                text = new FormattedText(point.Label, LabelCulture, FlowDirection.LeftToRight, typeface, 11, style.WaterPointLabelText);
-                origin = new Point(at.X + radius + (isSelected ? 9 : 3), at.Y - (text.Height / 2)); // clear of the selection ring
-            }
-
-            marks.Add(new WaterPointMark(point.Kind, at, radius, isSelected, text, origin));
-        }
-
-        return marks;
-    }
-
-    private static void DrawWaterPoint(DrawingContext context, WaterPointMark mark, MapStyle style)
-    {
-        DrawSymbol(context, mark.Kind, mark.At, mark.Radius);
-        if (mark.IsSelected)
-        {
-            context.DrawEllipse(null, new ImmutablePen(style.SelectedRing, 2.5), mark.At, mark.Radius + 5, mark.Radius + 5);
-        }
-
-        if (mark.Text is { } text)
-        {
-            context.FillRectangle(style.WaterPointLabelBackground, mark.TextBox, 2);
-            context.DrawText(text, mark.TextOrigin);
-        }
-    }
-
-    // A water point on screen: its symbol at `At`, and its label, if shown, from `TextOrigin`.
-    private sealed record WaterPointMark(WaterPointKind Kind, Point At, double Radius, bool IsSelected, FormattedText? Text, Point TextOrigin)
-    {
-        // The label's box.
-        public Rect TextBox => Text is null ? default : new Rect(TextOrigin.X - 2, TextOrigin.Y, Text.Width + 4, Text.Height);
-
-        // The symbol with its selection ring, and the label's box: what a map name keeps clear of.
-        public Rect Bounds
-        {
-            get
-            {
-                var reach = Radius + (IsSelected ? 6 : 0);
-                return new Rect(At.X - reach, At.Y - reach, 2 * reach, 2 * reach).Union(TextBox);
-            }
-        }
-    }
-
-    private static void DrawSymbol(DrawingContext context, WaterPointKind kind, Point at, double radius)
-    {
-        switch (kind)
-        {
-            case WaterPointKind.Hydrant:
-                context.DrawEllipse(HydrantBrush, WaterOutline, at, radius, radius);
-                break;
-            case WaterPointKind.Saugstelle:
-                // White underneath, so the ring reads on a blue river as well as on land.
-                context.DrawEllipse(Brushes.White, SaugstelleRing, at, radius - 1, radius - 1);
-                break;
-            case WaterPointKind.Loeschwasserbehaelter:
-                context.DrawRectangle(OpenWaterBrush, WaterOutline, new Rect(at.X - radius, at.Y - radius, 2 * radius, 2 * radius));
-                break;
-            default:
-                var diamond = new StreamGeometry();
-                using (var path = diamond.Open())
-                {
-                    path.BeginFigure(new Point(at.X, at.Y - radius - 1), isFilled: true);
-                    path.LineTo(new Point(at.X + radius + 1, at.Y));
-                    path.LineTo(new Point(at.X, at.Y + radius + 1));
-                    path.LineTo(new Point(at.X - radius - 1, at.Y));
-                    path.EndFigure(isClosed: true);
-                }
-
-                context.DrawGeometry(OpenWaterBrush, WaterOutline, diamond);
-                break;
-        }
-    }
 
     /// <summary>
     /// Where <paramref name="point"/> lands on a map of <paramref name="size"/> centred on

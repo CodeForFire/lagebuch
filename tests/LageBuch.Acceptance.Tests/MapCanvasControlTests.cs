@@ -24,6 +24,13 @@ public class MapCanvasControlTests
     private static readonly Color Land = Color.FromRgb(0xF2, 0xEF, 0xE9);
     private static readonly Color Water = Color.FromRgb(0xAA, 0xD3, 0xDF);
 
+    // The 1.600–3.199 l/min class.
+    private static readonly Color Green = Color.FromRgb(0x2E, 0x7D, 0x46);
+
+    // A pixel inside a flag's coloured field at zoom 16, off its glyph: the body is 20 px high and
+    // stands on an 8 px mast above the point at (200, 150).
+    private static readonly PixelPoint MediumField = new(203, 125);
+
     [AvaloniaFact]
     public void The_tiles_of_the_pack_are_drawn_under_the_centre()
     {
@@ -181,61 +188,131 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
-    public void Each_kind_of_water_point_has_its_own_symbol_from_zoom_15()
+    public void From_zoom_16_a_water_point_is_a_flag_whose_mast_foot_stands_on_it()
     {
-        var (window, control, viewport) = Show(new SolidTiles());
-        GeoPoint East(double pixels) => WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).X + pixels, WebMercator.ToWorldPixel(Fuerstenfeldbruck, 15).Y, 15);
-        control.WaterPoints =
-        [
-            new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100"),
-            new WaterPoint(East(60), WaterPointKind.Loeschwasserbehaelter, string.Empty),
-            new WaterPoint(East(-60), WaterPointKind.Saugstelle, string.Empty),
-            new WaterPoint(East(120), WaterPointKind.Loeschteich, string.Empty),
-        ];
-        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MinZoom));
-        Dispatcher.UIThread.RunJobs();
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(1600));
 
         using var frame = window.CaptureRenderedFrame()!;
 
-        Assert.Equal(Color.FromRgb(0xD3, 0x2F, 0x2F), PixelAt(frame, 200, 150));
-        Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 260, 150));
+        // The mast narrows to the point; left of it and below it is the map.
+        AssertNear(Green, PixelAt(frame, 200, 147));
+        Assert.Equal(Land, PixelAt(frame, 194, 147));
+        Assert.Equal(Land, PixelAt(frame, 200, 158));
 
-        // A Saugstelle is a ring: white in the middle, blue on its rim.
-        Assert.Equal(Colors.White, PixelAt(frame, 140, 150));
-        Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 144, 150));
+        // The body is above and right of the point: the coloured field, then white.
+        AssertNear(Green, PixelAt(frame, MediumField.X, MediumField.Y));
+        Assert.True(Has(frame, new PixelRect(220, 124, 30, 16), Colors.White));
+    }
 
-        // A Löschteich is a diamond: blue in the middle, but not in the corners a square would fill.
-        Assert.Equal(Color.FromRgb(0x15, 0x65, 0xC0), PixelAt(frame, 320, 150));
-        Assert.Equal(Land, PixelAt(frame, 325, 145));
+    [AvaloniaTheory]
+    [InlineData(null, 0x5F6B78)]
+    [InlineData(300, 0xB3261E)]
+    [InlineData(600, 0xD9731A)]
+    [InlineData(1200, 0xB8960F)]
+    [InlineData(1600, 0x2E7D46)]
+    [InlineData(3200, 0x0F5C6E)]
+    public void The_flow_class_colours_the_flag_s_field(int? litresPerMinute, uint rgb)
+    {
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(litresPerMinute));
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        AssertNear(Color.FromUInt32(0xFF000000 | rgb), PixelAt(frame, MediumField.X, MediumField.Y));
     }
 
     [AvaloniaFact]
-    public void The_water_point_whose_card_is_open_is_ringed()
+    public void A_stronger_source_lies_over_a_weaker_one_on_the_same_spot()
     {
-        var (window, control, viewport) = Show(new SolidTiles());
-        var hydrant = new WaterPoint(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100");
-        control.WaterPoints = [hydrant];
-        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MinZoom));
-        Dispatcher.UIThread.RunJobs();
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(3200), Hydrant(300));
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        AssertNear(Color.FromRgb(0x0F, 0x5C, 0x6E), PixelAt(frame, MediumField.X, MediumField.Y));
+    }
+
+    [AvaloniaFact]
+    public void At_zoom_15_a_water_point_is_a_disc_on_it_whose_ring_fills_with_its_class()
+    {
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MinZoom, Hydrant(1600));
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        AssertNear(Green, PixelAt(frame, 200, 144));
+
+        // Four classes of five: from twelve o'clock clockwise past nine, the last fifth left grey.
+        AssertNear(Green, PixelAt(frame, 209, 150));
+        AssertNear(Green, PixelAt(frame, 190, 150));
+        AssertNear(Color.FromRgb(0xD5, 0xD9, 0xDD), PixelAt(frame, 195, 142));
+
+        // No flag.
+        Assert.Equal(Land, PixelAt(frame, 215, 125));
+    }
+
+    [AvaloniaFact]
+    public void A_four_digit_estimate_stays_inside_the_flag_s_frame()
+    {
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.FullMinZoom, Hydrant(1600) with { IsEstimated = true, NominalDiameter = 100 });
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        // Body rows: the mast's 10 px above the point, then 32 px of body.
+        var (top, bottom) = (150 - 10 - 32, 150 - 10);
+        var frameRight = Enumerable.Range(200, 200).Last(x => IsNear(Green, PixelAt(frame, x, (top + bottom) / 2)));
+        Assert.True(HasText(frame, new PixelRect(230, top, frameRight - 230, bottom - top)));
+        Assert.False(HasText(frame, new PixelRect(frameRight + 1, top - 4, 399 - frameRight, bottom - top + 8)));
+    }
+
+    [AvaloniaFact]
+    public void Out_of_service_the_flag_loses_its_colour_and_is_struck_through_red()
+    {
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(1600) with { IsOutOfService = true });
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        AssertNear(Color.FromRgb(0x8A, 0x91, 0x99), PixelAt(frame, MediumField.X, MediumField.Y));
+        Assert.True(Has(frame, new PixelRect(220, 122, 40, 20), Color.FromRgb(0xD3, 0x2F, 0x2F)));
+    }
+
+    [AvaloniaFact]
+    public void The_water_point_whose_card_is_open_is_framed_dark()
+    {
+        var hydrant = Hydrant(1600);
+        var (window, control, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, hydrant);
+        var frameTop = new PixelRect(225, 119, 20, 6);
         using (var before = window.CaptureRenderedFrame()!)
         {
-            Assert.Equal(Land, PixelAt(before, 210, 150));
+            Assert.False(Has(before, frameTop, Color.FromRgb(0x21, 0x21, 0x21)));
         }
 
         control.SelectedWaterPoint = hydrant;
         Dispatcher.UIThread.RunJobs();
 
         using var after = window.CaptureRenderedFrame()!;
-        Assert.Equal(Color.FromRgb(0x21, 0x21, 0x21), PixelAt(after, 210, 150));
+        Assert.True(Has(after, frameTop, Color.FromRgb(0x21, 0x21, 0x21)));
+    }
+
+    [AvaloniaFact]
+    public void On_the_night_map_the_open_card_s_flag_keeps_its_white_body_and_is_framed_light()
+    {
+        var hydrant = Hydrant(1600);
+        var (window, control, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, hydrant);
+        control.IsNight = true;
+        control.SelectedWaterPoint = hydrant;
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.True(Has(frame, new PixelRect(225, 119, 20, 6), Color.FromRgb(0xE4, 0xE4, 0xE4)));
+        Assert.True(Has(frame, new PixelRect(225, 126, 20, 12), Colors.White));
     }
 
     [AvaloniaFact]
     public void A_place_name_gives_way_to_a_hydrant_s_label()
     {
         // The name is centred on the screen; left of the middle is its first half, clear of the hydrant's dot and label.
-        var (window, control, viewport) = Show(new PlaceNameTiles(Fuerstenfeldbruck, "Musterstadt", zoom: WaterPointLayer.LabelsMinZoom));
-        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.LabelsMinZoom));
-        var farAway = WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, WaterPointLayer.LabelsMinZoom).X, WebMercator.ToWorldPixel(Fuerstenfeldbruck, WaterPointLayer.LabelsMinZoom).Y + 100, WaterPointLayer.LabelsMinZoom);
+        var (window, control, viewport) = Show(new PlaceNameTiles(Fuerstenfeldbruck, "Musterstadt", zoom: WaterPointLayer.MediumMinZoom));
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, WaterPointLayer.MediumMinZoom));
+        var farAway = WebMercator.ToGeo(WebMercator.ToWorldPixel(Fuerstenfeldbruck, WaterPointLayer.MediumMinZoom).X, WebMercator.ToWorldPixel(Fuerstenfeldbruck, WaterPointLayer.MediumMinZoom).Y + 100, WaterPointLayer.MediumMinZoom);
         control.WaterPoints = [new WaterPoint(farAway, WaterPointKind.Hydrant, "UH 100")];
         Dispatcher.UIThread.RunJobs();
         using (var named = window.CaptureRenderedFrame()!)
@@ -471,6 +548,59 @@ public class MapCanvasControlTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return (window, control, viewport);
+    }
+
+    private static WaterPoint Hydrant(int? litresPerMinute) =>
+        new(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100") { FlowLitresPerMinute = litresPerMinute };
+
+    private static (Window Window, MapCanvasControl Control, MapViewport Viewport) ShowWaterPoints(int zoom, params WaterPoint[] points)
+    {
+        var (window, control, viewport) = Show(new SolidTiles());
+        control.WaterPoints = points;
+        viewport.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, zoom));
+        Dispatcher.UIThread.RunJobs();
+        return (window, control, viewport);
+    }
+
+    private static bool IsNear(Color expected, Color actual) =>
+        Math.Abs(expected.R - actual.R) <= 12 && Math.Abs(expected.G - actual.G) <= 12 && Math.Abs(expected.B - actual.B) <= 12;
+
+    private static void AssertNear(Color expected, Color actual) =>
+        Assert.True(IsNear(expected, actual), $"Expected about {expected}, was {actual}.");
+
+    // Whether any pixel in the box is about `colour`.
+    private static bool Has(WriteableBitmap frame, PixelRect box, Color colour)
+    {
+        for (var x = box.X; x < box.Right; x++)
+        {
+            for (var y = box.Y; y < box.Bottom; y++)
+            {
+                if (IsNear(colour, PixelAt(frame, x, y)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Whether any pixel in the box is as dark as the marker's numbers, and grey rather than a class colour.
+    private static bool HasText(WriteableBitmap frame, PixelRect box)
+    {
+        for (var x = box.X; x < box.Right; x++)
+        {
+            for (var y = box.Y; y < box.Bottom; y++)
+            {
+                var c = PixelAt(frame, x, y);
+                if (c.R < 0x70 && c.G < 0x70 && c.B < 0x70 && Math.Abs(c.R - c.G) < 0x18)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static GeoPoint GeoUnder(MapCanvasControl control, MapViewport viewport, Point screen)
