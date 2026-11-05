@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Controls;
 using LageBuch.AppLogic.ViewModels;
@@ -223,13 +222,4 @@ public partial class LeadershipView : UserControl
     }
 
     private void OnFunkgruppePointerExited(object? sender, PointerEventArgs e) => ViewModel?.ClearFunkgruppeHighlight();
-
-    // A Button inside a Flyout does not dismiss it; the command itself runs from the Button. The
-    // Stufe button lives in the El card's template, so it is looked up rather than named here.
-    // Closed only once the click is over: Button runs its command after raising Click, and the
-    // entries take StufeChoices from the DataContext the flyout inherits, which closing takes
-    // away -- closed inside Click, the entry had no command left by then and nothing was chosen.
-    private void OnStufeChoiceClick(object? sender, RoutedEventArgs e) =>
-        Dispatcher.UIThread.Post(() =>
-            this.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Name == "StufeButton")?.Flyout?.Hide());
 }

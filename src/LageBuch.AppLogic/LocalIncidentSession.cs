@@ -220,9 +220,6 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void AddChecklist(ChecklistSeed seed) =>
         Mutate(() => Incident.AddChecklist(_clock, RequireOperator(), seed));
 
-    public void SetFuehrungsstufe(Fuehrungsstufe? stufe) =>
-        Mutate(() => Incident.SetFuehrungsstufe(_clock, RequireOperator(), stufe));
-
     public void UpdateLeadershipPost(
         string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
         Mutate(() => Incident.UpdateLeadershipPost(_clock, RequireOperator(), standort, rufname, telefon, funkgruppen, fuehrungsfahrzeug));

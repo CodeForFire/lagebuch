@@ -108,4 +108,55 @@ public sealed class LeadershipFunkgruppeHighlightTests
 
         Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted);
     }
+
+    [Fact]
+    public void Hovering_a_line_from_no_card_turns_off_what_was_lit()
+    {
+        using var vm = NewVm(TwoAbschnitte());
+        vm.HighlightFunkgruppe(vm.El.TmoLines.Single());
+
+        vm.HighlightFunkgruppe(new FunkgruppeLine("FW 1000", null));
+
+        Assert.False(vm.El.TmoLines.Single().Highlight.IsHighlighted);
+        Assert.False(Card(vm, "Nord").TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void A_partner_with_the_same_funkgruppe_lights_up_with_the_abschnitt()
+    {
+        var session = TwoAbschnitte();
+        session.AddCommandNode(CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["FW 2000"], null));
+        using var vm = NewVm(session);
+        var partner = vm.Partners.Single();
+
+        vm.HighlightFunkgruppe(Card(vm, "Süd").TmoLines.Single());
+
+        Assert.True(Card(vm, "Süd").TmoLines.Single().Highlight.IsHighlighted);
+        Assert.True(partner.TmoLines.Single().Highlight.IsHighlighted);
+    }
+
+    [Fact]
+    public void The_einsatzleitung_card_announces_new_funkgruppen_lines()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        var changed = new List<string?>();
+        vm.El.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], ["307_F"]), null);
+
+        Assert.Contains(nameof(ElCard.TmoLines), changed);
+        Assert.Contains(nameof(ElCard.DmoLines), changed);
+        Assert.Equal([new FunkgruppeLine("FW 1000", null)], vm.El.TmoLines);
+    }
+
+    [Fact]
+    public void Two_funkgruppe_lines_are_equal_only_with_the_same_text_and_mark()
+    {
+        var line = new FunkgruppeLine("FW 1000", true);
+
+        Assert.Equal(new FunkgruppeLine("FW 1000", true), line);
+        Assert.NotEqual(new FunkgruppeLine("FW 2000", true), line);
+        Assert.NotEqual(new FunkgruppeLine("FW 1000", false), line);
+    }
 }

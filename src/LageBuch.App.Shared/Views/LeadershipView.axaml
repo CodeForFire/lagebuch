@@ -144,16 +144,6 @@
     <Style Selector="SelectableTextBlock.field-value.not-shared">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
     </Style>
-    <!-- The Vorschlag reads quiet while it matches the Stufe set, amber when it does not. -->
-    <Style Selector="TextBlock#StufeSuggestionText">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-    </Style>
-    <Style Selector="TextBlock#StufeSuggestionText.mismatch">
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
-    </Style>
 
     <!-- Why AUFLÖSEN is off. The desktop says it in the button's tooltip; a phone has no hover, so
          the narrow layout shows it under the button instead. Hidden by a Style, not an attribute, so
@@ -464,41 +454,6 @@
             <ItemsControl Grid.Row="5" Grid.Column="1" x:Name="ElDmo" Classes="funk-lines" ItemsSource="{Binding DmoLines}"
                           ItemTemplate="{StaticResource FunkgruppeChipTemplate}" />
           </Grid>
-
-          <!-- The Führungsstufe: a flyout of commands, the NodeChoicePicker idiom, closed on select. -->
-          <StackPanel Spacing="4">
-            <!-- Label above the button: "Keine Führungsstufe festgelegt" needs the card's whole width. -->
-            <StackPanel Spacing="4">
-              <TextBlock Classes="field-label" Text="FÜHRUNGSSTUFE" />
-              <Button x:Name="StufeButton" HorizontalAlignment="Left" Height="28" Padding="10,0"
-                      ToolTip.Tip="Führungsstufe wählen" AutomationProperties.Name="Führungsstufe wählen">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock x:Name="StufeText" Text="{Binding StufeText}" FontSize="13" VerticalAlignment="Center" />
-                  <PathIcon Width="9" Height="9" Foreground="{StaticResource TextSecondaryBrush}"
-                            Data="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" />
-                </StackPanel>
-                <Button.Flyout>
-                  <Flyout Placement="BottomEdgeAlignedLeft">
-                    <ItemsControl ItemsSource="{Binding StufeChoices}" MinWidth="150">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:StufeChoice">
-                          <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                                  Padding="8,5" Command="{Binding SelectCommand}" Click="OnStufeChoiceClick">
-                            <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
-                              <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold" IsVisible="{Binding IsCurrent}" />
-                              <TextBlock Grid.Column="1" Text="{Binding Label}" />
-                            </Grid>
-                          </Button>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </Flyout>
-                </Button.Flyout>
-              </Button>
-            </StackPanel>
-            <TextBlock x:Name="StufeSuggestionText" Text="{Binding SuggestionText}"
-                       Classes.mismatch="{Binding !MatchesSuggestion}" />
-          </StackPanel>
 
           <Button Classes="board-action" HorizontalAlignment="Left" Content="ERREICHBARKEIT BEARBEITEN"
                   ToolTip.Tip="Standort, Führungsfahrzeug, Rufname, Telefon und Funkgruppen bearbeiten"

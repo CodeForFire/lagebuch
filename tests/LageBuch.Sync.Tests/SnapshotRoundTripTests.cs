@@ -246,7 +246,7 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
-    public void Round_trip_preserves_abschnitte_placements_stufe_and_the_leadership_post()
+    public void Round_trip_preserves_abschnitte_placements_and_the_leadership_post()
     {
         var clock = new FixedClock();
         var op = new SessionOperator("Müller", "FFB 12/1");
@@ -259,7 +259,6 @@ public class SnapshotRoundTripTests
         var unit = incident.AddForceUnit(clock, op, "Aich", 9, "Aich 42/1", null, null, 4);
         incident.MoveForceUnit(clock, op, unit.Id, sub.Id);
         var al = incident.AssignRole(clock, op, "Abschnittsleiter", "Huber", nodeId: nord.Id, slot: RoleSlot.Leiter);
-        incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
         incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"]), "FFB 1/12/1");
         var polizei = incident.AddCommandNode(
             clock, op, CommandNodeKind.Partner, "Polizei", funkgruppen: new Funkgruppen(["POL 1", "POL 2"], ["303_F"]));
@@ -284,7 +283,6 @@ public class SnapshotRoundTripTests
         var roleBack = r.Roles.Single(x => x.Id == al.Id);
         Assert.Equal(nord.Id, roleBack.NodeId);
         Assert.Equal(RoleSlot.Leiter, roleBack.Slot);
-        Assert.Equal(Fuehrungsstufe.C, r.Fuehrungsstufe);
         Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0172", new Funkgruppen(["TG 1"], ["301_F"]), "FFB 1/12/1"), r.LeadershipPost);
         Assert.Equal(new Funkgruppen(["POL 1", "POL 2"], ["303_F"]), r.FindCommandNode(polizei.Id)?.Funkgruppen);
         Assert.Null(nordBack.Funkgruppe);
@@ -303,7 +301,6 @@ public class SnapshotRoundTripTests
         var withParent = Guid.NewGuid();
         var hostile = wire with
         {
-            Fuehrungsstufe = (Fuehrungsstufe)7,
             Roles = wire.Roles.Select(r => r with { Slot = (RoleSlot)42 }).ToList(),
             CommandNodes =
             [
@@ -316,7 +313,6 @@ public class SnapshotRoundTripTests
 
         var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(hostile)));
 
-        Assert.Null(r.Fuehrungsstufe);
         Assert.Equal(RoleSlot.None, r.Roles.Single().Slot);
         Assert.Equal(CommandNodeKind.Abschnitt, r.FindCommandNode(nord.Id)?.Kind);
         Assert.Equal(CommandNodeKind.Abschnitt, r.FindCommandNode(self)?.Kind);
@@ -356,7 +352,7 @@ public class SnapshotRoundTripTests
         var incident = Incident.Start(clock, op);
         incident.AddForceUnit(clock, op, "Aich", 9, "Aich 42/1", null, null, 4);
         var node = Assert.IsType<JsonObject>(JsonNode.Parse(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
-        foreach (var key in new[] { "commandNodes", "fuehrungsstufe", "elStandort", "elRufname", "elTelefon", "elFunkgruppe" })
+        foreach (var key in new[] { "commandNodes", "elStandort", "elRufname", "elTelefon", "elFunkgruppe" })
         {
             node.Remove(key);
         }
@@ -364,7 +360,6 @@ public class SnapshotRoundTripTests
         var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(node.ToJsonString()));
 
         Assert.Empty(r.CommandNodes);
-        Assert.Null(r.Fuehrungsstufe);
         Assert.Equal(LeadershipPost.Empty, r.LeadershipPost);
         Assert.Null(r.Forces.Single().NodeId);
     }

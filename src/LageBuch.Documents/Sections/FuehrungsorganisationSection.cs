@@ -130,11 +130,6 @@ public static class FuehrungsorganisationSection
             line += $" – Melder: {melder.PersonName}";
         }
 
-        if (incident.Fuehrungsstufe is { } stufe)
-        {
-            line += $" · Stufe {FuehrungsstufeLabels.Of(stufe)}";
-        }
-
         if (!incident.LeadershipPost.Funkgruppen.IsEmpty)
         {
             line += $" · {incident.LeadershipPost.Funkgruppen.Text}";

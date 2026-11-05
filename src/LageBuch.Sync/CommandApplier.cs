@@ -120,9 +120,6 @@ public static class CommandApplier
             case MoveForceUnitLabelCommand c:
                 incident.MoveForceUnitLabel(clock, Operator(c.Operator), c.UnitId, Offset(c.Dx, c.Dy));
                 break;
-            case SetFuehrungsstufeCommand c:
-                incident.SetFuehrungsstufe(clock, Operator(c.Operator), c.Stufe);
-                break;
             case SetNavVisibilityCommand c:
                 incident.SetNavVisibility(c.Key, c.Visible);
                 break;

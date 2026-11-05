@@ -147,7 +147,6 @@ public static class SnapshotMapper
                 n.Funkgruppen.Tmo,
                 n.Funkgruppen.Dmo,
                 n.Fuehrungsfahrzeug)).ToList(),
-            Fuehrungsstufe: incident.Fuehrungsstufe,
             ElStandort: incident.LeadershipPost.Standort,
             ElRufname: incident.LeadershipPost.Rufname,
             ElTelefon: incident.LeadershipPost.Telefon,
@@ -281,7 +280,6 @@ public static class SnapshotMapper
                 n.DissolvedAt,
                 Funkgruppen.FromRecord(n.FunkgruppenTmo, n.FunkgruppenDmo),
                 n.Fuehrungsfahrzeug)),
-            snapshot.Fuehrungsstufe,
             new LeadershipPost(
                 snapshot.ElStandort,
                 snapshot.ElRufname,

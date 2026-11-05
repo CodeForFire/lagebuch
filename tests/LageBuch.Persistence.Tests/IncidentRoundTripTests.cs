@@ -785,20 +785,38 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
-    public void Fuehrungsstufe_and_post_round_trip()
+    public void Leadership_post_round_trips()
     {
         var clock = new Clock();
         var op = new SessionOperator("Muster");
         var incident = Incident.Start(clock, op, "Brand");
-        incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.C);
         var groups = new Funkgruppen(["FW_MUSTER 1000", "FW_MUSTER 1001"], ["301_F", "302_F", "Kanal „Süd“"]);
         incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", groups, "FFB 1/12/1");
 
         IncidentRepository.Save(_path, incident);
         var loaded = IncidentRepository.Load(_path);
 
-        Assert.Equal(Fuehrungsstufe.C, loaded.Fuehrungsstufe);
         Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0171 0000002", groups, "FFB 1/12/1"), loaded.LeadershipPost);
+    }
+
+    // The Führungsstufe was dropped; files that recorded one keep the column and must still open
+    // with everything around it intact.
+    [Fact]
+    public void A_file_with_a_recorded_Fuehrungsstufe_still_opens()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var groups = new Funkgruppen(["FW_MUSTER 1000"], ["301_F"]);
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", groups, "FFB 1/12/1");
+        IncidentRepository.Save(_path, incident);
+
+        ExecRaw("UPDATE incident_meta SET fuehrungsstufe = 'C';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal("Brand", loaded.Keyword);
+        Assert.Equal(new LeadershipPost("Feuerwehrhaus", "Florian EL", "0171 0000002", groups, "FFB 1/12/1"), loaded.LeadershipPost);
+        Assert.Equal(incident.Journal.Count, loaded.Journal.Count);
     }
 
     [Fact]
@@ -1004,12 +1022,11 @@ public class IncidentRoundTripTests : IDisposable
         incident.AssignRole(clock, op, "Melder", "Max Muster", nodeId: node.Id, slot: RoleSlot.Melder);
         IncidentRepository.Save(_path, incident);
 
-        ExecRaw("UPDATE command_nodes SET kind = 'zauberschloss'; UPDATE role_assignments SET slot = 'koenig'; UPDATE incident_meta SET fuehrungsstufe = 'Z';");
+        ExecRaw("UPDATE command_nodes SET kind = 'zauberschloss'; UPDATE role_assignments SET slot = 'koenig';");
         var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(CommandNodeKind.Abschnitt, Assert.Single(loaded.CommandNodes).Kind);
         Assert.Equal(RoleSlot.None, Assert.Single(loaded.Roles).Slot);
-        Assert.Null(loaded.Fuehrungsstufe);
     }
 
     [Fact]
@@ -1047,7 +1064,7 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
-    public void A_v29_file_loads_with_every_unit_and_funktion_unplaced_and_no_Fuehrungsstufe()
+    public void A_v29_file_loads_with_every_unit_and_funktion_unplaced()
     {
         var clock = new Clock();
         var op = new SessionOperator("Muster");
@@ -1056,7 +1073,6 @@ public class IncidentRoundTripTests : IDisposable
         var unit = incident.AddForceUnit(clock, op, "FF Puch", 9);
         incident.MoveForceUnit(clock, op, unit.Id, node.Id);
         incident.AssignRole(clock, op, "Abschnittsleiter", "Erika Beispiel", nodeId: node.Id, slot: RoleSlot.Leiter);
-        incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.B);
         incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", new Funkgruppen(["TBZ 2"], null));
         IncidentRepository.Save(_path, incident);
 
@@ -1076,7 +1092,6 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Null(role.NodeId);
         Assert.Equal(RoleSlot.None, role.Slot);
         Assert.Empty(loaded.CommandNodes);
-        Assert.Null(loaded.Fuehrungsstufe);
         Assert.Equal(LeadershipPost.Empty, loaded.LeadershipPost);
     }
 

@@ -1,0 +1,1 @@
+The Führungsstufe is gone from the Führung board, its Vorschlag and the Bericht, because it carried no operational meaning; files that recorded one still open, and the ETB keeps the entries saying when it was set.

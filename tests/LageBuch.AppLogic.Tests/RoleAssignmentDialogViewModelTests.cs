@@ -628,14 +628,12 @@ public class RoleAssignmentDialogViewModelTests
     {
         var incident = NewSession().Incident;
         var opened = 0;
-        var card = new ElCard(_ => { }, canEdit: false, onAssistant: (_, _) => opened++);
+        var card = new ElCard(canEdit: false, onAssistant: (_, _) => opened++);
         var assistant = RoleAssignment.Create("S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
 
         card.Update(
             new ReportingEntry(0, ReportingEntryKind.Einsatzleitung, null, null, null, [assistant], []),
-            incident.LeadershipPost,
-            null,
-            Services.FuehrungsstufeAdvisor.Suggest(incident));
+            incident.LeadershipPost);
 
         var row = Assert.Single(card.Assistants);
         Assert.False(row.EditCommand.CanExecute(null));

@@ -26,7 +26,6 @@ public class FuehrungsorganisationSectionTests
     {
         var incident = Fresh();
         El(incident);
-        incident.SetFuehrungsstufe(Clock, Op, Fuehrungsstufe.B);
         incident.UpdateLeadershipPost(Clock, Op, null, null, null, new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
         incident.AssignRole(Clock, Op, "S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
 
@@ -90,12 +89,11 @@ public class FuehrungsorganisationSectionTests
         incident.AssignRole(Clock, Op, "Melder", "Tobias Wagner", slot: RoleSlot.Melder);
         incident.AssignRole(Clock, Op, "Einsatzabschnittsleiter", "Hans Huber", slot: RoleSlot.Leiter);
         incident.AssignRole(Clock, Op, "S2 Lage", "Erika Musterfrau", slot: RoleSlot.Fuehrungsassistent);
-        incident.SetFuehrungsstufe(Clock, Op, Fuehrungsstufe.C);
 
         PdfText.AssertInOrder(
             Print(incident),
             Heading,
-            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) – Melder: Tobias Wagner · Stufe C",
+            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) – Melder: Tobias Wagner",
             "Führungsunterstützung: S2 Lage Erika Musterfrau",
             "Weitere: Einsatzabschnittsleiter Hans Huber");
     }
@@ -199,7 +197,7 @@ public class FuehrungsorganisationSectionTests
         PdfText.AssertInOrder(
             text,
             Heading,
-            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Stufe B · TMO FW_EMMERING 1000 · DMO 307_F",
+            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · TMO FW_EMMERING 1000 · DMO 307_F",
             "Führungsunterstützung: S2 Lage Erika Musterfrau",
             "Bereitstellung Marktplatz",
             "Abschnitt 1 Nord – Auftrag: Brandbekämpfung – Leiter: Hans Huber – Melder: Lena Lehner – Funkgruppen: DMO 301_F – Stärke 0/0/9/9, AGT 0",
