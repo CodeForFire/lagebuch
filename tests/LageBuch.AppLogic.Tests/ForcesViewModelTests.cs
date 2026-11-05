@@ -559,6 +559,210 @@ public class ForcesViewModelTests
         Assert.Null(Assert.Single(session.Incident.Forces).VehicleType);
     }
 
+    // --- The Fahrzeugtyp, the taktisches Zeichen on the Lagekarte, is set in the Kräfte tab (#886). ---
+    [Fact]
+    public void A_unit_typed_in_by_hand_takes_the_fahrzeugtyp_picked_in_the_form()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        Assert.Equal(VehicleTypeChoices.None, vm.NewVehicleType);
+        vm.NewBrigade = "FF Nachbarort";
+        vm.NewCallSign = "Florian Nachbarort 40/1";
+        vm.NewMannschaftCount = 8;
+        vm.NewVehicleType = "TSF";
+
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Equal("TSF", session.Incident.Forces.Single(f => f.CallSign == "Florian Nachbarort 40/1").VehicleType);
+        Assert.Equal(VehicleTypeChoices.None, vm.NewVehicleType); // the next unit starts untyped
+    }
+
+    [Fact]
+    public void Picking_a_vehicle_fills_in_its_fahrzeugtyp_and_the_form_may_change_it()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+
+        vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "dlk");
+        Assert.Equal("DLK", vm.NewVehicleType); // the catalogue's spelling
+
+        vm.NewVehicleType = "HLF";
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Equal("HLF", session.Incident.Forces.Single(f => f.CallSign == "FFB 1/30/1").VehicleType);
+    }
+
+    [Fact]
+    public void A_vehicle_s_fahrzeugtyp_the_catalogue_lacks_is_offered_and_copied()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+
+        vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "TLF 4000");
+
+        Assert.Equal("TLF 4000", vm.NewVehicleType);
+        Assert.Contains("TLF 4000", vm.NewVehicleTypeOptions);
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal("TLF 4000", session.Incident.Forces.Single(f => f.CallSign == "FFB 1/30/1").VehicleType);
+        Assert.DoesNotContain("TLF 4000", vm.NewVehicleTypeOptions); // the form starts over untyped
+    }
+
+    [Fact]
+    public void Clearing_the_vehicle_clears_the_fahrzeugtyp_it_filled_in()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "TLF 4000");
+
+        vm.ClearVehicleCommand.Execute(null);
+
+        Assert.Equal(VehicleTypeChoices.None, vm.NewVehicleType);
+        Assert.DoesNotContain("TLF 4000", vm.NewVehicleTypeOptions);
+    }
+
+    [Fact]
+    public void Changing_the_fahrzeugtyp_in_the_list_records_it_with_an_etb_entry()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
+        var row = vm.Forces[0];
+        Assert.Equal(VehicleTypeChoices.None, row.VehicleTypeChoice);
+        Assert.Equal(VehicleTypeChoices.None, row.VehicleTypeOptions[0]);
+        Assert.Equal($"Fahrzeugtyp von {row.CallSign}", row.VehicleTypeAutomationName);
+        var entries = session.Incident.Journal.Count;
+
+        row.VehicleTypeChoice = "DLK";
+
+        Assert.Equal("DLK", session.Incident.Forces.Single(f => f.Id == row.Id).VehicleType);
+        Assert.Equal(entries + 1, session.Incident.Journal.Count);
+        Assert.Equal(1, changes[0]);
+        Assert.Same(row, vm.Forces[0]); // kept in place, not rebuilt
+        Assert.Equal("DLK", row.VehicleTypeChoice);
+    }
+
+    [Fact]
+    public void Choosing_ohne_typ_in_the_list_clears_the_fahrzeugtyp()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var row = vm.Forces[0];
+        session.SetForceUnitVehicleType(row.Id, "HLF");
+        Assert.Equal("HLF", row.VehicleTypeChoice);
+
+        row.VehicleTypeChoice = VehicleTypeChoices.None;
+
+        Assert.Null(session.Incident.Forces.Single(f => f.Id == row.Id).VehicleType);
+    }
+
+    [Fact]
+    public void A_lost_selection_in_the_list_does_not_clear_the_fahrzeugtyp()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var row = vm.Forces[0];
+        session.SetForceUnitVehicleType(row.Id, "HLF");
+        var entries = session.Incident.Journal.Count;
+
+        row.VehicleTypeChoice = null; // what a ComboBox writes while its list is replaced
+
+        Assert.Equal("HLF", session.Incident.Forces.Single(f => f.Id == row.Id).VehicleType);
+        Assert.Equal(entries, session.Incident.Journal.Count);
+    }
+
+    [Fact]
+    public void A_fahrzeugtyp_set_elsewhere_reaches_the_row_without_being_written_back()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
+        var row = vm.Forces[0];
+        var options = row.VehicleTypeOptions;
+
+        session.SetForceUnitVehicleType(row.Id, "RW");
+        var entries = session.Incident.Journal.Count;
+        session.SetForceUnitVehicleType(vm.Forces[1].Id, "LF"); // another change refreshes every row
+
+        Assert.Equal("RW", row.VehicleTypeChoice);
+        Assert.Same(options, row.VehicleTypeOptions); // the list is not swapped under the picker (#408)
+        Assert.Equal(entries + 1, session.Incident.Journal.Count);
+        Assert.Equal(0, changes[0]);
+    }
+
+    [Fact]
+    public void A_fahrzeugtyp_the_catalogue_lacks_stays_selectable_in_the_list()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var row = vm.Forces[0];
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        session.SetForceUnitVehicleType(row.Id, "TLF 4000");
+
+        Assert.Contains(nameof(ForceRow.VehicleTypeOptions), raised); // the picker gets the new entry
+        Assert.Equal("TLF 4000", row.VehicleTypeChoice);
+        Assert.Equal([VehicleTypeChoices.None, "TLF 4000"], row.VehicleTypeOptions.Take(2));
+        Assert.Equal(VehicleTypes.All.Count + 2, row.VehicleTypeOptions.Count);
+    }
+
+    [Fact]
+    public void A_fahrzeugtyp_recorded_in_other_case_shows_as_its_catalogue_entry()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
+        var row = vm.Forces[0];
+
+        session.SetForceUnitVehicleType(row.Id, "dlk");
+        var entries = session.Incident.Journal.Count;
+        session.SetForceUnitVehicleType(vm.Forces[1].Id, "LF"); // another change refreshes every row
+
+        Assert.Equal("DLK", row.VehicleTypeChoice);
+        Assert.Contains(row.VehicleTypeChoice, row.VehicleTypeOptions); // the picker does not go blank
+        Assert.Equal(entries + 1, session.Incident.Journal.Count); // showing it records nothing
+        Assert.Equal(0, changes[0]);
+    }
+
+    [Fact]
+    public void Picking_the_same_fahrzeugtyp_again_in_the_list_records_nothing()
+    {
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
+        var row = vm.Forces[0];
+        session.SetForceUnitVehicleType(row.Id, "DLK");
+        var entries = session.Incident.Journal.Count;
+
+        row.VehicleTypeChoice = "DLK";
+
+        Assert.Equal(entries, session.Incident.Journal.Count);
+        Assert.Equal(0, changes[0]);
+    }
+
+    [Fact]
+    public void A_closed_einsatz_takes_no_fahrzeugtyp_from_the_list()
+    {
+        var setup = NewVmWithUnits(readOnly: true);
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var row = vm.Forces[0];
+
+        row.VehicleTypeChoice = "DLK";
+
+        Assert.Null(session.Incident.Forces.Single(f => f.Id == row.Id).VehicleType);
+    }
+
     [Fact]
     public void Gf_and_mann_are_stored_as_total_with_officer_count()
     {

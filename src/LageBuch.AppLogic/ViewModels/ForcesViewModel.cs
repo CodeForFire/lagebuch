@@ -30,6 +30,7 @@ public sealed partial class ForceRow : ObservableObject
     private readonly Action<int, int, int, int> _onStrengthEdited;
     private readonly Action _onRemoved;
     private readonly Action<Guid?> _onMoved;
+    private readonly Action<string?> _onVehicleTypeSet;
 
     public ForceRow(
         Domain.ForceUnit unit,
@@ -39,11 +40,13 @@ public sealed partial class ForceRow : ObservableObject
         Action<int, int, int, int> onStrengthEdited,
         Action onRemoved,
         Domain.Incident incident,
-        Action<Guid?> onMoved)
+        Action<Guid?> onMoved,
+        Action<string?> onVehicleTypeSet)
     {
         ArgumentNullException.ThrowIfNull(unit);
         ArgumentNullException.ThrowIfNull(incident);
         ArgumentNullException.ThrowIfNull(onMoved);
+        ArgumentNullException.ThrowIfNull(onVehicleTypeSet);
         Id = unit.Id;
         Brigade = unit.Brigade;
         CallSign = unit.CallSign;
@@ -57,6 +60,7 @@ public sealed partial class ForceRow : ObservableObject
         _onStrengthEdited = onStrengthEdited;
         _onRemoved = onRemoved;
         _onMoved = onMoved;
+        _onVehicleTypeSet = onVehicleTypeSet;
         (NodeChoices, NodeLabel) = BuildNode(unit, incident);
         _placedNodeId = ViewModels.NodeChoices.CurrentNodeId(NodeChoices);
         Edits = unit.Edits;
@@ -67,6 +71,9 @@ public sealed partial class ForceRow : ObservableObject
         _scbaCount = unit.ScbaCount;
         _status = unit.Status;
         _notes = unit.Notes;
+        _recordedVehicleType = unit.VehicleType;
+        VehicleTypeOptions = VehicleTypeChoices.For(unit.VehicleType);
+        _vehicleTypeChoice = VehicleTypeChoices.Of(unit.VehicleType);
     }
 
     // Set while Update() writes the incident's values into the row, so the Status/Notes setters do
@@ -123,11 +130,21 @@ public sealed partial class ForceRow : ObservableObject
             OnPropertyChanged(nameof(NodeCellLabel));
         }
 
+        // The Fahrzeugtyp picker follows the same rule as the Status options above (#886).
+        var vehicleTypes = VehicleTypeChoices.For(unit.VehicleType);
+        if (!vehicleTypes.SequenceEqual(VehicleTypeOptions, StringComparer.Ordinal))
+        {
+            VehicleTypeOptions = vehicleTypes;
+            OnPropertyChanged(nameof(VehicleTypeOptions));
+        }
+
+        _recordedVehicleType = unit.VehicleType;
         _pulling = true;
         try
         {
             Status = unit.Status;
             Notes = unit.Notes;
+            VehicleTypeChoice = VehicleTypeChoices.Of(unit.VehicleType);
         }
         finally
         {
@@ -252,6 +269,37 @@ public sealed partial class ForceRow : ObservableObject
 
     [ObservableProperty]
     private string? _notes;
+
+    /// <summary>The Fahrzeugtyp picker's entries (#886): none, then the catalogue, plus a recorded type it lacks.</summary>
+    public IReadOnlyList<string> VehicleTypeOptions { get; private set; }
+
+    // The type the incident holds, so a pick of the same entry writes nothing to the ETB.
+    private string? _recordedVehicleType;
+
+    /// <summary>
+    /// The Fahrzeugtyp the unit's taktisches Zeichen shows, as the picker's entry (#886). Picking
+    /// another one records it in the Einsatz at once, with its ETB entry.
+    /// </summary>
+    [ObservableProperty]
+    private string? _vehicleTypeChoice;
+
+    public string VehicleTypeAutomationName => $"Fahrzeugtyp von {CallSign ?? Brigade}";
+
+    // A null pick is the ComboBox losing its selection while its list is replaced, not the
+    // Lagebuchführer clearing the type: that is what the "ohne Typ" entry is for.
+    partial void OnVehicleTypeChoiceChanged(string? value)
+    {
+        if (IsReadOnly || _pulling || value is null)
+        {
+            return;
+        }
+
+        var type = VehicleTypeChoices.ToStored(value);
+        if (!string.Equals(type, _recordedVehicleType, StringComparison.Ordinal))
+        {
+            _onVehicleTypeSet(type);
+        }
+    }
 
     partial void OnStatusChanged(string? value) => PushStatusNotes();
 
@@ -509,6 +557,20 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
     private Vehicle? _selectedVehicle;
 
     /// <summary>
+    /// The form's Fahrzeugtyp picker: none first, then the catalogue (#886), plus the picked
+    /// Fahrzeug's type when the Stammdaten name one the catalogue lacks.
+    /// </summary>
+    [ObservableProperty]
+    private IReadOnlyList<string> _newVehicleTypeOptions = VehicleTypeChoices.For(null);
+
+    /// <summary>
+    /// The Fahrzeugtyp the new unit's taktisches Zeichen shows (#886). A picked Fahrzeug fills it
+    /// in from the Stammdaten; a unit typed in by hand gets it here.
+    /// </summary>
+    [ObservableProperty]
+    private string? _newVehicleType = VehicleTypeChoices.None;
+
+    /// <summary>
     /// Drives the view's readonly lock on Feuerwehr/Funkrufname: once a vehicle derived them, they
     /// must not silently drift from the Stammdaten vehicle the row represents. Personnel counts
     /// stay editable regardless -- the real crew can differ from the vehicle's nominal seats.
@@ -527,11 +589,18 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         SelectedVehicle = null;
         NewBrigade = string.Empty;
         NewCallSign = null;
+        ResetNewVehicleType();
         NewZugfuehrerCount = null;
         NewOfficerCount = null;
         NewMannschaftCount = null;
         NewScbaCount = null;
         ShowErrors(false); // the blanked form must not read as a fresh complaint
+    }
+
+    private void ResetNewVehicleType()
+    {
+        NewVehicleType = VehicleTypeChoices.None;
+        NewVehicleTypeOptions = VehicleTypeChoices.For(null);
     }
 
     // Set while OnSelectedVehicleChanged derives NewBrigade from the picked vehicle (#215), so the
@@ -595,6 +664,12 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         _applyingVehiclePreset = false;
 
         NewCallSign = value.CallSign;
+
+        // The catalogue's spelling when it knows the type, the Stammdaten's text when it does not;
+        // options first, so that text already has an entry to select.
+        var vehicleType = Domain.VehicleTypes.Find(value.VehicleType)?.Code ?? Domain.VehicleTypes.FromStored(value.VehicleType);
+        NewVehicleTypeOptions = VehicleTypeChoices.For(vehicleType);
+        NewVehicleType = VehicleTypeChoices.Of(vehicleType);
 
         // Sitzplätze-Vorbelegung: 9 Sitze ergeben 1 Führungskraft + 8 Mannschaft (#76).
         // The Zugführer occupies one of the vehicle's seats, so it comes out of the same pool
@@ -751,7 +826,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
             NewScbaCount ?? 0,
             NewOfficerCount ?? 0,
             NewZugfuehrerCount ?? 0,
-            SelectedVehicle?.VehicleType); // Changed → RefreshForces; the Fahrzeugtyp is copied, never looked up again (#337)
+            VehicleTypeChoices.ToStored(NewVehicleType)); // Changed → RefreshForces; the Fahrzeugtyp is copied, never looked up again (#337)
 
         // FEUERWEHR is sticky (#540): several vehicles of one Feuerwehr usually arrive together, so
         // it stays, and the view selects it on the way past. The vehicle goes -- it is taken now --
@@ -762,6 +837,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         NewOfficerCount = null;
         NewMannschaftCount = null;
         NewScbaCount = null;
+        ResetNewVehicleType();
         NewStatus = null;
         NewNotes = null;
         ShowErrors(false); // the cleared form must not read as a fresh complaint
@@ -843,6 +919,11 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
                     return;
                 }
 
+                _onChanged();
+            },
+            vehicleType =>
+            {
+                _session.SetForceUnitVehicleType(f.Id, vehicleType); // Changed → RefreshForces
                 _onChanged();
             });
 }

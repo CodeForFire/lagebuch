@@ -50,7 +50,7 @@ public class ForcesStatusComboFocusTests
 
     private static ComboBox StatusCombo(ForcesView view, ForceRow row) =>
         view.GetControl<DataGrid>("ForcesGrid").GetVisualDescendants().OfType<ComboBox>()
-            .Single(c => ReferenceEquals(c.DataContext, row));
+            .Single(c => ReferenceEquals(c.DataContext, row) && ReferenceEquals(c.ItemsSource, row.StatusOptions));
 
     private static void Click(Window window, Control control)
     {

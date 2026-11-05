@@ -137,15 +137,8 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:LagekarteUnitRow">
                 <!-- The name gets the whole width: a Funkrufname cut to "Florian Musterst…" names no one. -->
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
                   <TextBlock Grid.ColumnSpan="4" Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                  <!-- The Fahrzeugtyp its taktisches Zeichen shows, for a vehicle the Stammdaten did not
-                       name one for. Picking writes it to the Einsatz at once. -->
-                  <ComboBox Grid.Row="2" Grid.ColumnSpan="4" Margin="0,4,0,0" MinWidth="110"
-                            AutomationProperties.Name="{Binding VehicleTypeAutomationName}"
-                            ToolTip.Tip="Fahrzeugtyp für das taktische Zeichen"
-                            ItemsSource="{Binding VehicleTypeOptions}" SelectedItem="{Binding SelectedVehicleType}"
-                            IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}" />
                   <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Detail}" FontSize="12" VerticalAlignment="Center"
                              Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                   <!-- ReflectionBinding: the commands live on the ItemsControl's DataContext,
