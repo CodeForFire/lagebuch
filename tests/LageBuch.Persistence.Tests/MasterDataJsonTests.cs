@@ -7,8 +7,17 @@ namespace LageBuch.Persistence.Tests;
 
 public class MasterDataJsonTests
 {
-    private static MasterDataSet Parse(string json) =>
-        MasterDataJson.Parse(new MemoryStream(Encoding.UTF8.GetBytes(json)));
+    private static MasterDataSet Parse(string json)
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        return MasterDataJson.Parse(stream);
+    }
+
+    private static MasterDataImportResult ParseForImport(string json)
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        return MasterDataJson.ParseForImport(stream);
+    }
 
     [Fact]
     public void Parse_reads_every_category_from_a_full_file()
@@ -341,14 +350,14 @@ public class MasterDataJsonTests
     [Fact]
     public void ParseForImport_reports_legacy_entries_that_no_vehicle_or_person_covers()
     {
-        var result = MasterDataJson.ParseForImport(new MemoryStream(Encoding.UTF8.GetBytes("""
+        var result = ParseForImport("""
             {
               "brigades": ["FFB Wache 1", "Alt-Wache", " ffb wache 1 "],
               "radioCallSigns": ["FFB 1/40/1", "Land 1", "Leitstelle"],
               "vehicles": [{ "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }],
               "personnel": [{ "lastName": "Mustermann", "firstName": "Max", "callSign": "Land 1" }]
             }
-            """)));
+            """);
 
         Assert.Equal(new[] { "FFB Wache 1" }, result.Set.Brigades);
         Assert.Equal(new[] { "Alt-Wache", "Leitstelle" }, result.DroppedLegacyEntries);
@@ -357,9 +366,9 @@ public class MasterDataJsonTests
     [Fact]
     public void ParseForImport_reports_nothing_for_a_current_format_file()
     {
-        var result = MasterDataJson.ParseForImport(new MemoryStream(Encoding.UTF8.GetBytes("""
+        var result = ParseForImport("""
             { "vehicles": [{ "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }] }
-            """)));
+            """);
 
         Assert.Empty(result.DroppedLegacyEntries);
     }
@@ -747,7 +756,8 @@ public class MasterDataJsonTests
             }
             """;
 
-        var fromStream = MasterDataJson.Parse(new MemoryStream(Encoding.UTF8.GetBytes(Json)));
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(Json));
+        var fromStream = MasterDataJson.Parse(stream);
         var fromString = MasterDataJson.Parse(Json);
 
         Assert.Equal(fromStream.Brigades, fromString.Brigades);
