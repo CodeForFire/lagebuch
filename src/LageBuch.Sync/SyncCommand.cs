@@ -369,7 +369,7 @@ public sealed record UpdateCoBuildingStructureCommand(
 public sealed record RemoveCoBuildingCommand(
     OperatorDto Operator, Guid BuildingId) : SyncCommand;
 
-// Protocol 26 (#410): one FERTIG's values, one per changed gas, keyed by the Einsatz's own gas id.
+// Protocol 38 (#410): one FERTIG's values, one per changed gas, keyed by the Einsatz's own gas id.
 // Replaced recordCoValue, which carried a single integer ppm. A null value clears that gas.
 public sealed record RecordCoValuesCommand(
     OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int ApartmentNumber, IReadOnlyList<GasValueDto> Values) : SyncCommand;
