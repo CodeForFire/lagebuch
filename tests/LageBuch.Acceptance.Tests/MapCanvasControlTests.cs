@@ -45,6 +45,34 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
+    public void Switched_to_night_the_tiles_already_drawn_are_drawn_again_dark()
+    {
+        var (window, control, _) = Show(new SolidTiles());
+        using (var day = window.CaptureRenderedFrame()!)
+        {
+            Assert.Equal(Land, PixelAt(day, 200, 150));
+        }
+
+        control.IsNight = true;
+        Dispatcher.UIThread.RunJobs();
+
+        using var night = window.CaptureRenderedFrame()!;
+        Assert.Equal(Color.FromRgb(0x1C, 0x1E, 0x21), PixelAt(night, 200, 150));
+    }
+
+    [AvaloniaFact]
+    public void At_night_a_map_without_a_pack_is_dark_too()
+    {
+        var (window, control, _) = Show(null);
+
+        control.IsNight = true;
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+        Assert.Equal(Color.FromRgb(0x14, 0x15, 0x18), PixelAt(frame, 200, 150));
+    }
+
+    [AvaloniaFact]
     public void Past_the_pack_s_finest_zoom_its_tiles_are_drawn_rather_than_missing()
     {
         var (window, _, viewport) = Show(new SolidTiles(maxZoom: 15));

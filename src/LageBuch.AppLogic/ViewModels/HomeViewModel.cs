@@ -25,6 +25,7 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly IAlarmService _alarm;
     private readonly AlarmMute? _alarmMute;
     private readonly IRegionPackLibrary? _mapPacks;
+    private readonly MapNightMode? _mapNightMode;
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly string _appVersion;
@@ -68,9 +69,10 @@ public sealed partial class HomeViewModel : ObservableObject
     // The report the crash notice is about, or null after a normal start.
     private readonly string? _crashReportPath;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null, string? lastCrashReport = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null, string? lastCrashReport = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null)
     {
         _mapPacks = mapPacks;
+        _mapNightMode = mapNightMode;
         ArgumentNullException.ThrowIfNull(recent);
         ArgumentNullException.ThrowIfNull(dialogs);
 
@@ -429,7 +431,7 @@ public sealed partial class HomeViewModel : ObservableObject
         // The local workspace's own saves flow through this same _store singleton, so wiring it
         // through here (issue #167 review follow-up) lets it surface a failed background write
         // that would otherwise leave the operator believing the incident is safely persisted.
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport, _store, _uiDispatcher, mailComposer: _mailComposer, alarmMute: _alarmMute, mapPacks: _mapPacks);
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport, _store, _uiDispatcher, mailComposer: _mailComposer, alarmMute: _alarmMute, mapPacks: _mapPacks, mapNightMode: _mapNightMode);
         WorkspaceOpened?.Invoke(workspace);
     }
 
@@ -710,7 +712,7 @@ public sealed partial class HomeViewModel : ObservableObject
     private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md, string host)
     {
         var workspace = new IncidentWorkspaceViewModel(
-            session, session.HostClock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController(), _pdfExporter, _lastPdfExport, remoteHost: host, alarmMute: _alarmMute, mapPacks: _mapPacks);
+            session, session.HostClock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController(), _pdfExporter, _lastPdfExport, remoteHost: host, alarmMute: _alarmMute, mapPacks: _mapPacks, mapNightMode: _mapNightMode);
         WorkspaceOpened?.Invoke(workspace);
     }
 }

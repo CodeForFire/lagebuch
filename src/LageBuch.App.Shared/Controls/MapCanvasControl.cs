@@ -58,6 +58,10 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<TerrainStyle?> TerrainStyleProperty =
         AvaloniaProperty.Register<MapCanvasControl, TerrainStyle?>(nameof(TerrainStyle));
 
+    /// <summary>Draws the map in <see cref="MapStyle.Night"/> instead of <see cref="MapStyle.Day"/>.</summary>
+    public static readonly StyledProperty<bool> IsNightProperty =
+        AvaloniaProperty.Register<MapCanvasControl, bool>(nameof(IsNight));
+
     public static readonly StyledProperty<ICommand?> TappedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(TappedCommand));
 
@@ -90,7 +94,7 @@ public sealed class MapCanvasControl : Control
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty, IsNightProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
@@ -153,6 +157,12 @@ public sealed class MapCanvasControl : Control
 
     /// <summary>Whether terrain tiles are still being worked out; the map redraws as each is ready.</summary>
     public bool IsTerrainBusy => _terrain.IsBusy;
+
+    public bool IsNight
+    {
+        get => GetValue(IsNightProperty);
+        set => SetValue(IsNightProperty, value);
+    }
 
     public bool WheelZoomNeedsControl
     {
@@ -221,6 +231,10 @@ public sealed class MapCanvasControl : Control
         if (change.Property == TileSourceProperty)
         {
             _tiles.Use(TileSource);
+        }
+        else if (change.Property == IsNightProperty)
+        {
+            _tiles.UseStyle(IsNight ? MapStyle.Night : MapStyle.Day);
         }
 
         if (change.Property == ElevationProperty || change.Property == TerrainStyleProperty)

@@ -111,6 +111,31 @@ public sealed class LagekarteRenderTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void The_night_map_button_draws_the_map_and_its_key_dark()
+    {
+        var (window, view, vm, _) = Show();
+        WaitForWaterPoints(vm);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+        var toggle = view.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "NightMapToggle");
+        var legend = view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WaterLegend");
+        Assert.True(toggle.IsVisible);
+        Assert.Equal(Avalonia.Media.Color.Parse("#E6FFFFFF"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(legend.Background).Color);
+
+        window.MouseDown(MiddleOf(toggle, window), MouseButton.Left);
+        window.MouseUp(MiddleOf(toggle, window), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(vm.IsNightMap);
+        Assert.True(view.GetVisualDescendants().OfType<MapCanvasControl>().Single().IsNight);
+        Assert.Equal(Avalonia.Media.Color.Parse("#E61E2023"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(legend.Background).Color);
+
+        // The PR screenshot.
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-nacht.png"));
+    }
+
+    [AvaloniaFact]
     public void Clicking_a_hydrant_opens_its_card_and_the_legend_explains_the_symbols()
     {
         var (window, view, vm, session) = Show();

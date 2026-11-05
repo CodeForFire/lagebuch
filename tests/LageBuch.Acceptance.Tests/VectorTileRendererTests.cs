@@ -32,6 +32,44 @@ public class VectorTileRendererTests
     }
 
     [AvaloniaFact]
+    public void At_night_land_and_water_are_dark_and_the_water_stays_apart_from_the_land()
+    {
+        var tile = MvtTile.Decode([.. Layer("earth", "earth", WholeTile), .. Layer("water", "lake", LeftHalf)]);
+
+        using var bitmap = VectorTileRenderer.Render(tile, zoom: 15, levels: 0, subX: 0, subY: 0, MapStyle.Night);
+
+        Assert.Equal(Color.FromRgb(0x2A, 0x58, 0x78), PixelAt(bitmap, 64, 128));
+        Assert.Equal(Color.FromRgb(0x1C, 0x1E, 0x21), PixelAt(bitmap, 192, 128));
+    }
+
+    // A class or a kind missing from one style would throw while drawing, or vanish from its map.
+    [Fact]
+    public void Day_and_night_colour_the_same_road_classes_and_landuse_kinds()
+    {
+        Assert.Equal(MapStyle.Day.Roads.Keys.Order(StringComparer.Ordinal), MapStyle.Night.Roads.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(MapStyle.Day.Landuse.Keys.Order(StringComparer.Ordinal), MapStyle.Night.Landuse.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [AvaloniaFact]
+    public void At_night_a_street_is_drawn_in_its_night_fill()
+    {
+        using var bitmap = VectorTileRenderer.Render(MvtTile.Decode(Road(null)), zoom: 15, levels: 0, subX: 0, subY: 0, MapStyle.Night);
+
+        Assert.Equal(Color.FromRgb(0x48, 0x4B, 0x51), PixelAt(bitmap, 128, 128));
+    }
+
+    [AvaloniaFact]
+    public void At_night_a_name_is_written_light_on_a_dark_halo_and_a_POI_keeps_its_meaning_in_a_lighter_ink()
+    {
+        var place = Assert.Single(VectorTileRenderer.Labels(MvtTile.Decode(Place("Fürstenfeldbruck", "locality", (2048, 2048))), zoom: 12, levels: 0, subX: 0, subY: 0, MapStyle.Night));
+        var poi = Assert.Single(VectorTileRenderer.Labels(MvtTile.Decode(Poi("fire_station", null, (2048, 2048))), zoom: 16, levels: 0, subX: 0, subY: 0, MapStyle.Night));
+
+        Assert.Same(MapStyle.Night.LabelInk, place.Ink);
+        Assert.Same(MapStyle.Night.Halo, place.Halo?.Brush);
+        Assert.Same(MapStyle.Night.FireStationInk, poi.Ink);
+    }
+
+    [AvaloniaFact]
     public void Where_the_tile_has_no_earth_it_stays_transparent_so_a_neighbouring_pack_shows_through()
     {
         // A tile on the pack's edge: its earth was cut to the pack's area, here the left half.

@@ -109,7 +109,8 @@ public class MainActivity : AvaloniaMainActivity
             lastConnection: new JsonLastConnectionStore(AndroidAppPaths.LastConnectionJsonPath(this)),
             lastCrashReport: CrashReports.TakePending(FilesDir!.AbsolutePath),
             alarmMute: new AlarmMute(AndroidAppPaths.AlarmMuteJsonPath(this)),
-            mapPacks: new RegionPackLibrary(MapPackHttp, AndroidAppPaths.RegionPacksDir(this))));
+            mapPacks: new RegionPackLibrary(MapPackHttp, AndroidAppPaths.RegionPacksDir(this)),
+            mapNightMode: new MapNightMode(AndroidAppPaths.MapNightJsonPath(this))));
 
         base.OnCreate(savedInstanceState);
     }

@@ -17,6 +17,8 @@ internal static class AppPaths
 
     public static string AlarmMuteJsonPath => Path.Join(Root, "alarm-mute.json");
 
+    public static string MapNightJsonPath => Path.Join(Root, "map-night.json");
+
     public static string AttachmentCacheDir => Path.Join(Root, "attachment-cache");
 
     public static string RegionPacksDir => Path.Join(Root, "regions");
