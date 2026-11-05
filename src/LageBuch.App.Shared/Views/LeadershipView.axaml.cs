@@ -232,9 +232,18 @@ public partial class LeadershipView : UserControl
         }
 
         _dropTarget?.Classes.Set("drop-target", false);
+        CardBefore(_dropTarget)?.Classes.Set("drop-before", false);
         _dropTarget = target;
         _dropTarget?.Classes.Set("drop-target", true);
+        CardBefore(_dropTarget)?.Classes.Set("drop-before", true);
     }
+
+    // The card a card head belongs to, when the target is a head: a card dropped there lands before
+    // that card, which its style marks outside its left edge. Null for every other target.
+    private static Border? CardBefore(Border? target) =>
+        target is not null && target.Classes.Contains("node-drop-before")
+            ? target.GetVisualAncestors().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("board-card"))
+            : null;
 
     // A Funkgruppe under the pointer: which lines light up with it is the view model's.
     private void OnFunkgruppePointerEntered(object? sender, PointerEventArgs e)

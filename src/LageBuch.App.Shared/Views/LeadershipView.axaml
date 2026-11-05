@@ -109,15 +109,29 @@
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
     </Style>
 
-    <!-- Moving a card: a cyan line above the head it would land before, and two strips that show
-         only while a card is dragged (into an Abschnitt, last at the top level). -->
+    <!-- Moving a card. Over a card's head it lands before that card, which a bar down the card's
+         left edge shows: the cards stand side by side, so a line above the head read as "into".
+         The code-behind puts "drop-before" on the card whose head is the target. The bar lies in
+         the card's padding over its content, so it moves nothing; a shadow outside the card was
+         clipped to the card's bounds. Two strips show only while a card is dragged (into an
+         Abschnitt, last at the top level), each in the place of a row of buttons, so the chart
+         does not move when the drag starts. -->
     <Style Selector="Border.node-drop-before">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0,3,0,0" />
     </Style>
-    <Style Selector="Border.node-drop-before.drop-target">
-      <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
+    <Style Selector="Border.drop-before-bar">
+      <Setter Property="IsVisible" Value="False" />
+      <Setter Property="Width" Value="4" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Margin" Value="-12,-4,0,-4" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="{StaticResource FocusBrush}" />
+    </Style>
+    <Style Selector="Border.board-card.unterabschnitt > Panel > Border.drop-before-bar">
+      <Setter Property="Margin" Value="-10,-2,0,-2" />
+    </Style>
+    <Style Selector="Border.board-card.drop-before > Panel > Border.drop-before-bar">
+      <Setter Property="IsVisible" Value="True" />
     </Style>
     <Style Selector="Border.node-drop-strip">
       <Setter Property="IsVisible" Value="False" />
@@ -125,13 +139,17 @@
       <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
-      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="Padding" Value="8,0" />
     </Style>
     <Style Selector="StackPanel#BoardRoot.dragging-node Border.node-drop-end">
       <Setter Property="IsVisible" Value="True" />
     </Style>
     <Style Selector="StackPanel#BoardRoot.dragging-node Border.node-drop-into.abschnitt">
       <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="StackPanel#BoardRoot.dragging-node WrapPanel.card-actions.abschnitt, StackPanel#BoardRoot.dragging-node WrapPanel.board-actions">
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
     <Style Selector="Border.node-drop-strip.drop-target">
       <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
@@ -239,11 +257,24 @@
       <Setter Property="Padding" Value="10,0" />
       <Setter Property="FontSize" Value="12" />
     </Style>
+    <!-- The grip is the only place a drag starts, so it is a target, not a 9px icon: the full
+         height of its row and wider than the dots, which light up under the pointer. -->
     <Style Selector="Border.unit-grip">
-      <Setter Property="Width" Value="16" />
+      <Setter Property="Width" Value="20" />
+      <Setter Property="MinHeight" Value="24" />
       <Setter Property="Background" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
       <Setter Property="Cursor" Value="SizeAll" />
-      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border.unit-grip > PathIcon">
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Border.unit-grip:pointerover">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+    </Style>
+    <Style Selector="Border.unit-grip:pointerover > PathIcon">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     </Style>
     <!-- A closed Einsatz is a record: nothing to pick up. -->
     <Style Selector="Border.unit-grip:disabled">
@@ -337,9 +368,9 @@
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardMove" />
         </Grid.ColumnDefinitions>
         <Border Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Classes="unit-grip" x:Name="UnitGrip"
-                ToolTip.Tip="Ziehen, um die Einheit zu verschieben"
+                ToolTip.Tip="Ziehen, um die Einheit zu verschieben, oder rechts den Abschnitt wählen"
                 AutomationProperties.Name="Einheit verschieben">
-          <PathIcon Width="9" Height="14" Foreground="{StaticResource TextSecondaryBrush}"
+          <PathIcon Width="9" Height="14"
                     Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
         </Border>
         <!-- The Funkrufname is the unit's name on the sheet: never trimmed, wrapped if it must. -->
@@ -526,6 +557,7 @@
     <DataTemplate DataType="vm:BoardNodeCard" x:DataType="vm:BoardNodeCard">
       <Border Classes="board-card" x:Name="NodeCard" Classes.unterabschnitt="{Binding IsUnterabschnitt}"
               Classes.dragged="{Binding IsDragged}">
+        <Panel>
         <!-- One shared-size scope per card, so the SUMME row lines up with the units table above it. -->
         <StackPanel Spacing="8" Grid.IsSharedSizeScope="True">
           <!-- The card's head is also where a dragged card lands to be placed before this one; the
@@ -534,9 +566,9 @@
           <DockPanel>
           <Border DockPanel.Dock="Left" Classes="unit-grip node-grip" x:Name="NodeGrip" Margin="0,2,6,0"
                   VerticalAlignment="Top" IsEnabled="{Binding IsMovable}"
-                  ToolTip.Tip="Ziehen, um den Abschnitt zu verschieben"
+                  ToolTip.Tip="Ziehen, um den Abschnitt zu verschieben, oder unter BEARBEITEN einordnen"
                   AutomationProperties.Name="Abschnitt verschieben">
-            <PathIcon Width="9" Height="14" Foreground="{StaticResource TextSecondaryBrush}"
+            <PathIcon Width="9" Height="14"
                       Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
           </Border>
           <StackPanel Spacing="1">
@@ -662,22 +694,29 @@
             </Grid>
           </Border>
 
-          <!-- Shown on an Abschnitt only while a card is dragged: drop here to hang it underneath. -->
-          <Border x:Name="NodeIntoStrip" Classes="node-drop-strip node-drop-into" Classes.abschnitt="{Binding IsAbschnitt}">
-            <TextBlock Classes="secondary" FontSize="11" Text="hier als Unterabschnitt einordnen" />
-          </Border>
-
           <TextBlock Classes="board-hint" Text="{Binding Hint}"
                      IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-          <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
-            <Button Classes="board-action" Content="BEARBEITEN" Command="{Binding EditCommand}" />
-            <Button Classes="board-action" Content="+ UNTERABSCHNITT" IsVisible="{Binding IsAbschnitt}"
-                    ToolTip.Tip="Unterabschnitt bilden" Command="{Binding AddUnterabschnittCommand}" />
-            <Button Classes="board-action" Content="+ FUNKTION"
-                    ToolTip.Tip="Funktion hinzufügen" Command="{Binding AddMemberCommand}" />
-          </WrapPanel>
+          <!-- The card's actions, and over them on an Abschnitt while a card is dragged the strip to
+               hang it underneath. One cell, so the strip takes the row's place instead of pushing
+               the chart down under the pointer the moment a drag starts. -->
+          <Grid>
+            <WrapPanel Classes="card-actions" Classes.abschnitt="{Binding IsAbschnitt}"
+                       Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
+              <Button Classes="board-action" Content="BEARBEITEN" Command="{Binding EditCommand}" />
+              <Button Classes="board-action" Content="+ UNTERABSCHNITT" IsVisible="{Binding IsAbschnitt}"
+                      ToolTip.Tip="Unterabschnitt bilden" Command="{Binding AddUnterabschnittCommand}" />
+              <Button Classes="board-action" Content="+ FUNKTION"
+                      ToolTip.Tip="Funktion hinzufügen" Command="{Binding AddMemberCommand}" />
+            </WrapPanel>
+            <Border x:Name="NodeIntoStrip" Classes="node-drop-strip node-drop-into" Classes.abschnitt="{Binding IsAbschnitt}">
+              <TextBlock Classes="secondary" FontSize="11" VerticalAlignment="Center" Text="hier als Unterabschnitt einordnen" />
+            </Border>
+          </Grid>
         </StackPanel>
+        <!-- A dragged card would land before this one: see Border.drop-before-bar. -->
+        <Border x:Name="DropBeforeBar" Classes="drop-before-bar" IsHitTestVisible="False" />
+        </Panel>
       </Border>
     </DataTemplate>
   </UserControl.DataTemplates>
@@ -726,12 +765,10 @@
         </ctrl:OrgChart>
       </ScrollViewer>
 
-      <!-- Shown only while a card is dragged: drop here to put it last, as an Abschnitt of its own. -->
-      <Border x:Name="NodeEndStrip" Classes="node-drop-strip node-drop-end">
-        <TextBlock Classes="secondary" FontSize="11" Text="hier als letzten Abschnitt einordnen" />
-      </Border>
-
-      <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+      <!-- The add buttons, and over them while a card is dragged the strip to put it last, as an
+           Abschnitt of its own: one cell, as on a card, so nothing moves when the drag starts. -->
+      <Grid>
+      <WrapPanel x:Name="BoardActions" Classes="board-actions" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
         <Button x:Name="LeadershipAddAbschnittButton" Classes="signal board-action" Content="+ ABSCHNITT"
                 ToolTip.Tip="Abschnitt bilden" Command="{Binding AddAbschnittCommand}" />
         <Button x:Name="AddBereitstellungButton" Classes="board-action" Content="+ BEREITSTELLUNG"
@@ -748,6 +785,10 @@
         <Button x:Name="AddFachberaterButton" Classes="board-action" Content="+ FACHBERATER"
                 ToolTip.Tip="Fachberater hinzufügen" Command="{Binding AddFachberaterCommand}" />
       </WrapPanel>
+      <Border x:Name="NodeEndStrip" Classes="node-drop-strip node-drop-end">
+        <TextBlock Classes="secondary" FontSize="11" VerticalAlignment="Center" Text="hier als letzten Abschnitt einordnen" />
+      </Border>
+      </Grid>
 
       <ItemsControl x:Name="EinsatzleitungHints" ItemsSource="{Binding Hints}" IsVisible="{Binding Hints.Count}">
         <ItemsControl.ItemTemplate>

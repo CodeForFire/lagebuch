@@ -1,0 +1,1 @@
+On the Führung board a card that would land before another now shows a bar down that card's left edge instead of a line above its head, the cards no longer jump when a card drag starts because the drop strips take the place of the button rows, and the grips are larger with a tooltip that names the other way to move a unit or an Abschnitt.

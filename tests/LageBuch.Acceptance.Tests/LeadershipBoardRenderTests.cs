@@ -1252,6 +1252,52 @@ public class LeadershipBoardRenderTests
         Assert.False(end.IsEffectivelyVisible);
     }
 
+    // The strips used to appear above each card's buttons and above the add buttons, so every card
+    // grew and the chart moved under the pointer the moment a drag started. Now they take the
+    // place of those button rows.
+    [AvaloniaFact]
+    public void Starting_a_card_drag_moves_no_card_and_no_unit()
+    {
+        var board = Show();
+        Rect PlaceOf(Control c) =>
+            new(c.TranslatePoint(default, board.Window)!.Value, c.Bounds.Size);
+        var watched = new Control[]
+        {
+            Card(board.View, "Abschnitt 1 Nord"),
+            Card(board.View, "Abschnitt 2 Süd"),
+            Card(board.View, "Dach"),
+            board.View.GetControl<Border>("UnplacedStrip"),
+        };
+        var before = watched.Select(PlaceOf).ToList();
+
+        board.Vm.BeginNodeDrag(NodeId(board.Session!, "Bereitstellung Marktplatz"));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(IntoStripOf(Card(board.View, "Abschnitt 2 Süd")).IsEffectivelyVisible);
+        Assert.True(board.View.GetControl<Border>("NodeEndStrip").IsEffectivelyVisible);
+        var after = watched.Select(PlaceOf).ToList();
+        for (var i = 0; i < watched.Length; i++)
+        {
+            Assert.True(
+                Math.Abs(before[i].X - after[i].X) <= 0.5 && Math.Abs(before[i].Y - after[i].Y) <= 0.5
+                    && Math.Abs(before[i].Height - after[i].Height) <= 0.5,
+                $"{watched[i].Name} {before[i]} -> {after[i]}");
+        }
+
+        Capture(board.Window, "fuehrung-board-node-drag.png");
+    }
+
+    [AvaloniaFact]
+    public void A_grip_is_a_target_the_height_of_its_row_not_just_its_dots()
+    {
+        var board = Show();
+        var grips = board.View.GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Classes.Contains("unit-grip") && b.IsEffectivelyVisible).ToList();
+
+        Assert.NotEmpty(grips);
+        Assert.All(grips, g => Assert.True(g.Bounds.Width >= 19.5 && g.Bounds.Height >= 23.5, $"{g.Name} {g.Bounds.Size}"));
+    }
+
     [AvaloniaFact]
     public void Every_card_but_a_partners_has_a_grip_to_move_it()
     {
@@ -1281,10 +1327,21 @@ public class LeadershipBoardRenderTests
         var over = Over(transfer, nordHead);
         Assert.Equal(DragDropEffects.Move, over.DragEffects);
         Assert.Contains("drop-target", nordHead.Classes);
+
+        // The cards stand side by side, so "before Nord" is a bar left of Nord's card, not a line above its head.
+        var nordCard = Card(board.View, "Abschnitt 1 Nord");
+        Assert.Contains("drop-before", nordCard.Classes);
+        var bar = nordCard.GetVisualDescendants().OfType<Border>().First(b => b.Name == "DropBeforeBar");
+        Assert.True(bar.IsEffectivelyVisible);
+        Assert.True(bar.TranslatePoint(default, nordCard)!.Value.X <= 2, "the bar runs down the card's left edge");
+        Assert.DoesNotContain(
+            Cards(board.View).Where(c => !ReferenceEquals(c, nordCard)),
+            c => c.GetVisualDescendants().OfType<Border>().Any(b => b.Name == "DropBeforeBar" && b.IsEffectivelyVisible));
         Capture(board.Window, "fuehrung-board-move.png");
         Drop(transfer, nordHead);
         board.Vm.EndNodeDrag();
         Dispatcher.UIThread.RunJobs();
+        Assert.DoesNotContain(Cards(board.View), c => c.Classes.Contains("drop-before"));
 
         Assert.Equal(["Bereitstellung Marktplatz", "Abschnitt 2 Süd", "Abschnitt 1 Nord"], TopLevelOrder(session));
         Assert.Equal("Abschnitt 2 Süd", board.Vm.Sections[1].Name);
