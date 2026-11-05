@@ -29,6 +29,15 @@ public class MapNightModeTests : IDisposable
     }
 
     [Fact]
+    public void A_switch_turned_back_to_day_reads_as_day_after_a_restart()
+    {
+        new MapNightMode(_path).Set(true);
+        new MapNightMode(_path).Set(false);
+
+        Assert.False(new MapNightMode(_path).IsNight);
+    }
+
+    [Fact]
     public void A_corrupt_file_reads_as_the_day_map()
     {
         File.WriteAllText(_path, "{ not json");

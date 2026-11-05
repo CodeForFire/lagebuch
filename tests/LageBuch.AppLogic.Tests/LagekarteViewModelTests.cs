@@ -200,6 +200,33 @@ public class LagekarteViewModelTests
         Assert.False(vm.IsNightMap);
         Assert.StartsWith("Nachtkarte nicht gespeichert:", vm.ActionError, StringComparison.Ordinal);
         Assert.Contains(nameof(LagekarteViewModel.IsNightMap), raised);
+
+        // The toggle snapping back writes the unchanged value; that saves nothing, so the error stays.
+        vm.IsNightMap = false;
+        Assert.NotNull(vm.ActionError);
+    }
+
+    [Fact]
+    public void Once_the_night_map_can_be_saved_again_the_error_goes()
+    {
+        var (session, _, _) = Open();
+        var folder = Path.Join(Path.GetTempPath(), $"night-{Guid.NewGuid():N}");
+        using var vm = new LagekarteViewModel(session, () => { }, nightMode: new MapNightMode(Path.Join(folder, "map-night.json")));
+        vm.IsNightMap = true;
+        Assert.NotNull(vm.ActionError);
+        Directory.CreateDirectory(folder);
+
+        try
+        {
+            vm.IsNightMap = true;
+
+            Assert.True(vm.IsNightMap);
+            Assert.Null(vm.ActionError);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     }
 
     [Fact]
