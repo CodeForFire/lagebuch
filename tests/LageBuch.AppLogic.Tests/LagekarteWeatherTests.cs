@@ -251,6 +251,108 @@ public class LagekarteWeatherTests
     }
 
     [Fact]
+    public void Before_any_load_there_is_nothing_to_show()
+    {
+        var (_, vm, _) = Open(new FakeWeather());
+
+        Assert.False(vm.Weather.HasReading);
+        Assert.False(vm.Weather.HasDetail);
+        Assert.False(vm.Weather.HasAlerts);
+        Assert.Empty(vm.Weather.Alerts);
+        Assert.Equal(string.Empty, vm.Weather.WindText);
+        Assert.Equal(string.Empty, vm.Weather.SourceText);
+    }
+
+    [Fact]
+    public async Task Detail_and_warnings_are_flagged_only_when_there_are_some()
+    {
+        var weather = new FakeWeather();
+        var (session, vm, _) = Open(weather);
+        session.SetIncidentLocation(Marktplatz);
+        var load = vm.Weather.LoadCommand.ExecuteAsync(null);
+        weather.Answer(Maisach with { Alerts = [Sturm] });
+        await load;
+        Assert.True(vm.Weather.HasDetail);
+        Assert.True(vm.Weather.HasAlerts);
+
+        var bare = vm.Weather.LoadCommand.ExecuteAsync(null);
+        weather.Answer(Maisach with { TemperatureCelsius = null, Condition = null });
+        await bare;
+        Assert.False(vm.Weather.HasDetail);
+        Assert.False(vm.Weather.HasAlerts);
+    }
+
+    [Fact]
+    public async Task The_time_of_measurement_is_shown_in_the_clocks_zone()
+    {
+        var weather = new FakeWeather();
+        var session = NewSession();
+        session.SetIncidentLocation(Marktplatz);
+        using var vm = new LagekarteViewModel(session, () => { }, weather: weather, clock: new FixedClock(T0.ToOffset(TimeSpan.FromHours(5))));
+        var load = vm.Weather.LoadCommand.ExecuteAsync(null);
+        weather.Answer(Maisach);
+        await load;
+
+        Assert.Equal("DWD-Station Maisach-Galgen (4,6 km) · Stand 02:10", vm.Weather.SourceText);
+    }
+
+    [Fact]
+    public async Task Only_turning_the_map_turns_the_arrow_and_only_while_there_is_one()
+    {
+        var weather = new FakeWeather();
+        var (session, vm, _) = Open(weather);
+        session.SetIncidentLocation(Marktplatz);
+        var notified = new List<string?>();
+        vm.Weather.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+
+        vm.Map.ChangeViewCommand.Execute(new LageBuch.AppLogic.Services.Map.MapViewChange(Marktplatz, vm.Map.Zoom, 90));
+        Assert.DoesNotContain(nameof(WeatherOverlay.WindArrowAngle), notified);
+
+        var load = vm.Weather.LoadCommand.ExecuteAsync(null);
+        weather.Answer(Maisach);
+        await load;
+        notified.Clear();
+        vm.Map.ChangeViewCommand.Execute(new LageBuch.AppLogic.Services.Map.MapViewChange(Marktplatz, vm.Map.Zoom - 1, 90));
+        Assert.DoesNotContain(nameof(WeatherOverlay.WindArrowAngle), notified);
+    }
+
+    [Fact]
+    public async Task An_answer_for_a_spot_left_behind_does_not_land_on_the_next_load()
+    {
+        var weather = new FakeWeather();
+        var (session, vm, _) = Open(weather);
+        session.SetIncidentLocation(Marktplatz);
+        var old = vm.Weather.LoadCommand.ExecuteAsync(null);
+        session.SetIncidentLocation(Amperbruecke);
+        var current = vm.Weather.LoadCommand.ExecuteAsync(null);
+
+        weather.Answer(Maisach with { StationName = "Alt" });
+        await old;
+        Assert.False(vm.Weather.HasReading);
+        Assert.True(vm.Weather.IsLoading);
+
+        weather.Answer(Maisach);
+        await current;
+        Assert.Equal("Maisach-Galgen", vm.Weather.Reading?.StationName);
+    }
+
+    [Fact]
+    public async Task Closing_a_logged_reading_lets_the_next_one_be_logged_again()
+    {
+        var weather = new FakeWeather();
+        var (session, vm, _) = Open(weather);
+        session.SetIncidentLocation(Marktplatz);
+        var load = vm.Weather.LoadCommand.ExecuteAsync(null);
+        weather.Answer(Maisach);
+        await load;
+        vm.Weather.LogToEtbCommand.Execute(null);
+
+        vm.Weather.CloseCommand.Execute(null);
+
+        Assert.False(vm.Weather.IsLogged);
+    }
+
+    [Fact]
     public void Nothing_can_be_logged_before_a_reading_is_loaded()
     {
         var (session, vm, _) = Open(new FakeWeather());
@@ -259,15 +361,17 @@ public class LagekarteWeatherTests
         Assert.False(vm.Weather.LogToEtbCommand.CanExecute(null));
     }
 
+    private static LocalIncidentSession NewSession() => TestSession.StartNew(
+        new FakeStore(),
+        new FixedClock(T0),
+        new SessionOperator("Müller", "FFB 12/1"),
+        "/x.lagebuch",
+        Array.Empty<(string, bool)>(),
+        Array.Empty<(string, bool)>());
+
     private static (LocalIncidentSession Session, LagekarteViewModel Vm, Func<int> Changes) Open(IWeatherSource? weather)
     {
-        var session = TestSession.StartNew(
-            new FakeStore(),
-            new FixedClock(T0),
-            new SessionOperator("Müller", "FFB 12/1"),
-            "/x.lagebuch",
-            Array.Empty<(string, bool)>(),
-            Array.Empty<(string, bool)>());
+        var session = NewSession();
         var changes = 0;
         var vm = new LagekarteViewModel(session, () => changes++, weather: weather, clock: new FixedClock(T0));
         return (session, vm, () => changes);

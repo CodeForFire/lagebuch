@@ -42,12 +42,14 @@ public sealed class BrightSkyClient : IWeatherSource
 
     private readonly HttpClient _http;
     private readonly Uri _endpoint;
+    private readonly TimeProvider _time;
 
-    public BrightSkyClient(HttpClient http, Uri? endpoint = null)
+    public BrightSkyClient(HttpClient http, Uri? endpoint = null, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(http);
         _http = http;
         _endpoint = endpoint ?? DefaultEndpoint;
+        _time = timeProvider ?? TimeProvider.System;
     }
 
     /// <inheritdoc />
@@ -85,8 +87,8 @@ public sealed class BrightSkyClient : IWeatherSource
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(_endpoint, relative));
         request.Headers.UserAgent.ParseAdd(UserAgent);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(RequestTimeout);
+        using var timer = new CancellationTokenSource(RequestTimeout, _time);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token);
 
         try
         {
@@ -96,6 +98,7 @@ public sealed class BrightSkyClient : IWeatherSource
                 throw new WeatherException(Refusal(response.StatusCode));
             }
 
+            // Stryker disable once Statement : the capped read below refuses the same body, only later.
             if (response.Content.Headers.ContentLength > MaxResponseBytes)
             {
                 throw new WeatherException(TooLarge);
@@ -283,6 +286,7 @@ public sealed class BrightSkyClient : IWeatherSource
             return null;
         }
 
+        // Stryker disable once Equality : a text of exactly the cap is cut to itself.
         return text.Length > MaxTextLength ? text[..MaxTextLength] : text;
     }
 

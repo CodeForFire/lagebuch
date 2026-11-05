@@ -47,9 +47,14 @@ public sealed class BrightSkyClientTests : IDisposable
         }
     }
 
-    /// <summary>A body that never says how long it is and runs on far past any cap.</summary>
-    private sealed class UnsizedStream : Stream
+    /// <summary>
+    /// A body that never says how long it is: <paramref name="content"/>, or without it one that
+    /// runs on far past any cap.
+    /// </summary>
+    private sealed class UnsizedStream(byte[]? content = null) : Stream
     {
+        private int _offset;
+
         public override bool CanRead => true;
 
         public override bool CanSeek => false;
@@ -62,8 +67,16 @@ public sealed class BrightSkyClientTests : IDisposable
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            Array.Fill(buffer, (byte)' ', offset, count);
-            return count;
+            if (content is null)
+            {
+                Array.Fill(buffer, (byte)' ', offset, count);
+                return count;
+            }
+
+            var n = Math.Min(count, content.Length - _offset);
+            Array.Copy(content, _offset, buffer, offset, n);
+            _offset += n;
+            return n;
         }
 
         public override void Flush()
@@ -77,11 +90,38 @@ public sealed class BrightSkyClientTests : IDisposable
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
+    /// <summary>Never answers; only the client's own timeout ends the wait.</summary>
+    private sealed class HangingHandler : HttpMessageHandler
+    {
+        public int Started { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Started++;
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
+    /// <summary>The observation padded with JSON whitespace to exactly <paramref name="length"/> bytes.</summary>
+    private static byte[] Padded(long length)
+    {
+        var bytes = Encoding.UTF8.GetBytes(CurrentWeather);
+        var padded = new byte[length];
+        Array.Fill(padded, (byte)' ');
+        bytes.CopyTo(padded, 0);
+        return padded;
+    }
+
+    private static string PathOf(HttpRequestMessage request) => Assert.IsType<Uri>(request.RequestUri).AbsolutePath;
+
+    private static bool IsAlerts(HttpRequestMessage request) => PathOf(request) == "/alerts";
+
     private static HttpResponseMessage Json(string body) =>
         new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
     private static Func<HttpRequestMessage, HttpResponseMessage> Answer(string current, string alerts) =>
-        r => Json(r.RequestUri!.AbsolutePath.EndsWith("/alerts", StringComparison.Ordinal) ? alerts : current);
+        r => Json(IsAlerts(r) ? alerts : current);
 
     private (BrightSkyClient Client, FakeHandler Handler) Create(Func<HttpRequestMessage, HttpResponseMessage> respond)
     {
@@ -101,12 +141,12 @@ public sealed class BrightSkyClientTests : IDisposable
 
         Assert.Equal(new DateTimeOffset(2026, 11, 5, 21, 10, 0, TimeSpan.Zero), reading.MeasuredAt);
         Assert.Equal("Maisach-Galgen", reading.StationName);
-        Assert.Equal(4576, reading.StationDistanceMetres!.Value, precision: 3);
-        Assert.Equal(60, reading.WindFromDegrees!.Value, precision: 3);
-        Assert.Equal(10.1, reading.WindSpeedKmh!.Value, precision: 3);
-        Assert.Equal(15.8, reading.WindGustKmh!.Value, precision: 3);
-        Assert.Equal(0.3, reading.TemperatureCelsius!.Value, precision: 3);
-        Assert.Equal(0, reading.PrecipitationMm!.Value, precision: 3);
+        Assert.Equal(4576, Assert.NotNull(reading.StationDistanceMetres), precision: 3);
+        Assert.Equal(60, Assert.NotNull(reading.WindFromDegrees), precision: 3);
+        Assert.Equal(10.1, Assert.NotNull(reading.WindSpeedKmh), precision: 3);
+        Assert.Equal(15.8, Assert.NotNull(reading.WindGustKmh), precision: 3);
+        Assert.Equal(0.3, Assert.NotNull(reading.TemperatureCelsius), precision: 3);
+        Assert.Equal(0, Assert.NotNull(reading.PrecipitationMm), precision: 3);
         Assert.Equal("dry", reading.Condition);
         Assert.Empty(reading.Alerts);
     }
@@ -138,11 +178,11 @@ public sealed class BrightSkyClientTests : IDisposable
             Assert.Equal(2, handler.Requests.Count);
             Assert.All(handler.Requests, r =>
             {
-                Assert.Equal("?lat=48.18&lon=11.26", r.RequestUri!.Query);
+                Assert.Equal("?lat=48.18&lon=11.26", Assert.IsType<Uri>(r.RequestUri).Query);
                 Assert.Contains("LageBuch", r.Headers.UserAgent.ToString(), StringComparison.Ordinal);
             });
-            Assert.Contains(handler.Requests, r => r.RequestUri!.AbsolutePath == "/current_weather");
-            Assert.Contains(handler.Requests, r => r.RequestUri!.AbsolutePath == "/alerts");
+            Assert.Contains(handler.Requests, r => PathOf(r) == "/current_weather");
+            Assert.Contains(handler.Requests, r => PathOf(r) == "/alerts");
         }
         finally
         {
@@ -153,7 +193,7 @@ public sealed class BrightSkyClientTests : IDisposable
     [Fact]
     public async Task Weather_without_the_warnings_still_loads_when_only_the_alerts_call_fails()
     {
-        var (client, _) = Create(r => r.RequestUri!.AbsolutePath == "/alerts"
+        var (client, _) = Create(r => PathOf(r) == "/alerts"
             ? new HttpResponseMessage(HttpStatusCode.InternalServerError)
             : Json(CurrentWeather));
 
@@ -242,6 +282,80 @@ public sealed class BrightSkyClientTests : IDisposable
     }
 
     [Fact]
+    public async Task Without_an_endpoint_it_asks_the_public_bright_sky_instance()
+    {
+        var handler = new FakeHandler(Answer(CurrentWeather, NoAlerts));
+        _http = new HttpClient(handler);
+
+        await new BrightSkyClient(_http).LoadAsync(Fuerstenfeldbruck);
+
+        Assert.All(handler.Requests, r => Assert.Equal("api.brightsky.dev", Assert.IsType<Uri>(r.RequestUri).Host));
+    }
+
+    [Fact]
+    public async Task A_body_of_exactly_the_cap_is_read_whether_or_not_it_says_its_length()
+    {
+        var (sized, _) = Create(r => IsAlerts(r)
+            ? Json(NoAlerts)
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Padded(BrightSkyClient.MaxResponseBytes)) });
+        Assert.Equal("Maisach-Galgen", (await sized.LoadAsync(Fuerstenfeldbruck)).StationName);
+
+        var (unsized, _) = Create(r => IsAlerts(r)
+            ? Json(NoAlerts)
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new UnsizedStream(Padded(BrightSkyClient.MaxResponseBytes))) });
+        Assert.Equal("Maisach-Galgen", (await unsized.LoadAsync(Fuerstenfeldbruck)).StationName);
+    }
+
+    [Fact]
+    public async Task One_byte_past_the_cap_without_a_length_is_refused()
+    {
+        var (client, _) = Create(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(new UnsizedStream(Padded(BrightSkyClient.MaxResponseBytes + 1))),
+        });
+
+        var e = await Assert.ThrowsAsync<WeatherException>(() => client.LoadAsync(Fuerstenfeldbruck));
+
+        Assert.Contains("zu groß", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_service_that_never_answers_runs_into_the_clients_own_timeout()
+    {
+        var handler = new HangingHandler();
+        _http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+        var time = new ManualTimeProvider();
+        var client = new BrightSkyClient(_http, new Uri("https://brightsky.test/"), time);
+
+        var load = client.LoadAsync(Fuerstenfeldbruck);
+        Assert.Equal(2, handler.Started);
+        Assert.False(load.IsCompleted);
+        time.Tick();
+
+        var e = await Assert.ThrowsAsync<WeatherException>(() => load);
+        Assert.Contains("nicht rechtzeitig", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_field_of_the_wrong_type_is_skipped_for_the_next_one_that_fits()
+    {
+        const string odd = """
+            {"weather":{"timestamp":"2026-11-05T21:10:00+00:00","wind_direction_10":360,"wind_speed_10":"10",
+            "wind_speed_30":5.5,"condition":42,"source_id":7},
+            "sources":[{"id":7,"station_name":"   ","distance":1000000}]}
+            """;
+        var (client, _) = Create(Answer(odd, NoAlerts));
+
+        var reading = await client.LoadAsync(Fuerstenfeldbruck);
+
+        Assert.Equal(360, Assert.NotNull(reading.WindFromDegrees), precision: 3);
+        Assert.Equal(5.5, Assert.NotNull(reading.WindSpeedKmh), precision: 3);
+        Assert.Equal(1_000_000, Assert.NotNull(reading.StationDistanceMetres), precision: 3);
+        Assert.Null(reading.Condition);
+        Assert.Null(reading.StationName);
+    }
+
+    [Fact]
     public async Task Values_that_make_no_sense_are_dropped_not_shown()
     {
         const string hostile = """
@@ -274,7 +388,7 @@ public sealed class BrightSkyClientTests : IDisposable
 
         Assert.Equal(BrightSkyClient.MaxAlerts, reading.Alerts.Count);
         Assert.All(reading.Alerts, a => Assert.True(a.Event.Length <= BrightSkyClient.MaxTextLength));
-        Assert.True(reading.StationName!.Length <= BrightSkyClient.MaxTextLength);
+        Assert.True(reading.StationName?.Length <= BrightSkyClient.MaxTextLength);
     }
 
     [Fact]

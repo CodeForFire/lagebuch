@@ -107,6 +107,12 @@ public class WeatherTextTests
             WeatherText.EtbEntry(Maisach([Sturm]), Cet));
 
     [Fact]
+    public void Etb_entry_names_precipitation_as_such() =>
+        Assert.Equal(
+            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus NO (60°) 10 km/h, Böen 16 km/h, 0,3 °C, Regen, 1,2 mm Niederschlag in 1 h.",
+            WeatherText.EtbEntry(Maisach() with { Condition = "rain", PrecipitationMm = 1.2 }, Cet));
+
+    [Fact]
     public void Etb_entry_without_measurements_says_so() =>
         Assert.Equal("Wetter (DWD, 22:10 Uhr): keine Messwerte.", WeatherText.EtbEntry(Empty(), Cet));
 }
