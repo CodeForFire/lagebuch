@@ -79,7 +79,7 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
         Assert.Equal(vm.Terrain.LegendText, text.Text);
         Assert.NotNull(vm.Terrain.Style);
 
-        using var frame = window.CaptureRenderedFrame()!;
+        using var frame = Assert.IsType<WriteableBitmap>(window.CaptureRenderedFrame());
         frame.SavePng(Path.Join(Shots(), shot));
     }
 
@@ -114,7 +114,7 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
     {
         var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
         Dispatcher.UIThread.RunJobs();
-        using (TopLevel.GetTopLevel(map)!.CaptureRenderedFrame())
+        using (Assert.IsAssignableFrom<TopLevel>(TopLevel.GetTopLevel(map)).CaptureRenderedFrame())
         {
             // Only drawn, so the map asks for its terrain tiles.
         }
@@ -131,8 +131,8 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
 
     private static void Click(Control control)
     {
-        var topLevel = TopLevel.GetTopLevel(control)!;
-        var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), topLevel)!.Value;
+        var topLevel = Assert.IsAssignableFrom<TopLevel>(TopLevel.GetTopLevel(control));
+        var centre = Assert.NotNull(control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), topLevel));
         topLevel.MouseDown(centre, MouseButton.Left);
         topLevel.MouseUp(centre, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
@@ -141,7 +141,7 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
     private static WriteableBitmap Frame(Window window)
     {
         Dispatcher.UIThread.RunJobs();
-        return window.CaptureRenderedFrame()!;
+        return Assert.IsType<WriteableBitmap>(window.CaptureRenderedFrame());
     }
 
     private static int DifferingPixels(WriteableBitmap a, WriteableBitmap b)

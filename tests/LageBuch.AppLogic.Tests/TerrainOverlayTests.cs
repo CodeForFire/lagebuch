@@ -133,6 +133,63 @@ public sealed class TerrainOverlayTests : IDisposable
         Assert.True(Assert.IsType<TerrainStyle>(terrain.Style).Low > Assert.IsType<TerrainStyle>(start).Low);
     }
 
+    [Fact]
+    public void The_colour_range_spans_about_a_screen_around_the_centre()
+    {
+        // ±640 × ±400 pixels at zoom 15: ±2.04 km east (±102 m) and ±1.28 km north (±32 m).
+        var terrain = Shown(new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz });
+        terrain.Layer = TerrainLayer.Hoehenschichten;
+
+        var style = Assert.IsType<TerrainStyle>(terrain.Style);
+
+        Assert.InRange(style.Low, 410, 430);
+        Assert.InRange(style.High, 670, 690);
+    }
+
+    [Fact]
+    public void The_key_tells_the_view_what_changed_and_nothing_when_nothing_did()
+    {
+        var map = new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz };
+        var terrain = Shown(map);
+        var raised = new List<string?>();
+        terrain.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        terrain.Layer = TerrainLayer.Hangneigung;
+        Assert.Contains(nameof(TerrainOverlay.LegendText), raised);
+        Assert.Contains(nameof(TerrainOverlay.ShowsLegend), raised);
+        Assert.Contains(nameof(TerrainOverlay.ShowsSlopeKey), raised);
+        Assert.DoesNotContain(nameof(TerrainOverlay.ShowsRelativeKey), raised);
+        Assert.DoesNotContain(nameof(TerrainOverlay.ShowsRampKey), raised);
+
+        // Another layer with a key: the key still shows, so only its text and swatches change.
+        raised.Clear();
+        terrain.Layer = TerrainLayer.Hoehenschichten;
+        Assert.DoesNotContain(nameof(TerrainOverlay.ShowsLegend), raised);
+        Assert.Contains(nameof(TerrainOverlay.ShowsRampKey), raised);
+        Assert.Contains(nameof(TerrainOverlay.ShowsSlopeKey), raised);
+        terrain.Layer = TerrainLayer.Hangneigung;
+
+        raised.Clear();
+        map.ChangeViewCommand.Execute(new MapViewChange(Shift(TerrainFixture.Marktplatz, 30, 15), 15));
+        Assert.DoesNotContain(nameof(TerrainOverlay.LegendText), raised);
+        Assert.DoesNotContain(nameof(TerrainOverlay.ShowsSlopeKey), raised);
+
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.RelativZumEinsatzort;
+        Assert.True(terrain.ShowsRelativeKey);
+        Assert.False(terrain.ShowsSlopeKey);
+        raised.Clear();
+        map.ChangeViewCommand.Execute(new MapViewChange(Shift(TerrainFixture.Marktplatz, 60, 15), 15));
+        Assert.DoesNotContain(nameof(TerrainOverlay.ShowsRelativeKey), raised);
+
+        terrain.Layer = TerrainLayer.Hoehenschichten;
+        Assert.True(terrain.ShowsRampKey);
+        raised.Clear();
+        map.ChangeViewCommand.Execute(new MapViewChange(Shift(TerrainFixture.Marktplatz, 90, 15), 15));
+        Assert.DoesNotContain(nameof(TerrainOverlay.ShowsRampKey), raised);
+        Assert.DoesNotContain(nameof(TerrainOverlay.ShowsLegend), raised);
+    }
+
     private TerrainOverlay Shown(MapViewport? map = null)
     {
         var terrain = new TerrainOverlay(map ?? new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz });

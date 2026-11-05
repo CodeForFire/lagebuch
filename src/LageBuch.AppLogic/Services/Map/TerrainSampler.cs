@@ -54,6 +54,7 @@ public static class TerrainSampler
             }
         }
 
+        // Stryker disable once Block : without the check the tile is sampled in full and comes out empty all the same; the check only saves the 67 000 lookups.
         if (!elevation.Covers(minE, minN, maxE, maxN))
         {
             return null;
@@ -101,7 +102,7 @@ public static class TerrainSampler
         ArgumentNullException.ThrowIfNull(northWest);
         ArgumentNullException.ThrowIfNull(southEast);
         const int steps = 16;
-        var samples = new List<double>(steps * steps);
+        var samples = new List<double>();
         for (var j = 0; j < steps; j++)
         {
             for (var i = 0; i < steps; i++)
@@ -122,7 +123,7 @@ public static class TerrainSampler
 
         samples.Sort();
         var low = Math.Floor(samples[(int)(samples.Count * 0.02)] / 10) * 10;
-        var high = Math.Ceiling(samples[(int)Math.Min(samples.Count - 1, samples.Count * 0.98)] / 10) * 10;
+        var high = Math.Ceiling(samples[(int)(samples.Count * 0.98)] / 10) * 10;
         return (low, Math.Max(high, low + 10));
     }
 

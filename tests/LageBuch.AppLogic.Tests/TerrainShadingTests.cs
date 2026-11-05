@@ -153,6 +153,268 @@ public sealed class TerrainShadingTests
         Assert.Empty(tile.Contours);
     }
 
+    // Shaded relief, worked out by hand for a slope of 0.3 (or 0.1) m per m, 2.5 × exaggerated:
+    // flat ground reflects sin 45° = 0.707 of the light; more is drawn white at up to 35 %, less
+    // black at up to 60 %, both doubled from the flat value and capped at full strength.
+    [Theory]
+    [InlineData(0.3, 0, 255, 75)] // facing west, into the light: 0.831 reflected
+    [InlineData(-0.3, 0, 0, 153)] // facing east, away from it: 0.301, capped
+    [InlineData(0.1, 0, 255, 52)] // facing west, gentler: 0.793
+    [InlineData(-0.1, 0, 0, 55)] // facing east, gentler: 0.579
+    [InlineData(0, 0.3, 0, 124)] // facing south: 0.421
+    [InlineData(0, -0.3, 255, -1)] // facing north, towards the light from the north: lightened
+    public void A_slope_is_shaded_by_how_much_light_it_reflects(double eastRise, double northRise, int white, int alpha)
+    {
+        // A rise to the north is a fall with the row number: rows run south.
+        var pixel = Pixel(Render(TerrainLayer.Schummerung, (x, y) => (float)(500 + (eastRise * x) - (northRise * y))), 128, 128);
+
+        if (alpha < 0)
+        {
+            Assert.True(Alpha(pixel) > 0);
+        }
+        else
+        {
+            Assert.InRange(Alpha(pixel), alpha - 1, alpha + 1);
+        }
+
+        Assert.Equal(white == 0 ? 0 : Alpha(pixel), Red(pixel));
+    }
+
+    [Fact]
+    public void Relief_measures_slope_in_metres_so_a_coarser_pixel_flattens_it()
+    {
+        // 0.3 m per pixel at 2 m a pixel is 0.15 m per m: the "facing west, gentler"-like value.
+        var coarse = Pixel(Render(new TerrainStyle(TerrainLayer.Schummerung), (x, _) => (float)(500 + (0.3 * x)), metresPerPixel: 2), 128, 128);
+        var fine = Pixel(Render(TerrainLayer.Schummerung, (x, _) => (float)(500 + (0.3 * x))), 128, 128);
+
+        Assert.True(Alpha(coarse) < Alpha(fine));
+    }
+
+    [Theory]
+    [InlineData(0.12, 0.09, 0xFF, 0xD9)] // 15 %: gelb
+    [InlineData(0.15, 0.2, 0xFF, 0x80)] // 25 %: orange
+    [InlineData(0, -0.4, 0xD9, 0x00)] // 40 % to the north: rot
+    public void A_slope_s_steepness_takes_both_directions_into_account(double eastRise, double northRise, int red, int green)
+    {
+        var pixel = Pixel(Render(TerrainLayer.Hangneigung, (x, y) => (float)(500 + (eastRise * x) - (northRise * y))), 128, 128);
+
+        var alpha = Alpha(pixel);
+        Assert.Equal(140, alpha);
+        Assert.InRange(Red(pixel), (red * alpha / 255) - 1, (red * alpha / 255) + 1);
+        Assert.InRange(Green(pixel), (green * alpha / 255) - 1, (green * alpha / 255) + 1);
+    }
+
+    [Fact]
+    public void Steepness_is_in_percent_of_ground_metres()
+    {
+        // 0.3 m per pixel at 2 m a pixel: 15 %, gelb rather than the 30 % orange.
+        var pixel = Pixel(Render(new TerrainStyle(TerrainLayer.Hangneigung), (x, _) => (float)(500 + (0.3 * x)), metresPerPixel: 2), 128, 128);
+
+        Assert.InRange(Green(pixel), (0xD9 * 140 / 255) - 1, (0xD9 * 140 / 255) + 1);
+    }
+
+    [Theory]
+    [InlineData(561, 0xFF, 0xF1, 0x76)] // halfway: the ramp's yellow
+    [InlineData(515.25, 0x65, 0xA4, 0x4B)] // an eighth: halfway from dark to light green
+    public void Hoehenschichten_blend_along_the_ramp(double height, int red, int green, int blue)
+    {
+        var style = new TerrainStyle(TerrainLayer.Hoehenschichten, Low: 500, High: 622);
+
+        var pixel = Pixel(Render(style, (_, _) => (float)height), 10, 10);
+
+        Assert.Equal(107, Alpha(pixel));
+        Assert.InRange(Red(pixel), (red * 107 / 255) - 1, (red * 107 / 255) + 1);
+        Assert.InRange(Green(pixel), (green * 107 / 255) - 1, (green * 107 / 255) + 1);
+        Assert.InRange(Blue(pixel), (blue * 107 / 255) - 1, (blue * 107 / 255) + 1);
+    }
+
+    [Fact]
+    public void Hoehenschichten_darken_a_slope_away_from_the_light_over_their_colour()
+    {
+        // Facing east at 0.3: the relief's black at 35 % over the yellow at 42 %: 62 % opaque, the
+        // yellow showing through at 0.42 × 0.65 = 27 %.
+        var style = new TerrainStyle(TerrainLayer.Hoehenschichten, Low: 500, High: 622);
+
+        var pixel = Pixel(Render(style, (x, _) => (float)(561 + (0.3 * (130 - x)))), 128, 128);
+
+        Assert.InRange(Alpha(pixel), 158, 160);
+        Assert.InRange(Red(pixel), 69, 71);
+        Assert.InRange(Green(pixel), 65, 67);
+        Assert.InRange(Blue(pixel), 31, 33);
+    }
+
+    [Fact]
+    public void Without_a_range_a_single_height_still_gets_a_colour()
+    {
+        var pixel = Pixel(Render(new TerrainStyle(TerrainLayer.Hoehenschichten, Low: 550, High: 550), (_, _) => 550.5f), 10, 10);
+
+        // Low equals High: one metre of range, so 550.5 m is halfway, the ramp's yellow.
+        Assert.InRange(Green(pixel), (0xF1 * 107 / 255) - 1, (0xF1 * 107 / 255) + 1);
+    }
+
+    [Theory]
+    [InlineData(520, 0x21, 0x66, 0xAC, 166)] // 30 m below: the full blue at 65 %
+    [InlineData(565, 0xD8, 0x8C, 0x95, 108)] // 15 m above: halfway from white to the red, at 42.5 %
+    [InlineData(550, 0xFF, 0xFF, 0xFF, 51)] // the Einsatzort's own height: a faint white
+    public void Relative_colours_are_mixed_from_white_by_the_height_difference(double height, int red, int green, int blue, int alpha)
+    {
+        var pixel = Pixel(Render(new TerrainStyle(TerrainLayer.RelativZumEinsatzort, ReferenceHeight: 550), (_, _) => (float)height), 10, 10);
+
+        Assert.Equal(alpha, Alpha(pixel));
+        Assert.InRange(Red(pixel), (red * alpha / 255) - 1, (red * alpha / 255) + 1);
+        Assert.InRange(Green(pixel), (green * alpha / 255) - 1, (green * alpha / 255) + 1);
+        Assert.InRange(Blue(pixel), (blue * alpha / 255) - 1, (blue * alpha / 255) + 1);
+    }
+
+    [Fact]
+    public void Relative_lines_count_from_the_Einsatzort_s_own_height()
+    {
+        // 552 m: lines at 542, 547, 552, 557, 562, labelled every 10 m from 552.
+        var tile = Render(new TerrainStyle(TerrainLayer.RelativZumEinsatzort, ReferenceHeight: 552), (x, _) => 538 + (0.1f * x));
+
+        var levels = tile.Contours.ToDictionary(c => c.Height);
+        Assert.Equal([542.0, 547, 552, 557, 562], levels.Keys.Order());
+        Assert.Equal("−10 m", levels[542].Label);
+        Assert.Equal(string.Empty, levels[547].Label);
+        Assert.Equal("+10 m", levels[562].Label);
+        Assert.Equal([552.0], tile.Contours.Where(c => c.IsMajor).Select(c => c.Height));
+    }
+
+    [Fact]
+    public void Every_fifth_contour_and_only_it_is_a_Zaehllinie()
+    {
+        var tile = Render(TerrainLayer.Hoehenlinien, (x, _) => 480 + (0.5f * x), zoom: 15);
+
+        Assert.Equal([500.0, 525, 550, 575, 600], tile.Contours.Where(c => c.IsMajor).Select(c => c.Height));
+        Assert.Equal("500 m", tile.Contours.Single(c => Math.Abs(c.Height - 500) < 1e-9).Label);
+        Assert.Equal(string.Empty, tile.Contours.Single(c => Math.Abs(c.Height - 505) < 1e-9).Label);
+    }
+
+    [Fact]
+    public void The_contours_of_a_cone_are_closed_rings_at_the_right_radius()
+    {
+        // 600 m at the tile's middle, falling 0.5 m per pixel: the 575 m line is a circle of 50 px.
+        var tile = Render(TerrainLayer.Hoehenlinien, (x, y) => (float)(600 - (0.5 * Math.Sqrt(((x - 130) * (x - 130)) + ((y - 130) * (y - 130))))), zoom: 15);
+        var ring = Assert.Single(tile.Contours, c => Math.Abs(c.Height - 575) < 1e-9);
+
+        // Every end is shared with exactly one other piece: the line never breaks.
+        var ends = ring.Segments.SelectMany(s => new[] { (Math.Round(s.X1, 6), Math.Round(s.Y1, 6)), (Math.Round(s.X2, 6), Math.Round(s.Y2, 6)) });
+        Assert.All(ends.GroupBy(e => e), g => Assert.Equal(2, g.Count()));
+        Assert.All(ring.Segments, s =>
+        {
+            // The tile's pixel (x, y) is the sample (x + 2, y + 2); its centre lies at x + 0.5.
+            var r = Math.Sqrt(((s.X1 - 128.5) * (s.X1 - 128.5)) + ((s.Y1 - 128.5) * (s.Y1 - 128.5)));
+            Assert.InRange(r, 49.0, 51.0);
+        });
+    }
+
+    [Theory]
+    [InlineData(1)] // high to the north-west and south-east
+    [InlineData(-1)] // high to the north-east and south-west
+    public void A_saddle_cell_gets_two_lines_not_one(int sign)
+    {
+        var tile = Render(TerrainLayer.Hoehenlinien, (x, y) => (float)(500 + (sign * (x - 130.5) * (y - 130.5) * 0.01)), zoom: 15);
+
+        // The saddle point is at the middle of the cell from pixel 128 to 129, both ways.
+        var through = tile.Contours.Single(c => Math.Abs(c.Height - 500) < 1e-9).Segments
+            .Count(s => (s.X1 + s.X2) / 2 is > 128.5 and < 129.5 && (s.Y1 + s.Y2) / 2 is > 128.5 and < 129.5);
+        Assert.Equal(2, through);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Ground_exactly_at_a_contour_s_height_counts_as_above_it(bool highToTheWest)
+    {
+        // A step: 505 m on one half, 500 m on the other. The 505 m line runs straight along the step.
+        var tile = Render(TerrainLayer.Hoehenlinien, (x, _) => (x < 130) == highToTheWest ? 505f : 500f, zoom: 15);
+
+        var line = Assert.Single(tile.Contours, c => Math.Abs(c.Height - 505) < 1e-9);
+        Assert.All(line.Segments, s => Assert.Equal(s.X1, s.X2, precision: 9));
+    }
+
+    [Fact]
+    public void A_contour_reaches_the_tile_s_west_edge_and_stops_one_cell_past_the_east_edge()
+    {
+        // 500 m lies between samples 1 (499.95 m) and 2 (500.05 m): at the tile's x = 0.0, the
+        // edge of the cell just outside the tile.
+        var west = Render(TerrainLayer.Hoehenlinien, (x, _) => 499.85f + (0.1f * x), zoom: 15);
+        Assert.Equal(WebMercator.TileSizePixels + 1, west.Contours.Single(c => Math.Abs(c.Height - 500) < 1e-9).Segments.Count(s => Math.Abs(s.X1) < 0.01));
+
+        // A line only beyond the last cell, at sample 258.5, is not drawn by this tile.
+        var east = Render(TerrainLayer.Hoehenlinien, (x, _) => x >= 259 ? 510f : 500f, zoom: 15);
+        Assert.DoesNotContain(east.Contours.SelectMany(c => c.Segments), s => s.X1 > 256.6);
+    }
+
+    [Fact]
+    public void A_level_whose_only_crossing_lies_in_the_margin_is_left_out()
+    {
+        // Sample column 0 is 510 m; smoothed, its neighbour reaches 503.3 m. No cell crosses 505 m or 510 m.
+        var tile = Render(TerrainLayer.Hoehenlinien, (x, _) => x == 0 ? 510f : 500f, zoom: 15);
+
+        Assert.Empty(tile.Contours);
+    }
+
+    [Fact]
+    public void A_hole_in_the_heights_breaks_the_lines_around_it_instead_of_bending_them()
+    {
+        var tile = Render(TerrainLayer.Hoehenlinien, (x, y) => x == 100 && y == 100 ? float.NaN : 500 + (0.5f * x) + (0.5f * y), zoom: 15);
+
+        // The sample (100, 100) is the pixel (98, 98), centre 98.5: no line touches the cells around it.
+        Assert.DoesNotContain(tile.Contours.SelectMany(c => c.Segments), s =>
+            Math.Abs(((s.X1 + s.X2) / 2) - 98.5) < 1 && Math.Abs(((s.Y1 + s.Y2) / 2) - 98.5) < 1);
+    }
+
+    [Fact]
+    public void A_hole_is_never_shaded_and_neither_is_ground_beside_it()
+    {
+        // The sample (100, 100) is the tile's pixel (98, 98); its neighbours' slopes need it too.
+        var tile = Render(TerrainLayer.Schummerung, (x, y) => x == 100 && y == 100 ? float.NaN : 600 - (0.3f * x), zoom: 15);
+
+        Assert.Equal(0, Alpha(Pixel(tile, 98, 98)));
+        Assert.Equal(0, Alpha(Pixel(tile, 97, 98)));
+        Assert.Equal(0, Alpha(Pixel(tile, 98, 97)));
+        Assert.NotEqual(0, Alpha(Pixel(tile, 90, 90)));
+    }
+
+    [Fact]
+    public void Smoothing_averages_each_height_with_its_eight_neighbours()
+    {
+        var heights = new float[Side * Side];
+        heights[(10 * Side) + 10] = 9;
+
+        var smooth = TerrainShading.Smooth(heights);
+
+        Assert.Equal(1, smooth[(9 * Side) + 9], precision: 5);
+        Assert.Equal(1, smooth[(11 * Side) + 11], precision: 5);
+        Assert.Equal(1, smooth[(10 * Side) + 11], precision: 5);
+        Assert.Equal(0, smooth[(12 * Side) + 10], precision: 5);
+    }
+
+    [Fact]
+    public void Smoothing_repeats_the_edge_past_the_grid()
+    {
+        var heights = new float[Side * Side];
+        heights[0] = 9;
+
+        // At the corner, four of the nine looked at are the corner itself.
+        Assert.Equal(4, TerrainShading.Smooth(heights)[0], precision: 5);
+    }
+
+    [Fact]
+    public void Smoothing_leaves_a_hole_a_hole_and_averages_around_it()
+    {
+        var heights = new float[Side * Side];
+        Array.Fill(heights, 8);
+        heights[(10 * Side) + 10] = float.NaN;
+        heights[(10 * Side) + 12] = 16;
+
+        var smooth = TerrainShading.Smooth(heights);
+
+        Assert.True(float.IsNaN(smooth[(10 * Side) + 10]));
+        Assert.Equal(9, smooth[(10 * Side) + 11], precision: 5); // (7 × 8 + 16) / 8
+    }
+
     [Fact]
     public void Heights_of_the_wrong_size_are_refused()
     {
@@ -162,8 +424,8 @@ public sealed class TerrainShadingTests
     private static TerrainTile Render(TerrainLayer layer, Func<int, int, float> height, int zoom = 15) =>
         Render(new TerrainStyle(layer), height, zoom);
 
-    // Heights by sample column and row, the margin included; one metre a pixel.
-    private static TerrainTile Render(TerrainStyle style, Func<int, int, float> height, int zoom = 15)
+    // Heights by sample column and row, the margin included; one metre a pixel unless said otherwise.
+    private static TerrainTile Render(TerrainStyle style, Func<int, int, float> height, int zoom = 15, double metresPerPixel = 1)
     {
         var heights = new float[Side * Side];
         for (var y = 0; y < Side; y++)
@@ -174,7 +436,7 @@ public sealed class TerrainShadingTests
             }
         }
 
-        return TerrainShading.Render(heights, 1, zoom, style);
+        return TerrainShading.Render(heights, metresPerPixel, zoom, style);
     }
 
     private static int[] Pixels(TerrainTile tile) => tile.Pixels?.ToArray() ?? new int[WebMercator.TileSizePixels * WebMercator.TileSizePixels];

@@ -215,10 +215,13 @@ public static class MapDrawing
         var scale = (double)(1 << levels);
         var side = WebMercator.TileSizePixels * scale;
         var tilesPerSide = 1 << sourceZoom;
+        var (fromX, toX) = (Math.Max(firstX >> levels, 0), Math.Min(lastX >> levels, tilesPerSide - 1));
+        var (fromY, toY) = (Math.Max(firstY >> levels, 0), Math.Min(lastY >> levels, tilesPerSide - 1));
+        terrain.Reserve(Math.Max(0, toX - fromX + 1) * Math.Max(0, toY - fromY + 1));
         var drawn = new List<(Point Origin, DrawnTerrainTile Tile)>();
-        for (var tx = Math.Max(firstX >> levels, 0); tx <= Math.Min(lastX >> levels, tilesPerSide - 1); tx++)
+        for (var tx = fromX; tx <= toX; tx++)
         {
-            for (var ty = Math.Max(firstY >> levels, 0); ty <= Math.Min(lastY >> levels, tilesPerSide - 1); ty++)
+            for (var ty = fromY; ty <= toY; ty++)
             {
                 if (terrain.Get(sourceZoom, tx, ty) is { } tile)
                 {

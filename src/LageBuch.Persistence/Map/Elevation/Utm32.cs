@@ -16,6 +16,9 @@ public static class Utm32
     private const double CentralMeridian = 9.0;
 
     private const double N = F / (2 - F);
+
+    // Stryker disable all : the fourth-order terms move a Bavarian position by micrometres, far below what any
+    // test can tell from PROJ at the millimetre; they stay because the series is documented to that order.
     private static readonly double Rectifying = A / (1 + N) * (1 + (N * N / 4) + (Math.Pow(N, 4) / 64));
     private static readonly double E = 2 * Math.Sqrt(N) / (1 + N);
     private static readonly double[] Alpha =
@@ -25,6 +28,8 @@ public static class Utm32
         (61 * Math.Pow(N, 3) / 240) - (103 * Math.Pow(N, 4) / 140),
         49561 * Math.Pow(N, 4) / 161280,
     ];
+
+    // Stryker restore all
 
     /// <summary>Easting and northing in metres of <paramref name="point"/>.</summary>
     public static (double Easting, double Northing) FromGeo(GeoPoint point)
@@ -38,6 +43,8 @@ public static class Utm32
         var eta = Math.Atanh(Math.Sin(lambda) / Math.Sqrt(1 + (t * t)));
         var x = eta;
         var y = xi;
+
+        // Stryker disable once Equality : the last term, α4, is of the fourth order too.
         for (var j = 1; j <= Alpha.Length; j++)
         {
             var k = 2.0 * j;

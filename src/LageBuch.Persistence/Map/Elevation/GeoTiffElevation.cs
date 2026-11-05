@@ -69,8 +69,10 @@ public sealed class GeoTiffElevation
     private readonly Lock _gate = new();
     private readonly ConcurrentDictionary<int, CachedTile> _cache = new();
     private long _clock;
-    private GridLayout? _layout;
-    private bool _opened;
+    private volatile GridLayout? _layout;
+    private volatile bool _opened;
+    private int _tileReads;
+    private int _layoutReads;
 
     public GeoTiffElevation(string path)
     {
@@ -80,6 +82,12 @@ public sealed class GeoTiffElevation
 
     /// <summary>Whether the file could be read as an elevation grid; false for a missing or foreign file.</summary>
     public bool IsReadable => Open() is not null;
+
+    /// <summary>How often a tile was read from the file: what the cache is there to keep low.</summary>
+    internal int TileReads => Volatile.Read(ref _tileReads);
+
+    /// <summary>How often the file's directory was read: once, however many threads ask.</summary>
+    internal int LayoutReads => Volatile.Read(ref _layoutReads);
 
     /// <summary>The grid's outer edges in EPSG:25832 metres, or null when the file is unreadable.</summary>
     public (double MinX, double MinY, double MaxX, double MaxY)? Bounds =>
@@ -114,7 +122,7 @@ public sealed class GeoTiffElevation
         Add(layout, col + 1, row, tx * (1 - ty), ref sum, ref weight);
         Add(layout, col, row + 1, (1 - tx) * ty, ref sum, ref weight);
         Add(layout, col + 1, row + 1, tx * ty, ref sum, ref weight);
-        return weight > 1e-9 ? sum / weight : null;
+        return weight > 0 ? sum / weight : null;
     }
 
     private void Add(GridLayout layout, int col, int row, double w, ref double sum, ref double weight)
@@ -182,8 +190,13 @@ public sealed class GeoTiffElevation
                 return null;
             }
 
+            Interlocked.Increment(ref _tileReads);
             var tileBytes = layout.TileWidth * layout.TileHeight * 4;
+
+            // Stryker disable once Bitwise : how the file is shared matters only while a pack is replaced, which the library does folder by folder.
             using var file = new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
+            // Stryker disable once Arithmetic : a read past the end throws, which the catch below also turns into "no heights"; the check only spares the exception.
             if (offset + count > file.Length || count > tileBytes * 2L)
             {
                 return null;
@@ -196,6 +209,8 @@ public sealed class GeoTiffElevation
             if (layout.Deflate)
             {
                 using var zlib = new ZLibStream(new MemoryStream(raw), CompressionMode.Decompress);
+
+                // Stryker disable once Boolean : a short stream either way means no heights: thrown, it lands in the catch below.
                 if (zlib.ReadAtLeast(bytes, tileBytes, throwOnEndOfStream: false) != tileBytes)
                 {
                     return null;
@@ -263,14 +278,22 @@ public sealed class GeoTiffElevation
         return result;
     }
 
+    // Every height lookup starts here, so after the first read it takes no lock: the layout is
+    // published before the flag that says it is there.
     private GridLayout? Open()
     {
+        if (_opened)
+        {
+            return _layout;
+        }
+
         lock (_gate)
         {
             if (!_opened)
             {
-                _opened = true;
+                Interlocked.Increment(ref _layoutReads);
                 _layout = ReadLayout(_path);
+                _opened = true;
             }
 
             return _layout;
@@ -282,6 +305,7 @@ public sealed class GeoTiffElevation
     {
         try
         {
+            // Stryker disable once Bitwise : how the file is shared matters only while a pack is replaced, which the library does folder by folder.
             using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             return ParseLayout(file);
         }
@@ -297,6 +321,8 @@ public sealed class GeoTiffElevation
         ArgumentNullException.ThrowIfNull(file);
         Span<byte> header = stackalloc byte[8];
         file.Position = 0;
+
+        // Stryker disable once Boolean : a file shorter than its header is refused either way: thrown, it lands in ReadLayout's catch.
         if (file.ReadAtLeast(header, 8, throwOnEndOfStream: false) != 8
             || header[0] != (byte)'I' || header[1] != (byte)'I' || BinaryPrimitives.ReadUInt16LittleEndian(header[2..]) != 42)
         {
@@ -338,6 +364,7 @@ public sealed class GeoTiffElevation
             return null;
         }
 
+        // Stryker disable once Unary : -9999, FORMAT.md's NoData, lies outside LowestHeight..HighestHeight too; the default only names it.
         var noData = -9999f;
         if (tags.GetValueOrDefault(TagGdalNoData)?.Text is { } text
             && float.TryParse(text.Trim('\0', ' '), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
@@ -361,6 +388,7 @@ public sealed class GeoTiffElevation
             NoData: noData);
     }
 
+    // Stryker disable once Equality,Logical : the values are unsigned, and a too-large one is refused by every caller's own range check.
     private static int? Scalar(Dictionary<ushort, TagValue> tags, ushort tag) =>
         tags.GetValueOrDefault(tag)?.Numbers is [var n, ..] && n is >= 0 and <= int.MaxValue ? (int)n : null;
 
@@ -371,6 +399,7 @@ public sealed class GeoTiffElevation
             return null;
         }
 
+        // Stryker disable once Arithmetic : reading past the key list throws, which ReadLayout's catch turns into "unreadable", as a missing key is.
         for (var i = 4; i + 3 < keys.Length; i += 4)
         {
             if ((int)keys[i] == key && (int)keys[i + 1] == 0)
@@ -384,6 +413,7 @@ public sealed class GeoTiffElevation
 
     private static Dictionary<ushort, TagValue>? ReadDirectory(Stream file, long offset)
     {
+        // Stryker disable once Equality,Arithmetic : a read past the end throws, which ReadLayout's catch also turns into "unreadable"; the check only spares the exception.
         if (offset + 2 > file.Length)
         {
             return null;
@@ -393,6 +423,8 @@ public sealed class GeoTiffElevation
         file.Position = offset;
         file.ReadExactly(two);
         var count = BinaryPrimitives.ReadUInt16LittleEndian(two);
+
+        // Stryker disable once Equality,Arithmetic : as above, reading the entries past the end throws into the same "unreadable".
         if (count > MaxTags || offset + 2 + (count * 12L) > file.Length)
         {
             return null;
@@ -415,6 +447,8 @@ public sealed class GeoTiffElevation
                 12 => 8,
                 _ => 0,
             };
+
+            // Stryker disable once Equality : a tag of exactly MaxValuesPerTag values is as harmless as one fewer.
             if (size == 0 || n > MaxValuesPerTag)
             {
                 continue;
@@ -429,6 +463,8 @@ public sealed class GeoTiffElevation
             else
             {
                 long at = BinaryPrimitives.ReadUInt32LittleEndian(entry[8..]);
+
+                // Stryker disable once Equality,Arithmetic : a read past the end throws into ReadLayout's "unreadable" all the same.
                 if (at + length > file.Length)
                 {
                     return null;

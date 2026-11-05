@@ -12,7 +12,7 @@ public static class Formatting
     public static string Number(int value) => value.ToString("N0", De);
 
     /// <summary>A height or length in whole metres, without grouping: "554 m", as a map labels it.</summary>
-    public static string Metres(double value) => Math.Round(value).ToString("0", De) + " m";
+    public static string Metres(double value) => Math.Round(value).ToString(De) + " m";
 
     /// <summary>A height above NHN to a tenth of a metre: "554,6 m".</summary>
     public static string Height(double value) => value.ToString("0.0", De) + " m";
@@ -23,8 +23,8 @@ public static class Formatting
         var rounded = Math.Round(metres);
         return rounded switch
         {
-            > 0 => "+" + rounded.ToString("0", De) + " m",
-            < 0 => "−" + (-rounded).ToString("0", De) + " m",
+            > 0 => "+" + rounded.ToString(De) + " m",
+            < 0 => "−" + (-rounded).ToString(De) + " m",
             _ => "±0 m",
         };
     }

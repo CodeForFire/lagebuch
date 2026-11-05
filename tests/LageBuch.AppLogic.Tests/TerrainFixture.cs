@@ -7,7 +7,8 @@ namespace LageBuch.AppLogic.Tests;
 
 /// <summary>
 /// Made-up terrain around the Fürstenfeldbruck Marktplatz: a plane rising 1 m every 20 m to the
-/// east from 550 m at the Marktplatz, on a 20 m grid 6 km square. Not DGM data.
+/// east and 1 m every 40 m to the north from 550 m at the Marktplatz, on a 20 m grid 6 km square.
+/// Not DGM data.
 /// </summary>
 internal static class TerrainFixture
 {
@@ -22,7 +23,8 @@ internal static class TerrainFixture
         300,
         300);
 
-    public static float Height(double east, double north) => (float)(550 + ((east - MarktplatzUtm.East) / 20));
+    public static float Height(double east, double north) =>
+        (float)(550 + ((east - MarktplatzUtm.East) / 20) + ((north - MarktplatzUtm.North) / 40));
 
     /// <summary>A pack folder under <paramref name="root"/> holding only the elevation file.</summary>
     public static InstalledRegionPack Pack(string root, string slug = "ffb", string name = "Landkreis Fürstenfeldbruck")

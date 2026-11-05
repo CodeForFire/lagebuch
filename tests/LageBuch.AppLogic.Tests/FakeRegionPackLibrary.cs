@@ -41,6 +41,9 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
 
     public void Preinstall(RegionPackInfo info) => _installed.Add(new InstalledRegionPack(info, Path.Join("regions", info.Slug)));
 
+    /// <summary>A pack whose folder is real, so the view model can read files from it.</summary>
+    public void Preinstall(InstalledRegionPack pack) => _installed.Add(pack);
+
     public async Task<IReadOnlyList<RegionPackInfo>> GetCatalogAsync(CancellationToken cancellationToken = default)
     {
         if (CatalogGate is { } gate)

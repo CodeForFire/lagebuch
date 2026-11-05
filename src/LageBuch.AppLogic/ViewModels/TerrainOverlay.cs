@@ -189,6 +189,8 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             var (x0, y0) = WebMercator.ToWorldPixel(at.Center, zoom);
             var (x1, y1) = WebMercator.ToWorldPixel(center, zoom);
+
+            // Stryker disable once Equality : a pan of exactly RangeRecomputeDistance pixels may go either way.
             if (Math.Abs(x1 - x0) < RangeRecomputeDistance && Math.Abs(y1 - y0) < RangeRecomputeDistance)
             {
                 return _range;
@@ -204,19 +206,38 @@ public sealed partial class TerrainOverlay : ObservableObject
         return _range;
     }
 
+    // Each part of the key tells the view only when it changed: Update runs on every pan.
     private void SetLegend(string? text, bool slope, bool relative, bool ramp)
     {
-        if (LegendText == text && ShowsSlopeKey == slope && ShowsRelativeKey == relative && ShowsRampKey == ramp)
+        var wasShown = ShowsLegend;
+        if (!string.Equals(LegendText, text, StringComparison.Ordinal))
         {
-            return;
+            LegendText = text;
+            OnPropertyChanged(nameof(LegendText));
         }
 
-        (LegendText, ShowsSlopeKey, ShowsRelativeKey, ShowsRampKey) = (text, slope, relative, ramp);
-        OnPropertyChanged(nameof(LegendText));
-        OnPropertyChanged(nameof(ShowsLegend));
-        OnPropertyChanged(nameof(ShowsSlopeKey));
-        OnPropertyChanged(nameof(ShowsRelativeKey));
-        OnPropertyChanged(nameof(ShowsRampKey));
+        if (ShowsLegend != wasShown)
+        {
+            OnPropertyChanged(nameof(ShowsLegend));
+        }
+
+        if (ShowsSlopeKey != slope)
+        {
+            ShowsSlopeKey = slope;
+            OnPropertyChanged(nameof(ShowsSlopeKey));
+        }
+
+        if (ShowsRelativeKey != relative)
+        {
+            ShowsRelativeKey = relative;
+            OnPropertyChanged(nameof(ShowsRelativeKey));
+        }
+
+        if (ShowsRampKey != ramp)
+        {
+            ShowsRampKey = ramp;
+            OnPropertyChanged(nameof(ShowsRampKey));
+        }
     }
 }
 

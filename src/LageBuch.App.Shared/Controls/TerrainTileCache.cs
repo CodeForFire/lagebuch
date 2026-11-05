@@ -19,7 +19,7 @@ namespace LageBuch.App.Shared.Controls;
 /// <remarks>Deliberately not <see cref="IDisposable"/>, like <see cref="MapTileCache"/>: its control releases it through <see cref="Clear"/>.</remarks>
 public sealed class TerrainTileCache
 {
-    /// <summary>About two screens of tiles.</summary>
+    /// <summary>About two screens of tiles; more when the screen itself shows more (<see cref="Reserve"/>).</summary>
     public const int Capacity = 96;
 
     // A label needs this much room from the tile's edge, so it is not cut by the next tile.
@@ -34,7 +34,11 @@ public sealed class TerrainTileCache
     private readonly Action? _ready;
 
     // Bumped whenever the heights or the style change, so a tile worked out for the old ones is dropped.
+    // Read from the thread pool too, so a queued tile that is already stale is not worked out at all.
     private int _generation;
+
+    // At least Capacity, and room for every tile on screen plus a margin: a turned 4K map shows ~300.
+    private int _capacity = Capacity;
 
     /// <param name="ready">Called on the UI thread whenever a tile has become ready to draw.</param>
     public TerrainTileCache(Action? ready = null)
@@ -57,6 +61,12 @@ public sealed class TerrainTileCache
         Clear();
         (Elevation, Style) = (elevation, style);
     }
+
+    /// <summary>
+    /// Makes room for <paramref name="tiles"/> tiles at once, so a map showing more than
+    /// <see cref="Capacity"/> never evicts a tile it is about to draw and asks for it again.
+    /// </summary>
+    public void Reserve(int tiles) => _capacity = Math.Max(_capacity, tiles + (tiles / 2));
 
     /// <summary>Whether tiles are still being worked out.</summary>
     public bool IsBusy => _pending.Count > 0;
@@ -90,7 +100,7 @@ public sealed class TerrainTileCache
 
     public void Clear()
     {
-        _generation++;
+        Interlocked.Increment(ref _generation);
         _pending.Clear();
         foreach (var entry in _recent)
         {
@@ -109,14 +119,14 @@ public sealed class TerrainTileCache
         TerrainTile? data;
         try
         {
-            data = await Task.Run(() => Work(elevation, style, zoom, x, y));
+            data = await Task.Run(() => generation == Volatile.Read(ref _generation) ? Work(elevation, style, zoom, x, y) : null);
         }
         catch (Exception)
         {
             data = null;
         }
 
-        if (generation != _generation)
+        if (generation != Volatile.Read(ref _generation))
         {
             return;
         }
@@ -124,7 +134,7 @@ public sealed class TerrainTileCache
         _pending.Remove((zoom, x, y));
         var tile = data is null ? null : Build(data);
         _entries[(zoom, x, y)] = _recent.AddFirst((zoom, x, y, tile));
-        if (_entries.Count > Capacity && _recent.Last is { } oldest)
+        if (_entries.Count > _capacity && _recent.Last is { } oldest)
         {
             _recent.RemoveLast();
             _entries.Remove((oldest.Value.Zoom, oldest.Value.X, oldest.Value.Y));

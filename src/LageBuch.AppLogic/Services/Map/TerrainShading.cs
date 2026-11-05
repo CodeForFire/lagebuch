@@ -58,9 +58,9 @@ public static class TerrainShading
             case TerrainLayer.Schummerung:
                 return new TerrainTile(Paint(smooth, (x, y) => Shade(smooth, x, y, metresPerPixel, 0.6, 0.35)), []);
             case TerrainLayer.Hoehenlinien:
+                // Step k runs at k × interval metres; every fifth is a Zähllinie and carries its height.
                 var interval = ContourInterval(zoom);
-                bool IsZaehllinie(double h) => Math.Abs(Math.IEEERemainder(h, interval * 5)) < 1e-6;
-                return new TerrainTile(null, Contours(smooth, interval, IsZaehllinie, h => IsZaehllinie(h) ? Formatting.Metres(h) : string.Empty));
+                return new TerrainTile(null, Contours(smooth, interval, 0, k => k % 5 == 0 ? (true, Formatting.Metres(k * interval)) : (false, string.Empty)));
             case TerrainLayer.Hoehenschichten:
                 var span = Math.Max(1, style.High - style.Low);
                 return new TerrainTile(Paint(smooth, (x, y) => Over(Shade(smooth, x, y, metresPerPixel, 0.35, 0), Tint(Colour(Ramp, (smooth[Index(x, y)] - style.Low) / span), 0.42))), []);
@@ -69,21 +69,20 @@ public static class TerrainShading
             case TerrainLayer.RelativZumEinsatzort when style.ReferenceHeight is { } reference:
                 var image = Paint(smooth, (x, y) => RelativeTint(smooth[Index(x, y)] - reference));
 
-                // Every line drawn, every other one labelled: on a steep slope five labels would touch.
-                var lines = Contours(
-                    smooth,
-                    RelativeInterval,
-                    h => Math.Abs(h - reference) < 1e-6,
-                    h => Math.Abs(Math.IEEERemainder(h - reference, 2 * RelativeInterval)) < 1e-6 ? Formatting.HeightDifference(h - reference) : string.Empty,
-                    offset: reference);
+                // Step k runs k × 5 m off the Einsatzort's height, which is step 0, the heavy line. Every
+                // line is drawn, every other one labelled: on a steep slope five labels would touch.
+                var lines = Contours(smooth, RelativeInterval, reference, k => (k == 0, k % 2 == 0 ? Formatting.HeightDifference(k * RelativeInterval) : string.Empty));
                 return new TerrainTile(image, lines);
             default:
                 return new TerrainTile(null, []);
         }
     }
 
-    // The heights under a 3 × 3 box, NaN left out, so a single noisy cell does not draw a ring.
-    private static float[] Smooth(float[] heights)
+    /// <summary>
+    /// The heights under a 3 × 3 box, NaN left out and the grid's edge repeated past it, so a single
+    /// noisy cell does not draw a ring. A hole stays a hole.
+    /// </summary>
+    internal static float[] Smooth(float[] heights)
     {
         var result = new float[heights.Length];
         for (var y = 0; y < Side; y++)
@@ -172,11 +171,6 @@ public static class TerrainShading
     // Blue below, red above, more opaque the further off; at the Einsatzort's own height a faint white.
     private static (double R, double G, double B, double A) RelativeTint(double difference)
     {
-        if (double.IsNaN(difference))
-        {
-            return default;
-        }
-
         var t = Math.Clamp(Math.Abs(difference) / RelativeSpan, 0, 1);
         var far = difference < 0 ? (0x21, 0x66, 0xAC) : (0xB2, 0x18, 0x2B);
         var colour = (255 + ((far.Item1 - 255) * t), 255 + ((far.Item2 - 255) * t), 255 + ((far.Item3 - 255) * t));
@@ -185,11 +179,6 @@ public static class TerrainShading
 
     private static (double R, double G, double B) Colour((double R, double G, double B)[] ramp, double t)
     {
-        if (double.IsNaN(t))
-        {
-            return (double.NaN, 0, 0);
-        }
-
         var at = Math.Clamp(t, 0, 1) * (ramp.Length - 1);
         var i = Math.Min((int)at, ramp.Length - 2);
         var f = at - i;
@@ -197,7 +186,7 @@ public static class TerrainShading
     }
 
     private static (double R, double G, double B, double A) Tint((double R, double G, double B) colour, double alpha) =>
-        double.IsNaN(colour.R) ? default : (colour.R, colour.G, colour.B, alpha);
+        (colour.R, colour.G, colour.B, alpha);
 
     // `top` laid over `bottom`, both straight (not premultiplied) colours.
     private static (double R, double G, double B, double A) Over((double R, double G, double B, double A) top, (double R, double G, double B, double A) bottom)
@@ -212,6 +201,7 @@ public static class TerrainShading
         return (Mix(top.R, bottom.R), Mix(top.G, bottom.G), Mix(top.B, bottom.B), a);
     }
 
+    // Each pixel with a height of its own; a hole stays transparent, whatever its neighbours hold.
     private static int[] Paint(float[] smooth, Func<int, int, (double R, double G, double B, double A)> pixel)
     {
         var result = new int[Size * Size];
@@ -225,11 +215,6 @@ public static class TerrainShading
                 }
 
                 var (r, g, b, a) = pixel(x, y);
-                if (a <= 0)
-                {
-                    continue;
-                }
-
                 var alpha = (int)Math.Round(Math.Clamp(a, 0, 1) * 255);
                 int Channel(double c) => (int)Math.Round(Math.Clamp(c, 0, 255) * alpha / 255);
                 result[(y * Size) + x] = (alpha << 24) | (Channel(r) << 16) | (Channel(g) << 8) | Channel(b);
@@ -243,35 +228,28 @@ public static class TerrainShading
     /// Marching squares over the cells between pixel centres, from one pixel outside the tile to one
     /// inside its far edge, so a line runs on into the neighbouring tile exactly where that tile picks it up.
     /// </summary>
-    private static List<ContourLevel> Contours(float[] smooth, double interval, Func<double, bool> isMajor, Func<double, string> label, double offset = 0)
+    private static List<ContourLevel> Contours(float[] smooth, double interval, double offset, Func<long, (bool IsMajor, string Label)> step)
     {
-        var low = double.MaxValue;
-        var high = double.MinValue;
-        foreach (var h in smooth)
-        {
-            if (!float.IsNaN(h))
-            {
-                (low, high) = (Math.Min(low, h), Math.Max(high, h));
-            }
-        }
-
         var levels = new List<ContourLevel>();
-        if (low > high)
+        var heights = smooth.Where(h => !float.IsNaN(h)).ToList();
+        if (heights.Count == 0)
         {
             return levels;
         }
 
         // A tile spans at most a few hundred metres of height; more levels than this are bad data, not terrain.
-        var first = Math.Ceiling((low - offset) / interval);
-        var count = (int)Math.Min(MaxContourLevels + 1, Math.Floor((high - offset) / interval) - first + 1);
-        if (count > MaxContourLevels)
+        var first = (long)Math.Ceiling((heights.Min() - offset) / interval);
+        var last = (long)Math.Floor((heights.Max() - offset) / interval);
+
+        // Stryker disable once Equality : exactly MaxContourLevels levels needs a tile spanning 2 km to the metre; the cap is what matters.
+        if (last - first >= MaxContourLevels)
         {
             return levels;
         }
 
-        for (var i = 0; i < count; i++)
+        for (var k = first; k <= last; k++)
         {
-            var level = offset + ((first + i) * interval);
+            var level = offset + (k * interval);
             var segments = new List<(double X1, double Y1, double X2, double Y2)>();
             for (var y = -1; y < Size; y++)
             {
@@ -283,7 +261,8 @@ public static class TerrainShading
 
             if (segments.Count > 0)
             {
-                levels.Add(new ContourLevel(level, isMajor(level), label(level), segments));
+                var (isMajor, label) = step(k);
+                levels.Add(new ContourLevel(level, isMajor, label, segments));
             }
         }
 
@@ -344,6 +323,7 @@ public static class TerrainShading
         }
     }
 
-    private static double Cross(double from, double to, double level) =>
-        Math.Abs(to - from) < 1e-9 ? 0.5 : Math.Clamp((level - from) / (to - from), 0, 1);
+    // Where along an edge the line crosses: only ever asked of an edge with one end at or above the
+    // level and the other below it, so the two ends differ.
+    private static double Cross(double from, double to, double level) => (level - from) / (to - from);
 }
