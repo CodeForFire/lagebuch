@@ -129,6 +129,15 @@
       <Setter Property="HorizontalAlignment" Value="Left" />
       <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
+    <!-- A DWD warning of level "Unwetter" or above: severe or extreme. -->
+    <Style Selector="Border.weather-alert.severe">
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <!-- On a phone the weather card leaves the legend its corner. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#WeatherCard">
+      <Setter Property="MaxWidth" Value="220" />
+    </Style>
   </UserControl.Styles>
 
   <DockPanel>
@@ -326,6 +335,14 @@
                             ViewChangedCommand="{Binding Map.ChangeViewCommand}"
                             TappedCommand="{Binding MapTappedCommand}" />
 
+        <!-- WETTER: the wind at the Einsatzort, pointing downwind, beneath every sign and pin. -->
+        <c:MapMarkerPanel x:Name="WindLayer" Center="{Binding Map.Center}" Zoom="{Binding Map.Zoom}"
+                          Rotation="{Binding Map.Rotation}" IsHitTestVisible="False"
+                          IsVisible="{Binding Weather.HasWind}">
+          <c:WindArrow x:Name="WindArrow" c:MapMarkerPanel.Position="{Binding EinsatzortPosition}"
+                       Angle="{Binding Weather.WindArrowAngle}" />
+        </c:MapMarkerPanel>
+
         <!-- The taktische Zeichen, beneath the pins: each stands at its offset from its pin and draws
              its Verbindungsstrich back to it (DV 102 §1.5). A sign never dragged gets a free place
              from the panel, clear of the other signs and of every pin. Dragging one moves only the
@@ -491,6 +508,23 @@
                   IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding ActionError}" TextWrapping="Wrap" MaxWidth="420" />
           </Border>
+          <Border Classes="map-banner" x:Name="WeatherLoadingBanner" IsVisible="{Binding Weather.IsLoading}">
+            <TextBlock Text="Wetter wird geladen …" />
+          </Border>
+          <Border Classes="map-banner" x:Name="WeatherErrorBanner" BorderBrush="{StaticResource ErrorBrush}"
+                  IsVisible="{Binding Weather.Error, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding Weather.Error}" TextWrapping="Wrap" MaxWidth="420" />
+          </Border>
+          <!-- The DWD's warnings for the Einsatzort, a severe or extreme one in the signal colour. -->
+          <ItemsControl x:Name="WeatherAlerts" ItemsSource="{Binding Weather.Alerts}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:WeatherAlertRow">
+                <Border Classes="map-banner weather-alert" Classes.severe="{Binding IsSevere}">
+                  <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="420" FontWeight="SemiBold" />
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </StackPanel>
 
         <!-- On the app's dark surface, so the buttons stand out against a light map. -->
@@ -542,6 +576,12 @@
                         IsChecked="{Binding IsNightMap}">
             <PathIcon Data="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z" />
           </ToggleButton>
+          <!-- WETTER: fetched only on this press, because it tells the weather service where the Einsatz is. -->
+          <Button x:Name="WeatherButton" Classes="icon-btn" ToolTip.Tip="{Binding Weather.LoadTip}"
+                  ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Wetter laden"
+                  IsVisible="{Binding Weather.IsAvailable}" Command="{Binding Weather.LoadCommand}">
+            <PathIcon Data="M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z" />
+          </Button>
         </StackPanel>
 
         <!-- What the water symbols and the POI dots mean, whenever they are on the map. Drawn like
@@ -694,15 +734,43 @@
           </StackPanel>
         </Border>
 
-        <!-- ODbL: every map drawn from OSM data names its source. -->
-        <Border x:Name="Attribution" HorizontalAlignment="Right" VerticalAlignment="Bottom" Padding="4,1"
-                IsVisible="{Binding Map.Attribution, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <StackPanel>
-            <TextBlock Text="{Binding Map.Attribution}" FontSize="10" TextWrapping="Wrap" />
-            <TextBlock x:Name="WaterPointsNote" Text="{Binding WaterPointsNote}" FontSize="10"
-                       IsVisible="{Binding WaterPointsNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          </StackPanel>
-        </Border>
+        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom">
+          <!-- WETTER: what the nearest DWD station measured, and where and when. -->
+          <Border Classes="map-banner" x:Name="WeatherCard" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                  MaxWidth="340" IsVisible="{Binding Weather.HasReading}">
+            <StackPanel Spacing="2">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock x:Name="WeatherWindText" Text="{Binding Weather.WindText}" FontWeight="SemiBold"
+                           TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Schließen"
+                        AutomationProperties.Name="Wetter schließen" Command="{Binding Weather.CloseCommand}">
+                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
+              </Grid>
+              <TextBlock Text="{Binding Weather.DetailText}" TextWrapping="Wrap" IsVisible="{Binding Weather.HasDetail}" />
+              <TextBlock Text="{Binding Weather.SourceText}" FontSize="11" TextWrapping="Wrap"
+                         Foreground="{StaticResource TextSecondaryBrush}" />
+              <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
+                <Button x:Name="WeatherToEtbButton" Classes="ghost" Content="INS ETB" IsVisible="{Binding Weather.CanLog}"
+                        Command="{Binding Weather.LogToEtbCommand}" />
+                <Button Classes="ghost" Content="NEU LADEN" Command="{Binding Weather.LoadCommand}" />
+              </StackPanel>
+              <TextBlock Text="Im ETB vermerkt." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                         IsVisible="{Binding Weather.IsLogged}" />
+              <TextBlock Text="Daten: Deutscher Wetterdienst, über Bright Sky" FontSize="10" TextWrapping="Wrap"
+                         Foreground="{StaticResource TextSecondaryBrush}" />
+            </StackPanel>
+          </Border>
+          <!-- ODbL: every map drawn from OSM data names its source. -->
+          <Border x:Name="Attribution" HorizontalAlignment="Right" Padding="4,1"
+                  IsVisible="{Binding Map.Attribution, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel>
+              <TextBlock Text="{Binding Map.Attribution}" FontSize="10" TextWrapping="Wrap" />
+              <TextBlock x:Name="WaterPointsNote" Text="{Binding WaterPointsNote}" FontSize="10"
+                         IsVisible="{Binding WaterPointsNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
       </Grid>
     </Border>
   </DockPanel>

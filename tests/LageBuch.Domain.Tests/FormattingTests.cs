@@ -31,6 +31,37 @@ public class FormattingTests
         Assert.Equal("554,6 m", Formatting.Height(554.62));
 
     [Theory]
+    [InlineData(0.3, "0,3 °C")]
+    [InlineData(-4.26, "-4,3 °C")]
+    [InlineData(12, "12,0 °C")]
+    public void A_temperature_has_one_decimal_with_a_German_comma(double celsius, string expected) =>
+        Assert.Equal(expected, Formatting.Celsius(celsius));
+
+    [Theory]
+    [InlineData(10.1, "10 km/h")]
+    [InlineData(15.8, "16 km/h")]
+    [InlineData(0.4, "0 km/h")]
+    public void A_speed_is_in_whole_kilometres_per_hour(double kmh, string expected) =>
+        Assert.Equal(expected, Formatting.Speed(kmh));
+
+    [Theory]
+    [InlineData(4576, "4,6 km")]
+    [InlineData(21825, "21,8 km")]
+    public void A_distance_is_in_kilometres_to_a_tenth(double metres, string expected) =>
+        Assert.Equal(expected, Formatting.Kilometres(metres));
+
+    [Fact]
+    public void Precipitation_has_one_decimal_in_millimetres() =>
+        Assert.Equal("1,2 mm", Formatting.Millimetres(1.23));
+
+    [Fact]
+    public void Day_and_time_leave_out_the_year()
+    {
+        var t = new DateTimeOffset(2026, 11, 5, 23, 0, 0, TimeSpan.FromHours(1));
+        Assert.Equal("05.11. 23:00", Formatting.DayAndTime(t));
+    }
+
+    [Theory]
     [InlineData(15.2, "+15 m")]
     [InlineData(-5, "−5 m")]
     [InlineData(0.3, "±0 m")]

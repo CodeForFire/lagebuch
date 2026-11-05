@@ -25,6 +25,21 @@ public static class Formatting
     /// <summary>A height above NHN to a tenth of a metre: "554,6 m".</summary>
     public static string Height(double value) => value.ToString("0.0", De) + " m";
 
+    /// <summary>An air temperature to a tenth of a degree: "0,3 °C".</summary>
+    public static string Celsius(double value) => value.ToString("0.0", De) + " °C";
+
+    /// <summary>A wind speed in whole kilometres per hour: "16 km/h". A tenth is noise at a station.</summary>
+    public static string Speed(double kmh) => Math.Round(kmh).ToString(De) + " km/h";
+
+    /// <summary>A distance given in metres, shown in kilometres to a tenth: "4,6 km".</summary>
+    public static string Kilometres(double metres) => (metres / 1000).ToString("0.0", De) + " km";
+
+    /// <summary>Precipitation to a tenth of a millimetre: "1,2 mm".</summary>
+    public static string Millimetres(double value) => value.ToString("0.0", De) + " mm";
+
+    /// <summary>Day and clock time without the year, "05.11. 23:00", for something that ends within days.</summary>
+    public static string DayAndTime(DateTimeOffset t) => t.ToString("dd.MM. HH:mm", De);
+
     /// <summary>A height difference in whole metres, signed: "+15 m", "−5 m", "±0 m".</summary>
     public static string HeightDifference(double metres)
     {

@@ -7,6 +7,7 @@ using LageBuch.App.Android.Services;
 using LageBuch.App.Shared;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.Services.Map;
+using LageBuch.AppLogic.Services.Weather;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
@@ -36,7 +37,7 @@ namespace LageBuch.App.Android;
 public class MainActivity : AvaloniaMainActivity
 {
     // Process-wide, like the alarm service: the activity is recreated on rotation, the client is not.
-    // Only the Kartenpakete download through it, on the Lagebuchführer's request.
+    // Only the Kartenpakete and the Lagekarte's weather go through it, each on the Lagebuchführer's request.
     private static readonly HttpClient MapPackHttp = new();
 
     // OpenDocument (rather than GetContent) accepts multiple MIME types on Launch, needed
@@ -119,7 +120,8 @@ public class MainActivity : AvaloniaMainActivity
             lastCrashReport: CrashReports.TakePending(FilesDir!.AbsolutePath),
             alarmMute: new AlarmMute(AndroidAppPaths.AlarmMuteJsonPath(this)),
             mapPacks: new RegionPackLibrary(MapPackHttp, AndroidAppPaths.RegionPacksDir(this)),
-            mapNightMode: new MapNightMode(AndroidAppPaths.MapNightJsonPath(this))));
+            mapNightMode: new MapNightMode(AndroidAppPaths.MapNightJsonPath(this)),
+            weather: new BrightSkyClient(MapPackHttp)));
 
         base.OnCreate(savedInstanceState);
     }

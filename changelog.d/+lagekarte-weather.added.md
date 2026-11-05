@@ -1,0 +1,1 @@
+On request, the Lagekarte loads the wind, temperature and DWD warnings at the Einsatzort from Bright Sky, draws the wind as an arrow pointing downwind, and writes the reading into the ETB with one tap.

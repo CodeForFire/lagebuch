@@ -165,8 +165,8 @@ Deinstallieren der App entfernt Android all diese Daten.**
 
 ## Was das Gerät verlässt
 
-Von selbst: nichts. Es gibt im gesamten Programm genau fünf Wege, auf denen
-Daten das Gerät verlassen können, und alle fünf werden von der Bedienerin oder
+Von selbst: nichts. Es gibt im gesamten Programm genau sechs Wege, auf denen
+Daten das Gerät verlassen können, und alle sechs werden von der Bedienerin oder
 dem Bediener ausgelöst:
 
 1. **Die Mehrgeräte-Verbindung.** Sie richtet sich an genau die Adresse, die im
@@ -188,8 +188,17 @@ dem Bediener ausgelöst:
    Lagebuch prüft jedes Paket vor dem Entpacken gegen die Prüfsumme im
    Verzeichnis. Danach zeichnet Lagebuch Karte und Hydranten ausschließlich aus
    dem Paket auf dem Gerät, und die Adresssuche auf der Lagekarte fragt nur das
-   Paket, keinen Suchdienst; niemand außerhalb des Geräts erfährt, wo ein
-   Einsatz liegt.
+   Paket, keinen Suchdienst; durch Karte und Adresssuche erfährt niemand
+   außerhalb des Geräts, wo ein Einsatz liegt.
+6. **Wetter auf der Lagekarte.** Erst wenn auf der Lagekarte WETTER LADEN
+   angetippt wird, fragt Lagebuch bei Bright Sky (`api.brightsky.dev`) die
+   Messwerte der nächsten Station des Deutschen Wetterdienstes und dessen
+   Warnungen ab. Dafür geht der Einsatzort, auf etwa einen Kilometer gerundet,
+   an Bright Sky; der Dienst sieht dabei die IP-Adresse des Geräts und diesen
+   ungefähren Ort – keine Adresse, keine Namen, keine weiteren Einsatzdaten.
+   Ohne Antippen wird nichts abgefragt, auch nicht erneut. Die Werte bleiben auf
+   dem Gerät; in den Einsatz gelangen sie nur, wenn sie mit INS ETB als Eintrag
+   übernommen werden.
 
 Nicht vorhanden sind: Nutzungsstatistiken, automatisch versandte Absturzberichte, Updateprüfungen,
 Werbe- oder Analysebibliotheken sowie Schriftarten oder Kartenkacheln, die während
@@ -309,7 +318,8 @@ ein Begleitgerät.
   Datei im eigenen Arbeitsverzeichnis handelt, bevor es sie an das
   Betriebssystem übergibt.
 - Nachvollziehbare Änderungshistorie: Korrekturen im ETB überschreiben nichts.
-- Keine Telemetrie, keine Protokolldateien, keine Drittanbieter-Dienste.
+- Keine Telemetrie, keine Protokolldateien. Fremde Dienste nur auf
+  ausdrückliches Antippen: Kartenpakete von GitHub, Wetter von Bright Sky.
 - Überprüfbare Installationsdateien: zu jedem Release gehören SHA-256-Prüfsummen
   und ein Sigstore-Herkunftsnachweis, siehe
   [Downloads prüfen](../README.md#downloads-prüfen).

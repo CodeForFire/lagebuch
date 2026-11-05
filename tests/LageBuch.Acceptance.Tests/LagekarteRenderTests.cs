@@ -11,6 +11,7 @@ using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.Services.Map;
+using LageBuch.AppLogic.Services.Weather;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.ValueObjects;
@@ -376,7 +377,7 @@ public sealed class LagekarteRenderTests : IDisposable
         workspace.Dispose();
     }
 
-    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show()
+    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show(IWeatherSource? weather = null)
     {
         var root = Path.Join(_dir, "regions");
         FictionalRegionPack.Install(root);
@@ -384,13 +385,89 @@ public sealed class LagekarteRenderTests : IDisposable
         session.AddForceUnit("FF Musterstadt", 9, "Florian Musterstadt 40/1", "Im Einsatz", officerCount: 1, vehicleType: "HLF");
         session.AddForceUnit("FF Musterstadt", 3, "Florian Musterstadt 11/1", "Im Einsatz", officerCount: 1, vehicleType: "ELW 1");
         session.AddForceUnit("FF Musterdorf", 9, "Florian Musterdorf 42/1", "Auf Anfahrt", officerCount: 1);
-        var vm = new LagekarteViewModel(session, () => { }, new RegionPackLibrary(_http, root));
+        var vm = new LagekarteViewModel(session, () => { }, new RegionPackLibrary(_http, root), weather: weather, clock: new FixedClock { Now = new(2026, 11, 5, 22, 15, 0, TimeSpan.FromHours(1)) });
         vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 16));
         var view = new LagekarteView { DataContext = vm };
         var window = new Window { Content = view, Width = 1280, Height = 800 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return (window, view, vm, session);
+    }
+
+    [AvaloniaFact]
+    public async Task Loading_the_weather_draws_the_wind_downwind_from_the_Einsatzort_and_lists_the_warning()
+    {
+        var weather = new CannedWeather(new WeatherReading(
+            new DateTimeOffset(2026, 11, 5, 21, 10, 0, TimeSpan.Zero),
+            "Maisach-Galgen",
+            4576,
+            250,
+            24.1,
+            47.5,
+            6.3,
+            "rain",
+            1.2,
+            [new WeatherAlert("STURMBÖEN", "Amtliche WARNUNG vor STURMBÖEN", WeatherAlertSeverity.Severe, null, new DateTimeOffset(2026, 11, 6, 3, 0, 0, TimeSpan.Zero))]));
+        var (window, view, vm, session) = Show(weather);
+        session.SetIncidentLocation(Marktplatz);
+        session.PlaceForceUnit(session.Incident.Forces[0].Id, new GeoPoint(48.1792, 11.2541));
+        vm.CenterOnEinsatzortCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var button = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "WeatherButton");
+        Assert.True(button.IsVisible);
+        Assert.Equal("Wetter laden", Avalonia.Automation.AutomationProperties.GetName(button));
+        await vm.Weather.LoadCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(Marktplatz, Assert.Single(weather.Asked));
+        Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WeatherCard").IsVisible);
+        Assert.Equal("Wind aus W (250°) · 24 km/h · Böen 48 km/h", view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "WeatherWindText").Text);
+        Assert.Equal(1, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "WeatherAlerts").ItemCount);
+
+        // The arrow is centred on the Einsatzort and points downwind: from 250° the wind blows to 70°.
+        var arrow = view.GetVisualDescendants().OfType<WindArrow>().Single();
+        Assert.True(arrow.IsEffectivelyVisible);
+        Assert.Equal(70, arrow.Angle, precision: 6);
+        var spot = MiddleOf(Pins(view).Children[0], window);
+        var centre = MiddleOf(arrow, window);
+        Assert.True(Math.Abs(spot.X - centre.X) <= 1.0 && Math.Abs(spot.Y - centre.Y) <= 1.0, $"arrow at {centre}, Einsatzort at {spot}");
+
+        // The PR screenshot.
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-wetter.png"));
+    }
+
+    [AvaloniaFact]
+    public void Without_an_Einsatzort_the_weather_button_waits_for_one()
+    {
+        var (_, view, vm, _) = Show(new CannedWeather(null));
+
+        var button = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "WeatherButton");
+        Assert.True(button.IsVisible);
+        Assert.False(button.IsEffectivelyEnabled);
+        Assert.Equal("Wetter: erst den Einsatzort setzen", ToolTip.GetTip(button));
+        Assert.False(view.GetVisualDescendants().OfType<WindArrow>().Single().IsEffectivelyVisible);
+        Assert.False(vm.Weather.HasReading);
+    }
+
+    [AvaloniaFact]
+    public void A_device_without_a_weather_source_shows_no_weather_button()
+    {
+        var (_, view, _, _) = Show();
+
+        Assert.False(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "WeatherButton").IsVisible);
+    }
+
+    private sealed class CannedWeather(WeatherReading? reading) : IWeatherSource
+    {
+        public List<GeoPoint> Asked { get; } = [];
+
+        public Task<WeatherReading> LoadAsync(GeoPoint at, CancellationToken cancellationToken = default)
+        {
+            Asked.Add(at);
+            return reading is null ? Task.FromException<WeatherReading>(new WeatherException("Wetterdienst nicht erreichbar. Internetverbindung prüfen.")) : Task.FromResult(reading);
+        }
     }
 
     [AvaloniaFact]
