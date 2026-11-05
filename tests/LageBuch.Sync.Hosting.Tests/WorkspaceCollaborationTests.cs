@@ -3,6 +3,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
@@ -650,5 +651,42 @@ public class WorkspaceCollaborationTests
 
         clientWs.DismissCommandRejectedCommand.Execute(null);
         Assert.Null(clientWs.CommandRejected);
+    }
+
+    // A joined client's move returns once it is queued, not once the host took it. A refusal that
+    // arrives after the offer must withdraw it, or RÜCKGÄNGIG would later put back a place the host
+    // never left, over whatever a peer did meanwhile.
+    [Fact]
+    public async Task A_refused_command_withdraws_the_undo_offer()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        hostSession.AddCommandNode(CommandNodeKind.Abschnitt, "Abschnitt Süd", null);
+        var sued = hostSession.Incident.CommandNodes[^1].Id;
+        hostSession.AddForceUnit("FF Emmering", 9, "Florian Emmering 40/1", scbaCount: 4, officerCount: 1);
+        var unit = hostSession.Incident.Forces[^1].Id;
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        Assert.True(clientWs.Leadership.MoveUnit(unit, sued));
+        Assert.NotNull(clientWs.UndoNotice);
+
+        var shown = new TaskCompletionSource();
+        clientWs.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(clientWs.CommandRejected) && clientWs.CommandRejected is not null)
+            {
+                shown.TrySetResult();
+            }
+        };
+
+        client.EditJournalEntry(Guid.NewGuid(), "geht nicht");
+        await shown.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Null(clientWs.UndoNotice);
     }
 }

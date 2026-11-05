@@ -1,0 +1,1 @@
+Moving a unit, an Abschnitt or the Führungsfahrzeug on the Führung board can now be undone for a few seconds with RÜCKGÄNGIG or Ctrl+Z, which also puts back the status a unit had, and the Einsatzleitung says "WIRD FÜHRUNGSFAHRZEUG" while a unit is held over it.

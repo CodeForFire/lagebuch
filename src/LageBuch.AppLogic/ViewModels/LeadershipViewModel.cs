@@ -30,6 +30,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     private readonly Action<CommandNodeDialogViewModel>? _openDialog;
     private readonly Action<LeadershipPersonDialogViewModel>? _openPersonDialog;
     private readonly Action<RoleAssignmentDialogViewModel>? _openAssignmentDialog;
+    private readonly Action<string, Action> _offerUndo;
     private readonly IClock _clock;
     private readonly FachberaterGroup _fachberaterGroup;
 
@@ -65,7 +66,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         Action<string, string, Action, string>? requestConfirm = null,
         Action<CommandNodeDialogViewModel>? openDialog = null,
         Action<LeadershipPersonDialogViewModel>? openPersonDialog = null,
-        Action<RoleAssignmentDialogViewModel>? openAssignmentDialog = null)
+        Action<RoleAssignmentDialogViewModel>? openAssignmentDialog = null,
+        Action<string, Action>? offerUndo = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clock);
@@ -78,6 +80,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         _openDialog = openDialog;
         _openPersonDialog = openPersonDialog;
         _openAssignmentDialog = openAssignmentDialog;
+        _offerUndo = offerUndo ?? ((_, _) => { });
         _clock = clock;
         _incident = session.Incident;
         IsReadOnly = session.IsReadOnly;
@@ -342,7 +345,10 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         return choices.Any(c => c.NodeId == nodeId) && NodeChoices.CurrentNodeId(choices) != nodeId;
     }
 
-    /// <summary>Moves a unit; false when <see cref="CanMoveUnit"/> says no or the session refuses.</summary>
+    /// <summary>
+    /// Moves a unit and offers the move back, place and status together: one stray drop changes both.
+    /// False when <see cref="CanMoveUnit"/> says no or the session refuses.
+    /// </summary>
     public bool MoveUnit(Guid unitId, Guid? nodeId)
     {
         ActionError = null;
@@ -351,7 +357,41 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             return false;
         }
 
-        return Run(() => UnitPlacement.Move(_session, _masterData.UnitStatus, unitId, nodeId));
+        // Read before the move: a joined client's Incident may not show it yet afterwards.
+        // Stryker disable once Linq : CanMoveUnit already found the unit, so First and FirstOrDefault agree.
+        var unit = _incident.Forces.First(u => u.Id == unitId);
+        var (fromNodeId, fromStatus) = (unit.NodeId, unit.Status);
+        var title = string.IsNullOrWhiteSpace(unit.CallSign) ? unit.Brigade : unit.CallSign;
+        var target = nodeId is { } id ? _incident.FindCommandNode(id) : null;
+        var from = fromNodeId is { } fid ? _incident.FindCommandNode(fid) : null;
+        var status = target is null ? null : UnitPlacement.ImpliedStatus(target.Kind, _masterData.UnitStatus);
+        if (!Run(() => UnitPlacement.Move(_session, _masterData.UnitStatus, unitId, nodeId)))
+        {
+            return false;
+        }
+
+        var statusChanged = status is not null && !string.Equals(status, fromStatus, StringComparison.Ordinal);
+        var message = target is null
+            ? $"„{title}“ aus „{from?.Name}“ genommen."
+            : statusChanged
+                ? $"„{title}“ in „{target.Name}“ eingeordnet, Status „{status}“."
+                : $"„{title}“ in „{target.Name}“ eingeordnet.";
+        _offerUndo(message, () => Run(() =>
+        {
+            // Straight back to the old place: UnitPlacement would give it that place's status, not the
+            // one it had. Whether the status changed is known from the move itself, since a joined
+            // client's Incident may not show the new status yet.
+            _session.MoveForceUnit(unitId, fromNodeId);
+            if (statusChanged)
+            {
+                // The notes as they stand now, so a peer's edit since the move stays. MoveForceUnit
+                // has just found the unit, or thrown into Run; a gone unit throws here into Run too.
+                // Stryker disable once Linq : the unit is there, so First and FirstOrDefault agree.
+                var notes = _session.Incident.Forces.First(u => u.Id == unitId).Notes;
+                _session.UpdateForceUnit(unitId, fromStatus, notes);
+            }
+        }));
+        return true;
     }
 
     /// <summary>
@@ -379,7 +419,19 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
         var callSign = _incident.Forces.First(u => u.Id == unitId).CallSign;
         var post = _incident.LeadershipPost;
-        return Run(() => _session.UpdateLeadershipPost(post.Standort, post.Rufname, post.Telefon, post.Funkgruppen, callSign));
+        var previous = post.Fuehrungsfahrzeug;
+        if (!Run(() => _session.UpdateLeadershipPost(post.Standort, post.Rufname, post.Telefon, post.Funkgruppen, callSign)))
+        {
+            return false;
+        }
+
+        // The post as it stands by then: only the Fahrzeug goes back, an edit made meanwhile stays.
+        _offerUndo($"„{callSign}“ ist Führungsfahrzeug der Einsatzleitung.", () => Run(() =>
+        {
+            var now = _session.Incident.LeadershipPost;
+            _session.UpdateLeadershipPost(now.Standort, now.Rufname, now.Telefon, now.Funkgruppen, previous);
+        }));
+        return true;
     }
 
     /// <summary>A drag of <paramref name="unitId"/> began; ignored on a read-only Einsatz.</summary>
@@ -412,18 +464,39 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         }
 
         // Same Abschnitt: only a new place among the siblings is a move.
-        var siblings = _incident.CommandNodes.Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, parentId)).Select(n => n.Id).ToList();
-        var index = siblings.IndexOf(nodeId);
-        var next = index + 1 < siblings.Count ? siblings[index + 1] : (Guid?)null;
-        return beforeNodeId != nodeId && beforeNodeId != next;
+        return beforeNodeId != nodeId && beforeNodeId != NextSibling(nodeId, parentId);
     }
 
-    /// <summary>Moves a node; false when <see cref="CanMoveNode"/> says no or the session refuses.</summary>
+    // The live sibling right after nodeId under parentId; null when it is the last.
+    private Guid? NextSibling(Guid nodeId, Guid? parentId)
+    {
+        var siblings = _incident.CommandNodes.Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, parentId)).Select(n => n.Id).ToList();
+        var index = siblings.IndexOf(nodeId);
+        return index + 1 < siblings.Count ? siblings[index + 1] : null;
+    }
+
+    /// <summary>
+    /// Moves a node and offers the move back; false when <see cref="CanMoveNode"/> says no or the
+    /// session refuses.
+    /// </summary>
     public bool MoveNode(Guid nodeId, Guid? parentId, Guid? beforeNodeId)
     {
         ActionError = null;
-        return CanMoveNode(nodeId, parentId, beforeNodeId)
-            && Run(() => _session.MoveCommandNode(nodeId, parentId, beforeNodeId));
+        if (!CanMoveNode(nodeId, parentId, beforeNodeId) || _incident.FindCommandNode(nodeId) is not { } node)
+        {
+            return false;
+        }
+
+        // Where it stands now: under its parent, before the sibling that follows it (null: last).
+        var fromParentId = node.ParentId;
+        var fromBeforeId = NextSibling(nodeId, fromParentId);
+        if (!Run(() => _session.MoveCommandNode(nodeId, parentId, beforeNodeId)))
+        {
+            return false;
+        }
+
+        _offerUndo($"„{node.Name}“ verschoben.", () => Run(() => _session.MoveCommandNode(nodeId, fromParentId, fromBeforeId)));
+        return true;
     }
 
     /// <summary>A drag of the card of <paramref name="nodeId"/> began; ignored on a read-only Einsatz.</summary>

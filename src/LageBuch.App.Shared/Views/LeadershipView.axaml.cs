@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Controls;
 using LageBuch.AppLogic.ViewModels;
@@ -34,6 +35,16 @@ public partial class LeadershipView : UserControl
         BoardRoot.AddHandler(DragDrop.DragOverEvent, OnDragOver);
         BoardRoot.AddHandler(DragDrop.DragLeaveEvent, (_, _) => EndDragFeedback());
         BoardRoot.AddHandler(DragDrop.DropEvent, OnDrop);
+
+        // A refusal shows at the head of the board, which a drop low on a long board, or RÜCKGÄNGIG
+        // in the workspace's banner, leaves scrolled out of sight. Once it has its place, show it.
+        LeadershipActionError.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == IsVisibleProperty && LeadershipActionError.IsVisible)
+            {
+                Dispatcher.UIThread.Post(() => LeadershipActionError.BringIntoView(), DispatcherPriority.Loaded);
+            }
+        };
     }
 
     private LeadershipViewModel? ViewModel => DataContext as LeadershipViewModel;

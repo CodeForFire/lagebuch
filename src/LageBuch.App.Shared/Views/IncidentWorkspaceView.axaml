@@ -465,8 +465,9 @@
             </Grid>
           </Border>
 
-          <!-- Rückgängig (#543): ticking an Aufgabe off takes one stray Space, so the change is
-               offered back for a few seconds, also on Ctrl+Z. A quiet row: nothing is wrong, it
+          <!-- Rückgängig (#543): ticking an Aufgabe off takes one stray Space, and a move on the
+               Führung board one stray drop, so the change is offered back for a few seconds, also
+               on Ctrl+Z. A quiet row: nothing is wrong, it
                only says what just happened. -->
           <Border x:Name="UndoNoticeBanner" Classes="meldung info"
                   IsVisible="{Binding UndoNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
