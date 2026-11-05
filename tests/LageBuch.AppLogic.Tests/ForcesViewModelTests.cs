@@ -684,9 +684,12 @@ public class ForcesViewModelTests
     {
         var (vm, session, _) = NewVmWithUnits();
         var row = vm.Forces[0];
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
         session.SetForceUnitVehicleType(row.Id, "TLF 4000");
 
+        Assert.Contains(nameof(ForceRow.VehicleTypeOptions), raised); // the picker gets the new entry
         Assert.Equal("TLF 4000", row.VehicleTypeChoice);
         Assert.Equal([VehicleTypeChoices.None, "TLF 4000"], row.VehicleTypeOptions.Take(2));
         Assert.Equal(VehicleTypes.All.Count + 2, row.VehicleTypeOptions.Count);
