@@ -34,6 +34,13 @@ public sealed class MapMarkerPanel : Panel
     public static readonly StyledProperty<IReadOnlyList<GeoPoint>?> KeepClearProperty =
         AvaloniaProperty.Register<MapMarkerPanel, IReadOnlyList<GeoPoint>?>(nameof(KeepClear));
 
+    /// <summary>
+    /// The Einsatzort, whose ESt pin stands above its spot (#885): a sign placed by the panel keeps
+    /// clear of the pin's head, not only of the spot.
+    /// </summary>
+    public static readonly StyledProperty<GeoPoint?> KeepClearEinsatzortProperty =
+        AvaloniaProperty.Register<MapMarkerPanel, GeoPoint?>(nameof(KeepClearEinsatzort));
+
     public static readonly AttachedProperty<GeoPoint?> PositionProperty =
         AvaloniaProperty.RegisterAttached<MapMarkerPanel, Control, GeoPoint?>("Position");
 
@@ -51,7 +58,7 @@ public sealed class MapMarkerPanel : Panel
 
     static MapMarkerPanel()
     {
-        AffectsArrange<MapMarkerPanel>(CenterProperty, ZoomProperty, RotationProperty, KeepClearProperty);
+        AffectsArrange<MapMarkerPanel>(CenterProperty, ZoomProperty, RotationProperty, KeepClearProperty, KeepClearEinsatzortProperty);
         AffectsParentArrange<MapMarkerPanel>(PositionProperty, LabelOffsetProperty, AnchorProperty);
         ClipToBoundsProperty.OverrideDefaultValue<MapMarkerPanel>(true);
     }
@@ -78,6 +85,12 @@ public sealed class MapMarkerPanel : Panel
     {
         get => GetValue(KeepClearProperty);
         set => SetValue(KeepClearProperty, value);
+    }
+
+    public GeoPoint? KeepClearEinsatzort
+    {
+        get => GetValue(KeepClearEinsatzortProperty);
+        set => SetValue(KeepClearEinsatzortProperty, value);
     }
 
     public static GeoPoint? GetPosition(Control control)
@@ -157,6 +170,11 @@ public sealed class MapMarkerPanel : Panel
         if (Center is { } c && KeepClear is { } keepClear)
         {
             occupied.AddRange(keepClear.Select(p => SignPlacement.PinBox(MapDrawing.ToScreen(c, Zoom, finalSize, p, Rotation))));
+        }
+
+        if (Center is { } centre && KeepClearEinsatzort is { } einsatzort)
+        {
+            occupied.Add(SignPlacement.EinsatzortPinBox(MapDrawing.ToScreen(centre, Zoom, finalSize, einsatzort, Rotation)));
         }
 
         // Signs moved by hand first: they stand where they were put, and the others make way.

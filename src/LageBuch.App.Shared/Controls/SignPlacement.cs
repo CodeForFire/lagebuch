@@ -31,6 +31,13 @@ public static class SignPlacement
     public static Rect PinBox(Point at) =>
         new(at.X - PinClearance, at.Y - PinClearance, PinClearance * 2, PinClearance * 2);
 
+    /// <summary>The Einsatzstelle's pin, as LagekarteView draws it: its width, and its height from the tip up (#885).</summary>
+    public static readonly Size EinsatzortPinSize = new(40, 48);
+
+    /// <summary>The box the Einsatzstelle's pin covers: its head stands above the spot <paramref name="at"/>, its tip on it.</summary>
+    public static Rect EinsatzortPinBox(Point at) =>
+        new(at.X - (EinsatzortPinSize.Width / 2), at.Y - EinsatzortPinSize.Height, EinsatzortPinSize.Width, EinsatzortPinSize.Height);
+
     /// <summary>Where a sign of <paramref name="size"/>, anchored at <paramref name="anchor"/>, stands at <paramref name="offset"/> from <paramref name="pin"/>.</summary>
     public static Rect Box(Point pin, LabelOffset offset, Size size, Point anchor)
     {

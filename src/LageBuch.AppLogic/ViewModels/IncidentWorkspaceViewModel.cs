@@ -374,8 +374,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // A template the format cannot read pre-fills nothing; the dialog then behaves as it did before #462.
         _ = IncidentNumberFormat.TryParse(_masterData.Settings.IncidentNumberFormat, out var numberFormat);
 
-        // A saved address is looked up on the Karte at once (fire-and-forget: a search that finds
-        // nothing clear leaves its hits in the KARTE tab, and a refusal lands in its ActionError).
+        // A saved address is looked up on the Lagekarte at once (fire-and-forget: a search that finds
+        // nothing clear leaves its hits in the LAGEKARTE tab, and a refusal lands in its ActionError).
         var dialog = new IncidentDataDialogViewModel(
             _session,
             OnChanged,

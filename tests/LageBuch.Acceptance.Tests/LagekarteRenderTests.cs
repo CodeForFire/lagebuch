@@ -229,8 +229,91 @@ public sealed class LagekarteRenderTests : IDisposable
         Assert.Equal(Marktplatz, vm.Map.Center);
     }
 
+    // #885: the Einsatzstelle is a pin with "ESt" in its head, the tip on the spot itself.
     [AvaloniaFact]
-    public void Fuehrung_has_a_KARTE_tab_that_shows_the_Lagekarte()
+    public void The_Einsatzort_is_a_pin_with_ESt_in_its_head_and_its_tip_on_the_spot()
+    {
+        var (window, view, vm, session) = Show();
+        session.SetIncidentLocation(Marktplatz);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var at = MapDrawing.ToScreen(Marktplatz, 17, map.Bounds.Size, Marktplatz, 0);
+        var pin = view.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>().Single(p => p.Name == "EinsatzortPin" && p.IsEffectivelyVisible);
+        var text = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "EinsatzortText" && t.IsEffectivelyVisible);
+        var shape = pin.Data!.Bounds;
+        var tip = pin.TranslatePoint(new Point(shape.Center.X, shape.Bottom), map)!.Value;
+        var head = text.TranslatePoint(new Point(text.Bounds.Width / 2, text.Bounds.Height / 2), map)!.Value;
+
+        Assert.True(pin.IsEffectivelyVisible);
+        Assert.Equal("ESt", text.Text);
+        Assert.True(Math.Abs(at.X - tip.X) <= 1 && Math.Abs(at.Y - tip.Y) <= 1, $"tip at {tip}, expected {at}");
+        Assert.True(head.Y < at.Y - 20, $"head at {head}, expected well above {at}");
+        Assert.Equal("Einsatzort", Avalonia.Automation.AutomationProperties.GetName(Pins(view).Children.Single().GetVisualDescendants().OfType<Panel>().First()));
+
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-est.png"));
+    }
+
+    // #885: units crowding the Einsatzstelle get their signs placed clear of the ESt pin's head.
+    [AvaloniaFact]
+    public void Signs_crowding_the_Einsatzort_keep_clear_of_the_ESt_pin_s_head()
+    {
+        var (window, view, vm, session) = Show();
+        session.SetIncidentLocation(Marktplatz);
+        foreach (var unit in session.Incident.Forces.ToList())
+        {
+            session.PlaceForceUnit(unit.Id, Marktplatz);
+        }
+
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var pin = view.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>().Single(p => p.Name == "EinsatzortPin" && p.IsEffectivelyVisible);
+        var pinBox = new Rect(pin.TranslatePoint(default, map)!.Value, pin.Bounds.Size);
+        var signs = view.GetVisualDescendants().OfType<TacticalSignControl>().ToList();
+
+        Assert.Equal(3, signs.Count);
+        var signsPanel = Assert.IsType<MapMarkerPanel>(view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "Signs").ItemsPanelRoot);
+        Assert.Equal(Marktplatz, signsPanel.KeepClearEinsatzort);
+        Assert.All(signs, sign =>
+        {
+            var signBox = new Rect(sign.TranslatePoint(default, map)!.Value, sign.Bounds.Size);
+            Assert.False(pinBox.Intersects(signBox), $"{sign.Title} at {signBox} covers the ESt pin {pinBox}");
+        });
+
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), "fuehrung-karte-est-zeichen.png"));
+    }
+
+    // #885: the pin is grabbed by its head, well above the spot; the tip moves with the hand, not to it.
+    [AvaloniaFact]
+    public void Dragging_the_ESt_pin_by_its_head_moves_its_tip_as_far_as_the_hand()
+    {
+        var (window, view, vm, session) = Show();
+        session.SetIncidentLocation(Marktplatz);
+        vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        var map = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+        var text = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "EinsatzortText" && t.IsEffectivelyVisible);
+        var start = MiddleOf(text, window);
+        window.MouseDown(start, MouseButton.Left);
+        window.MouseMove(new Point(start.X + 40, start.Y), RawInputModifiers.LeftMouseButton);
+        window.MouseMove(new Point(start.X + 80, start.Y), RawInputModifiers.LeftMouseButton);
+        window.MouseUp(new Point(start.X + 80, start.Y), MouseButton.Left);
+
+        var moved = session.Incident.Location;
+        Assert.NotNull(moved);
+        var before = MapDrawing.ToScreen(Marktplatz, 17, map.Bounds.Size, Marktplatz, 0);
+        var after = MapDrawing.ToScreen(Marktplatz, 17, map.Bounds.Size, moved, 0);
+        Assert.True(Math.Abs(after.X - before.X - 80) <= 1 && Math.Abs(after.Y - before.Y) <= 1, $"tip moved from {before} to {after}, expected 80 px right");
+    }
+
+    [AvaloniaFact]
+    public void Fuehrung_has_a_LAGEKARTE_tab_that_shows_the_Lagekarte()
     {
         var session = NewSession();
         var workspace = new IncidentWorkspaceViewModel(
@@ -242,9 +325,15 @@ public sealed class LagekarteRenderTests : IDisposable
         Dispatcher.UIThread.RunJobs();
 
         var tab = view.GetVisualDescendants().OfType<TabItem>().Single(t => t.Name == "MapTab");
-        Assert.Equal("KARTE", tab.Header);
+        Assert.Equal("LAGEKARTE", tab.Header);
+        Assert.Equal("Lagekarte", Avalonia.Automation.AutomationProperties.GetName(tab));
         Assert.Single(view.GetVisualDescendants().OfType<LagekarteView>());
         Assert.Same(workspace.Lagekarte, workspace.LeadershipTabs.Map);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(Shots(), "fuehrung-lagekarte-tab.png"));
+        }
+
         workspace.Dispose();
     }
 

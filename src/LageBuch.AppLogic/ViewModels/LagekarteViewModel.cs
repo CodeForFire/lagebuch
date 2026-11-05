@@ -10,7 +10,7 @@ using LageBuch.Sync;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// The KARTE tab in Führung: the Einsatzort and the units on an offline map. Placing works by
+/// The LAGEKARTE tab in Führung: the Einsatzort and the units on an offline map. Placing works by
 /// picking what to place and then tapping the map, the same on a desk and on a tablet; a marker
 /// already on the map is dragged to move it. Positions live in the incident, so they sync and
 /// survive another device's Kartenpaket -- the packs are only the backdrop, and every pack on
@@ -25,10 +25,23 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>The most address hits listed; a longer list is a query that needs another word.</summary>
     public const int MaxAddressHits = 20;
 
+    private const double MarkerTapSlop = 6;
+
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly IRegionPackLibrary? _library;
     private IReadOnlyList<InstalledRegionPack> _packs = [];
+
+    // Screen coordinates stay independent of the view's UI toolkit.
+    private LagekarteMarker? _draggedMarker;
+    private (double X, double Y) _markerPressedAt;
+    private (double X, double Y) _markerGrabbedOffset;
+    private bool _markerMoved;
+
+    private LagekarteMarker? _draggedSign;
+    private (double X, double Y) _signPressedAt;
+    private LabelOffset _offsetAtPress = new(0, 0);
+    private bool _signMoved;
 
     // Counts water point loads, so a slow read for an older set of packs cannot overwrite a newer one.
     private int _waterLoad;
@@ -74,6 +87,10 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>Where every pin stands, the Einsatzort's included: what a sign placed by the map keeps clear of.</summary>
     [ObservableProperty]
     private IReadOnlyList<GeoPoint> _pinPositions = [];
+
+    /// <summary>The Einsatzort, if marked: its ESt pin stands above the spot, and signs keep clear of its head too (#885).</summary>
+    [ObservableProperty]
+    private GeoPoint? _einsatzortPosition;
 
     /// <summary>
     /// The taktische Zeichen of the placed units: the same markers as their pins, drawn beneath
@@ -248,6 +265,143 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
     }
 
+    /// <summary>Starts a marker drag; the spot can be away from the hand, as with the ESt pin.</summary>
+    public void BeginMarkerDrag(LagekarteMarker marker, (double X, double Y) at, (double X, double Y) spot)
+    {
+        ArgumentNullException.ThrowIfNull(marker);
+        _draggedMarker = marker;
+        _markerPressedAt = at;
+        _markerGrabbedOffset = (at.X - spot.X, at.Y - spot.Y);
+        _markerMoved = false;
+    }
+
+    /// <summary>Moves the marker's preview after the tap threshold; returns whether the event was handled.</summary>
+    public bool ContinueMarkerDrag((double X, double Y) at, Func<double, double, GeoPoint?> screenToGeo)
+    {
+        ArgumentNullException.ThrowIfNull(screenToGeo);
+        if (_draggedMarker is not { } marker || !CanEdit
+            || (!_markerMoved && Math.Abs(at.X - _markerPressedAt.X) < MarkerTapSlop && Math.Abs(at.Y - _markerPressedAt.Y) < MarkerTapSlop))
+        {
+            return false;
+        }
+
+        _markerMoved = true;
+        if (screenToGeo(at.X - _markerGrabbedOffset.X, at.Y - _markerGrabbedOffset.Y) is { } position)
+        {
+            marker.Position = position;
+        }
+
+        return true;
+    }
+
+    /// <summary>Stores a drag or treats an unmoved marker as a tap at the hand.</summary>
+    public bool EndMarkerDrag((double X, double Y) at, Func<double, double, GeoPoint?> screenToGeo)
+    {
+        ArgumentNullException.ThrowIfNull(screenToGeo);
+        if (_draggedMarker is not { } marker)
+        {
+            return false;
+        }
+
+        _draggedMarker = null;
+        var position = _markerMoved
+            ? screenToGeo(at.X - _markerGrabbedOffset.X, at.Y - _markerGrabbedOffset.Y)
+            : screenToGeo(at.X, at.Y);
+        if (position is not null)
+        {
+            if (_markerMoved)
+            {
+                MoveMarker(marker, position);
+            }
+            else if (MapTappedCommand.CanExecute(position))
+            {
+                MapTappedCommand.Execute(position);
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Abandons a marker drag and restores its stored position.</summary>
+    public void CancelMarkerDrag()
+    {
+        if (_draggedMarker is not null && _markerMoved)
+        {
+            RestoreMarkers();
+        }
+
+        _draggedMarker = null;
+    }
+
+    /// <summary>Starts a sign drag from its stored or map-resolved offset.</summary>
+    public void BeginSignDrag(LagekarteMarker marker, (double X, double Y) at, LabelOffset resolvedOffset)
+    {
+        ArgumentNullException.ThrowIfNull(marker);
+        ArgumentNullException.ThrowIfNull(resolvedOffset);
+        _draggedSign = marker;
+        _offsetAtPress = marker.LabelOffset ?? resolvedOffset;
+        _signPressedAt = at;
+        _signMoved = false;
+    }
+
+    /// <summary>Updates the sign's preview after the pointer has moved past tap slop.</summary>
+    public bool UpdateSignDrag((double X, double Y) at)
+    {
+        if (_draggedSign is not { } marker || !CanEdit || !HasMoved(at))
+        {
+            return false;
+        }
+
+        marker.LabelOffset = new LabelOffset(
+            Math.Clamp(_offsetAtPress.Dx + at.X - _signPressedAt.X, -LabelOffset.MaxPixels, LabelOffset.MaxPixels),
+            Math.Clamp(_offsetAtPress.Dy + at.Y - _signPressedAt.Y, -LabelOffset.MaxPixels, LabelOffset.MaxPixels));
+        return true;
+    }
+
+    /// <summary>Stores a moved sign or treats an unmoved release as a map tap.</summary>
+    public bool EndSignDrag((double X, double Y) at, Func<double, double, GeoPoint?> screenToGeo)
+    {
+        ArgumentNullException.ThrowIfNull(screenToGeo);
+        if (_draggedSign is not { } marker)
+        {
+            return false;
+        }
+
+        _draggedSign = null;
+        if (_signMoved && marker.LabelOffset is { } offset)
+        {
+            MoveLabel(marker, offset);
+        }
+        else if (screenToGeo(at.X, at.Y) is { } position && MapTappedCommand.CanExecute(position))
+        {
+            MapTappedCommand.Execute(position);
+        }
+
+        return true;
+    }
+
+    /// <summary>Restores a sign preview when pointer capture is lost.</summary>
+    public void CancelSignDrag()
+    {
+        if (_draggedSign is not null && _signMoved)
+        {
+            RestoreMarkers();
+        }
+
+        _draggedSign = null;
+    }
+
+    private bool HasMoved((double X, double Y) at)
+    {
+        if (!_signMoved && Math.Abs(at.X - _signPressedAt.X) < MarkerTapSlop && Math.Abs(at.Y - _signPressedAt.Y) < MarkerTapSlop)
+        {
+            return false;
+        }
+
+        _signMoved = true;
+        return true;
+    }
+
     /// <summary>A marker dragged to a new spot.</summary>
     public void MoveMarker(LagekarteMarker marker, GeoPoint position)
     {
@@ -359,7 +513,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             return;
         }
 
-        // A pack downloaded since the KARTE tab was last open counts too.
+        // A pack downloaded since the LAGEKARTE tab was last open counts too.
         ReloadPacks();
         var incident = _session.Incident;
         AddressQuery = RecordedAddress(incident);
@@ -477,6 +631,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
 
         PinPositions = Markers.Select(m => m.Position).ToList();
+        EinsatzortPosition = incident.Location;
 
         // A unit that left the Einsatz while it was picked cannot be placed any more.
         if (Placing is { UnitId: { } picked } && units.All(u => u.Id != picked))
