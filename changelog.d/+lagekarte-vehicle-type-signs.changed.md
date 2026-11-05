@@ -1,0 +1,1 @@
+Taktische Zeichen on the Lagekarte now draw the mark of their Fahrzeugtyp after DV 102, so a Löschfahrzeug shows its fork, a DLK its ladder, a RW its winch, a WLF its frame and an RTW, KTW or NEF its cross, also for a Fahrzeugtyp written out further such as "HLF 20" or "DLK 23/12".
