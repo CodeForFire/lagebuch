@@ -320,13 +320,15 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
-    public void A_unit_row_names_the_feuerwehr_and_status_under_the_funkrufname_or_only_the_status_without_one()
+    public void A_unit_row_shows_only_the_status_under_its_title()
     {
         var withCallSign = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1", status: "Im Einsatz");
         var withoutCallSign = ForceUnit.Create("FF Musterstadt", 9, status: "Im Einsatz");
+        var callSignOnly = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1");
         var bare = ForceUnit.Create("FF Musterstadt", 9);
 
-        Assert.Equal("FF Musterstadt · Im Einsatz", new LagekarteUnitRow(withCallSign).Detail);
+        Assert.Equal("Im Einsatz", new LagekarteUnitRow(withCallSign).Detail);
+        Assert.Equal(string.Empty, new LagekarteUnitRow(callSignOnly).Detail);
         Assert.Equal("Im Einsatz", new LagekarteUnitRow(withoutCallSign).Detail);
         Assert.Equal("FF Musterstadt", new LagekarteUnitRow(withoutCallSign).Title);
         Assert.Equal(string.Empty, new LagekarteUnitRow(bare).Detail);
