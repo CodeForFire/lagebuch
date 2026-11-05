@@ -1248,26 +1248,26 @@ public class LeadershipBoardRenderTests
         Assert.DoesNotContain(FunkChips(board.View), b => b.Classes.Contains("linked"));
     }
 
-    // The chip under the pointer goes away without the pointer moving (a peer dissolves the
-    // Abschnitt): no chip is hovered any more, so the others that share it go dark too.
+    // The chip under the pointer goes away without the pointer moving (a peer renames the
+    // Abschnitt's TMO): the one hovered is gone, so the others that shared it go dark too.
+    // Nord, well inside the window, keeps its place, so whatever lies under the pointer
+    // afterwards is its new line, shown once and lit by nothing.
     [AvaloniaFact]
     public void A_hovered_funkgruppe_removed_by_a_refresh_turns_the_highlight_off()
     {
-        var board = Show(more: s => AddNode(
-            s, CommandNodeKind.Abschnitt, "Ost", funkgruppen: new Funkgruppen(["FW_EMMERING 1000"], null)));
-        var ost = Card(board.View, "Ost");
-        var chip = FunkChips(ost).Single();
-        Hover(board.Window, chip);
-        Assert.Contains(FunkChips(board.View), b => b.Classes.Contains("linked"));
+        var board = Show();
+        var nordCard = Card(board.View, "Abschnitt 1 Nord");
+        Hover(board.Window, FunkChips(nordCard).Single(b => b.DataContext is FunkgruppeLine { Text: "FW_EMMERING 1000" }));
+        Assert.Equal(3, FunkChips(board.View).Count(b => b.Classes.Contains("linked")));
 
         var session = Assert.IsType<LocalIncidentSession>(board.Session);
-        session.DissolveCommandNode(session.Incident.CommandNodes.Single(n => n.Name == "Ost").Id);
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        var nord = session.Incident.CommandNodes.Single(n => n.Name == "Abschnitt 1 Nord");
+        var renamed = new Funkgruppen(["FW_NORD 1001"], nord.Funkgruppen.Dmo);
+        session.UpdateCommandNode(
+            nord.Id, nord.Name, nord.Auftrag, nord.Standort, nord.Funkgruppe, nord.Rufname, nord.Telefon, renamed, nord.Fuehrungsfahrzeug);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.DoesNotContain(session.Incident.CommandNodes, n => n.Name == "Ost" && n.IsLive);
-        Assert.Equal(3, FunkChips(board.View).Count(b => b.DataContext is FunkgruppeLine { Text: "FW_EMMERING 1000" }));
+        Assert.Equal(2, FunkChips(board.View).Count(b => b.DataContext is FunkgruppeLine { Text: "FW_EMMERING 1000" }));
         Assert.DoesNotContain(FunkChips(board.View), b => b.Classes.Contains("linked"));
     }
 

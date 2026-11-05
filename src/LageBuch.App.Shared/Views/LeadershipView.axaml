@@ -332,7 +332,8 @@
          takes the first column so a long group still wraps. -->
     <DataTemplate x:Key="FunkgruppeChipTemplate" x:DataType="vm:FunkgruppeLine">
       <Border Classes="funk-chip" Classes.linked="{Binding Highlight.IsHighlighted}"
-              PointerEntered="OnFunkgruppePointerEntered" PointerExited="OnFunkgruppePointerExited">
+              PointerEntered="OnFunkgruppePointerEntered" PointerExited="OnFunkgruppePointerExited"
+              DetachedFromVisualTree="OnFunkgruppeDetached">
         <SelectableTextBlock Classes="field-value" Classes.not-shared="{Binding IsMarkedNotShared}"
                              Text="{Binding Text}" />
       </Border>
