@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain;
@@ -24,6 +25,11 @@ public sealed partial class TerrainOverlay : ObservableObject
     private readonly MapViewport _map;
     private (double Low, double High)? _range;
     private (ElevationSet Elevation, GeoPoint? Einsatzort)? _flowFor;
+
+    // Bumped whenever the route asked for changes, so a trace for an older Einsatzort is dropped.
+    private int _flowGeneration;
+    private Task? _flowTask;
+    private bool _flowFailed;
     private (GeoPoint Center, int Zoom)? _rangeAt;
 
     public TerrainOverlay(MapViewport map)
@@ -90,6 +96,13 @@ public sealed partial class TerrainOverlay : ObservableObject
     public bool ShowsRampKey { get; private set; }
 
     public bool ShowsFlowKey { get; private set; }
+
+    /// <summary>Whether the Fließweg is being traced: a hollow can take a moment to flood.</summary>
+    [ObservableProperty]
+    private bool _isTracingFlow;
+
+    /// <summary>The trace under way, or a finished task: what a test waits for.</summary>
+    internal Task FlowSettled => _flowTask ?? Task.CompletedTask;
 
     /// <summary>What the map draws of <see cref="FlowRoute"/>: its points, start first.</summary>
     public IReadOnlyList<GeoPoint>? FlowPoints => FlowRoute?.Points;
@@ -196,6 +209,8 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             FlowRoute = null;
             _flowFor = null;
+            _flowGeneration++;
+            IsTracingFlow = false;
         }
 
         Style = style;
@@ -208,7 +223,8 @@ public sealed partial class TerrainOverlay : ObservableObject
             flow: FlowRoute is not null);
     }
 
-    // Traced again only when the Einsatzort or the heights change, never on a pan.
+    // Traced off the UI thread -- flooding a hollow can take a while -- and again only when the
+    // Einsatzort or the heights change, never on a pan.
     private FlowRoute? FlowFor(ElevationSet elevation)
     {
         if (_flowFor is { } done && ReferenceEquals(done.Elevation, elevation) && Equals(done.Einsatzort, Einsatzort))
@@ -217,8 +233,40 @@ public sealed partial class TerrainOverlay : ObservableObject
         }
 
         _flowFor = (elevation, Einsatzort);
-        FlowRoute = Einsatzort is { } at ? FlowPath.Trace(elevation, at) : null;
-        return FlowRoute;
+        FlowRoute = null;
+        _flowFailed = false;
+        var generation = ++_flowGeneration;
+        if (Einsatzort is { } at)
+        {
+            IsTracingFlow = true;
+            _flowTask = TraceAsync(elevation, at, generation);
+        }
+
+        return null;
+    }
+
+    [SuppressMessage("Design", "CA1031", Justification = "A trace that fails says so in the key, through _flowFailed; the map carries on without the line.")]
+    private async Task TraceAsync(ElevationSet elevation, GeoPoint at, int generation)
+    {
+        FlowRoute? route = null;
+        var failed = false;
+        try
+        {
+            route = await Task.Run(() => FlowPath.Trace(elevation, at));
+        }
+        catch (Exception)
+        {
+            failed = true;
+        }
+
+        if (generation != _flowGeneration)
+        {
+            return;
+        }
+
+        (FlowRoute, _flowFailed) = (route, failed);
+        IsTracingFlow = false;
+        Update();
     }
 
     private string FlowLegend(FlowRoute? route)
@@ -226,6 +274,16 @@ public sealed partial class TerrainOverlay : ObservableObject
         if (Einsatzort is null)
         {
             return "Für den Fließweg erst den Einsatzort setzen.";
+        }
+
+        if (IsTracingFlow)
+        {
+            return "Fließweg wird berechnet …";
+        }
+
+        if (_flowFailed)
+        {
+            return "Der Fließweg ließ sich nicht berechnen.";
         }
 
         if (route is null)

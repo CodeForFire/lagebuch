@@ -104,6 +104,7 @@ public static class FlowPath
         edge = false;
         foreach (var (dx, dy, distance) in Neighbours)
         {
+            // Stryker disable once Arithmetic : the eight neighbours are symmetric, so subtracting the offsets visits the same cells.
             var neighbour = (cell.X + dx, cell.Y + dy);
             if (heightOf(neighbour) is not { } h)
             {
@@ -150,6 +151,8 @@ public static class FlowPath
             }
 
             level = Math.Max(level, h);
+
+            // Stryker disable once Equality : a hollow exactly MaxFillDepth deep, or of exactly MaxFillCells cells, may go either way.
             if (level - pitHeight > MaxFillDepth || from.Count > MaxFillCells)
             {
                 return null;
@@ -157,6 +160,7 @@ public static class FlowPath
 
             foreach (var (dx, dy, _) in Neighbours)
             {
+                // Stryker disable once Arithmetic : the eight neighbours are symmetric, so subtracting the offsets visits the same cells.
                 var neighbour = (cell.X + dx, cell.Y + dy);
                 if (!from.ContainsKey(neighbour) && heightOf(neighbour) is { } nh)
                 {
@@ -169,6 +173,10 @@ public static class FlowPath
         return null;
     }
 
-    private static double Distance((long X, long Y) a, (long X, long Y) b) =>
-        CellSize * Math.Sqrt(((a.X - b.X) * (a.X - b.X)) + ((a.Y - b.Y) * (a.Y - b.Y)));
+    private static double Distance((long X, long Y) a, (long X, long Y) b)
+    {
+        double dx = a.X - b.X;
+        double dy = a.Y - b.Y;
+        return CellSize * Math.Sqrt((dx * dx) + (dy * dy));
+    }
 }

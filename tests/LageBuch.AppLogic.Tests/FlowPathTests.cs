@@ -57,6 +57,30 @@ public sealed class FlowPathTests : IDisposable
     }
 
     [Fact]
+    public void On_flat_ground_the_water_stays_where_it_is()
+    {
+        var elevation = Terrain((_, _) => 550);
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(0, 0)));
+
+        Assert.Equal(FlowPathEnd.Senke, route.End);
+        Assert.Single(route.Points);
+        Assert.Equal(0, route.LengthMetres, precision: 6);
+    }
+
+    [Fact]
+    public void A_hollow_deeper_than_the_fill_depth_holds_the_water_even_on_a_slope()
+    {
+        // The plane falls to the east, but a bowl 6 m deep sits in it: the water does not climb out.
+        var elevation = Terrain((e, n) => (float)(600 - ((e - Origin.East) / 10) - (Math.Max(0, 1 - (Distance(e, n) / 60)) * 12)));
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(-200, 0)));
+
+        Assert.Equal(FlowPathEnd.Senke, route.End);
+        Assert.InRange(Distance(Utm32.FromGeo(route.Points[^1])), 0, 15);
+    }
+
+    [Fact]
     public void A_shallow_hollow_on_the_way_is_filled_and_crossed()
     {
         // A plane falling to the east with a dip 1 m deep and 60 m across on it: an embankment's

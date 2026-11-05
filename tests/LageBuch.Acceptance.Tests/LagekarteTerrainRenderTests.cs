@@ -72,6 +72,13 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
         var (window, view, vm) = Show(einsatzort: true);
 
         vm.Terrain.Layer = layer;
+        Assert.True(SpinWait.SpinUntil(
+            () =>
+            {
+                Dispatcher.UIThread.RunJobs();
+                return !vm.Terrain.IsTracingFlow;
+            },
+            TimeSpan.FromSeconds(20)));
         WaitForTerrain(view);
 
         var key = view.GetVisualDescendants().OfType<WrapPanel>().Single(p => p.Name == "TerrainKey");
