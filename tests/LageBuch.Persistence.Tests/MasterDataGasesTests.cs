@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Persistence.MasterData;
@@ -20,8 +19,7 @@ public class MasterDataGasesTests : IDisposable
         }
     }
 
-    private static MasterDataSet Parse(string json) =>
-        MasterDataJson.Parse(new MemoryStream(Encoding.UTF8.GetBytes(json)));
+    private static MasterDataSet Parse(string json) => MasterDataJson.Parse(json);
 
     [Fact]
     public void A_file_without_gases_measures_CO_with_the_old_bands()
