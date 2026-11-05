@@ -545,6 +545,22 @@ public class LeadershipBoardRenderTests
         });
     }
 
+    // The Funkrufname already names the Wache ("FFB 1/40/1" over "FFB Wache 1"), so the board
+    // does not repeat it under the unit.
+    [AvaloniaFact]
+    public void A_unit_with_a_funkrufname_does_not_repeat_its_wache_on_the_board()
+    {
+        var board = Show();
+
+        var texts = board.View.GetVisualDescendants().OfType<TextBlock>()
+            .Where(t => t.DataContext is BoardUnitRow && t.IsEffectivelyVisible)
+            .Select(t => t.Text)
+            .ToList();
+        Assert.Contains("Florian Emmering 40/1", texts);
+        Assert.DoesNotContain("FF Emmering", texts);
+        Assert.DoesNotContain("FF Aich", texts);
+    }
+
     [AvaloniaFact]
     public void The_units_table_lines_its_columns_up_across_rows()
     {
