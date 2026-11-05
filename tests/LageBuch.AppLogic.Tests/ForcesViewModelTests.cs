@@ -696,6 +696,22 @@ public class ForcesViewModelTests
     }
 
     [Fact]
+    public void A_fahrzeugtyp_recorded_in_other_case_shows_as_its_catalogue_entry()
+    {
+        var (vm, session, changes) = NewVmWithUnits();
+        var row = vm.Forces[0];
+
+        session.SetForceUnitVehicleType(row.Id, "dlk");
+        var entries = session.Incident.Journal.Count;
+        session.SetForceUnitVehicleType(vm.Forces[1].Id, "LF"); // another change refreshes every row
+
+        Assert.Equal("DLK", row.VehicleTypeChoice);
+        Assert.Contains(row.VehicleTypeChoice, row.VehicleTypeOptions); // the picker does not go blank
+        Assert.Equal(entries + 1, session.Incident.Journal.Count); // showing it records nothing
+        Assert.Equal(0, changes[0]);
+    }
+
+    [Fact]
     public void Picking_the_same_fahrzeugtyp_again_in_the_list_records_nothing()
     {
         var (vm, session, changes) = NewVmWithUnits();

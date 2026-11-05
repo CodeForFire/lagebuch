@@ -27,8 +27,13 @@ public static class VehicleTypeChoices
         return [None, .. codes];
     }
 
-    /// <summary>The picker's entry for a recorded Fahrzeugtyp; <see cref="None"/> for null.</summary>
-    public static string Of(string? vehicleType) => vehicleType ?? None;
+    /// <summary>
+    /// The picker's entry for a recorded Fahrzeugtyp: the catalogue's code when it matches in
+    /// another case ("dlk" shows as "DLK", the entry <see cref="For"/> offers), the recorded
+    /// spelling when the catalogue lacks it, and <see cref="None"/> for null.
+    /// </summary>
+    public static string Of(string? vehicleType) =>
+        VehicleTypes.Find(vehicleType)?.Code ?? vehicleType ?? None;
 
     /// <summary>What a picked entry records: null for <see cref="None"/> or no pick.</summary>
     public static string? ToStored(string? choice) => choice is null or None ? null : choice;
