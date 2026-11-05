@@ -4,6 +4,24 @@ namespace LageBuch.Domain.Tests;
 
 public class FormattingTests
 {
+    [Theory]
+    [InlineData(554.4, "554 m")]
+    [InlineData(1234.6, "1235 m")]
+    public void Metres_are_whole_and_ungrouped_as_a_map_labels_them(double value, string expected) =>
+        Assert.Equal(expected, Formatting.Metres(value));
+
+    [Fact]
+    public void A_height_has_one_decimal_with_a_German_comma() =>
+        Assert.Equal("554,6 m", Formatting.Height(554.62));
+
+    [Theory]
+    [InlineData(15.2, "+15 m")]
+    [InlineData(-5, "−5 m")]
+    [InlineData(0.3, "±0 m")]
+    [InlineData(-0.4, "±0 m")]
+    public void A_height_difference_carries_its_sign(double metres, string expected) =>
+        Assert.Equal(expected, Formatting.HeightDifference(metres));
+
     [Fact]
     public void Timestamp_uses_german_day_first_format()
     {

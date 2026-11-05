@@ -11,6 +11,24 @@ public static class Formatting
     /// <summary>A whole number the way the user reads it (de-DE grouping).</summary>
     public static string Number(int value) => value.ToString("N0", De);
 
+    /// <summary>A height or length in whole metres, without grouping: "554 m", as a map labels it.</summary>
+    public static string Metres(double value) => Math.Round(value).ToString("0", De) + " m";
+
+    /// <summary>A height above NHN to a tenth of a metre: "554,6 m".</summary>
+    public static string Height(double value) => value.ToString("0.0", De) + " m";
+
+    /// <summary>A height difference in whole metres, signed: "+15 m", "−5 m", "±0 m".</summary>
+    public static string HeightDifference(double metres)
+    {
+        var rounded = Math.Round(metres);
+        return rounded switch
+        {
+            > 0 => "+" + rounded.ToString("0", De) + " m",
+            < 0 => "−" + (-rounded).ToString("0", De) + " m",
+            _ => "±0 m",
+        };
+    }
+
     /// <summary>
     /// A position as decimal degrees, five places (about a metre), hemisphere as a letter:
     /// "48,17850° N, 11,25550° O". O, not E: it is read out in German.

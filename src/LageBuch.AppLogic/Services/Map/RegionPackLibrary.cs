@@ -44,9 +44,9 @@ public sealed class RegionPackLibrary : IRegionPackLibrary
     public static readonly Uri DefaultCatalogUrl = new("https://raw.githubusercontent.com/CodeForFire/lagebuch-geodata/main/packs.json");
 
     // The data files pack.json lists with size and SHA-256. elevation.tif is the Wasserförderung's
-    // terrain model (#587); it is installed and checked, not yet read.
+    // terrain model (#587), read by TerrainOverlay for the Lagekarte's terrain layers.
     private static readonly string[] DataFiles =
-        [InstalledRegionPack.VectorTilesFileName, "elevation.tif", InstalledRegionPack.WaterFileName, InstalledRegionPack.AddressesFileName, InstalledRegionPack.BoundaryFileName];
+        [InstalledRegionPack.VectorTilesFileName, InstalledRegionPack.ElevationFileName, InstalledRegionPack.WaterFileName, InstalledRegionPack.AddressesFileName, InstalledRegionPack.BoundaryFileName];
 
     // Everything a zip holds, at its root: FORMAT.md says exactly these, and a zip with any other
     // entry is refused. Each is written under this fixed name, so no entry name reaches a path.

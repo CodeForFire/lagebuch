@@ -183,6 +183,8 @@
                             AutomationProperties.Name="Lagekarte"
                             TileSource="{Binding Map.TileSource}"
                             WaterPoints="{Binding VisibleWaterPoints}"
+                            Elevation="{Binding Terrain.Elevation}"
+                            TerrainStyle="{Binding Terrain.Style}"
                             SelectedWaterPoint="{Binding SelectedWaterPoint}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
@@ -340,6 +342,10 @@
                   IsVisible="{Binding WaterPointsError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding WaterPointsError}" TextWrapping="Wrap" MaxWidth="420" />
           </Border>
+          <Border Classes="map-banner" x:Name="TerrainErrorBanner" BorderBrush="{StaticResource ErrorBrush}"
+                  IsVisible="{Binding Terrain.Error, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding Terrain.Error}" TextWrapping="Wrap" MaxWidth="420" />
+          </Border>
           <Border Classes="map-banner" x:Name="MapErrorBanner" BorderBrush="{StaticResource ErrorBrush}"
                   IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding ActionError}" TextWrapping="Wrap" MaxWidth="420" />
@@ -368,6 +374,27 @@
                         IsVisible="{Binding HasWaterPoints}" IsChecked="{Binding ShowWaterPoints}">
             <PathIcon Data="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
           </ToggleButton>
+          <!-- GELÄNDE: one of the DGM5 layers over the map, or none. -->
+          <Button x:Name="TerrainButton" Classes="icon-btn" ToolTip.Tip="Gelände"
+                  AutomationProperties.Name="Gelände" IsVisible="{Binding Terrain.HasElevation}">
+            <PathIcon Data="M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z" />
+            <Button.Flyout>
+              <Flyout Placement="LeftEdgeAlignedTop">
+                <StackPanel x:Name="TerrainChoices" Spacing="2" MinWidth="200">
+                  <TextBlock Text="GELÄNDE" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4"
+                             Foreground="{StaticResource TextSecondaryBrush}" />
+                  <ItemsControl ItemsSource="{Binding Terrain.Choices}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:TerrainChoice">
+                        <RadioButton GroupName="terrainLayer" Content="{Binding Label}"
+                                     IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="OnTerrainPicked" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
         </StackPanel>
 
         <!-- What the water symbols and the POI dots mean, whenever they are on the map. Drawn like
@@ -399,6 +426,36 @@
               <TextBlock Text="Löschwasserbehälter" />
               <Path Data="M 6,0 L 12,6 L 6,12 L 0,6 Z" Fill="#FF1565C0" Stroke="White" StrokeThickness="1.5" VerticalAlignment="Center" />
               <TextBlock Text="Löschteich" />
+            </WrapPanel>
+            <!-- The terrain layer's key, coloured as TerrainShading paints it. -->
+            <WrapPanel x:Name="TerrainKey" IsVisible="{Binding Terrain.ShowsLegend}">
+              <StackPanel Orientation="Horizontal" IsVisible="{Binding Terrain.ShowsSlopeKey}">
+                <Rectangle Width="14" Height="10" Fill="#8CFFD900" />
+                <TextBlock Text="ab 10 %" />
+                <Rectangle Width="14" Height="10" Fill="#8CFF8000" />
+                <TextBlock Text="ab 20 %" />
+                <Rectangle Width="14" Height="10" Fill="#8CD90000" />
+                <TextBlock Text="ab 35 %" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" IsVisible="{Binding Terrain.ShowsRelativeKey}">
+                <Rectangle Width="14" Height="10" Fill="#A62166AC" />
+                <TextBlock Text="tiefer" />
+                <Rectangle Width="14" Height="10" Fill="#A6B2182B" />
+                <TextBlock Text="höher" />
+              </StackPanel>
+              <Rectangle Width="60" Height="10" Margin="0,0,4,0" VerticalAlignment="Center"
+                         IsVisible="{Binding Terrain.ShowsRampKey}">
+                <Rectangle.Fill>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                    <GradientStop Offset="0" Color="#FF2E7D32" />
+                    <GradientStop Offset="0.25" Color="#FF9CCC65" />
+                    <GradientStop Offset="0.5" Color="#FFFFF176" />
+                    <GradientStop Offset="0.75" Color="#FFFFB74D" />
+                    <GradientStop Offset="1" Color="#FF8D6E63" />
+                  </LinearGradientBrush>
+                </Rectangle.Fill>
+              </Rectangle>
+              <TextBlock x:Name="TerrainLegendText" Text="{Binding Terrain.LegendText}" />
             </WrapPanel>
             <WrapPanel x:Name="PoiKey" IsVisible="{Binding ShowsPoiLegend}">
               <Ellipse Classes="poi" Fill="#FFE65100" />
