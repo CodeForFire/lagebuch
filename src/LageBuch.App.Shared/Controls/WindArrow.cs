@@ -29,8 +29,8 @@ public sealed class WindArrow : Control
     static WindArrow()
     {
         AffectsRender<WindArrow>(AngleProperty);
-        WidthProperty.OverrideDefaultValue<WindArrow>(200);
-        HeightProperty.OverrideDefaultValue<WindArrow>(200);
+        WidthProperty.OverrideDefaultValue<WindArrow>(240);
+        HeightProperty.OverrideDefaultValue<WindArrow>(240);
         IsHitTestVisibleProperty.OverrideDefaultValue<WindArrow>(false);
     }
 

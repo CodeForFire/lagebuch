@@ -9,9 +9,12 @@ namespace LageBuch.AppLogic.Services.Weather;
 /// </summary>
 public static class WeatherText
 {
-    private static readonly string[] CompassPoints = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+    private static readonly string[] CompassPoints = ["Nord", "Nordost", "Ost", "Südost", "Süd", "Südwest", "West", "Nordwest"];
 
-    /// <summary>The nearest of the eight compass points, in German ("NO", not "NE").</summary>
+    /// <summary>
+    /// The nearest of the eight compass points, spelled out in German ("Nordost"): an "O" for Ost
+    /// reads as a zero next to the degrees, and the word is what is said over the radio.
+    /// </summary>
     public static string CompassPoint(double degrees)
     {
         var normalized = ((degrees % 360) + 360) % 360;
@@ -32,7 +35,7 @@ public static class WeatherText
         _ => null,
     };
 
-    /// <summary>"Wind aus NO (60°) · 10 km/h · Böen 16 km/h".</summary>
+    /// <summary>"Wind aus Nordost (60°) · 10 km/h · Böen 16 km/h".</summary>
     public static string Wind(WeatherReading reading)
     {
         ArgumentNullException.ThrowIfNull(reading);
@@ -71,7 +74,7 @@ public static class WeatherText
     }
 
     /// <summary>
-    /// The reading as one ETB line: "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus NO
+    /// The reading as one ETB line: "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus Nordost
     /// (60°) 10 km/h, Böen 16 km/h, 0,3 °C, trocken." and every warning in force after it.
     /// </summary>
     public static string EtbEntry(WeatherReading reading, TimeSpan localOffset)

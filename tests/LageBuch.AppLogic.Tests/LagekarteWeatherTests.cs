@@ -77,7 +77,7 @@ public class LagekarteWeatherTests
         Assert.False(vm.Weather.IsLoading);
         Assert.True(vm.Weather.HasReading);
         Assert.True(vm.Weather.HasWind);
-        Assert.Equal("Wind aus NO (60°) · 10 km/h · Böen 16 km/h", vm.Weather.WindText);
+        Assert.Equal("Wind aus Nordost (60°) · 10 km/h · Böen 16 km/h", vm.Weather.WindText);
         Assert.Equal("0,3 °C · trocken", vm.Weather.DetailText);
         Assert.Equal("DWD-Station Maisach-Galgen (4,6 km) · Stand 22:10", vm.Weather.SourceText);
         Assert.Empty(vm.Weather.Alerts);
@@ -219,7 +219,7 @@ public class LagekarteWeatherTests
         Assert.Equal(before + 1, session.Incident.Journal.Count);
         Assert.Equal(EtbDirection.Internal, entry.Direction);
         Assert.Equal(
-            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus NO (60°) 10 km/h, Böen 16 km/h, 0,3 °C, trocken. Warnung: STURMBÖEN bis 05.11. 23:00.",
+            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus Nordost (60°) 10 km/h, Böen 16 km/h, 0,3 °C, trocken. Warnung: STURMBÖEN bis 05.11. 23:00.",
             entry.Text);
         Assert.Equal(changesBefore + 1, changes());
         Assert.True(vm.Weather.IsLogged);

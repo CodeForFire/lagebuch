@@ -29,19 +29,19 @@ public class WeatherTextTests
         new DateTimeOffset(2026, 11, 5, 22, 0, 0, TimeSpan.Zero));
 
     [Theory]
-    [InlineData(0, "N")]
-    [InlineData(22.4, "N")]
-    [InlineData(22.5, "NO")]
-    [InlineData(60, "NO")]
-    [InlineData(90, "O")]
-    [InlineData(135, "SO")]
-    [InlineData(180, "S")]
-    [InlineData(225, "SW")]
-    [InlineData(270, "W")]
-    [InlineData(315, "NW")]
-    [InlineData(337.4, "NW")]
-    [InlineData(337.5, "N")]
-    [InlineData(360, "N")]
+    [InlineData(0, "Nord")]
+    [InlineData(22.4, "Nord")]
+    [InlineData(22.5, "Nordost")]
+    [InlineData(60, "Nordost")]
+    [InlineData(90, "Ost")]
+    [InlineData(135, "Südost")]
+    [InlineData(180, "Süd")]
+    [InlineData(225, "Südwest")]
+    [InlineData(270, "West")]
+    [InlineData(315, "Nordwest")]
+    [InlineData(337.4, "Nordwest")]
+    [InlineData(337.5, "Nord")]
+    [InlineData(360, "Nord")]
     public void Compass_point_names_the_nearest_of_eight_in_german(double degrees, string expected) =>
         Assert.Equal(expected, WeatherText.CompassPoint(degrees));
 
@@ -60,7 +60,7 @@ public class WeatherTextTests
 
     [Fact]
     public void Wind_says_where_it_comes_from_how_strong_and_the_gusts() =>
-        Assert.Equal("Wind aus NO (60°) · 10 km/h · Böen 16 km/h", WeatherText.Wind(Maisach()));
+        Assert.Equal("Wind aus Nordost (60°) · 10 km/h · Böen 16 km/h", WeatherText.Wind(Maisach()));
 
     [Fact]
     public void Wind_without_a_measurement_says_so() =>
@@ -97,19 +97,19 @@ public class WeatherTextTests
     [Fact]
     public void Etb_entry_records_the_reading_in_one_line() =>
         Assert.Equal(
-            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus NO (60°) 10 km/h, Böen 16 km/h, 0,3 °C, trocken.",
+            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus Nordost (60°) 10 km/h, Böen 16 km/h, 0,3 °C, trocken.",
             WeatherText.EtbEntry(Maisach(), Cet));
 
     [Fact]
     public void Etb_entry_adds_every_warning_in_force() =>
         Assert.Equal(
-            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus NO (60°) 10 km/h, Böen 16 km/h, 0,3 °C, trocken. Warnung: STURMBÖEN bis 05.11. 23:00.",
+            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus Nordost (60°) 10 km/h, Böen 16 km/h, 0,3 °C, trocken. Warnung: STURMBÖEN bis 05.11. 23:00.",
             WeatherText.EtbEntry(Maisach([Sturm]), Cet));
 
     [Fact]
     public void Etb_entry_names_precipitation_as_such() =>
         Assert.Equal(
-            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus NO (60°) 10 km/h, Böen 16 km/h, 0,3 °C, Regen, 1,2 mm Niederschlag in 1 h.",
+            "Wetter (DWD, Station Maisach-Galgen, 22:10 Uhr): Wind aus Nordost (60°) 10 km/h, Böen 16 km/h, 0,3 °C, Regen, 1,2 mm Niederschlag in 1 h.",
             WeatherText.EtbEntry(Maisach() with { Condition = "rain", PrecipitationMm = 1.2 }, Cet));
 
     [Fact]

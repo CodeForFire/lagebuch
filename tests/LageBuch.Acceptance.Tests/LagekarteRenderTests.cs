@@ -422,7 +422,7 @@ public sealed class LagekarteRenderTests : IDisposable
 
         Assert.Equal(Marktplatz, Assert.Single(weather.Asked));
         Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WeatherCard").IsVisible);
-        Assert.Equal("Wind aus W (250°) · 24 km/h · Böen 48 km/h", view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "WeatherWindText").Text);
+        Assert.Equal("Wind aus West (250°) · 24 km/h · Böen 48 km/h", view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "WeatherWindText").Text);
         Assert.Equal(1, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "WeatherAlerts").ItemCount);
 
         // The arrow is centred on the Einsatzort and points downwind: from 250° the wind blows to 70°.
