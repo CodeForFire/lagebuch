@@ -10,8 +10,11 @@ namespace LageBuch.Persistence.Tests;
 // stops being the one the layout names.
 public class ChecklistTemplateJsonTests
 {
-    private static MasterDataSet Parse(string json) =>
-        MasterDataJson.Parse(new MemoryStream(Encoding.UTF8.GetBytes(json)));
+    private static MasterDataSet Parse(string json)
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        return MasterDataJson.Parse(stream);
+    }
 
     private static MasterDataSet RoundTrip(MasterDataSet set) => MasterDataJson.Parse(MasterDataJson.Serialize(set));
 

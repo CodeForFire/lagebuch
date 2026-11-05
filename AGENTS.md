@@ -309,6 +309,21 @@ what they cannot see.
 - **Dispose deterministically.** Use `using` or `await using` for every
   `IDisposable` you own — never a manual `.Dispose()` in a `finally`; see
   *Static analysis* below.
+  - **Tests included.** `.editorconfig` turns CA2000 off under `tests/**`, so
+    the build checks none of this there. The rule still holds, and review
+    flags it.
+  - **Never create a disposable inline as an argument to a method that only
+    reads it.** `MasterDataJson.Parse(new MemoryStream(…))` is that shape:
+    `Parse` does not dispose its stream, so nothing does. Give the object a
+    `using var` first, and a helper when several tests do the same:
+    ```csharp
+    using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+    return MasterDataJson.Parse(stream);
+    ```
+  - **Handing it to an owner is fine.** `new StreamContent(new MemoryStream(…))`
+    passes ownership on, because the content disposes its stream. What
+    matters is whether the callee owns the object afterwards, not where the
+    `new` appears.
 - **Packages:**
   - Versions live in `Directory.Packages.props` (central package management).
     Never put a `Version` on a `PackageReference` in a `.csproj`.
@@ -664,3 +679,12 @@ Stammdaten schema reference. Whenever `MasterDataSet` or `MasterDataJson`
 in `src/LageBuch.Persistence/MasterData/MasterDataSet.cs` gains, loses, or
 renames a top-level field, update `docs/master-data.example.json` in the
 same PR so it stays a complete, accurate example of every category.
+
+A new field also goes into `tests/Fixtures/stammdaten-vollstaendig.json`, with
+a value other than its default. That fictional file is what the import/export
+round-trip tests compare against byte for byte: the JSON, the store, the
+editor's view model and the rendered editor (#897). A field left at its
+default would let a leg that drops it pass, so a guard in
+`LageBuch.Persistence.Tests/MasterDataRoundTripTests` fails until the fixture
+covers it. Unlike `docs/master-data.example.json`, the fixture is written in
+exactly the form `MasterDataJson.Serialize` produces.
