@@ -25,8 +25,11 @@ public sealed class MasterDataRoundTripTests : IDisposable
         }
     }
 
-    private static MasterDataSet ParseFixture() =>
-        MasterDataJson.Parse(new MemoryStream(Encoding.UTF8.GetBytes(StammdatenFixture.Json)));
+    private static MasterDataSet ParseFixture()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(StammdatenFixture.Json));
+        return MasterDataJson.Parse(stream);
+    }
 
     [Fact]
     public void The_full_fidelity_fixture_is_written_exactly_as_the_export_writes_it()
@@ -77,16 +80,41 @@ public sealed class MasterDataRoundTripTests : IDisposable
         Assert.Equal(StammdatenFixture.Json, StammdatenFixture.Canonical(MasterDataJson.Serialize(reread)));
     }
 
-    // The primary constructor's parameters are the record's stored fields; everything else on it
-    // (DisplayName, HasEmail, Label ...) is derived. A field counts as covered when at least one
-    // row holds a value other than the parameter's default -- false for a bool defaulting to true.
-    // A list of plain strings has no fields: holding a row is all it can prove.
-    private static IEnumerable<string> FieldsLeftAtDefault(List<object> rows) =>
-        rows[0] is string
-            ? []
-            : StoredFields(rows[0].GetType())
-                .Where(f => rows.All(r => IsDefault(f.Property.GetValue(r), f.Default)))
-                .Select(f => f.Property.Name);
+    // A stored field is a public property with a setter: the positional ones and the init-only
+    // ones such as Premises.ApartmentLabels. Everything else (DisplayName, HasEmail, Label ...) is
+    // derived. A field counts as covered when at least one row holds a value other than its
+    // default -- false for a bool defaulting to true. A field that is itself a list of records,
+    // such as a Checkliste's items, is checked the same way across every row's items. A list of
+    // plain strings has no fields: holding a row is all it can prove.
+    private static IEnumerable<string> FieldsLeftAtDefault(List<object> rows)
+    {
+        if (rows[0] is string)
+        {
+            yield break;
+        }
+
+        foreach (var (property, fallback) in StoredFields(rows[0].GetType()))
+        {
+            var values = rows.Select(property.GetValue).ToList();
+            if (values.All(v => IsDefault(v, fallback)))
+            {
+                yield return property.Name;
+                continue;
+            }
+
+            var nested = values.OfType<IEnumerable>()
+                .Where(v => v is not string && !IsDictionary(v))
+                .SelectMany(v => v.Cast<object>())
+                .ToList();
+            if (nested.Count > 0)
+            {
+                foreach (var field in FieldsLeftAtDefault(nested))
+                {
+                    yield return $"{property.Name}.{field}";
+                }
+            }
+        }
+    }
 
     private static IEnumerable<string> FieldsEqualTo(IncidentSettings actual, IncidentSettings defaults) =>
         StoredFields(typeof(IncidentSettings))
@@ -95,15 +123,22 @@ public sealed class MasterDataRoundTripTests : IDisposable
 
     private static IEnumerable<(PropertyInfo Property, object? Default)> StoredFields(Type type)
     {
-        var constructor = type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
-        foreach (var parameter in constructor.GetParameters())
+        var parameters = type.GetConstructors()
+            .OrderByDescending(c => c.GetParameters().Length)
+            .First()
+            .GetParameters()
+            .Where(p => p.Name is not null)
+            .ToDictionary(p => p.Name ?? string.Empty, StringComparer.Ordinal);
+        foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite))
         {
-            if (parameter.Name is { } name && type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance) is { } property)
-            {
-                yield return (property, parameter.HasDefaultValue ? parameter.DefaultValue : DefaultOf(parameter.ParameterType));
-            }
+            yield return parameters.TryGetValue(property.Name, out var parameter) && parameter.HasDefaultValue
+                ? (property, parameter.DefaultValue)
+                : (property, DefaultOf(property.PropertyType));
         }
     }
+
+    private static bool IsDictionary(object value) =>
+        value.GetType().GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>));
 
     private static bool IsDefault(object? value, object? fallback) => value switch
     {
