@@ -1222,9 +1222,7 @@ public class LeadershipBoardRenderTests
         Capture(board.Window, "funkgruppe-before.png");
         var elTmo = FunkChips(Named<ItemsControl>(board.View, "ElTmo")).Single();
 
-        var centre = elTmo.TranslatePoint(new Point(elTmo.Bounds.Width / 2, elTmo.Bounds.Height / 2), board.Window)!.Value;
-        board.Window.MouseMove(centre);
-        Dispatcher.UIThread.RunJobs();
+        Hover(board.Window, elTmo);
 
         // The fade runs on the wall clock, not on render ticks: let it finish before the screenshot,
         // as ContactsTabRenderTests does. Screenshot path only, so no assertion waits on it.
@@ -1242,7 +1240,7 @@ public class LeadershipBoardRenderTests
 
         var lit = FunkChips(board.View).Where(b => b.Classes.Contains("linked")).ToList();
         Assert.Equal(3, lit.Count);
-        Assert.All(lit, b => Assert.Equal("FW_EMMERING 1000", ((FunkgruppeLine)b.DataContext!).Text));
+        Assert.All(lit, b => Assert.Equal("FW_EMMERING 1000", Assert.IsType<FunkgruppeLine>(b.DataContext).Text));
         Assert.Contains(elTmo, lit);
 
         board.Window.MouseMove(new Point(2, 2));
@@ -1259,19 +1257,26 @@ public class LeadershipBoardRenderTests
             s, CommandNodeKind.Abschnitt, "Ost", funkgruppen: new Funkgruppen(["FW_EMMERING 1000"], null)));
         var ost = Card(board.View, "Ost");
         var chip = FunkChips(ost).Single();
-        board.Window.MouseMove(chip.TranslatePoint(new Point(chip.Bounds.Width / 2, chip.Bounds.Height / 2), board.Window)!.Value);
-        Dispatcher.UIThread.RunJobs();
+        Hover(board.Window, chip);
         Assert.Contains(FunkChips(board.View), b => b.Classes.Contains("linked"));
 
-        var session = board.Session!;
+        var session = Assert.IsType<LocalIncidentSession>(board.Session);
         session.DissolveCommandNode(session.Incident.CommandNodes.Single(n => n.Name == "Ost").Id);
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         Dispatcher.UIThread.RunJobs();
 
         Assert.DoesNotContain(session.Incident.CommandNodes, n => n.Name == "Ost" && n.IsLive);
-        Assert.Equal(3, FunkChips(board.View).Count(b => ((FunkgruppeLine)b.DataContext!).Text == "FW_EMMERING 1000"));
+        Assert.Equal(3, FunkChips(board.View).Count(b => b.DataContext is FunkgruppeLine { Text: "FW_EMMERING 1000" }));
         Assert.DoesNotContain(FunkChips(board.View), b => b.Classes.Contains("linked"));
+    }
+
+    // The pointer moved onto the centre of the control, as a mouse resting on it.
+    private static void Hover(Window window, Control control)
+    {
+        var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window);
+        window.MouseMove(Assert.NotNull(centre));
+        Dispatcher.UIThread.RunJobs();
     }
 
     private static void Capture(Window window, string name)
