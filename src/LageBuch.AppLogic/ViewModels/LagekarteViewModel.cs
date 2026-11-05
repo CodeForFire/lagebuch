@@ -25,10 +25,18 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>The most address hits listed; a longer list is a query that needs another word.</summary>
     public const int MaxAddressHits = 20;
 
+    private const double MarkerTapSlop = 6;
+
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly IRegionPackLibrary? _library;
     private IReadOnlyList<InstalledRegionPack> _packs = [];
+
+    // Screen coordinates stay independent of the view's UI toolkit.
+    private LagekarteMarker? _draggedMarker;
+    private (double X, double Y) _markerPressedAt;
+    private (double X, double Y) _markerGrabbedOffset;
+    private bool _markerMoved;
 
     // Counts water point loads, so a slow read for an older set of packs cannot overwrite a newer one.
     private int _waterLoad;
@@ -250,6 +258,74 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             Placing = null;
             Place(target.UnitId, Map.Center);
         }
+    }
+
+    /// <summary>Starts a marker drag; the spot can be away from the hand, as with the ESt pin.</summary>
+    public void BeginMarkerDrag(LagekarteMarker marker, (double X, double Y) at, (double X, double Y) spot)
+    {
+        ArgumentNullException.ThrowIfNull(marker);
+        _draggedMarker = marker;
+        _markerPressedAt = at;
+        _markerGrabbedOffset = (at.X - spot.X, at.Y - spot.Y);
+        _markerMoved = false;
+    }
+
+    /// <summary>Moves the marker's preview after the tap threshold; returns whether the event was handled.</summary>
+    public bool ContinueMarkerDrag((double X, double Y) at, Func<double, double, GeoPoint?> screenToGeo)
+    {
+        ArgumentNullException.ThrowIfNull(screenToGeo);
+        if (_draggedMarker is not { } marker || !CanEdit
+            || (!_markerMoved && Math.Abs(at.X - _markerPressedAt.X) < MarkerTapSlop && Math.Abs(at.Y - _markerPressedAt.Y) < MarkerTapSlop))
+        {
+            return false;
+        }
+
+        _markerMoved = true;
+        if (screenToGeo(at.X - _markerGrabbedOffset.X, at.Y - _markerGrabbedOffset.Y) is { } position)
+        {
+            marker.Position = position;
+        }
+
+        return true;
+    }
+
+    /// <summary>Stores a drag or treats an unmoved marker as a tap at the hand.</summary>
+    public bool EndMarkerDrag((double X, double Y) at, Func<double, double, GeoPoint?> screenToGeo)
+    {
+        ArgumentNullException.ThrowIfNull(screenToGeo);
+        if (_draggedMarker is not { } marker)
+        {
+            return false;
+        }
+
+        _draggedMarker = null;
+        var position = _markerMoved
+            ? screenToGeo(at.X - _markerGrabbedOffset.X, at.Y - _markerGrabbedOffset.Y)
+            : screenToGeo(at.X, at.Y);
+        if (position is not null)
+        {
+            if (_markerMoved)
+            {
+                MoveMarker(marker, position);
+            }
+            else if (MapTappedCommand.CanExecute(position))
+            {
+                MapTappedCommand.Execute(position);
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Abandons a marker drag and restores its stored position.</summary>
+    public void CancelMarkerDrag()
+    {
+        if (_draggedMarker is not null && _markerMoved)
+        {
+            RestoreMarkers();
+        }
+
+        _draggedMarker = null;
     }
 
     /// <summary>A marker dragged to a new spot.</summary>

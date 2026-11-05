@@ -12,14 +12,9 @@ public partial class LagekarteView : UserControl
     // Same slop as the map's own: a mark pressed and let go in place is a tap on the map there.
     private const double TapSlop = 6;
 
-    // The mark under the hand while it is dragged, where the press began, and how far that lay from
-    // the mark's spot: the ESt pin is grabbed by its head, well above its tip (#885).
-    private LagekarteMarker? _dragged;
-    private Point _pressedAt;
-    private Vector _grabbedOff;
-    private bool _moved;
-
     // The sign under the hand while it is dragged, and where it stood from its pin at the press.
+    private Point _pressedAt;
+    private bool _moved;
     private LagekarteMarker? _draggedSign;
     private LabelOffset _offsetAtPress = new(0, 0);
 
@@ -30,81 +25,43 @@ public partial class LagekarteView : UserControl
     private void OnMarkerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Control { DataContext: LagekarteMarker marker } control
+            || ViewModel is not { } vm
             || !e.GetCurrentPoint(control).Properties.IsLeftButtonPressed)
         {
             return;
         }
 
-        _dragged = marker;
-        _pressedAt = e.GetPosition(Map);
+        var at = e.GetPosition(Map);
 
         // MapMarkerPanel centres a mark on its spot, so the mark's centre is where it stands.
-        var spot = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), Map) ?? _pressedAt;
-        _grabbedOff = _pressedAt - spot;
-        _moved = false;
+        var spot = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), Map) ?? at;
+        vm.BeginMarkerDrag(marker, (at.X, at.Y), (spot.X, spot.Y));
         e.Pointer.Capture(control);
         e.Handled = true;
     }
 
-    // The mark follows the hand; nothing is stored until it is let go.
     private void OnMarkerMoved(object? sender, PointerEventArgs e)
     {
-        if (_dragged is null || ViewModel is not { CanEdit: true })
-        {
-            return;
-        }
-
         var at = e.GetPosition(Map);
-        if (!_moved && Math.Abs(at.X - _pressedAt.X) < TapSlop && Math.Abs(at.Y - _pressedAt.Y) < TapSlop)
+        if (ViewModel?.ContinueMarkerDrag((at.X, at.Y), ScreenToGeo) is true)
         {
-            return;
+            e.Handled = true;
         }
-
-        _moved = true;
-        if (Map.ScreenToGeo(at - _grabbedOff) is { } position)
-        {
-            _dragged.Position = position;
-        }
-
-        e.Handled = true;
     }
 
     private void OnMarkerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (_dragged is not { } marker || ViewModel is not { } vm)
-        {
-            return;
-        }
-
-        _dragged = null;
-        e.Pointer.Capture(null);
-        e.Handled = true;
         var at = e.GetPosition(Map);
-        if (Map.ScreenToGeo(_moved ? at - _grabbedOff : at) is not { } position)
+        if (ViewModel?.EndMarkerDrag((at.X, at.Y), ScreenToGeo) is true)
         {
-            return;
-        }
-
-        if (_moved)
-        {
-            vm.MoveMarker(marker, position);
-        }
-        else if (vm.MapTappedCommand.CanExecute(position))
-        {
-            vm.MapTappedCommand.Execute(position);
+            e.Pointer.Capture(null);
+            e.Handled = true;
         }
     }
 
-    // Lost mid-drag (a window switch, a second finger): put the mark back where it is stored.
-    private void OnMarkerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
-    {
-        if (_dragged is not null && _moved)
-        {
-            ViewModel?.RestoreMarkers();
-        }
+    private GeoPoint? ScreenToGeo(double x, double y) => Map.ScreenToGeo(new Point(x, y));
 
-        _dragged = null;
-    }
+    private void OnMarkerCaptureLost(object? sender, PointerCaptureLostEventArgs e) => ViewModel?.CancelMarkerDrag();
 
     private void OnSignPressed(object? sender, PointerPressedEventArgs e)
     {
