@@ -563,7 +563,9 @@ public class ForcesViewModelTests
     [Fact]
     public void A_unit_typed_in_by_hand_takes_the_fahrzeugtyp_picked_in_the_form()
     {
-        var (vm, session, _) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
         Assert.Equal(VehicleTypeChoices.None, vm.NewVehicleType);
         vm.NewBrigade = "FF Nachbarort";
         vm.NewCallSign = "Florian Nachbarort 40/1";
@@ -579,7 +581,9 @@ public class ForcesViewModelTests
     [Fact]
     public void Picking_a_vehicle_fills_in_its_fahrzeugtyp_and_the_form_may_change_it()
     {
-        var (vm, session, _) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
 
         vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "dlk");
         Assert.Equal("DLK", vm.NewVehicleType); // the catalogue's spelling
@@ -593,7 +597,9 @@ public class ForcesViewModelTests
     [Fact]
     public void A_vehicle_s_fahrzeugtyp_the_catalogue_lacks_is_offered_and_copied()
     {
-        var (vm, session, _) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
 
         vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "TLF 4000");
 
@@ -607,7 +613,8 @@ public class ForcesViewModelTests
     [Fact]
     public void Clearing_the_vehicle_clears_the_fahrzeugtyp_it_filled_in()
     {
-        var (vm, _, _) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
         vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/30/1", 2, VehicleType: "TLF 4000");
 
         vm.ClearVehicleCommand.Execute(null);
@@ -619,7 +626,10 @@ public class ForcesViewModelTests
     [Fact]
     public void Changing_the_fahrzeugtyp_in_the_list_records_it_with_an_etb_entry()
     {
-        var (vm, session, changes) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
         var row = vm.Forces[0];
         Assert.Equal(VehicleTypeChoices.None, row.VehicleTypeChoice);
         Assert.Equal(VehicleTypeChoices.None, row.VehicleTypeOptions[0]);
@@ -638,7 +648,9 @@ public class ForcesViewModelTests
     [Fact]
     public void Choosing_ohne_typ_in_the_list_clears_the_fahrzeugtyp()
     {
-        var (vm, session, _) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
         var row = vm.Forces[0];
         session.SetForceUnitVehicleType(row.Id, "HLF");
         Assert.Equal("HLF", row.VehicleTypeChoice);
@@ -651,7 +663,9 @@ public class ForcesViewModelTests
     [Fact]
     public void A_lost_selection_in_the_list_does_not_clear_the_fahrzeugtyp()
     {
-        var (vm, session, _) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
         var row = vm.Forces[0];
         session.SetForceUnitVehicleType(row.Id, "HLF");
         var entries = session.Incident.Journal.Count;
@@ -665,7 +679,10 @@ public class ForcesViewModelTests
     [Fact]
     public void A_fahrzeugtyp_set_elsewhere_reaches_the_row_without_being_written_back()
     {
-        var (vm, session, changes) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
         var row = vm.Forces[0];
         var options = row.VehicleTypeOptions;
 
@@ -682,7 +699,9 @@ public class ForcesViewModelTests
     [Fact]
     public void A_fahrzeugtyp_the_catalogue_lacks_stays_selectable_in_the_list()
     {
-        var (vm, session, _) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
         var row = vm.Forces[0];
         var raised = new List<string?>();
         row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -698,7 +717,10 @@ public class ForcesViewModelTests
     [Fact]
     public void A_fahrzeugtyp_recorded_in_other_case_shows_as_its_catalogue_entry()
     {
-        var (vm, session, changes) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
         var row = vm.Forces[0];
 
         session.SetForceUnitVehicleType(row.Id, "dlk");
@@ -714,7 +736,10 @@ public class ForcesViewModelTests
     [Fact]
     public void Picking_the_same_fahrzeugtyp_again_in_the_list_records_nothing()
     {
-        var (vm, session, changes) = NewVmWithUnits();
+        var setup = NewVmWithUnits();
+        using var vm = setup.Vm;
+        var session = setup.Session;
+        var changes = setup.Changes;
         var row = vm.Forces[0];
         session.SetForceUnitVehicleType(row.Id, "DLK");
         var entries = session.Incident.Journal.Count;
@@ -728,7 +753,9 @@ public class ForcesViewModelTests
     [Fact]
     public void A_closed_einsatz_takes_no_fahrzeugtyp_from_the_list()
     {
-        var (vm, session, _) = NewVmWithUnits(readOnly: true);
+        var setup = NewVmWithUnits(readOnly: true);
+        using var vm = setup.Vm;
+        var session = setup.Session;
         var row = vm.Forces[0];
 
         row.VehicleTypeChoice = "DLK";
