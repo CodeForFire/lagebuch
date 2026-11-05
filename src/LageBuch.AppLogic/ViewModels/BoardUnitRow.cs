@@ -55,6 +55,10 @@ public sealed partial class BoardUnitRow : ObservableObject
     [ObservableProperty]
     private int _scbaCount;
 
+    /// <summary>Whether this unit is the one being dragged; the board dims it where it came from.</summary>
+    [ObservableProperty]
+    private bool _isDragged;
+
     /// <summary>What a waiting row says under the unit, in place of the Raum it has not been given.</summary>
     public const string WaitingText = "● Laut Status im BR – Raum zuweisen";
 

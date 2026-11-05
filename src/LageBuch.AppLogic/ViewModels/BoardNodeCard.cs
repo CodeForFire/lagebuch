@@ -78,6 +78,10 @@ public sealed partial class BoardNodeCard : ObservableObject
     /// <summary>Whether the card can be picked up and moved; a partner's Einsatzleitung has a row of its own.</summary>
     public bool IsMovable => Kind != CommandNodeKind.Partner;
 
+    /// <summary>Whether this card is the one being dragged; the board dims it where it came from.</summary>
+    [ObservableProperty]
+    private bool _isDragged;
+
     /// <summary>The SUMME row's Stärke, Zugführer / Gruppenführer / Mannschaft / Gesamt, an Abschnitt's Unterabschnitte included.</summary>
     [ObservableProperty]
     private string _strengthTotal = string.Empty;

@@ -20,6 +20,12 @@ public sealed class Incident
     /// <summary>The most distinct rail overrides an Einsatz holds.</summary>
     public const int MaxNavOverrides = 64;
 
+    /// <summary>
+    /// Why <see cref="MoveForceUnit"/> refuses a partner's Einsatzleitung, in German. The Führung
+    /// board says the same while a unit is held over one.
+    /// </summary>
+    public const string PartnerLeadsNoUnits = "Einsatzleitungen anderer Organisationen führen keine eigenen Einheiten.";
+
     private readonly Dictionary<string, bool> _navOverrides = new(StringComparer.Ordinal);
     private readonly List<ChecklistList> _checklists = new();
     private readonly List<EtbEntry> _journal = new();
@@ -1332,8 +1338,7 @@ public sealed class Incident
 
             if (target.Kind == CommandNodeKind.Partner)
             {
-                throw new InvalidOperationException(
-                    "Einsatzleitungen anderer Organisationen führen keine eigenen Einheiten.");
+                throw new InvalidOperationException(PartnerLeadsNoUnits);
             }
         }
 

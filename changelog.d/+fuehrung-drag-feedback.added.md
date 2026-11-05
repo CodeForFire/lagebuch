@@ -1,0 +1,1 @@
+While a unit or an Abschnitt is dragged on the Führung board, it is dimmed where it came from, and a place that refuses it says why at the foot of the board, for example "Erst die Unterabschnitte verschieben." instead of only a no-drop cursor.
