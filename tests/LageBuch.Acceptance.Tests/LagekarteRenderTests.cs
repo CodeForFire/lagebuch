@@ -135,6 +135,20 @@ public sealed class LagekarteRenderTests : IDisposable
         frame.SavePng(Path.Join(Shots(), "fuehrung-karte-nacht.png"));
     }
 
+    // Without a Kartenpaket the map still takes marks on its plain background, which has a night colour too.
+    [AvaloniaFact]
+    public void Without_a_map_pack_the_night_map_button_is_still_offered()
+    {
+        var vm = new LagekarteViewModel(NewSession(), () => { });
+        var view = new LagekarteView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1280, Height = 800 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(vm.HasNoMap);
+        Assert.True(view.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "NightMapToggle").IsVisible);
+    }
+
     [AvaloniaFact]
     public void Clicking_a_hydrant_opens_its_card_and_the_legend_explains_the_symbols()
     {
