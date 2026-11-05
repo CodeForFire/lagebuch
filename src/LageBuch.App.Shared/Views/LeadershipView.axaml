@@ -66,6 +66,23 @@
     <Style Selector="Border.board-card.unterabschnitt.drop-target">
       <Setter Property="Padding" Value="9,7" />
     </Style>
+    <!-- A unit dropped on the Einsatzleitung stays where it is and becomes its Führungsfahrzeug
+         (#888), which the same cyan frame alone would not tell from a move. So the card says so and
+         lights the row that changes. The hint shares its row with "Einsatzleitung", so it has text
+         only while it is shown and the card keeps its height; a hidden one is not read out. -->
+    <Style Selector="TextBlock.el-drop-hint">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="0.4" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{StaticResource FocusBrush}" />
+    </Style>
+    <Style Selector="Border#ElCard.drop-target TextBlock.el-drop-hint">
+      <Setter Property="Text" Value="WIRD FÜHRUNGSFAHRZEUG" />
+    </Style>
+    <Style Selector="Border#ElCard.drop-target SelectableTextBlock#ElFahrzeug">
+      <Setter Property="Foreground" Value="{StaticResource FocusBrush}" />
+    </Style>
 
     <!-- Moving a card: a cyan line above the head it would land before, and two strips that show
          only while a card is dragged (into an Abschnitt, last at the top level). -->
@@ -333,7 +350,10 @@
       <Border x:Name="ElCard" Classes="board-card" ctrl:OrgChildrenPanel.IsAnchor="True">
         <StackPanel Spacing="9">
           <StackPanel Spacing="1">
-            <TextBlock Classes="card-kind" Text="Einsatzleitung" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <TextBlock Grid.Column="0" Classes="card-kind" Text="Einsatzleitung" />
+              <TextBlock Grid.Column="1" x:Name="ElDropHint" Classes="el-drop-hint" />
+            </Grid>
             <SelectableTextBlock Classes="card-name" Text="Feuerwehr" />
           </StackPanel>
 

@@ -809,15 +809,20 @@ public class LeadershipBoardRenderTests
         var unit = UnitId(board, "Florian Emmering 11/2");
         var el = board.View.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ElCard");
         var target = Named<TextBlock>(board.View, "ElFahrzeug");
+        var hint = Named<TextBlock>(board.View, "ElDropHint");
+        var height = el.Bounds.Height;
         using var transfer = Dragging(unit);
         board.Vm.BeginDrag(unit);
         Dispatcher.UIThread.RunJobs();
+        Assert.True(string.IsNullOrEmpty(hint.Text), "the hint says nothing until the unit is over the card");
 
         var over = Over(transfer, target);
         Capture(board.Window, "fuehrung-el-drag.png");
 
         Assert.Equal(DragDropEffects.Move, over.DragEffects);
         Assert.Contains("drop-target", el.Classes);
+        Assert.Equal("WIRD FÜHRUNGSFAHRZEUG", hint.Text);
+        Assert.True(Math.Abs(el.Bounds.Height - height) <= 0.5, $"card height {el.Bounds.Height}, was {height}");
 
         Drop(transfer, target);
         board.Vm.EndDrag();
@@ -828,7 +833,37 @@ public class LeadershipBoardRenderTests
         Assert.Null(NodeOfUnit(session, unit));
         Assert.Contains(board.Vm.UnplacedUnits, u => u.Id == unit);
         Assert.DoesNotContain("drop-target", el.Classes);
+        Assert.True(string.IsNullOrEmpty(hint.Text));
         Capture(board.Window, "fuehrung-el-dropped.png");
+
+        // The Fahrzeug it replaced is one RÜCKGÄNGIG away.
+        var notice = Assert.IsType<UndoNoticeViewModel>(board.Workspace.UndoNotice);
+        Assert.Equal("„Florian Emmering 11/2“ ist Führungsfahrzeug der Einsatzleitung.", notice.Message);
+        notice.UndoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Florian Emmering 12/1", Named<TextBlock>(board.View, "ElFahrzeug").Text);
+    }
+
+    // The board's refusal stands at its head; RÜCKGÄNGIG pressed with the board scrolled down still shows it.
+    [AvaloniaFact]
+    public void A_refused_undo_scrolls_the_board_up_to_its_reason()
+    {
+        var board = ShowSmall();
+        var session = board.Session!;
+        var unit = UnitId(board, "Florian Steinhöring 40/1");
+        Assert.True(board.Vm.MoveUnit(unit, NodeId(session, "Abschnitt 2 Süd")));
+        session.DissolveCommandNode(NodeId(session, "Bereitstellung Marktplatz"));
+        var scroll = board.View.GetControl<ScrollViewer>("BoardScroll");
+        scroll.Offset = new Vector(0, scroll.Extent.Height);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(scroll.Offset.Y > 100, $"offset {scroll.Offset.Y}");
+
+        Assert.IsType<UndoNoticeViewModel>(board.Workspace.UndoNotice).UndoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotNull(board.Vm.ActionError);
+        Assert.True(scroll.Offset.Y < 1, $"offset {scroll.Offset.Y}");
+        Capture(board.Window, "fuehrung-undo-refused.png");
     }
 
     [AvaloniaFact]

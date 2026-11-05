@@ -5,7 +5,8 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// A short-lived "Rückgängig" offer after a toggle (#543): ticking off an Aufgabe takes one
-/// stray Space, so the change is offered back for a few seconds. The host decides when it
+/// stray Space, so the change is offered back for a few seconds; so is a move on the Führung
+/// board, which takes one stray drop. The host decides when it
 /// expires and clears it on <see cref="Closed"/>, whichever way the notice ended.
 /// </summary>
 public sealed partial class UndoNoticeViewModel : ObservableObject

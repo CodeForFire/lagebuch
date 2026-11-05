@@ -1105,7 +1105,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             (title, message, confirmed, label) => RequestConfirmAs(title, message, label, confirmed),
             OpenCommandNodeDialog,
             OpenLeadershipPersonDialog,
-            OpenRoleAssignmentDialog);
+            OpenRoleAssignmentDialog,
+            OfferUndo);
 
         Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks);
 
