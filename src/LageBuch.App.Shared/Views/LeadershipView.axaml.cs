@@ -29,8 +29,9 @@ public partial class LeadershipView : UserControl
         _autoScroll = new DragAutoScroll(BoardScroll, ChartScroll);
 
         // Drag and drop of units between the cards. DragDrop's events are routed events, not bindable
-        // commands, so they are forwarded from here; CanMoveUnit and MoveUnit decide, and on the
-        // Einsatzleitung CanAssignFuehrungsfahrzeug and AssignFuehrungsfahrzeug.
+        // commands, so they are forwarded from here; PreviewUnitDrop and MoveUnit decide, on the
+        // Einsatzleitung PreviewFuehrungsfahrzeugDrop and AssignFuehrungsfahrzeug, and for a card
+        // PreviewNodeDrop and MoveNode.
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel);
         BoardRoot.AddHandler(DragDrop.DragOverEvent, OnDragOver);
         BoardRoot.AddHandler(DragDrop.DragLeaveEvent, (_, _) => EndDragFeedback());
@@ -162,23 +163,34 @@ public partial class LeadershipView : UserControl
     {
         // Before the target check: the way to a valid target leads over ones that refuse the drop.
         _autoScroll.Update(e);
+
+        // The Preview calls answer as the Can calls do and also leave the reason a place refuses
+        // for the banner; over no place at all there is nothing to explain.
         Border? highlight = null;
-        if (DraggedId(e) is { } toEl
-            && EinsatzleitungUnder(e) is { } el)
+        var vm = ViewModel;
+        if (vm is not null && DraggedId(e) is { } unit)
         {
-            highlight = ViewModel?.CanAssignFuehrungsfahrzeug(toEl) == true ? el : null;
+            if (EinsatzleitungUnder(e) is { } el)
+            {
+                highlight = vm.PreviewFuehrungsfahrzeugDrop(unit) ? el : null;
+            }
+            else if (TryTargetUnder(e, out var target, out var nodeId))
+            {
+                highlight = vm.PreviewUnitDrop(unit, nodeId) ? target : null;
+            }
+            else
+            {
+                vm.ClearDropPreview();
+            }
         }
-        else if (DraggedId(e) is { } dragged
-            && TryTargetUnder(e, out var target, out var nodeId)
-            && ViewModel?.CanMoveUnit(dragged, nodeId) == true)
+        else if (vm is not null && DraggedNodeId(e) is { } node
+            && TryNodeTargetUnder(e, out var nodeTarget, out var parentId, out var beforeNodeId))
         {
-            highlight = target;
+            highlight = vm.PreviewNodeDrop(node, parentId, beforeNodeId) ? nodeTarget : null;
         }
-        else if (DraggedNodeId(e) is { } draggedNode
-            && TryNodeTargetUnder(e, out var nodeTarget, out var parentId, out var beforeNodeId)
-            && ViewModel?.CanMoveNode(draggedNode, parentId, beforeNodeId) == true)
+        else
         {
-            highlight = nodeTarget;
+            vm?.ClearDropPreview();
         }
 
         e.DragEffects = highlight is null ? DragDropEffects.None : DragDropEffects.Move;
@@ -209,6 +221,7 @@ public partial class LeadershipView : UserControl
     {
         _autoScroll.Stop();
         SetDropTarget(null);
+        ViewModel?.ClearDropPreview();
     }
 
     private void SetDropTarget(Border? target)

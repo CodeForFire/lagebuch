@@ -910,6 +910,60 @@ public class LeadershipBoardRenderTests
         Assert.Equal(NodeId(session, "Abschnitt 2 Süd"), NodeOfUnit(session, unit));
     }
 
+    // A no-drop cursor alone left the Lagebuchführer guessing: the board says why, at its foot, and
+    // dims what is held where it came from.
+    [AvaloniaFact]
+    public void A_unit_held_over_a_partner_is_dimmed_at_home_and_the_board_says_why_not()
+    {
+        var board = Show();
+        var unit = UnitId(board, "Florian Aich 40/1");
+        var banner = board.View.GetControl<Border>("DropRefusalBanner");
+        var row = board.View.GetVisualDescendants().OfType<Grid>()
+            .Single(g => g.Classes.Contains("unit-row") && g.DataContext is BoardUnitRow r && r.Id == unit);
+        using var transfer = Dragging(unit);
+        board.Vm.BeginDrag(unit);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains("dragged", row.Classes);
+        Assert.False(banner.IsVisible);
+
+        Over(transfer, NameOf(Card(board.View, "Polizei")));
+
+        Assert.True(banner.IsEffectivelyVisible);
+        Assert.Equal(Incident.PartnerLeadsNoUnits, board.View.GetControl<TextBlock>("DropRefusalText").Text);
+        Capture(board.Window, "fuehrung-drop-refused.png");
+
+        // Over a card that takes it the reason goes, and with the drag the dimming.
+        Over(transfer, NameOf(Card(board.View, "Abschnitt 1 Nord")));
+        Assert.False(banner.IsVisible);
+        Drop(transfer, NameOf(Card(board.View, "Abschnitt 1 Nord")));
+        board.Vm.EndDrag();
+        Dispatcher.UIThread.RunJobs();
+        Assert.DoesNotContain(board.View.GetVisualDescendants().OfType<Grid>(), g => g.Classes.Contains("dragged"));
+    }
+
+    [AvaloniaFact]
+    public void A_card_held_where_the_rules_refuse_it_shows_the_rule()
+    {
+        var board = Show();
+        var session = board.Session!;
+        var nord = Card(board.View, "Abschnitt 1 Nord");
+        using var transfer = DraggingNode(NodeId(session, "Abschnitt 1 Nord"));
+        board.Vm.BeginNodeDrag(NodeId(session, "Abschnitt 1 Nord"));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains("dragged", nord.Classes);
+
+        // Nord leads Dach, so it cannot become an Unterabschnitt of Süd.
+        var over = Over(transfer, IntoStripOf(Card(board.View, "Abschnitt 2 Süd")));
+
+        Assert.Equal(DragDropEffects.None, over.DragEffects);
+        Assert.Equal("Erst die Unterabschnitte verschieben.", board.View.GetControl<TextBlock>("DropRefusalText").Text);
+        Capture(board.Window, "fuehrung-card-drop-refused.png");
+        board.Vm.EndNodeDrag();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(board.View.GetControl<Border>("DropRefusalBanner").IsVisible);
+        Assert.DoesNotContain("dragged", nord.Classes);
+    }
+
     [AvaloniaFact]
     public void A_unit_dropped_on_its_own_card_is_refused()
     {

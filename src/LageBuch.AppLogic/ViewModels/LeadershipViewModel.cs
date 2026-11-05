@@ -23,6 +23,9 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </remarks>
 public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware, IDisposable
 {
+    /// <summary>What the board says while a unit without a Funkrufname is held over the Einsatzleitung.</summary>
+    public const string FuehrungsfahrzeugNeedsCallSign = "Führungsfahrzeug wird nur eine Einheit mit Funkrufname.";
+
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly Action<string, string, Action, string>? _requestConfirm;
@@ -118,6 +121,13 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     private Guid? _draggingNodeId;
 
     public bool IsDraggingNode => DraggingNodeId is not null;
+
+    /// <summary>
+    /// Why the place under a dragged unit or card refuses it, in German; null while it is allowed,
+    /// would change nothing, or nothing is held. Set by the Preview methods, cleared with the drag.
+    /// </summary>
+    [ObservableProperty]
+    private string? _dropRefusal;
 
     /// <summary>What + RETTUNGSDIENST says it does, or why it is off.</summary>
     [ObservableProperty]
@@ -236,6 +246,9 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
         // A card a refresh added mid-hover (a peer formed an Abschnitt) takes the highlight too.
         ApplyFunkgruppeHighlight();
+
+        // A row or card a refresh rebuilt mid-drag (a peer's change) keeps the mark of the one held.
+        ApplyDragged();
     }
 
     // The reporting-line rows that stand for a command node, paired with it so no caller has to
@@ -443,7 +456,74 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         }
     }
 
-    public void EndDrag() => DraggingUnitId = null;
+    public void EndDrag()
+    {
+        DraggingUnitId = null;
+        DropRefusal = null;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="unitId"/> may drop on <paramref name="nodeId"/>, as <see cref="CanMoveUnit"/>
+    /// says, and why not in <see cref="DropRefusal"/>. Only a partner's Einsatzleitung has a reason
+    /// to give; the unit's own card refuses in silence, since nothing would change.
+    /// </summary>
+    public bool PreviewUnitDrop(Guid unitId, Guid? nodeId)
+    {
+        var can = CanMoveUnit(unitId, nodeId);
+        DropRefusal = !can && !IsReadOnly
+            && nodeId is { } id && _incident.FindCommandNode(id) is { Kind: CommandNodeKind.Partner }
+            ? Incident.PartnerLeadsNoUnits
+            : null;
+        return can;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="unitId"/> may become the Führungsfahrzeug by a drop, as
+    /// <see cref="CanAssignFuehrungsfahrzeug"/> says, and why not in <see cref="DropRefusal"/>.
+    /// </summary>
+    public bool PreviewFuehrungsfahrzeugDrop(Guid unitId)
+    {
+        var can = CanAssignFuehrungsfahrzeug(unitId);
+        DropRefusal = !can && !IsReadOnly
+            && _incident.Forces.FirstOrDefault(u => u.Id == unitId) is { } unit && string.IsNullOrWhiteSpace(unit.CallSign)
+            ? FuehrungsfahrzeugNeedsCallSign
+            : null;
+        return can;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="nodeId"/> may drop there, as <see cref="CanMoveNode"/> says, and the
+    /// rule that refuses it in <see cref="DropRefusal"/>. A place that would change nothing says nothing.
+    /// </summary>
+    public bool PreviewNodeDrop(Guid nodeId, Guid? parentId, Guid? beforeNodeId)
+    {
+        var can = CanMoveNode(nodeId, parentId, beforeNodeId);
+        DropRefusal = can || IsReadOnly ? null : CommandNodeMoves.Refusal(_incident, nodeId, parentId, beforeNodeId);
+        return can;
+    }
+
+    /// <summary>The pointer is over no place: nothing to explain.</summary>
+    public void ClearDropPreview() => DropRefusal = null;
+
+    partial void OnDraggingUnitIdChanged(Guid? value) => ApplyDragged();
+
+    partial void OnDraggingNodeIdChanged(Guid? value) => ApplyDragged();
+
+    // Marks the unit and the card being dragged where they stand, a waiting unit in every
+    // Bereitstellungsraum that shows it.
+    private void ApplyDragged()
+    {
+        var cards = Sections.Concat(Sections.SelectMany(c => c.Children)).ToList();
+        foreach (var row in cards.SelectMany(c => c.Units).Concat(UnplacedUnits))
+        {
+            row.IsDragged = row.Id == DraggingUnitId;
+        }
+
+        foreach (var card in cards)
+        {
+            card.IsDragged = card.Id == DraggingNodeId;
+        }
+    }
 
     /// <summary>
     /// Whether <paramref name="nodeId"/> may go under <paramref name="parentId"/> (null: the top level)
@@ -508,7 +588,11 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         }
     }
 
-    public void EndNodeDrag() => DraggingNodeId = null;
+    public void EndNodeDrag()
+    {
+        DraggingNodeId = null;
+        DropRefusal = null;
+    }
 
     /// <summary>
     /// Lights up every line on the board with the same Funkgruppe as <paramref name="line"/>: same

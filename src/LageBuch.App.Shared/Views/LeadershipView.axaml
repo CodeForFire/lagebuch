@@ -83,6 +83,31 @@
     <Style Selector="Border#ElCard.drop-target SelectableTextBlock#ElFahrzeug">
       <Setter Property="Foreground" Value="{StaticResource FocusBrush}" />
     </Style>
+    <!-- What is held, dimmed where it came from: no drag picture follows the pointer, so this is
+         how the Lagebuchführer sees which unit or card is in hand. -->
+    <Style Selector="Grid.unit-row.dragged">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <Style Selector="Border.board-card.dragged">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <!-- Why a place refuses: amber like the board's other hints, not red, since nothing went wrong. -->
+    <Style Selector="Border.drop-refusal">
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Bottom" />
+      <Setter Property="Margin" Value="16,0,16,16" />
+      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+    </Style>
+    <Style Selector="Border.drop-refusal > TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
 
     <!-- Moving a card: a cyan line above the head it would land before, and two strips that show
          only while a card is dragged (into an Abschnitt, last at the top level). -->
@@ -303,7 +328,7 @@
     <!-- One unit: on a card a row of the units table, in the strip a chip. The grip starts a drag on
          the desktop; the picker moves the unit anywhere, and is the phone's only way. -->
     <DataTemplate x:Key="UnitRowTemplate" x:DataType="vm:BoardUnitRow">
-      <Grid RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+      <Grid Classes="unit-row" Classes.dragged="{Binding IsDragged}" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
           <ColumnDefinition Width="*" />
@@ -499,7 +524,8 @@
     <!-- A Bereitstellung, Abschnitt, Unterabschnitt or partner Einsatzleitung. Children use the same
          template, so an Unterabschnitt card is drawn inside its Abschnitt's. -->
     <DataTemplate DataType="vm:BoardNodeCard" x:DataType="vm:BoardNodeCard">
-      <Border Classes="board-card" x:Name="NodeCard" Classes.unterabschnitt="{Binding IsUnterabschnitt}">
+      <Border Classes="board-card" x:Name="NodeCard" Classes.unterabschnitt="{Binding IsUnterabschnitt}"
+              Classes.dragged="{Binding IsDragged}">
         <!-- One shared-size scope per card, so the SUMME row lines up with the units table above it. -->
         <StackPanel Spacing="8" Grid.IsSharedSizeScope="True">
           <!-- The card's head is also where a dragged card lands to be placed before this one; the
@@ -656,6 +682,8 @@
     </DataTemplate>
   </UserControl.DataTemplates>
 
+  <!-- The board, and over its foot the reason a place refuses what is held over it. -->
+  <Panel>
   <ScrollViewer x:Name="BoardScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <StackPanel x:Name="BoardRoot" Spacing="14" Background="Transparent" Classes.dragging-node="{Binding IsDraggingNode}"
                 IsEnabled="{Binding !IsReadOnly}" DragDrop.AllowDrop="{Binding !IsReadOnly}">
@@ -783,4 +811,12 @@
       </ItemsControl>
     </StackPanel>
   </ScrollViewer>
+
+  <!-- Over the board, not in it: it neither moves the cards under the pointer nor scrolls away,
+       and it takes no hits, so the drop still lands on the card beneath. -->
+  <Border x:Name="DropRefusalBanner" Classes="drop-refusal" IsHitTestVisible="False"
+          IsVisible="{Binding DropRefusal, Converter={x:Static ObjectConverters.IsNotNull}}">
+    <TextBlock x:Name="DropRefusalText" Text="{Binding DropRefusal}" />
+  </Border>
+  </Panel>
 </UserControl>
