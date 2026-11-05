@@ -122,13 +122,6 @@
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
-    <!-- The picker's label at the size of the row around it, not the global TextBlock's 14. -->
-    <Style Selector="ctrl|NodeChoicePicker TextBlock">
-      <Setter Property="FontSize" Value="12" />
-    </Style>
-    <Style Selector="ctrl|NodeChoicePicker.unit-picker">
-      <Setter Property="Height" Value="26" />
-    </Style>
     <Style Selector="TextBlock.field-value, SelectableTextBlock.field-value">
       <Setter Property="FontSize" Value="14" />
       <Setter Property="TextWrapping" Value="Wrap" />
@@ -218,7 +211,8 @@
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <!-- On a phone the picker is the only way to move a unit: a thumb target. -->
-    <Style Selector="Panel#WorkspaceRoot.narrow ctrl|NodeChoicePicker.unit-picker">
+    <Style Selector="Panel#WorkspaceRoot.narrow ctrl|NodeChoicePicker.unit-picker Button#PickerButton">
+      <Setter Property="Width" Value="{StaticResource ControlHeightTouch}" />
       <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow TextBlock.dissolve-reason.blocked">
@@ -250,12 +244,13 @@
     <!-- One unit: on a card a row of the units table, in the strip a chip. The grip starts a drag on
          the desktop; the picker moves the unit anywhere, and is the phone's only way. -->
     <DataTemplate x:Key="UnitRowTemplate" x:DataType="vm:BoardUnitRow">
-      <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+      <Grid RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardGrip" />
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardStrength" />
           <ColumnDefinition Width="Auto" SharedSizeGroup="BoardAgt" />
+          <ColumnDefinition Width="Auto" SharedSizeGroup="BoardMove" />
         </Grid.ColumnDefinitions>
         <Border Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Classes="unit-grip" x:Name="UnitGrip"
                 ToolTip.Tip="Ziehen, um die Einheit zu verschieben"
@@ -264,20 +259,21 @@
                     Data="M9,3H11V5H9V3M13,3H15V5H13V3M9,7H11V9H9V7M13,7H15V9H13V7M9,11H11V13H9V11M13,11H15V13H13V11M9,15H11V17H9V15M13,15H15V17H13V15M9,19H11V21H9V19M13,19H15V21H13V19Z" />
         </Border>
         <!-- The Funkrufname is the unit's name on the sheet: never trimmed, wrapped if it must. -->
-        <SelectableTextBlock Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitTitle" Classes="unit-title"
+        <SelectableTextBlock Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="4" x:Name="UnitTitle" Classes="unit-title"
                    Text="{Binding Title}" ToolTip.Tip="{Binding Title}" />
         <!-- No Wache under it: the Funkrufname already names the Wache ("FFB 1/40/1"). The strength
              keeps its own line, so a long Funkrufname above it still fits on one. -->
-        <TextBlock Grid.Row="1" Grid.Column="2" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
+        <TextBlock Grid.Row="1" Grid.Column="2" x:Name="UnitStrength" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
                    Text="{Binding StrengthText}" ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt" />
         <TextBlock Grid.Row="1" Grid.Column="3" Classes="mono" VerticalAlignment="Center" HorizontalAlignment="Right"
                    MinWidth="22" TextAlignment="Right"
                    Text="{Binding ScbaCount}" ToolTip.Tip="davon Atemschutzgeräteträger" />
-        <ctrl:NodeChoicePicker Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitNodePicker" Classes="unit-picker"
-                               HorizontalAlignment="Left" MinWidth="80" MaxWidth="200"
+        <!-- An icon, not the node's name: the card it sits on already says that. -->
+        <ctrl:NodeChoicePicker Grid.Row="1" Grid.Column="4" x:Name="UnitNodePicker" Classes="unit-picker"
+                               IsIconOnly="True" VerticalAlignment="Center"
                                Choices="{Binding NodeChoices}" Label="{Binding NodeLabel}" />
         <!-- #825: shown in every Bereitstellungsraum by its status alone, until one is picked. -->
-        <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" x:Name="UnitWaitingHint" Classes="board-hint"
+        <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="4" x:Name="UnitWaitingHint" Classes="board-hint"
                    Text="{x:Static vm:BoardUnitRow.WaitingText}" IsVisible="{Binding IsWaitingByStatus}"
                    ToolTip.Tip="Der Status sagt Bereitstellungsraum, die Einheit steht aber in keinem. Raum im Auswahlfeld wählen oder hineinziehen." />
       </Grid>
@@ -528,6 +524,7 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BoardStrength" />
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BoardAgt" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardMove" />
               </Grid.ColumnDefinitions>
               <TextBlock Grid.Column="1" Classes="field-label" Text="EINHEITEN" />
               <TextBlock Grid.Column="2" Classes="field-label" Text="STÄRKE" HorizontalAlignment="Right"
@@ -554,6 +551,7 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BoardStrength" />
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BoardAgt" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BoardMove" />
               </Grid.ColumnDefinitions>
               <TextBlock Grid.Column="1" x:Name="NodeStrengthLabel" Classes="field-label" Text="{Binding StrengthLabel}"
                          VerticalAlignment="Center" />

@@ -9,10 +9,18 @@
        and not a ComboBox: a selection bound to a domain write re-enters through Changed mid-update
        (see SafetyTruppChoice). The entry in force is marked rather than styled, so it still reads
        at a glance on the ELW's dimmed screen. -->
+  <!-- IsIconOnly swaps the label for a move icon and takes the shared icon-btn look; the tooltip
+       still names the entry in force. -->
   <Button x:Name="PickerButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
           Padding="8,4" FontSize="12"
+          Classes.icon-btn="{Binding IsIconOnly, ElementName=Root}"
           ToolTip.Tip="{Binding Label, ElementName=Root}" AutomationProperties.Name="{Binding PickerName, ElementName=Root}">
-    <TextBlock Text="{Binding Label, ElementName=Root}" TextTrimming="CharacterEllipsis" />
+    <Panel>
+      <TextBlock Text="{Binding Label, ElementName=Root}" TextTrimming="CharacterEllipsis"
+                 IsVisible="{Binding !IsIconOnly, ElementName=Root}" />
+      <PathIcon IsVisible="{Binding IsIconOnly, ElementName=Root}"
+                Data="M6.99 11 3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" />
+    </Panel>
     <Button.Flyout>
       <Flyout Placement="BottomEdgeAlignedLeft">
         <ItemsControl ItemsSource="{Binding Choices, ElementName=Root}" MinWidth="190">

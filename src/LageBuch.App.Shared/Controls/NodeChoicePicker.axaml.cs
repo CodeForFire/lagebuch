@@ -21,6 +21,13 @@ public partial class NodeChoicePicker : UserControl
     public static readonly StyledProperty<string> PickerNameProperty =
         AvaloniaProperty.Register<NodeChoicePicker, string>(nameof(PickerName), "Abschnitt wählen");
 
+    /// <summary>
+    /// A move icon in place of the label, where the picker's surroundings already name the entry
+    /// in force (a unit on a Führung board card). The tooltip still names it.
+    /// </summary>
+    public static readonly StyledProperty<bool> IsIconOnlyProperty =
+        AvaloniaProperty.Register<NodeChoicePicker, bool>(nameof(IsIconOnly));
+
     public NodeChoicePicker() => InitializeComponent();
 
     public IReadOnlyList<NodeChoice>? Choices
@@ -39,6 +46,12 @@ public partial class NodeChoicePicker : UserControl
     {
         get => GetValue(PickerNameProperty);
         set => SetValue(PickerNameProperty, value);
+    }
+
+    public bool IsIconOnly
+    {
+        get => GetValue(IsIconOnlyProperty);
+        set => SetValue(IsIconOnlyProperty, value);
     }
 
     // A Button inside a Flyout does not dismiss it, and the row owning the picker is kept across

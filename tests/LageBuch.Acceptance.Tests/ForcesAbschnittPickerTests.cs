@@ -54,6 +54,10 @@ public class ForcesAbschnittPickerTests
             .Where(b => AutomationProperties.GetName(b) == PickerName && b.IsEffectivelyVisible)
             .ToList();
 
+    // What the picker reads, the label the Kräfte list shows rather than the board's icon.
+    private static string LabelOf(Button picker) =>
+        picker.GetVisualDescendants().OfType<TextBlock>().Single(t => t.IsEffectivelyVisible).Text!;
+
     private static void Capture(Visual visual, string name)
     {
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
@@ -109,7 +113,7 @@ public class ForcesAbschnittPickerTests
         Assert.Equal(2, pickers.Count);
         Assert.Equal(
             new[] { "—", "Abschnitt 1 / Nord" }, // by Funkrufname: Aich before Emmering
-            pickers.Select(p => ((TextBlock)p.Content!).Text!));
+            pickers.Select(p => LabelOf(p)));
         Assert.All(pickers, p => Assert.False(string.IsNullOrEmpty(ToolTip.GetTip(p) as string)));
         Capture(window, "kraefte-abschnitt-after.png");
     }
@@ -147,7 +151,7 @@ public class ForcesAbschnittPickerTests
         Assert.False(picker.Flyout.IsOpen);
 
         Assert.Equal("Bereitstellung Marktplatz", vm.Forces[0].NodeLabel);
-        Assert.Equal("Bereitstellung Marktplatz", ((TextBlock)picker.Content!).Text!);
+        Assert.Equal("Bereitstellung Marktplatz", LabelOf(picker));
     }
 
     [AvaloniaFact]
@@ -160,7 +164,7 @@ public class ForcesAbschnittPickerTests
         Assert.Equal(2, pickers.Count);
         Assert.Equal(
             new[] { NodeChoices.UnplacedLabel, "Abschnitt 1 / Nord" },
-            pickers.Select(p => ((TextBlock)p.Content!).Text!));
+            pickers.Select(p => LabelOf(p)));
         Assert.Equal(2, cards.GetVisualDescendants().OfType<TextBlock>().Count(t => t.Text == "ABSCHNITT"));
         Capture(window, "kraefte-abschnitt-narrow.png");
     }
