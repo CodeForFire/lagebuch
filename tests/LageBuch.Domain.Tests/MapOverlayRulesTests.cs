@@ -77,6 +77,17 @@ public class MapOverlayRulesTests
     }
 
     [Fact]
+    public void A_closed_Einsatz_keeps_its_Ebenen()
+    {
+        var (incident, clock, op) = NewIncident();
+        var overlay = Import(incident, clock, op, new MapOverlaySummary("a", 1, null, null));
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(() => incident.RemoveMapOverlay(clock, op, overlay.Id));
+        Assert.Single(incident.MapOverlays);
+    }
+
+    [Fact]
     public void Removing_an_Ebene_whose_file_is_already_gone_returns_no_file()
     {
         var overlay = MapOverlay.Rehydrate(Guid.NewGuid(), Guid.NewGuid(), "a", T0, "Muster", 1, null, null);
