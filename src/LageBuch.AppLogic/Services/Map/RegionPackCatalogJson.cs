@@ -8,7 +8,7 @@ namespace LageBuch.AppLogic.Services.Map;
 /// Reads the Kartenpaket catalogue, <c>packs.json</c> of <c>CodeForFire/lagebuch-geodata</c>
 /// (format version 2, its <c>FORMAT.md</c>). The catalogue comes from the network, so an entry
 /// missing a field, carrying a slug that could name a path, a bounding box off the globe or a
-/// checksum that is no SHA-256 is skipped rather than trusted.
+/// checksum that is no SHA-256 is skipped rather than trusted, as is a second entry for a slug.
 /// </summary>
 public static partial class RegionPackCatalogJson
 {
@@ -54,9 +54,11 @@ public static partial class RegionPackCatalogJson
             }
 
             var packs = new List<RegionPackInfo>();
+            var slugs = new HashSet<string>(StringComparer.Ordinal);
             foreach (var entry in entries.EnumerateArray().Take(MaxEntries))
             {
-                if (TryParseEntry(entry, out var pack))
+                // A slug names one folder on the device, so only its first entry counts.
+                if (TryParseEntry(entry, out var pack) && slugs.Add(pack.Slug))
                 {
                     packs.Add(pack);
                 }

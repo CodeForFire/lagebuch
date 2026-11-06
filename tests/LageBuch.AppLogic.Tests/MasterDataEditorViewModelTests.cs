@@ -1278,22 +1278,55 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
-    public void Without_a_map_library_the_editor_has_no_Karten_section() =>
-        Assert.Empty(Vm(new InMemoryProvider()).Sections.OfType<MapPacksSection>());
+    public void Without_a_map_library_the_editor_has_no_Karten_section()
+    {
+        var vm = Vm(new InMemoryProvider());
+
+        Assert.Empty(vm.DeviceSections);
+        Assert.Empty(vm.Sections.OfType<MapPacksSection>());
+    }
 
     [Fact]
-    public void The_Karten_section_survives_a_reload_and_never_makes_the_editor_dirty()
+    public void Karten_is_its_own_rail_group_not_one_of_the_Stammdaten_categories()
+    {
+        var vm = new MasterDataEditorViewModel(new InMemoryProvider(), new FakeDialogs(), new FakeFileService(), new FakeRegionPackLibrary());
+
+        Assert.Equal("Karten", Assert.Single(vm.DeviceSections).Title);
+        Assert.DoesNotContain(vm.Sections, s => s is MapPacksSection);
+    }
+
+    [Fact]
+    public void Opening_Karten_fetches_the_catalogue_and_opening_it_again_does_not()
+    {
+        var library = new FakeRegionPackLibrary { Catalogue = [FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck")] };
+        var vm = new MasterDataEditorViewModel(new InMemoryProvider(), new FakeDialogs(), new FakeFileService(), library);
+        var karten = vm.DeviceSections.Single();
+        Assert.Empty(karten.Packs);
+
+        vm.SelectedSection = karten;
+        Assert.Single(karten.Packs);
+
+        library.Catalogue = [];
+        vm.SelectedSection = vm.Sections[0];
+        vm.SelectedSection = karten;
+        Assert.Single(karten.Packs);
+    }
+
+    [Fact]
+    public void The_Karten_section_survives_a_reload_stays_selected_and_never_makes_the_editor_dirty()
     {
         var library = new FakeRegionPackLibrary();
         library.Preinstall(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck"));
         var vm = new MasterDataEditorViewModel(new InMemoryProvider(), new FakeDialogs(), new FakeFileService(), library);
-        var karten = vm.Sections.OfType<MapPacksSection>().Single();
+        var karten = vm.DeviceSections.Single();
+        vm.SelectedSection = karten;
 
         karten.SelectedPack = null;
         Roles(vm).AddCommand.Execute(null);
         vm.DiscardCommand.Execute(null);
 
-        Assert.Same(karten, vm.Sections.OfType<MapPacksSection>().Single());
+        Assert.Same(karten, vm.DeviceSections.Single());
+        Assert.Same(karten, vm.SelectedSection);
         Assert.False(vm.IsDirty);
     }
 

@@ -294,6 +294,46 @@
                   </ListBox.ItemTemplate>
                 </ListBox>
 
+                <!-- What lives on this device rather than in the Stammdaten: Karten downloads from
+                     the internet and acts at once, where everything above waits for SPEICHERN. Its
+                     own group so it is not mistaken for one more category. Collapsed without a map
+                     library, the way the Checklisten list is when empty. -->
+                <StackPanel x:Name="DeviceGroup" IsVisible="{Binding DeviceSections.Count}">
+                  <Grid ColumnDefinitions="Auto,*" Margin="6,10,6,8">
+                    <TextBlock Grid.Column="0" Text="AUF DIESEM GERÄT" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" />
+                    <Border Grid.Column="1" Height="1" Background="{StaticResource HairlineBrush}"
+                            VerticalAlignment="Center" Margin="10,0,0,0" />
+                  </Grid>
+                  <ListBox x:Name="DeviceSectionList"
+                           ItemsSource="{Binding DeviceSections}"
+                           SelectedItem="{Binding SelectedSection}"
+                           AutomationProperties.Name="Auf diesem Gerät"
+                           ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                    <ListBox.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel />
+                      </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:MapPacksSection">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                          <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding Title}" />
+                            <TextBlock x:Name="MapPacksRailSummary" Text="{Binding RailSummary}" FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <!-- Says what sets it apart: it fetches data. Decorative; the summary
+                               line carries the meaning for a screen reader. -->
+                          <PathIcon Grid.Column="1" Width="16" Height="16" VerticalAlignment="Center"
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    Data="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z" />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </StackPanel>
+
                 <!-- Group heading: the HomeView idiom, an overline plus a hairline rule. -->
                 <Grid ColumnDefinitions="Auto,*" Margin="6,10,6,8">
                   <TextBlock Grid.Column="0" Text="CHECKLISTEN" Classes="overline" FontSize="10"
@@ -600,14 +640,30 @@
                                  Margin="0,0,0,12"
                                  Text="Kartenpakete liegen auf diesem Gerät, nicht in den Stammdaten. Jedes Gerät lädt seine eigenen; die Karte braucht danach kein Internet." />
 
-                      <TextBlock Text="AUF DIESEM GERÄT" Classes="overline" FontSize="10" Margin="0,0,0,6" />
+                      <!-- One list, whatever the state: what is on the device, what can be updated,
+                           what the catalogue offers. Each row carries its own action, and a download
+                           shows its progress in the row it fetches, not somewhere under the list. -->
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                        <TextBlock Grid.Column="0" Text="KARTENPAKETE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                          <TextBlock x:Name="MapCatalogLoading" Text="Liste wird geladen …" VerticalAlignment="Center"
+                                     Foreground="{StaticResource TextMutedBrush}" FontSize="12"
+                                     IsVisible="{Binding IsCatalogLoading}" />
+                          <Button x:Name="LoadMapCatalogButton" Classes="ghost" Content="LISTE NEU LADEN"
+                                  Command="{Binding LoadCatalogCommand}" />
+                        </StackPanel>
+                      </Grid>
+                      <!-- Above the list, so a catalogue that could not be fetched is read before the
+                           list that lacks it. -->
+                      <TextBlock x:Name="MapPacksStatus" Text="{Binding Status}" TextWrapping="Wrap"
+                                 Margin="0,0,0,8" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.IsNotNull}}" />
                       <TextBlock x:Name="NoMapPacksHint" Text="Noch kein Kartenpaket installiert."
-                                 Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,12"
+                                 Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,8"
                                  IsVisible="{Binding !HasInstalled}" />
-                      <ListBox x:Name="InstalledMapPacks" Margin="0,0,0,12"
-                               AutomationProperties.Name="Installierte Kartenpakete"
-                               ItemsSource="{Binding Installed}" SelectedItem="{Binding SelectedPack}"
-                               IsVisible="{Binding HasInstalled}"
+                      <ListBox x:Name="MapPackList" Margin="0,0,0,12"
+                               AutomationProperties.Name="Kartenpakete"
+                               ItemsSource="{Binding Packs}" SelectedItem="{Binding SelectedPack}"
+                               Grid.IsSharedSizeScope="True"
                                ScrollViewer.VerticalScrollBarVisibility="Disabled">
                         <!-- Disabled and a plain StackPanel, as the category rail does: the list
                              takes its full height and leaves the wheel to MapPacksScroll. -->
@@ -617,53 +673,66 @@
                           </ItemsPanelTemplate>
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
-                          <DataTemplate x:DataType="vm:InstalledMapPackRow">
-                            <Grid ColumnDefinitions="*,32">
-                              <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
+                          <DataTemplate x:DataType="vm:MapPackRow">
+                            <!-- The state chip sits beside the name rather than in a column of its
+                                 own, so a phone wraps it under the name instead of squeezing both.
+                                 The action column is shared, so the buttons line up row to row. -->
+                            <Grid>
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="MapPackAction" />
+                              </Grid.ColumnDefinitions>
+                              <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="2">
+                                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                  <Border CornerRadius="{StaticResource RadiusSm}" Padding="6,1" VerticalAlignment="Center"
+                                          BorderBrush="{StaticResource ActiveBrush}" BorderThickness="1"
+                                          IsVisible="{Binding IsCurrent}">
+                                    <TextBlock Text="Installiert" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource ActiveBrush}" />
+                                  </Border>
+                                  <Border CornerRadius="{StaticResource RadiusSm}" Padding="6,1" VerticalAlignment="Center"
+                                          BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                                          IsVisible="{Binding HasUpdate}">
+                                    <TextBlock Text="Update verfügbar" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{StaticResource AmberBrush}" />
+                                  </Border>
+                                </WrapPanel>
+                                <StackPanel IsVisible="{Binding ShowsDetail}">
+                                  <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMutedBrush}" FontSize="12"
+                                             TextWrapping="Wrap" />
+                                  <TextBlock Text="{Binding UpdateReason}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                             TextWrapping="Wrap"
+                                             IsVisible="{Binding UpdateReason, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                </StackPanel>
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0" IsVisible="{Binding IsDownloading}">
+                                  <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding Progress}"
+                                               VerticalAlignment="Center" AutomationProperties.Name="Fortschritt" />
+                                  <TextBlock Grid.Column="1" Text="{Binding ProgressText}" Margin="10,0,0,0" FontSize="12"
+                                             Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                </Grid>
                               </StackPanel>
-                              <!-- ReflectionBinding: the section command lives on the ListBox's DataContext,
-                                   object-typed under compiled bindings. -->
-                              <Button Grid.Column="1" Classes="icon-btn" ToolTip.Tip="Kartenpaket löschen"
-                                      AutomationProperties.Name="Kartenpaket löschen"
-                                      Command="{ReflectionBinding $parent[ListBox].DataContext.RemoveCommand}"
-                                      CommandParameter="{Binding}">
-                                <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                              </Button>
+                              <!-- ReflectionBinding: the section's commands live on the ListBox's
+                                   DataContext, object-typed under compiled bindings. -->
+                              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"
+                                          HorizontalAlignment="Right">
+                                <Button Classes="signal" Content="{Binding ActionLabel}" IsVisible="{Binding ShowsAction}"
+                                        Command="{ReflectionBinding $parent[ListBox].DataContext.InstallCommand}"
+                                        CommandParameter="{Binding}" />
+                                <Button Classes="ghost" Content="ABBRECHEN" IsVisible="{Binding IsDownloading}"
+                                        Command="{ReflectionBinding $parent[ListBox].DataContext.CancelInstallCommand}" />
+                                <Button Classes="icon-btn" ToolTip.Tip="Kartenpaket löschen"
+                                        AutomationProperties.Name="Kartenpaket löschen"
+                                        IsVisible="{Binding ShowsRemove}"
+                                        Command="{ReflectionBinding $parent[ListBox].DataContext.RemoveCommand}"
+                                        CommandParameter="{Binding}">
+                                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                </Button>
+                              </StackPanel>
                             </Grid>
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
-
-                      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
-                        <TextBlock Grid.Column="0" Text="VERFÜGBAR" Classes="overline" FontSize="10" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" x:Name="LoadMapCatalogButton" Classes="ghost" Content="LISTE LADEN"
-                                Command="{Binding LoadCatalogCommand}" />
-                      </Grid>
-                      <ItemsControl ItemsSource="{Binding Available}" Margin="0,0,0,6">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:AvailableMapPackRow">
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
-                              <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" />
-                                <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" />
-                                <TextBlock Text="{Binding UpdateReason}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap"
-                                           IsVisible="{Binding UpdateReason, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                              </StackPanel>
-                              <Button Grid.Column="1" Classes="signal" Content="{Binding ActionLabel}"
-                                      Command="{ReflectionBinding $parent[ItemsControl].DataContext.InstallCommand}"
-                                      CommandParameter="{Binding}" />
-                            </Grid>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}"
-                                   Margin="0,0,0,6" IsVisible="{Binding IsBusy}"
-                                   AutomationProperties.Name="Fortschritt" />
-                      <TextBlock x:Name="MapPacksStatus" Text="{Binding Status}" TextWrapping="Wrap"
-                                 Margin="0,0,0,12" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.IsNotNull}}" />
                     </StackPanel>
                   </ScrollViewer>
 
@@ -697,6 +766,12 @@
                           <c:CompassNeedle Angle="{Binding Preview.Rotation}" />
                         </Button>
                       </StackPanel>
+                      <!-- A pack picked that is not on the device yet has nothing to show. -->
+                      <Border x:Name="NoMapPreviewHint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Background="{StaticResource SurfaceRaisedBrush}" CornerRadius="{StaticResource RadiusSm}"
+                              Padding="12,6" IsVisible="{Binding HasNoPreview}">
+                        <TextBlock Text="Vorschau nach dem Herunterladen." Foreground="{StaticResource TextSecondaryBrush}" />
+                      </Border>
                       <!-- ODbL: every map drawn from OSM data names its source. -->
                       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#CCFFFFFF" Padding="4,1">
                         <TextBlock x:Name="MapAttribution" Text="{Binding Preview.Attribution}" FontSize="10"

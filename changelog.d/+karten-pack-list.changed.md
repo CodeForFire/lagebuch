@@ -1,0 +1,1 @@
+Karten has its own place in the Stammdaten rail under "Auf diesem Gerät", and its Kartenpakete are one list that loads by itself, shows each pack as installed, updatable or new, and draws a download's progress in that pack's own row with a way to cancel it.
