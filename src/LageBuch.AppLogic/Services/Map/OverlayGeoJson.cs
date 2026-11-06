@@ -296,7 +296,7 @@ public static class OverlayGeoJson
         var name = string.IsNullOrEmpty(aegl) ? "Konzentration" : char.ToUpperInvariant(aegl[0]) + aegl[1..];
         var threshold = Text(properties, "thr_ppm")?.Trim() ?? Number(properties, "thr_ppm")?.ToString(CultureInfo.InvariantCulture);
         var label = string.IsNullOrEmpty(threshold) ? name : $"{name} > {threshold} ppm";
-        return label.Length > MaxLabelLength ? label[..MaxLabelLength] : label;
+        return label[..Math.Min(label.Length, MaxLabelLength)];
     }
 
     private sealed class Reader

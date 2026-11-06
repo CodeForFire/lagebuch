@@ -135,6 +135,48 @@ public class OverlayGeoJsonTests
         Assert.Equal("Stoff > 1e-08 ppm", legend.Label);
     }
 
+    [Theory]
+    [InlineData("\"aegl\": \"AEGL-2\", \"thr_ppm\": \"12\"", "AEGL-2 > 12 ppm")]
+    [InlineData("\"aegl\": \"stoff\", \"thr_ppm\": 0.5", "Stoff > 0.5 ppm")]
+    [InlineData("\"aegl\": \"stoff\"", "Stoff")]
+    [InlineData("\"aegl\": \" \", \"thr_ppm\": \"3\"", "Konzentration > 3 ppm")]
+    [InlineData("\"thr_ppm\": \" 3 \"", "Konzentration > 3 ppm")]
+    public void A_DWD_legend_names_the_class_and_its_threshold_as_far_as_the_file_says(string properties, string label)
+    {
+        var json = $$$"""{"type": "Feature", "properties": {"pixelvalue": 2, "ftime": "2026-03-14T09:00:00Z", {{{properties}}}}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        Assert.Equal(label, Assert.Single(Parse(Utf8(json)).Legend).Label);
+    }
+
+    [Fact]
+    public void A_DWD_legend_lists_each_colour_once_and_twelve_at_most()
+    {
+        var features = string.Join(",", Enumerable.Range(0, 14).Select(i =>
+            $$$"""{"type": "Feature", "properties": {"pixelvalue": {{{i + 1}}}, "ftime": "2026-03-14T09:00:00Z", "fill": "#0000{{{i:X2}}}"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}"""));
+        var repeated = $$$"""{"type": "Feature", "properties": {"pixelvalue": 1, "ftime": "2026-03-14T09:00:00Z", "fill": "#000000"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        var legend = Parse(Utf8($$$"""{"type": "FeatureCollection", "features": [{{{repeated}}}, {{{features}}}]}""")).Legend;
+
+        Assert.Equal(OverlayGeoJson.MaxLegendEntries, legend.Count);
+        Assert.Equal(legend.Count, legend.Select(e => e.FillArgb).Distinct().Count());
+    }
+
+    [Fact]
+    public void A_long_DWD_class_name_is_cut()
+    {
+        var json = $$$"""{"type": "Feature", "properties": {"pixelvalue": 1, "ftime": "2026-03-14T09:00:00Z", "aegl": "{{{new string('a', 300)}}}"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        Assert.Equal(OverlayGeoJson.MaxLabelLength, Assert.Single(Parse(Utf8(json)).Legend).Label.Length);
+    }
+
+    [Fact]
+    public void A_point_s_outline_is_its_marker_colour_not_a_stroke()
+    {
+        var json = """{"type": "Feature", "properties": {"marker-color": "#778899", "stroke": "#112233"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        Assert.Equal(0x778899u, Parse(Utf8(json)).Frames[0].Shapes[0].Style.StrokeArgb & 0xFFFFFF);
+    }
+
     [Fact]
     public void A_file_that_is_not_a_DWD_forecast_has_no_legend_and_keeps_every_feature()
     {

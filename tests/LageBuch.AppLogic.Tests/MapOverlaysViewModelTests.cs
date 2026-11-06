@@ -196,6 +196,58 @@ public sealed class MapOverlaysViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task The_Zeitleiste_steps_stop_at_either_end()
+    {
+        var (_, vm, dialogs, _) = Open();
+        dialogs.Next = Write("prognose.geojson", Forecast);
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+        var item = Assert.Single(vm.Items);
+
+        item.FrameIndex = 0;
+        Assert.False(item.PreviousFrameCommand.CanExecute(null));
+        Assert.True(item.NextFrameCommand.CanExecute(null));
+
+        item.FrameIndex = item.MaxFrameIndex;
+        Assert.True(item.PreviousFrameCommand.CanExecute(null));
+        Assert.False(item.NextFrameCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task The_legend_shows_only_for_a_shown_Ebene_that_has_one()
+    {
+        var (_, vm, dialogs, _) = Open();
+        dialogs.Next = Write("d93_9.geojson", DwdForecast);
+        await vm.ImportCommand.ExecuteAsync(null);
+        dialogs.Next = Write("sperrgebiet.geojson", Sperrgebiet("x"));
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+        var (dwd, plain) = (vm.Items[0], vm.Items[1]);
+
+        Assert.False(dwd.IsVisible);
+        Assert.False(dwd.ShowsLegend);
+        Assert.True(plain.IsVisible);
+        Assert.Empty(plain.Legend);
+        Assert.False(plain.ShowsLegend);
+
+        dwd.IsVisible = true;
+        Assert.True(dwd.ShowsLegend);
+    }
+
+    [Fact]
+    public void An_Ebene_still_being_read_has_an_empty_legend()
+    {
+        var (session, _, _, _) = Open();
+        session.Incident.AddMapOverlay(
+            new FixedClock(T0), new SessionOperator("Bauer", "FFB 3"), Guid.NewGuid(), Guid.NewGuid(), "p.geojson", "application/geo+json", 10, new MapOverlaySummary("p", 1, null, null));
+
+        var item = new MapOverlaysViewModel(session, () => { }, null, null, new FixedClock(T0), _ => { }, Berlin).Items.Single();
+
+        Assert.Empty(item.Legend);
+        Assert.False(item.ShowsLegend);
+    }
+
+    [Fact]
     public async Task A_hidden_Ebene_shows_no_Zeitleiste_and_a_plain_one_never_does()
     {
         var (_, vm, dialogs, _) = Open();

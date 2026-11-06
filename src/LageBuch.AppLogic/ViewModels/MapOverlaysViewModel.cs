@@ -89,6 +89,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     /// </summary>
     public void Refresh()
     {
+        // Stryker disable once Update : only whether the count moved matters, never which way.
         _changes++;
         var overlays = _session.Incident.MapOverlays;
         if (!overlays.Select(o => o.Id).SequenceEqual(Items.Select(i => i.Id)))
