@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LageBuch.App.Shared;
 
@@ -6,7 +7,7 @@ namespace LageBuch.Acceptance.Tests;
 
 public class ViewLocatorTests
 {
-    [Fact]
+    [AvaloniaFact]
     public void Null_data_builds_the_placeholder()
     {
         var view = new ViewLocator().Build(null);
@@ -14,7 +15,7 @@ public class ViewLocatorTests
         Assert.Equal("—", Assert.IsType<TextBlock>(view).Text);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void A_view_model_without_a_view_builds_the_missing_view_message()
     {
         var view = new ViewLocator().Build(new MissingViewModel());
