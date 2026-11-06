@@ -114,6 +114,18 @@ public class RegionPackCatalogJsonTests
     }
 
     [Fact]
+    public void A_second_entry_with_a_slug_already_listed_is_skipped()
+    {
+        var twin = Ffb.Replace("Landkreis Fürstenfeldbruck", "Doppelt", StringComparison.Ordinal);
+        var sta = Ffb.Replace("\"slug\": \"ffb\"", "\"slug\": \"sta\"", StringComparison.Ordinal);
+
+        var packs = Catalogue($"[{Ffb},{twin},{sta}]");
+
+        Assert.Equal(["ffb", "sta"], packs.Select(p => p.Slug));
+        Assert.Equal("Landkreis Fürstenfeldbruck", packs[0].Name);
+    }
+
+    [Fact]
     public void A_bounding_box_spanning_the_whole_globe_is_on_it()
     {
         var world = Ffb.Replace(

@@ -215,7 +215,8 @@ public sealed partial class MapPacksSection : EditorSection
         // Stryker disable once Boolean : a pack row is never one the section added blank, so isBlank changes nothing.
         RemoveAfterConfirm(row, row.Name, isBlank: false, () =>
         {
-            if (string.Equals(SelectedPack?.Slug, row.Slug, StringComparison.Ordinal))
+            var wasSelected = string.Equals(SelectedPack?.Slug, row.Slug, StringComparison.Ordinal);
+            if (wasSelected)
             {
                 SelectedPack = null;
             }
@@ -230,7 +231,8 @@ public sealed partial class MapPacksSection : EditorSection
                 Status = e.Message;
             }
 
-            Rebuild();
+            // A pack that is gone matches no installed row, so a removal that worked falls back to the first.
+            Rebuild(wasSelected ? row.Slug : null);
         });
     }
 

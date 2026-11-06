@@ -312,6 +312,22 @@ public class MapPacksSectionTests
     }
 
     [Fact]
+    public void A_shown_pack_that_cannot_be_deleted_stays_shown()
+    {
+        var library = new FakeRegionPackLibrary();
+        library.Preinstall(Ffb);
+        library.Preinstall(Sta);
+        var section = new MapPacksSection("Karten", library);
+        section.SelectedPack = Row(section, "sta");
+        library.Failure = new RegionPackException("„Landkreis Starnberg“ konnte nicht gelöscht werden.");
+
+        section.RemoveCommand.Execute(Row(section, "sta"));
+
+        Assert.Equal("Landkreis Starnberg", section.SelectedPack?.Name);
+        Assert.Equal(Sta.Attribution, section.Preview.Attribution);
+    }
+
+    [Fact]
     public async Task While_the_list_loads_no_pack_can_be_installed()
     {
         var library = new FakeRegionPackLibrary { Catalogue = [Ffb] };
