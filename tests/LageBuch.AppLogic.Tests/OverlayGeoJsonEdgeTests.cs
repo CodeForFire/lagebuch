@@ -143,6 +143,75 @@ public class OverlayGeoJsonEdgeTests
         Assert.Equal(OverlayGeoJson.MaxEntries, Parse(Zip(entries)).Frames[0].Shapes.Count);
     }
 
+    // The end-of-central-directory record is the zip's last 22 bytes when it has no comment.
+    private static byte[] WithEndRecord(byte[] zip, ushort? entries = null, uint? size = null)
+    {
+        var copy = (byte[])zip.Clone();
+        var record = copy.AsSpan(copy.Length - 22);
+        if (entries is { } e)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(record[8..], e);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(record[10..], e);
+        }
+
+        if (size is { } s)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(record[12..], s);
+        }
+
+        return copy;
+    }
+
+    [Fact]
+    public void A_zip_declaring_more_entries_than_allowed_is_refused_before_its_directory_is_read()
+    {
+        // One real entry; the record claims 60,000 -- what a crafted 25 MB file can actually hold.
+        var zip = WithEndRecord(Zip(("a.geojson", Utf8(Point))), entries: 60_000);
+
+        Assert.Equal(OverlayGeoJson.TooManyEntriesMessage, Refused(zip));
+    }
+
+    [Fact]
+    public void A_zip_with_an_oversized_directory_is_refused_even_under_the_entry_cap()
+    {
+        var longName = new string('x', 3000) + ".txt";
+        var entries = Enumerable.Range(0, 90).Select(i => ($"{i:D2}{longName}", new byte[] { 1 })).ToArray();
+
+        Assert.Equal(OverlayGeoJson.TooManyEntriesMessage, Refused(Zip(entries)));
+    }
+
+    [Theory]
+    [InlineData(0xFFFF, null)]
+    [InlineData(null, 0xFFFFFFFFL)]
+    public void A_ZIP64_archive_is_refused(int? entries, long? size)
+    {
+        var zip = WithEndRecord(Zip(("a.geojson", Utf8(Point))), (ushort?)entries, (uint?)size);
+
+        Assert.Equal(OverlayGeoJson.ZipFormatMessage, Refused(zip));
+    }
+
+    [Fact]
+    public void A_zip_without_its_end_record_is_refused()
+    {
+        var zip = Zip(("a.geojson", Utf8(Point)));
+
+        Assert.Equal(OverlayGeoJson.InvalidMessage, Refused(zip[..^22]));
+    }
+
+    [Fact]
+    public void A_zip_with_a_comment_is_still_read()
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            archive.Comment = "Ausbreitungsprognose";
+            using var entry = archive.CreateEntry("a.geojson").Open();
+            entry.Write(Utf8(Point));
+        }
+
+        Assert.Single(Parse(stream.ToArray()).Frames);
+    }
+
     [Fact]
     public void A_zip_may_unpack_to_exactly_the_budget_and_not_a_byte_more()
     {

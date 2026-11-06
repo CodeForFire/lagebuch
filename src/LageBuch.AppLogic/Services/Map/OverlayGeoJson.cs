@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO.Compression;
@@ -28,6 +29,12 @@ public static class OverlayGeoJson
     /// <summary>The most entries a zip may hold, GeoJSON or not.</summary>
     public const int MaxEntries = 100;
 
+    /// <summary>
+    /// The largest central directory a zip may declare: 100 entries with long names fit many times
+    /// over, and it bounds what ZipArchive allocates when it reads the directory.
+    /// </summary>
+    public const long MaxCentralDirectoryBytes = 256 * 1024;
+
     /// <summary>The most positions read from one Ebene, all shapes and frames together.</summary>
     public const int MaxPoints = 200_000;
 
@@ -42,6 +49,7 @@ public static class OverlayGeoJson
     public const string TooLargeMessage = "Die Datei ist zu groß für eine Kartenebene.";
     public const string TooManyEntriesMessage = "Das Archiv enthält zu viele Dateien.";
     public const string NoGeoJsonInZipMessage = "Das Archiv enthält keine GeoJSON-Datei.";
+    public const string ZipFormatMessage = "Das Archiv ist im ZIP64-Format gepackt; bitte als gewöhnliches ZIP speichern.";
     public const string EmptyMessage = "Die Datei enthält nichts, was die Lagekarte zeichnen kann.";
     public static readonly string TooManyPointsMessage = $"Die Kartenebene ist zu detailliert (höchstens {MaxPoints:N0} Punkte).";
     public static readonly string TooManyShapesMessage = $"Die Kartenebene hat zu viele Formen (höchstens {MaxShapes:N0}).";
@@ -54,6 +62,9 @@ public static class OverlayGeoJson
     private const double MinFillOpacity = 0.15;
     private const double MaxFillOpacity = 0.8;
     private const double DefaultStrokeWidth = 2;
+
+    private const uint EndOfCentralDirectorySignature = 0x06054B50;
+    private const int EndOfCentralDirectoryLength = 22;
 
     private static readonly byte[] ZipMagic = [0x50, 0x4B, 0x03, 0x04];
 
@@ -88,6 +99,36 @@ public static class OverlayGeoJson
         }
 
         return reader.TryBuild(out data, out error);
+    }
+
+    // The end-of-central-directory record, found the way ZipArchive finds it: the last signature
+    // within a comment's reach of the end. What it declares is checked before anything is built
+    // from it; ZipArchive refuses a directory that does not match what its record declares.
+    private static string? CentralDirectoryError(byte[] bytes)
+    {
+        var lowest = Math.Max(0, bytes.Length - EndOfCentralDirectoryLength - ushort.MaxValue);
+        for (var at = bytes.Length - EndOfCentralDirectoryLength; at >= lowest; at--)
+        {
+            var record = bytes.AsSpan(at);
+            if (BinaryPrimitives.ReadUInt32LittleEndian(record) != EndOfCentralDirectorySignature)
+            {
+                continue;
+            }
+
+            var entries = BinaryPrimitives.ReadUInt16LittleEndian(record[10..]);
+            var size = BinaryPrimitives.ReadUInt32LittleEndian(record[12..]);
+
+            // All ones is the ZIP64 marker: the real numbers would be elsewhere, and no Ebene
+            // needs an archive that size.
+            if (entries == ushort.MaxValue || size == uint.MaxValue)
+            {
+                return ZipFormatMessage;
+            }
+
+            return entries > MaxEntries || size > MaxCentralDirectoryBytes ? TooManyEntriesMessage : null;
+        }
+
+        return InvalidMessage;
     }
 
     private static bool IsGeoJsonName(string name) =>
@@ -199,12 +240,16 @@ public static class OverlayGeoJson
 
         public string? ReadZip(byte[] bytes)
         {
+            // ZipArchive builds an entry for every record of the central directory the moment it is
+            // opened, so the entry cap has to be checked on the bytes before it is: a 25 MB file
+            // can declare half a million entries.
+            if (CentralDirectoryError(bytes) is { } refused)
+            {
+                return refused;
+            }
+
             using var stream = new MemoryStream(bytes);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-            if (archive.Entries.Count > MaxEntries)
-            {
-                return TooManyEntriesMessage;
-            }
 
             long budget = MaxUnpackedBytes;
             var found = false;
