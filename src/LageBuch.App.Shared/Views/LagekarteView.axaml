@@ -317,6 +317,7 @@
                             WaterPoints="{Binding VisibleWaterPoints}"
                             Elevation="{Binding Terrain.Elevation}"
                             TerrainStyle="{Binding Terrain.Style}"
+                            FlowPath="{Binding Terrain.FlowPoints}"
                             SelectedWaterPoint="{Binding SelectedWaterPoint}"
                             Overlays="{Binding MapShapes}"
                             Center="{Binding Map.Center}"
@@ -623,6 +624,9 @@
                 <Rectangle Width="14" Height="10" Fill="#A6B2182B" />
                 <TextBlock Text="höher" />
               </StackPanel>
+              <Border Width="22" Height="7" Margin="0,0,4,0" VerticalAlignment="Center" CornerRadius="3"
+                      Background="#FF0D47A1" BorderBrush="White" BorderThickness="1.5"
+                      IsVisible="{Binding Terrain.ShowsFlowKey}" />
               <Rectangle Width="60" Height="10" Margin="0,0,4,0" VerticalAlignment="Center"
                          IsVisible="{Binding Terrain.ShowsRampKey}">
                 <Rectangle.Fill>

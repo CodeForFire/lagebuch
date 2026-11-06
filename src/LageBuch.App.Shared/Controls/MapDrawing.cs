@@ -27,10 +27,11 @@ public static class MapDrawing
     /// <paramref name="waterPoints"/> over those: a name that would run under a water point's
     /// label is left out, since the label is what the crew is looking for. The
     /// <paramref name="terrain"/> layer lies between the tiles and the names, and the
-    /// <paramref name="overlays"/> over the terrain, under the names. All of it but the
-    /// terrain and the Kartenebenen in the colours of the cache's <see cref="MapTileCache.Style"/>.
+    /// <paramref name="overlays"/> over the terrain, under the names, and the
+    /// <paramref name="flowPath"/> over the Kartenebenen. All of it but the terrain, the
+    /// Kartenebenen and the Fließweg in the colours of the cache's <see cref="MapTileCache.Style"/>.
     /// </summary>
-    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null, TerrainTileCache? terrain = null, IReadOnlyList<OverlayShape>? overlays = null)
+    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null, TerrainTileCache? terrain = null, IReadOnlyList<OverlayShape>? overlays = null, IReadOnlyList<GeoPoint>? flowPath = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(tiles);
@@ -66,6 +67,13 @@ public static class MapDrawing
         if (overlays is { Count: > 0 })
         {
             DrawOverlays(context, overlays, center, zoom, size, rotation, style);
+        }
+
+        // The Fließweg over a Kartenebene, so the route a spill takes stays visible inside a plume.
+        // A route of one point -- water that stays where it is, on flat ground -- is just its end dot.
+        if (flowPath is { Count: > 0 })
+        {
+            DrawFlowPath(context, flowPath, center, zoom, size, rotation);
         }
 
         if (labels.Count > 0)
@@ -373,6 +381,61 @@ public static class MapDrawing
 
             context.DrawGeometry(area ? fill : null, stroke, geometry);
         }
+    }
+
+    // The Fließweg: a blue line on a white casing, so it reads on blue water and dark relief alike.
+    private static readonly IPen FlowCasing = new ImmutablePen(Brushes.White, 7, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+    private static readonly IPen FlowLine = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromRgb(0x0D, 0x47, 0xA1)), 3.5, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+    private static readonly IPen FlowArrow = new ImmutablePen(Brushes.White, 2, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+    private static readonly IBrush FlowEnd = new ImmutableSolidColorBrush(Color.FromRgb(0x0D, 0x47, 0xA1));
+
+    /// <summary>A chevron on the Fließweg every this many pixels, pointing downhill.</summary>
+    public const double FlowArrowSpacing = 90;
+
+    // The Fließweg on screen: the line, a chevron every FlowArrowSpacing pixels pointing the way the
+    // water runs, and a dot where it ends.
+    private static void DrawFlowPath(DrawingContext context, IReadOnlyList<GeoPoint> path, GeoPoint center, int zoom, Size size, double rotation)
+    {
+        var points = path.Select(p => ToScreen(center, zoom, size, p, rotation)).ToList();
+        var line = new StreamGeometry();
+        using (var g = line.Open())
+        {
+            g.BeginFigure(points[0], isFilled: false);
+            foreach (var p in points.Skip(1))
+            {
+                g.LineTo(p);
+            }
+
+            g.EndFigure(isClosed: false);
+        }
+
+        context.DrawGeometry(null, FlowCasing, line);
+        context.DrawGeometry(null, FlowLine, line);
+
+        var travelled = 0.0;
+        var nextArrow = FlowArrowSpacing / 2;
+        for (var i = 1; i < points.Count; i++)
+        {
+            var (a, b) = (points[i - 1], points[i]);
+            var length = Distance(a, b);
+            while (length > 0 && travelled + length >= nextArrow)
+            {
+                var t = (nextArrow - travelled) / length;
+                var at = new Point(a.X + ((b.X - a.X) * t), a.Y + ((b.Y - a.Y) * t));
+                var angle = Math.Atan2(b.Y - a.Y, b.X - a.X);
+                using (context.PushTransform(Matrix.CreateRotation(angle) * Matrix.CreateTranslation(at.X, at.Y)))
+                {
+                    context.DrawLine(FlowArrow, new Point(-3, -3.5), new Point(1.5, 0));
+                    context.DrawLine(FlowArrow, new Point(1.5, 0), new Point(-3, 3.5));
+                }
+
+                nextArrow += FlowArrowSpacing;
+            }
+
+            travelled += length;
+        }
+
+        context.DrawEllipse(FlowEnd, FlowCasing, points[^1], 6, 6);
     }
 
     // DIN 14090 colours: hydrants red, open water and tanks blue.

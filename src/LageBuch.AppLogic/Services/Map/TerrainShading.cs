@@ -57,6 +57,9 @@ public static class TerrainShading
         {
             case TerrainLayer.Schummerung:
                 return new TerrainTile(Paint(smooth, (x, y) => Shade(smooth, x, y, metresPerPixel, 0.6, 0.35)), []);
+            case TerrainLayer.Fliessweg:
+                // Lighter than Schummerung: enough to see why the water turns, not so much it hides the line.
+                return new TerrainTile(Paint(smooth, (x, y) => Shade(smooth, x, y, metresPerPixel, 0.4, 0.2)), []);
             case TerrainLayer.Hoehenlinien:
                 // Step k runs at k × interval metres; every fifth is a Zähllinie and carries its height.
                 var interval = ContourInterval(zoom);

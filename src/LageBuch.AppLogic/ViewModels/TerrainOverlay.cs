@@ -1,9 +1,11 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map.Elevation;
+using LageBuch.Persistence.Map.Vector;
 
 namespace LageBuch.AppLogic.ViewModels;
 
@@ -22,13 +24,29 @@ public sealed partial class TerrainOverlay : ObservableObject
     private const double RangeRecomputeDistance = 512;
 
     private readonly MapViewport _map;
+    private readonly Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, CancellationToken, FlowRoute?> _traceFlow;
     private (double Low, double High)? _range;
+    private (ElevationSet Elevation, GeoPoint? Einsatzort)? _flowFor;
+
+    // Bumped whenever the route asked for changes, so a trace for an older Einsatzort is dropped.
+    private int _flowGeneration;
+    private Task? _flowTask;
+
+    // Stops the trace under way, if there is one: it is no longer wanted.
+    private Action? _cancelFlow;
+    private bool _flowFailed;
     private (GeoPoint Center, int Zoom)? _rangeAt;
 
-    public TerrainOverlay(MapViewport map)
+    // The shown packs' vector tiles, where the Fließweg looks for the Gewässer it runs into.
+    private IReadOnlyList<string> _waterTiles = [];
+
+    /// <param name="map">The map whose view the colour range follows.</param>
+    /// <param name="traceFlow">Traces the Fließweg; <see cref="FlowPath.Trace"/> unless a test says otherwise.</param>
+    public TerrainOverlay(MapViewport map, Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, CancellationToken, FlowRoute?>? traceFlow = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         _map = map;
+        _traceFlow = traceFlow ?? FlowPath.Trace;
         Choices =
         [
             new TerrainChoice(this, TerrainLayer.None, "Aus"),
@@ -37,6 +55,7 @@ public sealed partial class TerrainOverlay : ObservableObject
             new TerrainChoice(this, TerrainLayer.Hoehenschichten, "Höhenschichten"),
             new TerrainChoice(this, TerrainLayer.Hangneigung, "Hangneigung"),
             new TerrainChoice(this, TerrainLayer.RelativZumEinsatzort, "Höhe zum Einsatzort"),
+            new TerrainChoice(this, TerrainLayer.Fliessweg, "Fließweg vom Einsatzort"),
         ];
         _map.PropertyChanged += OnMapChanged;
     }
@@ -58,6 +77,14 @@ public sealed partial class TerrainOverlay : ObservableObject
     [ObservableProperty]
     private TerrainStyle? _style;
 
+    /// <summary>
+    /// The way water runs from the Einsatzort while <see cref="TerrainLayer.Fliessweg"/> is shown;
+    /// null otherwise, without an Einsatzort, or where there are no heights under it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FlowPoints))]
+    private FlowRoute? _flowRoute;
+
     /// <summary>Why a pack's heights are missing, in German; the map works on without them.</summary>
     [ObservableProperty]
     private string? _error;
@@ -78,6 +105,18 @@ public sealed partial class TerrainOverlay : ObservableObject
     public bool ShowsRelativeKey { get; private set; }
 
     public bool ShowsRampKey { get; private set; }
+
+    public bool ShowsFlowKey { get; private set; }
+
+    /// <summary>Whether the Fließweg is being traced: a hollow can take a moment to flood.</summary>
+    [ObservableProperty]
+    private bool _isTracingFlow;
+
+    /// <summary>The trace under way, or a finished task: what a test waits for.</summary>
+    internal Task FlowSettled => _flowTask ?? Task.CompletedTask;
+
+    /// <summary>What the map draws of <see cref="FlowRoute"/>: its points, start first.</summary>
+    public IReadOnlyList<GeoPoint>? FlowPoints => FlowRoute?.Points;
 
     /// <summary>
     /// Opens the heights of <paramref name="packs"/>. A pack without an elevation file is left out
@@ -103,6 +142,7 @@ public sealed partial class TerrainOverlay : ObservableObject
 
         Error = unreadable.Count == 0 ? null : $"Höhendaten nicht lesbar ({string.Join(", ", unreadable)}) – dort kein Gelände.";
         _rangeAt = null;
+        _waterTiles = [.. packs.Select(p => p.VectorTilesPath).Where(File.Exists)];
         Elevation = grids.Count == 0 ? null : new ElevationSet(grids);
     }
 
@@ -164,12 +204,25 @@ public sealed partial class TerrainOverlay : ObservableObject
                     legend = "Relief überhöht dargestellt";
                     style = new TerrainStyle(Layer);
                     break;
+                case TerrainLayer.Fliessweg:
+                    legend = FlowLegend(FlowFor(elevation));
+                    style = new TerrainStyle(Layer);
+                    break;
             }
 
-            if (tooFar)
+            // The Fließweg is a line, drawn at any zoom; only its relief needs the map closer.
+            if (tooFar && Layer != TerrainLayer.Fliessweg)
             {
                 legend = "Gelände: näher heranzoomen.";
             }
+        }
+
+        if (Layer != TerrainLayer.Fliessweg || Elevation is null)
+        {
+            _cancelFlow?.Invoke();
+            FlowRoute = null;
+            _flowFor = null;
+            IsTracingFlow = false;
         }
 
         Style = style;
@@ -178,7 +231,131 @@ public sealed partial class TerrainOverlay : ObservableObject
             legend,
             slope: reachable && Layer == TerrainLayer.Hangneigung,
             relative: reachable && Layer == TerrainLayer.RelativZumEinsatzort,
-            ramp: reachable && Layer == TerrainLayer.Hoehenschichten);
+            ramp: reachable && Layer == TerrainLayer.Hoehenschichten,
+            flow: FlowRoute is not null);
+    }
+
+    // Traced off the UI thread -- flooding a hollow can take a while -- and again only when the
+    // Einsatzort or the heights change, never on a pan.
+    private FlowRoute? FlowFor(ElevationSet elevation)
+    {
+        if (_flowFor is { } done && ReferenceEquals(done.Elevation, elevation) && Equals(done.Einsatzort, Einsatzort))
+        {
+            return FlowRoute;
+        }
+
+        _flowFor = (elevation, Einsatzort);
+        FlowRoute = null;
+        _cancelFlow?.Invoke();
+
+        // Stryker disable once Update : any change to the generation drops the older trace.
+        var generation = ++_flowGeneration;
+        if (Einsatzort is { } at)
+        {
+            IsTracingFlow = true;
+            _flowTask = TraceAsync(elevation, at, _waterTiles, generation);
+        }
+
+        return null;
+    }
+
+    [SuppressMessage("Design", "CA1031", Justification = "A trace that fails says so in the key, through _flowFailed; the map carries on without the line.")]
+    private async Task TraceAsync(ElevationSet elevation, GeoPoint at, IReadOnlyList<string> waterTiles, int generation)
+    {
+        using var cancel = new CancellationTokenSource();
+        var token = cancel.Token;
+        Action stop = () =>
+        {
+            try
+            {
+                cancel.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The trace finished meanwhile; its result is dropped as stale anyway.
+            }
+        };
+        _cancelFlow = stop;
+
+        FlowRoute? route = null;
+        var failed = false;
+        try
+        {
+            route = await Task.Run(() => _traceFlow(elevation, at, WaterAt(waterTiles), token), token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Cancelled because it is no longer wanted: whatever replaced it sets the key.
+            return;
+        }
+        catch (Exception)
+        {
+            failed = true;
+        }
+        finally
+        {
+            // Its token source goes with it, so a later Update has nothing left to cancel -- unless a
+            // newer trace has put its own in place meanwhile.
+            if (ReferenceEquals(_cancelFlow, stop))
+            {
+                _cancelFlow = null;
+            }
+        }
+
+        if (generation != _flowGeneration)
+        {
+            return;
+        }
+
+        (FlowRoute, _flowFailed) = (route, failed);
+        IsTracingFlow = false;
+        Update();
+    }
+
+    // A Gewässer from any of the packs, the first that has one there. Opened afresh for each trace:
+    // a tile source keeps what it has read, and the map's own is busy on the UI thread.
+    private static Func<GeoPoint, string?>? WaterAt(IReadOnlyList<string> tiles)
+    {
+        if (tiles.Count == 0)
+        {
+            return null;
+        }
+
+        var packs = tiles.Select(path => new VectorWater(new PmTilesFileSource(path))).ToList();
+        return point => packs.Select(pack => pack.At(point)).FirstOrDefault(name => name is not null);
+    }
+
+    private string FlowLegend(FlowRoute? route)
+    {
+        if (Einsatzort is null)
+        {
+            return "Für den Fließweg erst den Einsatzort setzen.";
+        }
+
+        if (IsTracingFlow)
+        {
+            return "Fließweg wird berechnet …";
+        }
+
+        if (_flowFailed)
+        {
+            return "Der Fließweg ließ sich nicht berechnen.";
+        }
+
+        if (route is null)
+        {
+            return "Am Einsatzort gibt es keine Höhendaten.";
+        }
+
+        var end = route.End switch
+        {
+            FlowPathEnd.Senke => "sammelt sich in einer Senke",
+            FlowPathEnd.Kartenrand => "läuft aus dem Kartenpaket hinaus",
+            FlowPathEnd.Gewaesser when route.WaterName is { Length: > 0 } name => $"erreicht das Gewässer „{name}“",
+            FlowPathEnd.Gewaesser => "erreicht ein Gewässer",
+            _ => $"nach {Formatting.Distance(FlowPath.MaxLength)} nicht weiter verfolgt",
+        };
+        return $"Fließweg {Formatting.Distance(route.LengthMetres)}, {Formatting.Metres(route.DropMetres)} Gefälle, {end}";
     }
 
     private (double Low, double High)? RangeFor(ElevationSet elevation)
@@ -207,7 +384,7 @@ public sealed partial class TerrainOverlay : ObservableObject
     }
 
     // Each part of the key tells the view only when it changed: Update runs on every pan.
-    private void SetLegend(string? text, bool slope, bool relative, bool ramp)
+    private void SetLegend(string? text, bool slope, bool relative, bool ramp, bool flow)
     {
         var wasShown = ShowsLegend;
         if (!string.Equals(LegendText, text, StringComparison.Ordinal))
@@ -237,6 +414,12 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             ShowsRampKey = ramp;
             OnPropertyChanged(nameof(ShowsRampKey));
+        }
+
+        if (ShowsFlowKey != flow)
+        {
+            ShowsFlowKey = flow;
+            OnPropertyChanged(nameof(ShowsFlowKey));
         }
     }
 }

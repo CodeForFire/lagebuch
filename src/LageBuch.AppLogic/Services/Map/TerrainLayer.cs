@@ -20,4 +20,7 @@ public enum TerrainLayer
 
     /// <summary>Blue below the Einsatzort, red above it, with a line every few metres: the Förderhöhe at a glance.</summary>
     RelativZumEinsatzort,
+
+    /// <summary>Where water or a spilled Gefahrstoff runs from the Einsatzort, over a light relief (<see cref="FlowPath"/>).</summary>
+    Fliessweg,
 }

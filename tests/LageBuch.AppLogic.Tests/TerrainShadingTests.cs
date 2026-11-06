@@ -180,6 +180,16 @@ public sealed class TerrainShadingTests
         Assert.Equal(white == 0 ? 0 : Alpha(pixel), Red(pixel));
     }
 
+    [Theory]
+    [InlineData(-0.3, 0, 102)] // facing east: black, capped at 40 % rather than Schummerung's 60 %
+    [InlineData(0.3, 0, 43)] // facing west: white at 20 % of the 0.84 reached, not 35 %
+    public void Under_the_Fliessweg_the_relief_is_lighter_so_the_line_stands_out(double eastRise, double northRise, int alpha)
+    {
+        var pixel = Pixel(Render(TerrainLayer.Fliessweg, (x, y) => (float)(500 + (eastRise * x) - (northRise * y))), 128, 128);
+
+        Assert.InRange(Alpha(pixel), alpha - 1, alpha + 1);
+    }
+
     [Fact]
     public void Relief_measures_slope_in_metres_so_a_coarser_pixel_flattens_it()
     {

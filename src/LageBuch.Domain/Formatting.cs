@@ -14,6 +14,10 @@ public static class Formatting
     /// <summary>A height or length in whole metres, without grouping: "554 m", as a map labels it.</summary>
     public static string Metres(double value) => Math.Round(value).ToString(De) + " m";
 
+    /// <summary>A distance as it is said: "515 m" below a kilometre, "1,4 km" from one on.</summary>
+    public static string Distance(double metres) =>
+        metres < 999.5 ? Metres(metres) : (metres / 1000).ToString("0.0", De) + " km";
+
     /// <summary>A height above NHN to a tenth of a metre: "554,6 m".</summary>
     public static string Height(double value) => value.ToString("0.0", De) + " m";
 

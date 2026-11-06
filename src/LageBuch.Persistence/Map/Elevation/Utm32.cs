@@ -29,6 +29,23 @@ public static class Utm32
         49561 * Math.Pow(N, 4) / 161280,
     ];
 
+    private static readonly double[] Beta =
+    [
+        (N / 2) - (2 * N * N / 3) + (37 * Math.Pow(N, 3) / 96) - (Math.Pow(N, 4) / 360),
+        (N * N / 48) + (Math.Pow(N, 3) / 15) - (437 * Math.Pow(N, 4) / 1440),
+        (17 * Math.Pow(N, 3) / 480) - (37 * Math.Pow(N, 4) / 840),
+        4397 * Math.Pow(N, 4) / 161280,
+    ];
+
+    // From the conformal latitude back to the geodetic one.
+    private static readonly double[] Delta =
+    [
+        (2 * N) - (2 * N * N / 3) - (2 * Math.Pow(N, 3)) + (116 * Math.Pow(N, 4) / 45),
+        (7 * N * N / 3) - (8 * Math.Pow(N, 3) / 5) - (227 * Math.Pow(N, 4) / 45),
+        (56 * Math.Pow(N, 3) / 15) - (136 * Math.Pow(N, 4) / 35),
+        4279 * Math.Pow(N, 4) / 630,
+    ];
+
     // Stryker restore all
 
     /// <summary>Easting and northing in metres of <paramref name="point"/>.</summary>
@@ -53,5 +70,34 @@ public static class Utm32
         }
 
         return (FalseEasting + (K0 * Rectifying * x), K0 * Rectifying * y);
+    }
+
+    /// <summary>The position at <paramref name="easting"/>, <paramref name="northing"/>: the inverse of <see cref="FromGeo"/>.</summary>
+    public static GeoPoint ToGeo(double easting, double northing)
+    {
+        var xi = northing / (K0 * Rectifying);
+        var eta = (easting - FalseEasting) / (K0 * Rectifying);
+        var x = eta;
+        var y = xi;
+
+        // Stryker disable once Equality : the last term, β4, is of the fourth order too.
+        for (var j = 1; j <= Beta.Length; j++)
+        {
+            var k = 2.0 * j;
+            x -= Beta[j - 1] * Math.Cos(k * xi) * Math.Sinh(k * eta);
+            y -= Beta[j - 1] * Math.Sin(k * xi) * Math.Cosh(k * eta);
+        }
+
+        var chi = Math.Asin(Math.Sin(y) / Math.Cosh(x));
+        var phi = chi;
+
+        // Stryker disable once Equality : as above, δ4.
+        for (var j = 1; j <= Delta.Length; j++)
+        {
+            phi += Delta[j - 1] * Math.Sin(2.0 * j * chi);
+        }
+
+        var lambda = Math.Atan2(Math.Sinh(x), Math.Cos(y));
+        return new GeoPoint(phi * 180 / Math.PI, CentralMeridian + (lambda * 180 / Math.PI));
     }
 }

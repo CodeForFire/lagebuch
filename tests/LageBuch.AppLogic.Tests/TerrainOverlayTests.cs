@@ -1,6 +1,8 @@
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Map.Vector;
+using LageBuch.Persistence.Tests;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -16,7 +18,7 @@ public sealed class TerrainOverlayTests : IDisposable
         var terrain = new TerrainOverlay(new MapViewport());
 
         Assert.Equal(
-            ["Aus", "Schummerung", "Höhenlinien", "Höhenschichten", "Hangneigung", "Höhe zum Einsatzort"],
+            ["Aus", "Schummerung", "Höhenlinien", "Höhenschichten", "Hangneigung", "Höhe zum Einsatzort", "Fließweg vom Einsatzort"],
             terrain.Choices.Select(c => c.Label));
         Assert.Equal(TerrainLayer.None, terrain.Layer);
         Assert.True(terrain.Choices[0].IsSelected);
@@ -58,7 +60,7 @@ public sealed class TerrainOverlayTests : IDisposable
         terrain.Choices[1].IsSelected = true;
 
         Assert.Equal(TerrainLayer.Schummerung, terrain.Layer);
-        Assert.Equal([false, true, false, false, false, false], terrain.Choices.Select(c => c.IsSelected));
+        Assert.Equal([false, true, false, false, false, false, false], terrain.Choices.Select(c => c.IsSelected));
         Assert.Equal(new TerrainStyle(TerrainLayer.Schummerung), terrain.Style);
 
         terrain.Choices[0].IsSelected = true;
@@ -188,6 +190,304 @@ public sealed class TerrainOverlayTests : IDisposable
         map.ChangeViewCommand.Execute(new MapViewChange(Shift(TerrainFixture.Marktplatz, 90, 15), 15));
         Assert.DoesNotContain(nameof(TerrainOverlay.ShowsRampKey), raised);
         Assert.DoesNotContain(nameof(TerrainOverlay.ShowsLegend), raised);
+    }
+
+    [Fact]
+    public async Task The_Fliessweg_waits_for_an_Einsatzort_then_runs_from_it()
+    {
+        var terrain = Shown();
+        terrain.Layer = TerrainLayer.Fliessweg;
+
+        Assert.Null(terrain.FlowPoints);
+        Assert.Equal("Für den Fließweg erst den Einsatzort setzen.", terrain.LegendText);
+        Assert.False(terrain.ShowsFlowKey);
+        var raised = new List<string?>();
+        terrain.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        await terrain.FlowSettled;
+
+        Assert.Contains(nameof(TerrainOverlay.ShowsFlowKey), raised);
+        Assert.False(terrain.IsTracingFlow);
+        var points = Assert.IsAssignableFrom<IReadOnlyList<GeoPoint>>(terrain.FlowPoints);
+        Assert.True(points.Count > 10);
+        Assert.Equal(TerrainFixture.Marktplatz.Latitude, points[0].Latitude, precision: 4);
+        Assert.Equal(TerrainFixture.Marktplatz.Longitude, points[0].Longitude, precision: 4);
+        Assert.StartsWith("Fließweg ", terrain.LegendText, StringComparison.Ordinal);
+        Assert.True(terrain.ShowsFlowKey);
+        Assert.Equal(new TerrainStyle(TerrainLayer.Fliessweg), terrain.Style);
+    }
+
+    [Fact]
+    public async Task The_Fliessweg_is_traced_once_per_Einsatzort_not_on_every_pan()
+    {
+        var map = new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz };
+        var terrain = Shown(map);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+        var first = Assert.IsType<FlowRoute>(terrain.FlowRoute);
+
+        map.ChangeViewCommand.Execute(new MapViewChange(Shift(TerrainFixture.Marktplatz, 300, 15), 15));
+        Assert.Same(first, terrain.FlowRoute);
+        Assert.False(terrain.IsTracingFlow);
+
+        terrain.Einsatzort = Shift(TerrainFixture.Marktplatz, 100, 15);
+        await terrain.FlowSettled;
+        Assert.NotSame(first, terrain.FlowRoute);
+    }
+
+    [Fact]
+    public async Task While_the_Fliessweg_is_traced_the_key_says_so()
+    {
+        using var held = new ManualResetEventSlim();
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at, water, cancellationToken) =>
+            {
+                held.Wait(TimeSpan.FromSeconds(10), cancellationToken);
+                return FlowPath.Trace(elevation, at, water, cancellationToken);
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+
+        Assert.True(terrain.IsTracingFlow);
+        Assert.Null(terrain.FlowRoute);
+        Assert.Equal("Fließweg wird berechnet …", terrain.LegendText);
+
+        held.Set();
+        await terrain.FlowSettled;
+        Assert.False(terrain.IsTracingFlow);
+        Assert.NotNull(terrain.FlowRoute);
+    }
+
+    [Fact]
+    public async Task Moving_the_Einsatzort_stops_the_trace_for_the_old_one()
+    {
+        using var running = new ManualResetEventSlim();
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at, water, cancellationToken) =>
+            {
+                if (Equals(at, TerrainFixture.Marktplatz))
+                {
+                    running.Set();
+                    stopped.SetResult(cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(10)));
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return FlowPath.Trace(elevation, at, water, cancellationToken);
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var stale = terrain.FlowSettled;
+
+        // Under way, not merely queued: a trace cancelled before it starts never runs at all.
+        Assert.True(running.Wait(TimeSpan.FromSeconds(10)));
+        terrain.Einsatzort = new GeoPoint(52.52, 13.40);
+
+        Assert.True(await stopped.Task);
+        await stale;
+        await terrain.FlowSettled;
+        Assert.False(terrain.IsTracingFlow);
+        Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task Leaving_the_layer_stops_the_trace()
+    {
+        using var running = new ManualResetEventSlim();
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (_, _, _, cancellationToken) =>
+            {
+                running.Set();
+                stopped.SetResult(cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(10)));
+                cancellationToken.ThrowIfCancellationRequested();
+                return null;
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var stale = terrain.FlowSettled;
+
+        Assert.True(running.Wait(TimeSpan.FromSeconds(10)));
+        terrain.Layer = TerrainLayer.Schummerung;
+
+        Assert.True(await stopped.Task);
+        await stale;
+        Assert.False(terrain.IsTracingFlow);
+        Assert.Equal("Relief überhöht dargestellt", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task A_trace_for_an_Einsatzort_that_moved_meanwhile_is_dropped()
+    {
+        using var started = new ManualResetEventSlim();
+        using var first = new ManualResetEventSlim();
+        FlowRoute? staleRoute = null;
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at, water, cancellationToken) =>
+            {
+                if (!Equals(at, TerrainFixture.Marktplatz))
+                {
+                    return FlowPath.Trace(elevation, at, water, cancellationToken);
+                }
+
+                // A trace too far along to notice it was cancelled: it still comes back with a route.
+                started.Set();
+                first.Wait(TimeSpan.FromSeconds(10), CancellationToken.None);
+                staleRoute = FlowPath.Trace(elevation, at, water, CancellationToken.None);
+                return staleRoute;
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var stale = terrain.FlowSettled;
+        Assert.True(started.Wait(TimeSpan.FromSeconds(10)));
+
+        // Moved to where there are no heights: the new trace finds nothing, the old one must not win.
+        terrain.Einsatzort = new GeoPoint(52.52, 13.40);
+        await terrain.FlowSettled;
+        first.Set();
+        await stale;
+
+        Assert.NotNull(staleRoute);
+        Assert.Null(terrain.FlowRoute);
+        Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task A_trace_that_fails_says_so_in_the_key()
+    {
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (_, _, _, _) => throw new InvalidOperationException("broken"));
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        Assert.Null(terrain.FlowRoute);
+        Assert.False(terrain.IsTracingFlow);
+        Assert.Equal("Der Fließweg ließ sich nicht berechnen.", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task Leaving_the_layer_while_tracing_drops_the_result()
+    {
+        var terrain = Shown();
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var stale = terrain.FlowSettled;
+
+        terrain.Layer = TerrainLayer.Schummerung;
+        await stale;
+
+        Assert.Null(terrain.FlowRoute);
+        Assert.False(terrain.IsTracingFlow);
+        Assert.Equal("Relief überhöht dargestellt", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task Leaving_the_Fliessweg_takes_the_line_off_the_map_and_coming_back_draws_it_again()
+    {
+        var terrain = Shown();
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        terrain.Layer = TerrainLayer.Schummerung;
+        Assert.Null(terrain.FlowPoints);
+        Assert.False(terrain.ShowsFlowKey);
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+        Assert.NotNull(terrain.FlowPoints);
+    }
+
+    [Fact]
+    public async Task The_Fliessweg_is_a_line_and_shows_even_too_far_out_for_relief()
+    {
+        var map = new MapViewport { Zoom = TerrainSampler.MinZoom - 1, Center = TerrainFixture.Marktplatz };
+        var terrain = Shown(map);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        Assert.NotNull(terrain.FlowPoints);
+        Assert.StartsWith("Fließweg ", terrain.LegendText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Without_heights_under_the_Einsatzort_the_key_says_so()
+    {
+        var terrain = Shown();
+        terrain.Einsatzort = new GeoPoint(52.52, 13.40);
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        Assert.Null(terrain.FlowPoints);
+        Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
+    }
+
+    [Theory]
+    [InlineData("Amper", "erreicht das Gewässer „Amper“")]
+    [InlineData(null, "erreicht ein Gewässer")]
+    public async Task A_Fliessweg_into_a_Gewaesser_names_it_in_the_key(string? name, string end)
+    {
+        var pack = TerrainFixture.Pack(_dir);
+        WaterUnderTheMarktplatz(pack, name);
+        var terrain = new TerrainOverlay(new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz });
+        terrain.Show([pack]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        var route = Assert.IsType<FlowRoute>(terrain.FlowRoute);
+        Assert.Equal(FlowPathEnd.Gewaesser, route.End);
+        Assert.EndsWith(", " + end, terrain.LegendText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_pack_without_vector_tiles_gives_the_trace_no_water_to_find()
+    {
+        var asked = new List<Func<GeoPoint, string?>?>();
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at, water, cancellationToken) =>
+            {
+                asked.Add(water);
+                return FlowPath.Trace(elevation, at, water, cancellationToken);
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        Assert.Null(Assert.Single(asked));
+        Assert.NotEqual(FlowPathEnd.Gewaesser, terrain.FlowRoute?.End);
+    }
+
+    // A pack's vector tiles with the zoom 15 tile under the Marktplatz all water.
+    private static void WaterUnderTheMarktplatz(InstalledRegionPack pack, string? name)
+    {
+        var (x, y) = WebMercator.ToWorldPixel(TerrainFixture.Marktplatz, VectorWater.Zoom);
+        (int X, int Y)[] all = [(0, 0), (4096, 0), (4096, 4096), (0, 4096)];
+        (string Key, string Value)[] tags = name is null ? [("kind", "water")] : [("kind", "water"), ("name", name)];
+        var tile = VectorTileFixtures.Tile("water", (VectorGeometryType.Polygon, tags, [all]));
+        File.WriteAllBytes(pack.VectorTilesPath, VectorTileFixtures.Archive([(VectorWater.Zoom, (int)(x / 256), (int)(y / 256), tile)]));
     }
 
     private TerrainOverlay Shown(MapViewport? map = null)
