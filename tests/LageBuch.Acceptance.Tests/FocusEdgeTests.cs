@@ -59,13 +59,19 @@ public class FocusEdgeTests
         var perimeter = (int)(target.Bounds.Width + target.Bounds.Height);
 
         // A text input's edge fades in over a 150ms BrushTransition (Styles.axaml), and transitions
-        // run on the wall clock, not on render ticks. Captured at once, a fast enough machine sees
-        // no edge yet -- the Windows runner did, twice in a row (#622). So render until the edge is
-        // there, up to a cap far past the fade: a style that never draws it still fails.
+        // run on the wall clock, not on render ticks.
         var settle = Stopwatch.StartNew();
+        while (settle.ElapsedMilliseconds < 250)
+        {
+            Thread.Sleep(25);
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
+        }
+
         var found = FocusPixels(window, target);
         while (found < perimeter && settle.ElapsedMilliseconds < 1000)
         {
+            Thread.Sleep(25);
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             Dispatcher.UIThread.RunJobs();
             found = FocusPixels(window, target);
