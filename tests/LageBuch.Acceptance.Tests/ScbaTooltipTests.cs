@@ -15,7 +15,7 @@ public class ScbaTooltipTests
     [InlineData(true)]
     public void Transition_buttons_explain_the_action_and_the_two_pressure_states(bool narrow)
     {
-        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
+        using var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
         var scba = vm.Scba;
         scba.NewDesignation = "Angriffstrupp";
         scba.NewTruppfuehrer = "Müller";
@@ -62,7 +62,8 @@ public class ScbaTooltipTests
             .First(b => b.IsEffectivelyVisible && "IM EINSATZ".Equals(b.Content) && ReferenceEquals(b.DataContext, row));
         ToolTip.SetIsOpen(button, true);
         Dispatcher.UIThread.RunJobs();
-        using var frame = window.CaptureRenderedFrame()!;
+        using var frame = window.CaptureRenderedFrame();
+        Assert.NotNull(frame);
         frame.SavePng(Path.Join(output, narrow ? "scba-narrow.png" : "scba-wide.png"));
         ToolTip.SetIsOpen(button, false);
     }
