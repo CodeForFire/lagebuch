@@ -11,4 +11,7 @@ public enum FlowPathEnd
 
     /// <summary>After <see cref="FlowPath.MaxLength"/> metres: further on it is no longer the Einsatzstelle's concern.</summary>
     MaxLength,
+
+    /// <summary>In a Gewässer: where it drifts from there, the ground does not tell.</summary>
+    Gewaesser,
 }

@@ -1,6 +1,8 @@
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.Map.Vector;
+using LageBuch.Persistence.Tests;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -257,14 +259,14 @@ public sealed class TerrainOverlayTests : IDisposable
         using var first = new ManualResetEventSlim();
         var terrain = new TerrainOverlay(
             new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
-            (elevation, at) =>
+            (elevation, at, water) =>
             {
                 if (Equals(at, TerrainFixture.Marktplatz))
                 {
                     first.Wait(TimeSpan.FromSeconds(10));
                 }
 
-                return FlowPath.Trace(elevation, at);
+                return FlowPath.Trace(elevation, at, water);
             });
         terrain.Show([TerrainFixture.Pack(_dir)]);
         terrain.Einsatzort = TerrainFixture.Marktplatz;
@@ -286,7 +288,7 @@ public sealed class TerrainOverlayTests : IDisposable
     {
         var terrain = new TerrainOverlay(
             new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
-            (_, _) => throw new InvalidOperationException("broken"));
+            (_, _, _) => throw new InvalidOperationException("broken"));
         terrain.Show([TerrainFixture.Pack(_dir)]);
         terrain.Einsatzort = TerrainFixture.Marktplatz;
 
@@ -356,6 +358,56 @@ public sealed class TerrainOverlayTests : IDisposable
 
         Assert.Null(terrain.FlowPoints);
         Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
+    }
+
+    [Theory]
+    [InlineData("Amper", "erreicht das Gewässer „Amper“")]
+    [InlineData(null, "erreicht ein Gewässer")]
+    public async Task A_Fliessweg_into_a_Gewaesser_names_it_in_the_key(string? name, string end)
+    {
+        var pack = TerrainFixture.Pack(_dir);
+        WaterUnderTheMarktplatz(pack, name);
+        var terrain = new TerrainOverlay(new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz });
+        terrain.Show([pack]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        var route = Assert.IsType<FlowRoute>(terrain.FlowRoute);
+        Assert.Equal(FlowPathEnd.Gewaesser, route.End);
+        Assert.EndsWith(", " + end, terrain.LegendText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_pack_without_vector_tiles_gives_the_trace_no_water_to_find()
+    {
+        var asked = new List<Func<GeoPoint, string?>?>();
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at, water) =>
+            {
+                asked.Add(water);
+                return FlowPath.Trace(elevation, at, water);
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+
+        terrain.Layer = TerrainLayer.Fliessweg;
+        await terrain.FlowSettled;
+
+        Assert.Null(Assert.Single(asked));
+        Assert.NotEqual(FlowPathEnd.Gewaesser, terrain.FlowRoute?.End);
+    }
+
+    // A pack's vector tiles with the zoom 15 tile under the Marktplatz all water.
+    private static void WaterUnderTheMarktplatz(InstalledRegionPack pack, string? name)
+    {
+        var (x, y) = WebMercator.ToWorldPixel(TerrainFixture.Marktplatz, VectorWater.Zoom);
+        (int X, int Y)[] all = [(0, 0), (4096, 0), (4096, 4096), (0, 4096)];
+        (string Key, string Value)[] tags = name is null ? [("kind", "water")] : [("kind", "water"), ("name", name)];
+        var tile = VectorTileFixtures.Tile("water", (VectorGeometryType.Polygon, tags, [all]));
+        File.WriteAllBytes(pack.VectorTilesPath, VectorTileFixtures.Archive([(VectorWater.Zoom, (int)(x / 256), (int)(y / 256), tile)]));
     }
 
     private TerrainOverlay Shown(MapViewport? map = null)

@@ -5,6 +5,7 @@ using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map.Elevation;
+using LageBuch.Persistence.Map.Vector;
 
 namespace LageBuch.AppLogic.ViewModels;
 
@@ -23,7 +24,7 @@ public sealed partial class TerrainOverlay : ObservableObject
     private const double RangeRecomputeDistance = 512;
 
     private readonly MapViewport _map;
-    private readonly Func<ElevationSet, GeoPoint, FlowRoute?> _traceFlow;
+    private readonly Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, FlowRoute?> _traceFlow;
     private (double Low, double High)? _range;
     private (ElevationSet Elevation, GeoPoint? Einsatzort)? _flowFor;
 
@@ -33,9 +34,12 @@ public sealed partial class TerrainOverlay : ObservableObject
     private bool _flowFailed;
     private (GeoPoint Center, int Zoom)? _rangeAt;
 
+    // The shown packs' vector tiles, where the Fließweg looks for the Gewässer it runs into.
+    private IReadOnlyList<string> _waterTiles = [];
+
     /// <param name="map">The map whose view the colour range follows.</param>
     /// <param name="traceFlow">Traces the Fließweg; <see cref="FlowPath.Trace"/> unless a test says otherwise.</param>
-    public TerrainOverlay(MapViewport map, Func<ElevationSet, GeoPoint, FlowRoute?>? traceFlow = null)
+    public TerrainOverlay(MapViewport map, Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, FlowRoute?>? traceFlow = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         _map = map;
@@ -135,6 +139,7 @@ public sealed partial class TerrainOverlay : ObservableObject
 
         Error = unreadable.Count == 0 ? null : $"Höhendaten nicht lesbar ({string.Join(", ", unreadable)}) – dort kein Gelände.";
         _rangeAt = null;
+        _waterTiles = [.. packs.Select(p => p.VectorTilesPath).Where(File.Exists)];
         Elevation = grids.Count == 0 ? null : new ElevationSet(grids);
     }
 
@@ -243,20 +248,20 @@ public sealed partial class TerrainOverlay : ObservableObject
         if (Einsatzort is { } at)
         {
             IsTracingFlow = true;
-            _flowTask = TraceAsync(elevation, at, generation);
+            _flowTask = TraceAsync(elevation, at, _waterTiles, generation);
         }
 
         return null;
     }
 
     [SuppressMessage("Design", "CA1031", Justification = "A trace that fails says so in the key, through _flowFailed; the map carries on without the line.")]
-    private async Task TraceAsync(ElevationSet elevation, GeoPoint at, int generation)
+    private async Task TraceAsync(ElevationSet elevation, GeoPoint at, IReadOnlyList<string> waterTiles, int generation)
     {
         FlowRoute? route = null;
         var failed = false;
         try
         {
-            route = await Task.Run(() => _traceFlow(elevation, at));
+            route = await Task.Run(() => _traceFlow(elevation, at, WaterAt(waterTiles)));
         }
         catch (Exception)
         {
@@ -271,6 +276,19 @@ public sealed partial class TerrainOverlay : ObservableObject
         (FlowRoute, _flowFailed) = (route, failed);
         IsTracingFlow = false;
         Update();
+    }
+
+    // A Gewässer from any of the packs, the first that has one there. Opened afresh for each trace:
+    // a tile source keeps what it has read, and the map's own is busy on the UI thread.
+    private static Func<GeoPoint, string?>? WaterAt(IReadOnlyList<string> tiles)
+    {
+        if (tiles.Count == 0)
+        {
+            return null;
+        }
+
+        var packs = tiles.Select(path => new VectorWater(new PmTilesFileSource(path))).ToList();
+        return point => packs.Select(pack => pack.At(point)).FirstOrDefault(name => name is not null);
     }
 
     private string FlowLegend(FlowRoute? route)
@@ -299,6 +317,8 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             FlowPathEnd.Senke => "sammelt sich in einer Senke",
             FlowPathEnd.Kartenrand => "läuft aus dem Kartenpaket hinaus",
+            FlowPathEnd.Gewaesser when route.WaterName is { Length: > 0 } name => $"erreicht das Gewässer „{name}“",
+            FlowPathEnd.Gewaesser => "erreicht ein Gewässer",
             _ => $"nach {Formatting.Distance(FlowPath.MaxLength)} nicht weiter verfolgt",
         };
         return $"Fließweg {Formatting.Distance(route.LengthMetres)}, {Formatting.Metres(route.DropMetres)} Gefälle, {end}";

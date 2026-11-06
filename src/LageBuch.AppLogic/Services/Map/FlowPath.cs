@@ -8,6 +8,8 @@ namespace LageBuch.AppLogic.Services.Map;
 /// the eight neighbouring DGM cells. A hollow on the way is filled up to
 /// <see cref="MaxFillDepth"/> to find where it spills over -- the DGM shows a road embankment
 /// but not the culvert under it -- and a deeper one ends the way as a <see cref="FlowPathEnd.Senke"/>.
+/// Where it reaches a Gewässer the way ends too: the DGM shows a river's surface flat, so past its
+/// bank the heights no longer say where the water goes.
 /// </summary>
 /// <remarks>
 /// The surface is bare earth: water also runs into drains, along kerbs and through buildings the
@@ -34,7 +36,13 @@ public static class FlowPath
     ];
 
     /// <summary>The route from <paramref name="start"/>, or null where there is no height to start from.</summary>
-    public static FlowRoute? Trace(ElevationSet elevation, GeoPoint start)
+    /// <param name="elevation">The heights the water runs over.</param>
+    /// <param name="start">Where it starts: the Einsatzort.</param>
+    /// <param name="waterAt">
+    /// The name of the Gewässer at a point, empty for one without a name, null on land; the route
+    /// ends in the first cell it finds water in. Without it the route never meets a Gewässer.
+    /// </param>
+    public static FlowRoute? Trace(ElevationSet elevation, GeoPoint start, Func<GeoPoint, string?>? waterAt = null)
     {
         ArgumentNullException.ThrowIfNull(elevation);
         ArgumentNullException.ThrowIfNull(start);
@@ -43,6 +51,8 @@ public static class FlowPath
         // Cells are addressed by their index on the 5 m lattice, so a cell is the same cell however it is reached.
         var origin = ((long)Math.Floor(east / CellSize), (long)Math.Floor(north / CellSize));
         double? Height((long X, long Y) cell) => elevation.HeightAt((cell.X + 0.5) * CellSize, (cell.Y + 0.5) * CellSize);
+        GeoPoint Centre((long X, long Y) cell) => Utm32.ToGeo((cell.X + 0.5) * CellSize, (cell.Y + 0.5) * CellSize);
+        string? Water((long X, long Y) cell) => waterAt?.Invoke(Centre(cell));
 
         if (Height(origin) is not { } startHeight)
         {
@@ -55,7 +65,13 @@ public static class FlowPath
         var height = startHeight;
         var length = 0.0;
         var end = FlowPathEnd.MaxLength;
-        while (length < MaxLength)
+        var water = Water(origin);
+        if (water is not null)
+        {
+            end = FlowPathEnd.Gewaesser;
+        }
+
+        while (water is null && length < MaxLength)
         {
             var next = Steepest(current, height, Height, visited, out var nextHeight, out var edge);
             if (edge)
@@ -70,6 +86,8 @@ public static class FlowPath
                 (current, height) = (step, nextHeight);
                 cells.Add(step);
                 visited.Add(step);
+                water = Water(step);
+                end = water is null ? end : FlowPathEnd.Gewaesser;
                 continue;
             }
 
@@ -79,19 +97,22 @@ public static class FlowPath
                 break;
             }
 
-            foreach (var cell in way.TakeWhile(_ => length < MaxLength))
+            foreach (var cell in way.TakeWhile(_ => water is null && length < MaxLength))
             {
                 length += Distance(current, cell);
                 current = cell;
                 cells.Add(cell);
                 visited.Add(cell);
+                water = Water(cell);
             }
+
+            end = water is null ? end : FlowPathEnd.Gewaesser;
 
             height = Height(current) ?? height;
         }
 
-        var points = cells.Select(c => Utm32.ToGeo((c.X + 0.5) * CellSize, (c.Y + 0.5) * CellSize)).ToList();
-        return new FlowRoute(points, length, startHeight - height, end);
+        var points = cells.Select(Centre).ToList();
+        return new FlowRoute(points, length, startHeight - height, end, water);
     }
 
     // The lowest neighbour by drop per metre that lies below `height`; none in a hollow or on a flat.

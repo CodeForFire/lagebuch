@@ -153,6 +153,63 @@ public sealed class FlowPathTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Where_the_water_reaches_a_Gewaesser_the_route_ends_there()
+    {
+        // A slope falling 1 m every 10 m to the east, down to a river 200 m east whose surface is
+        // flat in the DGM: there the heights cannot say where it goes on.
+        var elevation = Terrain((e, _) => Math.Max(580, 600 - ((e - Origin.East) / 10)));
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(-200, 0), EastOf(200, "Amper")));
+
+        Assert.Equal(FlowPathEnd.Gewaesser, route.End);
+        Assert.Equal("Amper", route.WaterName);
+        Assert.InRange(Utm32.FromGeo(route.Points[^1]).Easting - Origin.East, 200, 205);
+        Assert.InRange(route.LengthMetres, 400, 410);
+        Assert.InRange(route.DropMetres, 39, 40.5);
+    }
+
+    [Fact]
+    public void A_spill_out_of_a_hollow_ends_at_the_first_cell_in_the_water()
+    {
+        // The shallow dip of the culvert test, with a Gewässer starting on its far side.
+        var elevation = Terrain((e, n) => (float)(600 - ((e - Origin.East) / 10) - (Math.Max(0, 1 - (Distance(e, n) / 30)) * 4)));
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(-200, 0), EastOf(10, "Weiher")));
+
+        Assert.Equal(FlowPathEnd.Gewaesser, route.End);
+        Assert.Equal("Weiher", route.WaterName);
+        Assert.InRange(Utm32.FromGeo(route.Points[^1]).Easting - Origin.East, 10, 15);
+    }
+
+    [Fact]
+    public void An_Einsatzort_in_the_water_is_its_own_route()
+    {
+        var elevation = Terrain((e, _) => 600 - ((e - Origin.East) / 10));
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(0, 0), EastOf(-100, string.Empty)));
+
+        Assert.Equal(FlowPathEnd.Gewaesser, route.End);
+        Assert.Equal(string.Empty, route.WaterName);
+        Assert.Single(route.Points);
+        Assert.Equal(0, route.DropMetres, precision: 6);
+    }
+
+    [Fact]
+    public void A_route_that_ends_on_land_names_no_Gewaesser()
+    {
+        var elevation = Terrain((e, _) => 600 - ((e - Origin.East) / 10));
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(-400, 0), _ => null));
+
+        Assert.Equal(FlowPathEnd.Kartenrand, route.End);
+        Assert.Null(route.WaterName);
+    }
+
+    // Water everywhere east of `metres` east of the origin.
+    private static Func<GeoPoint, string?> EastOf(double metres, string name) =>
+        p => Utm32.FromGeo(p).Easting - Origin.East >= metres ? name : null;
+
     private static double Distance(double east, double north) =>
         Math.Sqrt(((east - Origin.East) * (east - Origin.East)) + ((north - Origin.North) * (north - Origin.North)));
 
