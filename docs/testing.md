@@ -6,8 +6,10 @@ code are English. Use fictional incident and master data only.
 
 ## Test projects
 
-There are currently nine test projects under `tests/`, plus the shared
-`Fixtures/` directory.
+There are currently nine test projects under `tests/`, plus the shared fictional
+Stammdaten fixture directory [`tests/Fixtures/`](../tests/Fixtures/) (`StammdatenFixture.cs`
+and `stammdaten-vollstaendig.json`, linked by `LageBuch.Persistence.Tests`,
+`LageBuch.AppLogic.Tests` and `LageBuch.Acceptance.Tests`).
 
 | Project | What belongs here |
 | --- | --- |
@@ -34,9 +36,11 @@ make test PROJECT=tests/LageBuch.Domain.Tests FILTER=FullyQualifiedName~Formatti
 
 `make test` runs `LageBuch.Desktop.slnf`, excluding the Android application head.
 `PROJECT` selects one project; `FILTER` becomes `dotnet test --filter`. Supply
-both when narrowing: a filter applied to the whole solution can leave other
-assemblies with no matching tests and fail the run. A nonzero exit is not a pass;
-look for `Test Run Failed` as well as individual assembly summaries.
+both when narrowing: a filter applied across the whole solution can match no tests
+in other assemblies. Neither a zero exit nor `0 Error(s)` in the build tail proves
+the tests passed: a filter matching no tests can exit zero. Search the complete
+log for `Test Run Failed`, and require the expected assemblies to report `Passed!`
+with non-zero test counts and no failed tests.
 
 `make test-all` uses the full `LageBuch.sln`, including the Android head. It needs
 the Android workload and a compatible JDK (21 or earlier), as explained in
@@ -46,8 +50,9 @@ and the desktop filter on Windows.
 
 For the clean desktop build/test gate, the repository provides `make clean ci`.
 It restores, builds Release, and runs the tests without rebuilding. Formatting
-is a separate `make format-check` gate. Changes to C# also require the CodeQL
-check described in `CONTRIBUTING.md`; passing ordinary tests does not replace it.
+is a separate `make format-check` gate. Changes to C# also require `make codeql`
+([`../AGENTS.md#static-analysis`](../AGENTS.md#static-analysis)); ordinary tests
+do not replace CodeQL.
 
 ## Headless Avalonia tests
 
