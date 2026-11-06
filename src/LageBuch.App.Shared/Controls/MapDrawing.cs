@@ -320,10 +320,12 @@ public static class MapDrawing
 
     // Every shape whose bounds reach the screen, in the order the file gave them: areas filled
     // even-odd so a hole stays open, lines stroked, points as dots with their name close up. The
-    // shapes keep the colours their file gave them by day and by night; a name sits in the same
-    // box a water point's does, so it reads on the Nachtkarte too.
+    // shapes keep the colours their file gave them by day and by night; a name sits in a box in
+    // the map style's colours, so it reads on the Nachtkarte too.
     private static void DrawOverlays(DrawingContext context, IReadOnlyList<OverlayShape> shapes, GeoPoint center, int zoom, Size size, double rotation, MapStyle style)
     {
+        // Close enough that a name beside each point still leaves room for the street.
+        const int labelsMinZoom = 17;
         const double margin = 40;
         Point[] corners = [new(-margin, -margin), new(size.Width + margin, -margin), new(-margin, size.Height + margin), new(size.Width + margin, size.Height + margin)];
         var view = GeoBounds.Of(corners.Select(c => ToGeo(center, zoom, size, c, rotation)));
@@ -350,11 +352,11 @@ public static class MapDrawing
                 {
                     var at = Screen(part[0]);
                     context.DrawEllipse(new ImmutableSolidColorBrush(Color.FromUInt32(shape.Style.StrokeArgb)), PointOutline, at, 6, 6);
-                    if (shape.Label is { } label && zoom >= WaterPointLayer.LabelsMinZoom)
+                    if (shape.Label is { } label && zoom >= labelsMinZoom)
                     {
-                        var text = new FormattedText(label, LabelCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), 11, style.WaterPointLabelText);
+                        var text = new FormattedText(label, LabelCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), 11, style.OverlayLabelText);
                         var origin = new Point(at.X + 10, at.Y - (text.Height / 2));
-                        context.FillRectangle(style.WaterPointLabelBackground, new Rect(origin.X - 2, origin.Y, text.Width + 4, text.Height), 2);
+                        context.FillRectangle(style.OverlayLabelBackground, new Rect(origin.X - 2, origin.Y, text.Width + 4, text.Height), 2);
                         context.DrawText(text, origin);
                     }
                 }

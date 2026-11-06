@@ -65,7 +65,7 @@ public sealed class LagekarteTerrainRenderTests : IDisposable
             TimeSpan.FromSeconds(10));
 
         // The Saugstelle at the Musterbach, south-east of the Marktplatz.
-        vm.SelectedWaterPoint = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<WaterPoint>>(vm.WaterPoints), w => w.Kind == WaterPointKind.Saugstelle);
+        vm.SelectedWaterPoint = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<WaterPoint>>(vm.WaterPoints), w => w.Kind == WaterPointKind.Saugstelle && w.Label == "Musterbach");
         Dispatcher.UIThread.RunJobs();
         var button = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ShowProfileButton");
         Assert.True(button.IsEffectivelyVisible);
