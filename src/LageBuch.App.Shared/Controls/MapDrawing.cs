@@ -70,7 +70,8 @@ public static class MapDrawing
         }
 
         // The Fließweg over a Kartenebene, so the route a spill takes stays visible inside a plume.
-        if (flowPath is { Count: > 1 })
+        // A route of one point -- water that stays where it is, on flat ground -- is just its end dot.
+        if (flowPath is { Count: > 0 })
         {
             DrawFlowPath(context, flowPath, center, zoom, size, rotation);
         }

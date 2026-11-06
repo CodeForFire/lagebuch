@@ -426,6 +426,35 @@ public class MapCanvasControlTests
         Assert.Equal(Color.FromRgb(0xE5, 0xE3, 0xDF), PixelAt(frame, 200, 150));
     }
 
+    [AvaloniaFact]
+    public void A_Fliessweg_of_one_point_on_flat_ground_still_marks_where_it_ends()
+    {
+        var (window, control, _) = Show(null);
+        control.FlowPath = [Fuerstenfeldbruck];
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(FlowBlue, PixelAt(frame, 200, 150));
+    }
+
+    [AvaloniaFact]
+    public void The_Fliessweg_is_drawn_over_a_Kartenebene()
+    {
+        var (window, control, _) = Show(null);
+        static GeoPoint At(double dLat, double dLon) => new(Fuerstenfeldbruck.Latitude + dLat, Fuerstenfeldbruck.Longitude + dLon);
+        IReadOnlyList<GeoPoint> plume = [At(-0.02, -0.02), At(-0.02, 0.02), At(0.02, 0.02), At(0.02, -0.02), At(-0.02, -0.02)];
+        control.Overlays = [new OverlayShape(OverlayShapeKind.Area, [plume], new OverlayStyle(0xCCFF0000, 0xFFFF0000, 2), null, GeoBounds.Of(plume))];
+        control.FlowPath = [At(0, -0.01), Fuerstenfeldbruck];
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(FlowBlue, PixelAt(frame, 200, 150));
+    }
+
+    private static readonly Color FlowBlue = Color.FromRgb(0x0D, 0x47, 0xA1);
+
     private static (Window Window, MapCanvasControl Control, MapViewport Viewport) Show(IMapTileSource? tiles)
     {
         var viewport = new MapViewport { TileSource = tiles, Center = Fuerstenfeldbruck, Zoom = 13 };
