@@ -49,7 +49,7 @@ public static class OverlayGeoJson
     public const string TooLargeMessage = "Die Datei ist zu groß für eine Kartenebene.";
     public const string TooManyEntriesMessage = "Das Archiv enthält zu viele Dateien.";
     public const string NoGeoJsonInZipMessage = "Das Archiv enthält keine GeoJSON-Datei.";
-    public const string ZipFormatMessage = "Das Archiv ist im ZIP64-Format gepackt; bitte als gewöhnliches ZIP speichern.";
+    public const string ZipFormatMessage = "Das Archiv ist im ZIP64-Format oder auf mehrere Teile gepackt; bitte als gewöhnliches ZIP speichern.";
     public const string EmptyMessage = "Die Datei enthält nichts, was die Lagekarte zeichnen kann.";
     public static readonly string TooManyPointsMessage = $"Die Kartenebene ist zu detailliert (höchstens {MaxPoints:N0} Punkte).";
     public static readonly string TooManyShapesMessage = $"Die Kartenebene hat zu viele Formen (höchstens {MaxShapes:N0}).";
@@ -65,6 +65,10 @@ public static class OverlayGeoJson
 
     private const uint EndOfCentralDirectorySignature = 0x06054B50;
     private const int EndOfCentralDirectoryLength = 22;
+    private const uint Zip64LocatorSignature = 0x07064B50;
+    private const int Zip64LocatorLength = 20;
+    private const uint CentralHeaderSignature = 0x02014B50;
+    private const int CentralHeaderLength = 46;
 
     private static readonly byte[] ZipMagic = [0x50, 0x4B, 0x03, 0x04];
 
@@ -102,33 +106,71 @@ public static class OverlayGeoJson
     }
 
     // The end-of-central-directory record, found the way ZipArchive finds it: the last signature
-    // within a comment's reach of the end. What it declares is checked before anything is built
-    // from it; ZipArchive refuses a directory that does not match what its record declares.
+    // within a comment's reach of the end. Nothing in it is trusted: the directory it points at is
+    // walked here, header by header, the way ZipArchive will walk it, and refused at the first
+    // header past the cap -- so ZipArchive never builds more entries than this has counted.
     private static string? CentralDirectoryError(byte[] bytes)
     {
         var lowest = Math.Max(0, bytes.Length - EndOfCentralDirectoryLength - ushort.MaxValue);
         for (var at = bytes.Length - EndOfCentralDirectoryLength; at >= lowest; at--)
         {
-            var record = bytes.AsSpan(at);
-            if (BinaryPrimitives.ReadUInt32LittleEndian(record) != EndOfCentralDirectorySignature)
+            if (BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(at)) == EndOfCentralDirectorySignature)
             {
-                continue;
+                return DirectoryError(bytes, at);
             }
-
-            var entries = BinaryPrimitives.ReadUInt16LittleEndian(record[10..]);
-            var size = BinaryPrimitives.ReadUInt32LittleEndian(record[12..]);
-
-            // All ones is the ZIP64 marker: the real numbers would be elsewhere, and no Ebene
-            // needs an archive that size.
-            if (entries == ushort.MaxValue || size == uint.MaxValue)
-            {
-                return ZipFormatMessage;
-            }
-
-            return entries > MaxEntries || size > MaxCentralDirectoryBytes ? TooManyEntriesMessage : null;
         }
 
         return InvalidMessage;
+    }
+
+    private static string? DirectoryError(byte[] bytes, int at)
+    {
+        var record = bytes.AsSpan(at);
+        var disk = BinaryPrimitives.ReadUInt16LittleEndian(record[4..]);
+        var directoryDisk = BinaryPrimitives.ReadUInt16LittleEndian(record[6..]);
+        var entriesOnDisk = BinaryPrimitives.ReadUInt16LittleEndian(record[8..]);
+        var entries = BinaryPrimitives.ReadUInt16LittleEndian(record[10..]);
+        var size = BinaryPrimitives.ReadUInt32LittleEndian(record[12..]);
+        var offset = BinaryPrimitives.ReadUInt32LittleEndian(record[16..]);
+
+        // Any field at all ones, or a ZIP64 locator in front of the record, sends ZipArchive to read
+        // the real numbers from somewhere else. No Ebene needs an archive that size.
+        if (disk == ushort.MaxValue || directoryDisk == ushort.MaxValue || entriesOnDisk == ushort.MaxValue
+            || entries == ushort.MaxValue || size == uint.MaxValue || offset == uint.MaxValue
+            || (at >= Zip64LocatorLength && BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(at - Zip64LocatorLength)) == Zip64LocatorSignature))
+        {
+            return ZipFormatMessage;
+        }
+
+        // One disk only, and the directory lies whole before the record that describes it.
+        if (disk != 0 || directoryDisk != 0 || entriesOnDisk != entries || (long)offset + size > at)
+        {
+            return InvalidMessage;
+        }
+
+        if (entries > MaxEntries || size > MaxCentralDirectoryBytes)
+        {
+            return TooManyEntriesMessage;
+        }
+
+        var position = (long)offset;
+        var count = 0;
+        while (position + CentralHeaderLength <= at
+               && BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan((int)position)) == CentralHeaderSignature)
+        {
+            if (++count > MaxEntries)
+            {
+                return TooManyEntriesMessage;
+            }
+
+            var header = bytes.AsSpan((int)position);
+            position += CentralHeaderLength
+                + BinaryPrimitives.ReadUInt16LittleEndian(header[28..])
+                + BinaryPrimitives.ReadUInt16LittleEndian(header[30..])
+                + BinaryPrimitives.ReadUInt16LittleEndian(header[32..]);
+        }
+
+        return count == entries && position == offset + size ? null : InvalidMessage;
     }
 
     private static bool IsGeoJsonName(string name) =>
@@ -250,6 +292,12 @@ public static class OverlayGeoJson
 
             using var stream = new MemoryStream(bytes);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+            // Stryker disable once all : a second line behind CentralDirectoryError, which has counted these headers already.
+            if (archive.Entries.Count > MaxEntries)
+            {
+                return TooManyEntriesMessage;
+            }
 
             long budget = MaxUnpackedBytes;
             var found = false;

@@ -190,6 +190,69 @@ public class OverlayGeoJsonEdgeTests
         Assert.Equal(OverlayGeoJson.ZipFormatMessage, Refused(zip));
     }
 
+    private static byte[] Patched(byte[] zip, int offsetFromEnd, uint value, int width)
+    {
+        var copy = (byte[])zip.Clone();
+        var at = copy.AsSpan(copy.Length - offsetFromEnd);
+        if (width == 2)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(at, (ushort)value);
+        }
+        else
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(at, value);
+        }
+
+        return copy;
+    }
+
+    [Fact]
+    public void A_zip_hiding_more_headers_than_it_declares_is_refused_by_counting_them()
+    {
+        // 150 real entries; the record claims one, with the first header's length. ZipArchive walks
+        // every header that follows, so the count it declares is worth nothing.
+        var entries = Enumerable.Range(0, 150).Select(i => ($"{i:D3}.txt", new byte[] { 1 })).ToArray();
+        var zip = Zip(entries);
+        var firstHeader = 46 + "000.txt".Length;
+        zip = WithEndRecord(zip, entries: 1, size: (uint)firstHeader);
+
+        Assert.Equal(OverlayGeoJson.TooManyEntriesMessage, Refused(zip));
+    }
+
+    [Theory]
+    [InlineData(22 - 4, 2)]
+    [InlineData(22 - 6, 2)]
+    [InlineData(22 - 16, 4)]
+    public void Every_ZIP64_marker_in_the_end_record_is_refused(int offsetFromEnd, int width)
+    {
+        var zip = Patched(Zip(("a.geojson", Utf8(Point))), offsetFromEnd, width == 2 ? 0xFFFF : 0xFFFFFFFF, width);
+
+        Assert.Equal(OverlayGeoJson.ZipFormatMessage, Refused(zip));
+    }
+
+    [Fact]
+    public void A_ZIP64_locator_in_front_of_the_end_record_is_refused()
+    {
+        var zip = Zip(("a.geojson", Utf8(Point)));
+
+        // The 20 bytes before the record are the end of the directory's last header here; a locator
+        // signature there is what sends ZipArchive looking for ZIP64 numbers.
+        Assert.Equal(OverlayGeoJson.ZipFormatMessage, Refused(Patched(zip, 22 + 20, 0x07064B50, 4)));
+    }
+
+    [Theory]
+    [InlineData(22 - 4, 1u, 2)]
+    [InlineData(22 - 8, 2u, 2)]
+    [InlineData(22 - 10, 2u, 2)]
+    [InlineData(22 - 16, 0x00100000u, 4)]
+    public void An_end_record_that_does_not_match_its_directory_is_refused(int offsetFromEnd, uint value, int width)
+    {
+        // A second disk, counts that disagree, or a directory said to start past the record.
+        var zip = Patched(Zip(("a.geojson", Utf8(Point))), offsetFromEnd, value, width);
+
+        Assert.Equal(OverlayGeoJson.InvalidMessage, Refused(zip));
+    }
+
     [Fact]
     public void A_zip_without_its_end_record_is_refused()
     {
