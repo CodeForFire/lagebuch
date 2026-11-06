@@ -279,8 +279,8 @@ public static class WaterPointMarkers
 
     private static void Head(DrawingContext context, IPen pen, Point tip, int direction)
     {
-        context.DrawLine(pen, tip, new Point(tip.X - (3 * direction), tip.Y - 2.5));
-        context.DrawLine(pen, tip, new Point(tip.X - (3 * direction), tip.Y + 2.5));
+        context.DrawLine(pen, tip, new Point(tip.X - (3.0 * direction), tip.Y - 2.5));
+        context.DrawLine(pen, tip, new Point(tip.X - (3.0 * direction), tip.Y + 2.5));
     }
 
     private static void DrawGlyph(DrawingContext context, WaterPointSymbol symbol, Rect into)
