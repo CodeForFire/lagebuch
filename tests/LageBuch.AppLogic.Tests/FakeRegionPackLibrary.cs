@@ -62,7 +62,7 @@ internal sealed class FakeRegionPackLibrary : IRegionPackLibrary
         progress?.Report(0.5);
         if (InstallGate is { } gate)
         {
-            await gate.Task;
+            await gate.Task.WaitAsync(cancellationToken);
         }
 
         if (Failure is { } failure)

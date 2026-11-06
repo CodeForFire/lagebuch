@@ -57,6 +57,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         _dialogs = dialogs;
         _files = files;
         _mapPacks = mapPacks is null ? null : new MapPacksSection("Karten", mapPacks, RequestConfirm);
+        if (_mapPacks is not null)
+        {
+            DeviceSections.Add(_mapPacks);
+        }
+
         Load();
     }
 
@@ -76,11 +81,18 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     public ObservableCollection<ChecklistTemplateSection> Checklists { get; } = new();
 
     /// <summary>
+    /// What belongs to this device rather than to the Stammdaten -- the Kartenpakete, or nothing
+    /// without a map library. Its own rail group: it downloads from the internet and acts at once,
+    /// where every other category waits for SPEICHERN.
+    /// </summary>
+    public ObservableCollection<MapPacksSection> DeviceSections { get; } = new();
+
+    /// <summary>
     /// The section the detail pane shows.
     /// </summary>
     /// <remarks>
     /// A null assignment is ignored: the editor always has exactly one section selected, and the
-    /// rail is two ListBoxes over this one property. <c>SelectedItem</c> is a two-way direct
+    /// rail is three ListBoxes over this one property. <c>SelectedItem</c> is a two-way direct
     /// property and Avalonia writes a target change straight back to the source with no
     /// re-entrancy guard, so the list that does <em>not</em> hold the selected item reports null
     /// here as it clears its own highlight. Honouring that null would instantly undo the selection
@@ -97,6 +109,13 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             }
 
             SetProperty(ref _selectedSection, value);
+
+            // The catalogue is fetched on the first look rather than at startup: only someone
+            // opening Karten wants the network asked.
+            if (value is MapPacksSection maps)
+            {
+                maps.EnsureCatalogLoaded();
+            }
 
             // On a phone the rail and the detail cannot share 412dp, so picking a category is a
             // step into it rather than a change beside it.
@@ -200,6 +219,9 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         var previousChecklistId = (SelectedSection as ChecklistTemplateSection)?.Id;
         var previousTitle = SelectedSection?.Title;
 
+        // Device sections survive a reload as they are; only the Stammdaten ones are rebuilt.
+        var previousDevice = SelectedSection as MapPacksSection;
+
         Sections.Clear();
         Checklists.Clear();
 
@@ -247,8 +269,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             _talkGroups = new TalkGroupsSection("Funkgruppen", set.TalkGroups, MarkDirty, RequestConfirm),
         };
 
-        EditorSection[] deviceSections = _mapPacks is null ? [] : [_mapPacks];
-        foreach (var section in categories.Concat(deviceSections).OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
+        foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
         {
             Sections.Add(section);
         }
@@ -264,7 +285,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
         SelectedSection = previousChecklistId is { } id
             ? Checklists.FirstOrDefault(c => c.Id == id) ?? Sections[0]
-            : Sections.FirstOrDefault(s => s.Title == previousTitle) ?? Sections[0];
+            : previousDevice ?? Sections.FirstOrDefault(s => s.Title == previousTitle) ?? Sections[0];
 
         // Here rather than in Load: Import populates the sections too, and used to leave both
         // conflict rules unevaluated until the operator happened to edit a row. An imported file
@@ -428,8 +449,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         Checklists.Remove(section);
         _navigation.Rebuild(_navigation.ToValues(), Checklists);
 
-        // The nearest surviving neighbour, else the rail entry directly above the group. Clamping
-        // into Checklists unconditionally would index an empty collection when the last one goes.
+        // The nearest surviving neighbour, else the last Stammdaten category -- not Karten, which
+        // sits between them but would reach for the network on a delete. Clamping into Checklists unconditionally would index an empty collection when the last one goes.
         SelectedSection = Checklists.Count > 0
             ? Checklists[Math.Clamp(index, 0, Checklists.Count - 1)]
             : Sections[^1];
