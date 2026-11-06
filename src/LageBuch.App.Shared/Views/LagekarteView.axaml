@@ -281,6 +281,31 @@
       </DockPanel>
     </Border>
 
+    <!-- HÖHENPROFIL: under the map rather than over it, so the map's key and marks stay in view. -->
+    <Border x:Name="ProfilePanel" DockPanel.Dock="Bottom" Margin="0,8,0,0" Padding="10,6"
+            Background="{StaticResource SurfaceRaisedBrush}" BorderBrush="{StaticResource HairlineBrush}"
+            BorderThickness="1" CornerRadius="{StaticResource RadiusMd}" IsVisible="{Binding HasProfile}">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="2">
+            <TextBlock FontWeight="SemiBold">
+              <Run Text="HÖHENPROFIL  " />
+              <Run Text="{Binding ProfileTitle}" />
+            </TextBlock>
+            <TextBlock x:Name="ProfileSummary" Text="{Binding ProfileSummary}" FontSize="12" TextWrapping="Wrap"
+                       Foreground="{StaticResource TextSecondaryBrush}" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="icon-btn" VerticalAlignment="Top" ToolTip.Tip="Höhenprofil schließen"
+                  AutomationProperties.Name="Höhenprofil schließen" Command="{Binding CloseProfileCommand}">
+            <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+          </Button>
+        </Grid>
+        <c:ElevationProfileChart x:Name="ProfileChart" Height="130" Margin="0,6,0,0"
+                                 AutomationProperties.Name="Höhenprofil"
+                                 Profile="{Binding Profile}" Foreground="{StaticResource TextSecondaryBrush}" />
+      </DockPanel>
+    </Border>
+
     <!-- The map, its marks, and what floats over it. -->
     <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
@@ -293,7 +318,7 @@
                             Elevation="{Binding Terrain.Elevation}"
                             TerrainStyle="{Binding Terrain.Style}"
                             SelectedWaterPoint="{Binding SelectedWaterPoint}"
-                            Overlays="{Binding Overlays.VisibleShapes}"
+                            Overlays="{Binding MapShapes}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
                             Rotation="{Binding Map.Rotation}"
@@ -429,6 +454,13 @@
               <TextBlock DockPanel.Dock="Bottom" Margin="0,6,0,0" FontSize="11" TextWrapping="Wrap"
                          Foreground="{StaticResource TextSecondaryBrush}"
                          Text="Aus OpenStreetMap, nicht vom Wasserversorger. Vor Ort prüfen." />
+              <!-- HÖHENPROFIL: from this water point to the Einsatzort, for the Wasserförderung. -->
+              <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" Spacing="2" IsVisible="{Binding OffersProfile}">
+                <Button x:Name="ShowProfileButton" Classes="ghost" HorizontalAlignment="Stretch"
+                        Content="HÖHENPROFIL ZUM EINSATZORT" Command="{Binding ShowProfileCommand}" />
+                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                           IsVisible="{Binding !HasEinsatzort}" Text="Erst den Einsatzort setzen." />
+              </StackPanel>
               <ItemsControl x:Name="WaterPointDetails" ItemsSource="{Binding SelectedWaterPoint.Details}" Grid.IsSharedSizeScope="True">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="map:WaterPointDetail">

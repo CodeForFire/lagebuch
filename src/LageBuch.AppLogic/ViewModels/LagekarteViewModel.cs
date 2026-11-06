@@ -29,6 +29,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
     private const double MarkerTapSlop = 6;
 
+    // The Höhenprofil's colour on the map and in its chart: a magenta no map feature uses.
+    private const uint ProfileArgb = 0xFFD81B60;
+
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly IRegionPackLibrary? _library;
@@ -73,8 +76,21 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             {
                 OnPropertyChanged(nameof(ShowsLegend));
             }
+
+            if (e.PropertyName is nameof(TerrainOverlay.Elevation))
+            {
+                OnPropertyChanged(nameof(OffersProfile));
+                ShowProfileCommand.NotifyCanExecuteChanged();
+            }
         };
         Overlays = new MapOverlaysViewModel(session, onChanged, dialogs, requestConfirm, clock ?? new SystemClock(), ShowBounds);
+        Overlays.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(MapOverlaysViewModel.VisibleShapes))
+            {
+                OnPropertyChanged(nameof(MapShapes));
+            }
+        };
         Refresh();
         ShowPacks(InstalledPacks(mapPacks), centerOnPacks: true);
         if (session.Incident.Location is { } location)
@@ -178,7 +194,136 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>The water point whose card is open: tapped on the map while nothing was picked to place.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelectedWaterPoint))]
+    [NotifyCanExecuteChangedFor(nameof(ShowProfileCommand))]
     private WaterPoint? _selectedWaterPoint;
+
+    /// <summary>
+    /// The HÖHENPROFIL from a Wasserentnahmestelle to the Einsatzort, under the map; null while none
+    /// is open. Follows the Einsatzort when it is moved.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasProfile))]
+    [NotifyPropertyChangedFor(nameof(ProfileSummary))]
+    [NotifyPropertyChangedFor(nameof(MapShapes))]
+    private ElevationProfile? _profile;
+
+    /// <summary>"UH 100 → Einsatzort": what the open profile runs between.</summary>
+    [ObservableProperty]
+    private string? _profileTitle;
+
+    public bool HasProfile => Profile is not null;
+
+    /// <summary>The card offers a profile wherever the packs have heights; it needs an Einsatzort to run to.</summary>
+    public bool OffersProfile => Terrain.HasElevation;
+
+    /// <summary>The profile in words: length, how much higher the Einsatzort lies, the climb on the way, the highest point.</summary>
+    public string? ProfileSummary => Profile is { } profile ? Describe(profile) : null;
+
+    /// <summary>What the map draws over its tiles: the Kartenebenen, and the open profile's line.</summary>
+    public IReadOnlyList<OverlayShape> MapShapes => Profile is { } profile ? [.. Overlays.VisibleShapes, .. ProfileShapes(profile)] : Overlays.VisibleShapes;
+
+    private bool CanShowProfile => SelectedWaterPoint is not null && _session.Incident.Location is not null && Terrain.Elevation is not null;
+
+    /// <summary>Opens the profile from the open card's water point to the Einsatzort.</summary>
+    [RelayCommand(CanExecute = nameof(CanShowProfile))]
+    private void ShowProfile()
+    {
+        if (SelectedWaterPoint is { } water && _session.Incident.Location is { } einsatzort && Terrain.Elevation is { } elevation)
+        {
+            _profileSource = water.Position;
+            ProfileTitle = $"{water.Title} → Einsatzort";
+            Profile = ElevationProfile.Along(elevation, water.Position, einsatzort);
+        }
+    }
+
+    [RelayCommand]
+    private void CloseProfile()
+    {
+        _profileSource = null;
+        Profile = null;
+        ProfileTitle = null;
+    }
+
+    // Where the open profile starts, so it can follow a moved Einsatzort; null while none is open.
+    private GeoPoint? _profileSource;
+
+    // The open profile again for the Einsatzort as it is now; closed when there is none any more.
+    private void RefreshProfile()
+    {
+        ShowProfileCommand.NotifyCanExecuteChanged();
+        if (_profileSource is not { } source)
+        {
+            return;
+        }
+
+        if (_session.Incident.Location is { } einsatzort && Terrain.Elevation is { } elevation)
+        {
+            if (Profile is not { } open || !Equals(open.To, einsatzort))
+            {
+                Profile = ElevationProfile.Along(elevation, source, einsatzort);
+            }
+        }
+        else
+        {
+            CloseProfile();
+        }
+    }
+
+    private static string Describe(ElevationProfile profile)
+    {
+        if (profile.StartHeight is not { } start)
+        {
+            return "An der Entnahmestelle gibt es keine Höhendaten.";
+        }
+
+        if (profile.Rise is not { } rise)
+        {
+            return "Am Einsatzort gibt es keine Höhendaten.";
+        }
+
+        var parts = new List<string>
+        {
+            $"{Formatting.Metres(profile.Length)} Luftlinie",
+            rise switch
+            {
+                >= 0.5 => $"Einsatzort {Formatting.Metres(rise)} höher",
+                <= -0.5 => $"Einsatzort {Formatting.Metres(-rise)} tiefer",
+                _ => "Einsatzort gleich hoch",
+            },
+            $"Anstieg gesamt {Formatting.Metres(profile.Climb)}",
+        };
+
+        // A crest on the way, above both ends: the hose has to be pumped over it, not just up to the Einsatzort.
+        if (profile.Highest is { } top && top.Height >= Math.Max(start, start + rise) + 0.5)
+        {
+            parts.Add($"höchster Punkt {Formatting.HeightDifference(top.Height - start)} nach {Formatting.Metres(top.Distance)}");
+        }
+
+        if (profile.HasGaps)
+        {
+            parts.Add("mit Lücken in den Höhendaten");
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    // The profile's line on the map, and a dot at its highest point when that is not one of its ends.
+    private static IReadOnlyList<OverlayShape> ProfileShapes(ElevationProfile profile)
+    {
+        var style = new OverlayStyle(0, ProfileArgb, 4);
+        var line = new OverlayShape(OverlayShapeKind.Line, [[profile.From, profile.To]], style, null, GeoBounds.Of([profile.From, profile.To]));
+        if (profile.Highest is not { } top || top.Distance <= 0 || top.Distance >= profile.Length || profile.StartHeight is not { } start)
+        {
+            return [line];
+        }
+
+        var t = top.Distance / profile.Length;
+        var at = new GeoPoint(
+            profile.From.Latitude + ((profile.To.Latitude - profile.From.Latitude) * t),
+            profile.From.Longitude + ((profile.To.Longitude - profile.From.Longitude) * t));
+        var label = $"höchster Punkt {Formatting.HeightDifference(top.Height - start)}";
+        return [line, new OverlayShape(OverlayShapeKind.Point, [[at]], style, label, GeoBounds.Of([at]))];
+    }
 
     public bool HasSelectedWaterPoint => SelectedWaterPoint is not null;
 
@@ -706,6 +851,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         PinPositions = Markers.Select(m => m.Position).ToList();
         EinsatzortPosition = incident.Location;
         Terrain.Einsatzort = incident.Location;
+        RefreshProfile();
 
         // A unit that left the Einsatz while it was picked cannot be placed any more.
         if (Placing is { UnitId: { } picked } && units.All(u => u.Id != picked))

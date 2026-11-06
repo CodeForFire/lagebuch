@@ -1,0 +1,1 @@
+A Wasserentnahmestelle's card on the Lagekarte opens a Höhenprofil to the Einsatzort: the ground along the straight line, how much higher the Einsatzort lies, the climb on the way and any crest to pump over.
