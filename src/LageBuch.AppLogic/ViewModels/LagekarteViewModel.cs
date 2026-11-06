@@ -79,8 +79,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
             if (e.PropertyName is nameof(TerrainOverlay.Elevation))
             {
+                // Packs reloaded: an open profile is drawn again from the new heights, or closed without any.
                 OnPropertyChanged(nameof(OffersProfile));
-                ShowProfileCommand.NotifyCanExecuteChanged();
+                RefreshProfile(newHeights: true);
             }
         };
         Overlays = new MapOverlaysViewModel(session, onChanged, dialogs, requestConfirm, clock ?? new SystemClock(), ShowBounds);
@@ -247,8 +248,8 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     // Where the open profile starts, so it can follow a moved Einsatzort; null while none is open.
     private GeoPoint? _profileSource;
 
-    // The open profile again for the Einsatzort as it is now; closed when there is none any more.
-    private void RefreshProfile()
+    // The open profile again for the Einsatzort as it is now, or for new heights; closed when either is gone.
+    private void RefreshProfile(bool newHeights = false)
     {
         ShowProfileCommand.NotifyCanExecuteChanged();
         if (_profileSource is not { } source)
@@ -258,7 +259,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
         if (_session.Incident.Location is { } einsatzort && Terrain.Elevation is { } elevation)
         {
-            if (Profile is not { } open || !Equals(open.To, einsatzort))
+            if (newHeights || Profile is not { } open || !Equals(open.To, einsatzort))
             {
                 Profile = ElevationProfile.Along(elevation, source, einsatzort);
             }

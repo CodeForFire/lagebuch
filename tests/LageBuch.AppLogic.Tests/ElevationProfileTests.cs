@@ -33,6 +33,30 @@ public sealed class ElevationProfileTests : IDisposable
     }
 
     [Fact]
+    public void A_line_running_north_follows_the_ground_northwards()
+    {
+        // Rising 1 m every 10 m to the north.
+        var elevation = Terrain((_, n) => 500 + ((n - Origin.North) / 10));
+
+        var profile = ElevationProfile.Along(elevation, At(0, -200), At(0, 200));
+
+        Assert.InRange(Assert.NotNull(profile.Rise), 39.5, 40.5);
+        Assert.InRange(Assert.NotNull(profile.Heights[profile.Heights.Count / 2]), 499.5, 500.5);
+    }
+
+    [Fact]
+    public void Wholly_outside_the_heights_a_profile_has_no_highest_point_and_no_climb()
+    {
+        var elevation = Terrain((_, _) => 500);
+
+        var profile = ElevationProfile.Along(elevation, new GeoPoint(48.18, 11.40), new GeoPoint(48.18, 11.41));
+
+        Assert.Null(profile.Highest);
+        Assert.Equal(0, profile.Climb, precision: 9);
+        Assert.Null(profile.StartHeight);
+    }
+
+    [Fact]
     public void Over_a_hill_the_climb_counts_the_way_up_even_where_the_end_lies_lower()
     {
         // 20 m up to a crest in the middle, 30 m down beyond it.

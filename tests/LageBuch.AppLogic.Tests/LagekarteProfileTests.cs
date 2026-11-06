@@ -1,6 +1,8 @@
+using System.Text;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.AppLogic.Tests;
@@ -88,6 +90,86 @@ public sealed class LagekarteProfileTests : IDisposable
             vm.ProfileSummary);
         var crest = Assert.Single(vm.MapShapes, s => s.Kind == OverlayShapeKind.Point);
         Assert.Matches("^höchster Punkt \\+(19|20) m$", crest.Label);
+    }
+
+    [Fact]
+    public void The_crest_s_dot_lies_on_the_line_as_far_along_as_the_crest()
+    {
+        var (e0, _) = TerrainFixture.MarktplatzUtm;
+        var (session, vm) = Open((e, _) => (float)(500 + (20 * Math.Max(0, 1 - (Math.Abs(e - (e0 - 50)) / 30)))));
+        session.SetIncidentLocation(TerrainFixture.Marktplatz);
+        vm.SelectedWaterPoint = new WaterPoint(West, WaterPointKind.Hydrant, "UH 100");
+
+        vm.ShowProfileCommand.Execute(null);
+
+        // 150 m along a 200 m line running east: three quarters of the way, at the line's latitude.
+        var dot = Assert.Single(vm.MapShapes, s => s.Kind == OverlayShapeKind.Point).Parts[0][0];
+        var fraction = (dot.Longitude - West.Longitude) / (TerrainFixture.Marktplatz.Longitude - West.Longitude);
+        Assert.InRange(fraction, 0.72, 0.78);
+        Assert.Equal(48.1785, dot.Latitude, precision: 6);
+    }
+
+    [Fact]
+    public void A_line_across_a_hole_in_the_heights_says_so()
+    {
+        var (e0, _) = TerrainFixture.MarktplatzUtm;
+        var (session, vm) = Open((e, _) => Math.Abs(e - (e0 - 100)) < 20 ? Persistence.Tests.GeoTiffFixtures.NoData : 520f);
+        session.SetIncidentLocation(TerrainFixture.Marktplatz);
+        vm.SelectedWaterPoint = new WaterPoint(West, WaterPointKind.Hydrant, "UH 100");
+
+        vm.ShowProfileCommand.Execute(null);
+
+        Assert.EndsWith(" · mit Lücken in den Höhendaten", vm.ProfileSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Reloaded_packs_redraw_an_open_profile_from_their_heights_and_its_pack_gone_closes_it()
+    {
+        var library = new FakeRegionPackLibrary();
+        var pack = TerrainFixture.Pack(_dir);
+        library.Preinstall(pack);
+        var (session, _) = Open();
+        session.SetIncidentLocation(TerrainFixture.Marktplatz);
+        using var vm = new LagekarteViewModel(session, () => { }, library);
+        vm.SelectedWaterPoint = new WaterPoint(West, WaterPointKind.Hydrant, "UH 100");
+        vm.ShowProfileCommand.Execute(null);
+        Assert.Contains("10 m höher", vm.ProfileSummary, StringComparison.Ordinal);
+
+        // A newer version of the pack, its ground flat.
+        library.Remove(pack);
+        var flat = Directory.CreateDirectory(Path.Join(_dir, "flat")).FullName;
+        Persistence.Tests.GeoTiffFixtures.Write(Path.Join(flat, InstalledRegionPack.ElevationFileName), TerrainFixture.Grid, (_, _) => 530f, tileSide: 64);
+        library.Preinstall(new InstalledRegionPack(FakeRegionPackLibrary.Pack("ffb", "Landkreis Fürstenfeldbruck", version: 2), flat));
+        vm.ReloadPacks();
+
+        Assert.Contains("gleich hoch", vm.ProfileSummary, StringComparison.Ordinal);
+
+        library.Remove(library.GetInstalled()[0]);
+        vm.ReloadPacks();
+
+        Assert.Null(vm.Profile);
+        Assert.False(vm.OffersProfile);
+        Assert.False(vm.ShowProfileCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task An_open_profile_and_a_shown_Ebene_are_both_on_the_map()
+    {
+        var (session, vm) = Open();
+        session.SetIncidentLocation(TerrainFixture.Marktplatz);
+        vm.SelectedWaterPoint = new WaterPoint(West, WaterPointKind.Hydrant, "UH 100");
+        vm.ShowProfileCommand.Execute(null);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        const string box = """{"type": "Polygon", "coordinates": [[[11.25, 48.17], [11.26, 48.17], [11.26, 48.18], [11.25, 48.17]]]}""";
+        await session.AddMapOverlayAsync("e.geojson", "application/geo+json", Encoding.UTF8.GetBytes(box), new MapOverlaySummary("e", 1, null, null));
+        await vm.Overlays.SettledAsync();
+        vm.Overlays.Items[^1].ShowCommand.Execute(null);
+
+        Assert.Contains(nameof(LagekarteViewModel.MapShapes), raised);
+        Assert.Contains(vm.MapShapes, s => s.Kind == OverlayShapeKind.Area);
+        Assert.Contains(vm.MapShapes, s => s.Kind == OverlayShapeKind.Line);
     }
 
     [Fact]
