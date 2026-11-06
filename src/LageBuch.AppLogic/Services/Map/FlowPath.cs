@@ -42,7 +42,9 @@ public static class FlowPath
     /// The name of the Gewässer at a point, empty for one without a name, null on land; the route
     /// ends in the first cell it finds water in. Without it the route never meets a Gewässer.
     /// </param>
-    public static FlowRoute? Trace(ElevationSet elevation, GeoPoint start, Func<GeoPoint, string?>? waterAt = null)
+    /// <param name="cancellationToken">Stops a trace no longer wanted: the Einsatzort moved, or the layer was left.</param>
+    /// <exception cref="OperationCanceledException">When <paramref name="cancellationToken"/> stops it.</exception>
+    public static FlowRoute? Trace(ElevationSet elevation, GeoPoint start, Func<GeoPoint, string?>? waterAt = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(elevation);
         ArgumentNullException.ThrowIfNull(start);
@@ -73,6 +75,7 @@ public static class FlowPath
 
         while (water is null && length < MaxLength)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var next = Steepest(current, height, Height, visited, out var nextHeight, out var edge);
             if (edge)
             {
@@ -91,7 +94,7 @@ public static class FlowPath
                 continue;
             }
 
-            if (Spill(current, height, Height, visited) is not { } way)
+            if (Spill(current, height, Height, visited, cancellationToken) is not { } way)
             {
                 end = FlowPathEnd.Senke;
                 break;
@@ -149,7 +152,7 @@ public static class FlowPath
     /// Null when the water would have to rise more than <see cref="MaxFillDepth"/> or flood more
     /// than <see cref="MaxFillCells"/> cells first.
     /// </summary>
-    private static List<(long X, long Y)>? Spill((long X, long Y) pit, double pitHeight, Func<(long X, long Y), double?> heightOf, HashSet<(long X, long Y)> route)
+    private static List<(long X, long Y)>? Spill((long X, long Y) pit, double pitHeight, Func<(long X, long Y), double?> heightOf, HashSet<(long X, long Y)> route, CancellationToken cancellationToken)
     {
         var queue = new PriorityQueue<(long X, long Y), double>();
         var from = new Dictionary<(long X, long Y), (long X, long Y)>();
@@ -158,7 +161,8 @@ public static class FlowPath
         from[pit] = pit;
         while (queue.TryDequeue(out var cell, out var h))
         {
-            if (h < pitHeight && !route.Contains(cell))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (h < pitHeight)
             {
                 // Lower than the hollow's bottom: the rim is behind, and from here it runs down again.
                 var way = new List<(long X, long Y)>();
@@ -183,7 +187,9 @@ public static class FlowPath
             {
                 // Stryker disable once Arithmetic : the eight neighbours are symmetric, so subtracting the offsets visits the same cells.
                 var neighbour = (cell.X + dx, cell.Y + dy);
-                if (!from.ContainsKey(neighbour) && heightOf(neighbour) is { } nh)
+
+                // The route the water came along is not flooded again, so its way out never runs back over it.
+                if (!from.ContainsKey(neighbour) && !route.Contains(neighbour) && heightOf(neighbour) is { } nh)
                 {
                     from[neighbour] = cell;
                     queue.Enqueue(neighbour, nh);

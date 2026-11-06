@@ -222,6 +222,27 @@ public sealed class VectorWaterTests
         Assert.Equal(1, tiles.Reads);
     }
 
+    [Fact]
+    public void A_pack_whose_finest_zoom_is_coarser_is_read_at_that_zoom()
+    {
+        // The zoom 15 tile (TileX, TileY) is the south-west quarter of its zoom 14 parent, so the
+        // point (2000, 2000) in it lies at (1000, 3048) in the parent.
+        (int X, int Y)[] quarter = [(500, 2548), (1500, 2548), (1500, 3548), (500, 3548)];
+        var tiles = new Tiles(maxZoom: 14) { [(TileX / 2, TileY / 2)] = Tile("water", (VectorGeometryType.Polygon, [("kind", "water"), ("name", "Ampersee")], [quarter])) };
+
+        Assert.Equal("Ampersee", new VectorWater(tiles).At(At(2000, 2000)));
+        Assert.All(tiles.Asked, zoom => Assert.Equal(14, zoom));
+    }
+
+    [Fact]
+    public void A_source_without_tiles_is_never_asked_for_one()
+    {
+        var tiles = new Tiles(maxZoom: null);
+
+        Assert.Null(new VectorWater(tiles).At(At(2000, 2000)));
+        Assert.Empty(tiles.Asked);
+    }
+
     private static VectorWater Water(params (VectorGeometryType Type, (string Key, string Value)[] Tags, (int X, int Y)[][] Parts)[] features) =>
         new(new Tiles { [(TileX, TileY)] = Tile("water", features) });
 
@@ -236,18 +257,21 @@ public sealed class VectorWaterTests
         return new GeoPoint(latitude, longitude);
     }
 
-    private sealed class Tiles : Dictionary<(int X, int Y), byte[]>, IMapTileSource
+    // Holds tiles at one zoom: the source's finest.
+    private sealed class Tiles(int? maxZoom = VectorWater.Zoom) : Dictionary<(int X, int Y), byte[]>, IMapTileSource
     {
-        public int Reads { get; private set; }
+        public List<int> Asked { get; } = [];
+
+        public int Reads => Asked.Count;
 
         public byte[]? GetTile(int zoom, int x, int y)
         {
-            Reads++;
-            return zoom == VectorWater.Zoom && TryGetValue((x, y), out var tile) ? tile : null;
+            Asked.Add(zoom);
+            return zoom == maxZoom && TryGetValue((x, y), out var tile) ? tile : null;
         }
 
         public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
 
-        public int? GetMaxZoom() => VectorWater.Zoom;
+        public int? GetMaxZoom() => maxZoom;
     }
 }

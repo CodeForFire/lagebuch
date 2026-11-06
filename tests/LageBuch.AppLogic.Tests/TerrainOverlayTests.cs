@@ -238,19 +238,91 @@ public sealed class TerrainOverlayTests : IDisposable
     }
 
     [Fact]
-    public void While_the_Fliessweg_is_traced_the_key_says_so()
+    public async Task While_the_Fliessweg_is_traced_the_key_says_so()
     {
-        var terrain = Shown();
+        using var held = new ManualResetEventSlim();
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at, water, cancellationToken) =>
+            {
+                held.Wait(TimeSpan.FromSeconds(10), cancellationToken);
+                return FlowPath.Trace(elevation, at, water, cancellationToken);
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
         terrain.Einsatzort = TerrainFixture.Marktplatz;
 
         terrain.Layer = TerrainLayer.Fliessweg;
 
-        // Without a UI thread to come back to, the trace's result arrives later; until then:
-        Assert.True(terrain.IsTracingFlow || terrain.FlowRoute is not null);
-        if (terrain.IsTracingFlow)
-        {
-            Assert.Equal("Fließweg wird berechnet …", terrain.LegendText);
-        }
+        Assert.True(terrain.IsTracingFlow);
+        Assert.Null(terrain.FlowRoute);
+        Assert.Equal("Fließweg wird berechnet …", terrain.LegendText);
+
+        held.Set();
+        await terrain.FlowSettled;
+        Assert.False(terrain.IsTracingFlow);
+        Assert.NotNull(terrain.FlowRoute);
+    }
+
+    [Fact]
+    public async Task Moving_the_Einsatzort_stops_the_trace_for_the_old_one()
+    {
+        using var running = new ManualResetEventSlim();
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (elevation, at, water, cancellationToken) =>
+            {
+                if (Equals(at, TerrainFixture.Marktplatz))
+                {
+                    running.Set();
+                    stopped.SetResult(cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(10)));
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return FlowPath.Trace(elevation, at, water, cancellationToken);
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var stale = terrain.FlowSettled;
+
+        // Under way, not merely queued: a trace cancelled before it starts never runs at all.
+        Assert.True(running.Wait(TimeSpan.FromSeconds(10)));
+        terrain.Einsatzort = new GeoPoint(52.52, 13.40);
+
+        Assert.True(await stopped.Task);
+        await stale;
+        await terrain.FlowSettled;
+        Assert.False(terrain.IsTracingFlow);
+        Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
+    }
+
+    [Fact]
+    public async Task Leaving_the_layer_stops_the_trace()
+    {
+        using var running = new ManualResetEventSlim();
+        var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var terrain = new TerrainOverlay(
+            new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
+            (_, _, _, cancellationToken) =>
+            {
+                running.Set();
+                stopped.SetResult(cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(10)));
+                cancellationToken.ThrowIfCancellationRequested();
+                return null;
+            });
+        terrain.Show([TerrainFixture.Pack(_dir)]);
+        terrain.Einsatzort = TerrainFixture.Marktplatz;
+        terrain.Layer = TerrainLayer.Fliessweg;
+        var stale = terrain.FlowSettled;
+
+        Assert.True(running.Wait(TimeSpan.FromSeconds(10)));
+        terrain.Layer = TerrainLayer.Schummerung;
+
+        Assert.True(await stopped.Task);
+        await stale;
+        Assert.False(terrain.IsTracingFlow);
+        Assert.Equal("Relief überhöht dargestellt", terrain.LegendText);
     }
 
     [Fact]
@@ -259,14 +331,14 @@ public sealed class TerrainOverlayTests : IDisposable
         using var first = new ManualResetEventSlim();
         var terrain = new TerrainOverlay(
             new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
-            (elevation, at, water) =>
+            (elevation, at, water, cancellationToken) =>
             {
                 if (Equals(at, TerrainFixture.Marktplatz))
                 {
-                    first.Wait(TimeSpan.FromSeconds(10));
+                    first.Wait(TimeSpan.FromSeconds(10), cancellationToken);
                 }
 
-                return FlowPath.Trace(elevation, at, water);
+                return FlowPath.Trace(elevation, at, water, cancellationToken);
             });
         terrain.Show([TerrainFixture.Pack(_dir)]);
         terrain.Einsatzort = TerrainFixture.Marktplatz;
@@ -288,7 +360,7 @@ public sealed class TerrainOverlayTests : IDisposable
     {
         var terrain = new TerrainOverlay(
             new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
-            (_, _, _) => throw new InvalidOperationException("broken"));
+            (_, _, _, _) => throw new InvalidOperationException("broken"));
         terrain.Show([TerrainFixture.Pack(_dir)]);
         terrain.Einsatzort = TerrainFixture.Marktplatz;
 
@@ -385,10 +457,10 @@ public sealed class TerrainOverlayTests : IDisposable
         var asked = new List<Func<GeoPoint, string?>?>();
         var terrain = new TerrainOverlay(
             new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
-            (elevation, at, water) =>
+            (elevation, at, water, cancellationToken) =>
             {
                 asked.Add(water);
-                return FlowPath.Trace(elevation, at, water);
+                return FlowPath.Trace(elevation, at, water, cancellationToken);
             });
         terrain.Show([TerrainFixture.Pack(_dir)]);
         terrain.Einsatzort = TerrainFixture.Marktplatz;

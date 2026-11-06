@@ -206,6 +206,39 @@ public sealed class FlowPathTests : IDisposable
         Assert.Null(route.WaterName);
     }
 
+    [Fact]
+    public void A_route_never_runs_through_the_same_cell_twice()
+    {
+        // A slope falling to the east, rippled into many shallow hollows: each spill out of one
+        // must not lead back over the route that ran into it.
+        var elevation = Terrain((e, n) => 600 - ((e - Origin.East) / 40) + (1.5 * Math.Sin((e - Origin.East) / 11) * Math.Cos((n - Origin.North) / 7)));
+
+        var twice = new List<string>();
+        for (var east = -400; east <= 400; east += 100)
+        {
+            for (var north = -400; north <= 400; north += 100)
+            {
+                var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(east, north)));
+                if (route.Points.Distinct().Count() != route.Points.Count)
+                {
+                    twice.Add($"({east}, {north})");
+                }
+            }
+        }
+
+        Assert.Empty(twice);
+    }
+
+    [Fact]
+    public void A_trace_that_is_no_longer_wanted_stops()
+    {
+        var elevation = Terrain((e, _) => 600 - ((e - Origin.East) / 10));
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => FlowPath.Trace(elevation, At(-400, 0), cancellationToken: cancelled.Token));
+    }
+
     // Water everywhere east of `metres` east of the origin.
     private static Func<GeoPoint, string?> EastOf(double metres, string name) =>
         p => Utm32.FromGeo(p).Easting - Origin.East >= metres ? name : null;

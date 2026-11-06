@@ -14,7 +14,10 @@ namespace LageBuch.Persistence.Map.Vector;
 /// </remarks>
 public sealed class VectorWater(IMapTileSource tiles)
 {
-    /// <summary>The zoom the tiles are read at: the packs' finest, where a Bach is still mapped.</summary>
+    /// <summary>
+    /// The zoom the tiles are read at, where a Bach is still mapped; a pack whose finest zoom is
+    /// coarser is read at its own.
+    /// </summary>
     public const int Zoom = 15;
 
     /// <summary>A point this close to a waterway line, in metres, is in it: one DGM5 cell.</summary>
@@ -30,6 +33,9 @@ public sealed class VectorWater(IMapTileSource tiles)
     private static readonly HashSet<string> NotGewaesser = new(["fountain", "swimming_pool"], StringComparer.Ordinal);
 
     private readonly IMapTileSource _tiles = tiles ?? throw new ArgumentNullException(nameof(tiles));
+
+    // The finer of Zoom and the pack's own finest zoom; null for a source without tiles.
+    private readonly int? _zoom = tiles.GetMaxZoom() is { } finest ? Math.Clamp(finest, 0, Zoom) : null;
     private readonly Dictionary<(int X, int Y), VectorLayer?> _read = [];
 
     /// <summary>
@@ -38,12 +44,17 @@ public sealed class VectorWater(IMapTileSource tiles)
     public string? At(GeoPoint point)
     {
         ArgumentNullException.ThrowIfNull(point);
-        const double n = 1 << Zoom;
+        if (_zoom is not { } zoom)
+        {
+            return null;
+        }
+
+        double n = 1 << zoom;
         var latitude = Math.Clamp(point.Latitude, -85.0511, 85.0511) * Math.PI / 180;
         var worldX = (point.Longitude + 180) / 360 * n;
         var worldY = (1 - (Math.Log(Math.Tan(latitude) + (1 / Math.Cos(latitude))) / Math.PI)) / 2 * n;
         var (tileX, tileY) = ((int)Math.Floor(worldX), (int)Math.Floor(worldY));
-        if (Layer(tileX, tileY) is not { } layer)
+        if (Layer(zoom, tileX, tileY) is not { } layer)
         {
             return null;
         }
@@ -118,11 +129,11 @@ public sealed class VectorWater(IMapTileSource tiles)
 
     private static double Square(double value) => value * value;
 
-    private VectorLayer? Layer(int x, int y)
+    private VectorLayer? Layer(int zoom, int x, int y)
     {
         if (!_read.TryGetValue((x, y), out var layer))
         {
-            layer = Decode(_tiles.GetTile(Zoom, x, y));
+            layer = Decode(_tiles.GetTile(zoom, x, y));
             _read[(x, y)] = layer;
         }
 

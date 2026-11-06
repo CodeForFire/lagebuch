@@ -24,13 +24,16 @@ public sealed partial class TerrainOverlay : ObservableObject
     private const double RangeRecomputeDistance = 512;
 
     private readonly MapViewport _map;
-    private readonly Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, FlowRoute?> _traceFlow;
+    private readonly Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, CancellationToken, FlowRoute?> _traceFlow;
     private (double Low, double High)? _range;
     private (ElevationSet Elevation, GeoPoint? Einsatzort)? _flowFor;
 
     // Bumped whenever the route asked for changes, so a trace for an older Einsatzort is dropped.
     private int _flowGeneration;
     private Task? _flowTask;
+
+    // Stops the trace under way, if there is one: it is no longer wanted.
+    private Action? _cancelFlow;
     private bool _flowFailed;
     private (GeoPoint Center, int Zoom)? _rangeAt;
 
@@ -39,7 +42,7 @@ public sealed partial class TerrainOverlay : ObservableObject
 
     /// <param name="map">The map whose view the colour range follows.</param>
     /// <param name="traceFlow">Traces the Fließweg; <see cref="FlowPath.Trace"/> unless a test says otherwise.</param>
-    public TerrainOverlay(MapViewport map, Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, FlowRoute?>? traceFlow = null)
+    public TerrainOverlay(MapViewport map, Func<ElevationSet, GeoPoint, Func<GeoPoint, string?>?, CancellationToken, FlowRoute?>? traceFlow = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         _map = map;
@@ -216,6 +219,7 @@ public sealed partial class TerrainOverlay : ObservableObject
 
         if (Layer != TerrainLayer.Fliessweg || Elevation is null)
         {
+            _cancelFlow?.Invoke();
             FlowRoute = null;
             _flowFor = null;
             IsTracingFlow = false;
@@ -242,6 +246,7 @@ public sealed partial class TerrainOverlay : ObservableObject
 
         _flowFor = (elevation, Einsatzort);
         FlowRoute = null;
+        _cancelFlow?.Invoke();
 
         // Stryker disable once Update : any change to the generation drops the older trace.
         var generation = ++_flowGeneration;
@@ -257,11 +262,30 @@ public sealed partial class TerrainOverlay : ObservableObject
     [SuppressMessage("Design", "CA1031", Justification = "A trace that fails says so in the key, through _flowFailed; the map carries on without the line.")]
     private async Task TraceAsync(ElevationSet elevation, GeoPoint at, IReadOnlyList<string> waterTiles, int generation)
     {
+        using var cancel = new CancellationTokenSource();
+        var token = cancel.Token;
+        _cancelFlow = () =>
+        {
+            try
+            {
+                cancel.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The trace finished meanwhile; its result is dropped as stale anyway.
+            }
+        };
+
         FlowRoute? route = null;
         var failed = false;
         try
         {
-            route = await Task.Run(() => _traceFlow(elevation, at, WaterAt(waterTiles)));
+            route = await Task.Run(() => _traceFlow(elevation, at, WaterAt(waterTiles), token), token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Cancelled because it is no longer wanted: whatever replaced it sets the key.
+            return;
         }
         catch (Exception)
         {
@@ -272,6 +296,8 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             return;
         }
+
+        _cancelFlow = null;
 
         (FlowRoute, _flowFailed) = (route, failed);
         IsTracingFlow = false;
