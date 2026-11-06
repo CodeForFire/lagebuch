@@ -71,6 +71,106 @@ public sealed class VectorWaterTests
     }
 
     [Theory]
+    [InlineData("river")]
+    [InlineData("canal")]
+    [InlineData("stream")]
+    [InlineData("ditch")]
+    [InlineData("drain")]
+    public void Each_kind_of_waterway_line_is_a_Gewaesser(string kind)
+    {
+        var water = Water((VectorGeometryType.LineString, [("kind", kind)], [[(2000, 0), (2000, 4096)]]));
+
+        Assert.Equal(string.Empty, water.At(At(2010, 2000)));
+    }
+
+    [Theory]
+    [InlineData(2011, 2011, true)] // about 3 m off the middle of a diagonal stream
+    [InlineData(2071, 2071, false)] // about 20 m off it
+    [InlineData(3071, 929, false)] // 20 m beyond its end, on the line it would make if it went on
+    [InlineData(929, 3071, false)] // and 20 m before its start
+    public void The_distance_to_a_slanting_stream_is_measured_across_it_and_ends_where_it_ends(int x, int y, bool reached)
+    {
+        var water = Water((VectorGeometryType.LineString, [("kind", "stream")], [[(1000, 3000), (3000, 1000)]]));
+
+        Assert.Equal(reached, water.At(At(x, y)) is not null);
+    }
+
+    [Fact]
+    public void A_stream_in_several_parts_is_reached_at_its_nearest_part()
+    {
+        var water = Water((VectorGeometryType.LineString, [("kind", "stream")], [[(100, 0), (100, 4096)], [(2000, 0), (2000, 4096)]]));
+
+        Assert.NotNull(water.At(At(2010, 2000)));
+    }
+
+    [Theory]
+    [InlineData(2000, 2000)]
+    [InlineData(2000, 2010)]
+    public void A_waterway_of_a_single_point_or_with_a_point_twice_is_still_reached(int lastX, int lastY)
+    {
+        var water = Water((VectorGeometryType.LineString, [("kind", "ditch")], [[(2000, 2000), (lastX, lastY)]]));
+        var single = Water((VectorGeometryType.LineString, [("kind", "ditch")], [[(2000, 2000)]]));
+
+        Assert.NotNull(water.At(At(2010, 2000)));
+        Assert.NotNull(single.At(At(2010, 2000)));
+        Assert.Null(single.At(At(2100, 2000)));
+    }
+
+    [Fact]
+    public void A_named_river_names_the_water_before_a_nearer_unnamed_one_and_the_nearer_of_two_named_wins()
+    {
+        var water = Water(
+            (VectorGeometryType.Polygon, [("kind", "water")], [Square]),
+            (VectorGeometryType.LineString, [("kind", "river")], [[(2010, 0), (2010, 4096)]]),
+            (VectorGeometryType.LineString, [("kind", "river"), ("name", "Maisach")], [[(2300, 0), (2300, 4096)]]),
+            (VectorGeometryType.LineString, [("kind", "river"), ("name", "Amper")], [[(2100, 0), (2100, 4096)]]));
+
+        Assert.Equal("Amper", water.At(At(2000, 2000)));
+    }
+
+    [Theory]
+    [InlineData(1980, 1980, true)]
+    [InlineData(2020, 2020, false)]
+    public void A_shore_that_slants_is_followed_on_both_sides(int x, int y, bool inside)
+    {
+        (int X, int Y)[] triangle = [(1000, 1000), (3000, 1000), (1000, 3000)];
+        var water = Water((VectorGeometryType.Polygon, [("kind", "water")], [triangle]));
+
+        Assert.Equal(inside, water.At(At(x, y)) is not null);
+    }
+
+    [Theory]
+    [InlineData(1500, true)]
+    [InlineData(500, false)]
+    [InlineData(3500, false)]
+    public void A_point_level_with_the_corners_of_a_diamond_lake_is_inside_only_between_them(int x, bool inside)
+    {
+        (int X, int Y)[] diamond = [(2000, 1000), (3000, 2000), (2000, 3000), (1000, 2000)];
+        var water = Water((VectorGeometryType.Polygon, [("kind", "water")], [diamond]));
+
+        Assert.Equal(inside, water.At(At(x, 2000)) is not null);
+    }
+
+    [Fact]
+    public void Just_outside_a_river_area_s_shore_is_land()
+    {
+        var water = Water((VectorGeometryType.Polygon, [("kind", "river")], [Square]));
+
+        Assert.Null(water.At(At(990, 2000)));
+        Assert.NotNull(water.At(At(1010, 2000)));
+    }
+
+    [Fact]
+    public void A_waterway_without_geometry_is_passed_over()
+    {
+        var water = Water(
+            (VectorGeometryType.LineString, [("kind", "stream")], []),
+            (VectorGeometryType.LineString, [("kind", "stream"), ("name", "Ascherbach")], [[(2000, 0), (2000, 4096)]]));
+
+        Assert.Equal("Ascherbach", water.At(At(2010, 2000)));
+    }
+
+    [Theory]
     [InlineData("fountain")]
     [InlineData("swimming_pool")]
     public void A_fountain_or_a_pool_is_not_a_Gewaesser(string kind)
@@ -101,7 +201,8 @@ public sealed class VectorWaterTests
     [Fact]
     public void A_damaged_tile_or_no_tile_is_land()
     {
-        var tiles = new Tiles { [(TileX, TileY)] = [0xFF, 0xFF, 0xFF] };
+        // A layer field that claims 1 000 bytes and carries three: MvtTile refuses it.
+        var tiles = new Tiles { [(TileX, TileY)] = [.. Varint((3 << 3) | 2), .. Varint(1_000), 1, 2, 3] };
 
         Assert.Null(new VectorWater(tiles).At(At(2000, 2000)));
         Assert.Null(new VectorWater(tiles).At(At(2000, 2000 + 4096)));

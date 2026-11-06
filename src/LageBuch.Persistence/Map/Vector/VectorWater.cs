@@ -52,13 +52,21 @@ public sealed class VectorWater(IMapTileSource tiles)
         var y = (worldY - tileY) * layer.Extent;
         var metresPerUnit = EarthCircumference * Math.Cos(latitude) / n / layer.Extent;
 
-        var area = layer.Features.FirstOrDefault(f => f.Type == VectorGeometryType.Polygon && IsGewaesser(f) && f.Parts.Count(ring => Inside(ring, x, y)) % 2 == 1);
-        var (line, distance) = layer.Features
-            .Where(f => f.Type == VectorGeometryType.LineString && f.Parts.Count > 0 && Waterways.Contains(f.Get("kind") ?? string.Empty))
-            .Select(f => (Feature: f, Distance: f.Parts.Min(part => DistanceTo(part, x, y)) * metresPerUnit))
-            .OrderBy(c => string.IsNullOrEmpty(c.Feature.Get("name")) ? 1 : 0)
-            .ThenBy(c => c.Distance)
-            .FirstOrDefault(c => c.Distance <= (area is null ? LineReachMetres : NameReachMetres));
+        var area = layer.Features.FirstOrDefault(f => f.Type == VectorGeometryType.Polygon && !Has(f, "kind", NotGewaesser) && !Has(f, "kind_detail", NotGewaesser) && f.Parts.Count(ring => Inside(ring, x, y)) % 2 == 1);
+
+        // In an area, the nearest named waterway gives it its name; outside one, a waterway this
+        // close is the Gewässer itself. A named one goes before a nearer one without a name.
+        var reach = area is null ? LineReachMetres : NameReachMetres;
+        var waterways = layer.Features
+            .Where(f => f.Type == VectorGeometryType.LineString && f.Parts.Count > 0 && Has(f, "kind", Waterways))
+            .Select(f => (Feature: f, Metres: f.Parts.Min(part => DistanceTo(part, x, y)) * metresPerUnit));
+
+        // Stryker disable once Equality : a waterway exactly at the reach may count either way.
+        var line = waterways.Where(c => c.Metres <= reach)
+            .OrderBy(c => Named(c.Feature) is null)
+            .ThenBy(c => c.Metres)
+            .Select(c => c.Feature)
+            .FirstOrDefault();
 
         if (area is not null)
         {
@@ -70,8 +78,7 @@ public sealed class VectorWater(IMapTileSource tiles)
 
     private static string? Named(VectorFeature? feature) => feature?.Get("name") is { Length: > 0 } name ? name : null;
 
-    private static bool IsGewaesser(VectorFeature area) =>
-        !NotGewaesser.Contains(area.Get("kind") ?? string.Empty) && !NotGewaesser.Contains(area.Get("kind_detail") ?? string.Empty);
+    private static bool Has(VectorFeature feature, string key, HashSet<string> values) => feature.Get(key) is { } value && values.Contains(value);
 
     // Even-odd: a ring crossed an odd number of times by a ray to the east holds the point.
     private static bool Inside(IReadOnlyList<(int X, int Y)> ring, double x, double y)
@@ -89,15 +96,16 @@ public sealed class VectorWater(IMapTileSource tiles)
         return inside;
     }
 
+    // To the nearest of the line's segments; a line of one point is a segment of no length.
     private static double DistanceTo(IReadOnlyList<(int X, int Y)> line, double x, double y)
     {
         var nearest = double.MaxValue;
-        for (var i = 1; i < line.Count; i++)
+        for (var i = 0; i < line.Count; i++)
         {
-            nearest = Math.Min(nearest, DistanceToSegment(line[i - 1], line[i], x, y));
+            nearest = Math.Min(nearest, DistanceToSegment(line[Math.Max(0, i - 1)], line[i], x, y));
         }
 
-        return line.Count == 1 ? Math.Sqrt(Square(line[0].X - x) + Square(line[0].Y - y)) : nearest;
+        return nearest;
     }
 
     private static double DistanceToSegment((int X, int Y) a, (int X, int Y) b, double x, double y)
@@ -121,13 +129,9 @@ public sealed class VectorWater(IMapTileSource tiles)
         return layer;
     }
 
+    // No tile at all decodes to no layers: land, like a tile without water.
     private static VectorLayer? Decode(byte[]? tile)
     {
-        if (tile is null)
-        {
-            return null;
-        }
-
         try
         {
             return MvtTile.Decode(tile).FirstOrDefault(l => string.Equals(l.Name, "water", StringComparison.Ordinal));
