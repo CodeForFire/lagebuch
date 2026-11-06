@@ -122,6 +122,34 @@ public sealed class AndroidFileDialogService : IFileDialogService
     {
         var pending = _pendingAttachment;
         _pendingAttachment = null;
+        CompletePickedFile(pending, uri);
+    }
+
+    private TaskCompletionSource<string?>? _pendingMapOverlay;
+
+    public Task<string?> PickMapOverlayAsync()
+    {
+        _pendingMapOverlay = new TaskCompletionSource<string?>();
+        OnLaunchMapOverlayPicker?.Invoke();
+        return _pendingMapOverlay.Task;
+    }
+
+    /// <summary>Set by MainActivity to the registered ActivityResultLauncher's Launch call.</summary>
+    public Action? OnLaunchMapOverlayPicker { get; set; }
+
+    /// <summary>
+    /// Called by MainActivity's registered picker callback for a Kartenebene: copied exactly like
+    /// an attachment (<see cref="CompleteAttachment"/>), into the same folder and under the same cap.
+    /// </summary>
+    public void CompleteMapOverlay(global::Android.Net.Uri? uri)
+    {
+        var pending = _pendingMapOverlay;
+        _pendingMapOverlay = null;
+        CompletePickedFile(pending, uri);
+    }
+
+    private void CompletePickedFile(TaskCompletionSource<string?>? pending, global::Android.Net.Uri? uri)
+    {
         if (pending is null)
         {
             return;

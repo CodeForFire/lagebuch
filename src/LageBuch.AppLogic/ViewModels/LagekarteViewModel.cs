@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain;
+using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map;
 using LageBuch.Sync;
@@ -47,7 +49,14 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     // Counts water point loads, so a slow read for an older set of packs cannot overwrite a newer one.
     private int _waterLoad;
 
-    public LagekarteViewModel(IIncidentSession session, Action onChanged, IRegionPackLibrary? mapPacks = null, MapNightMode? nightMode = null)
+    public LagekarteViewModel(
+        IIncidentSession session,
+        Action onChanged,
+        IRegionPackLibrary? mapPacks = null,
+        MapNightMode? nightMode = null,
+        IFileDialogService? dialogs = null,
+        Action<string, string, Action>? requestConfirm = null,
+        IClock? clock = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -65,6 +74,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
                 OnPropertyChanged(nameof(ShowsLegend));
             }
         };
+        Overlays = new MapOverlaysViewModel(session, onChanged, dialogs, requestConfirm, clock ?? new SystemClock(), ShowBounds);
         Refresh();
         ShowPacks(InstalledPacks(mapPacks), centerOnPacks: true);
         if (session.Incident.Location is { } location)
@@ -95,6 +105,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
     /// <summary>The GELÄNDE picker: the packs' DGM5 heights laid over the map.</summary>
     public TerrainOverlay Terrain { get; }
+
+    /// <summary>The Kartenebenen: imported GeoJSON, such as an Ausbreitungsprognose.</summary>
+    public MapOverlaysViewModel Overlays { get; }
 
     /// <summary>Every unit of the Einsatz, by Funkrufname, each saying whether it is on the map.</summary>
     public ObservableCollection<LagekarteUnitRow> Units { get; } = new();
@@ -642,8 +655,29 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         return true;
     }
 
+    // The whole of an Ebene, as close as fits a window: the zoom at which its box is at most about
+    // 900 by 600 pixels. The view does not know its size here, and a Lagekarte is never much smaller.
+    private void ShowBounds(GeoBounds bounds)
+    {
+        var zoom = MapViewport.MaxZoom;
+        while (zoom > MapViewport.MinZoom)
+        {
+            var (west, north) = WebMercator.ToWorldPixel(new GeoPoint(bounds.North, bounds.West), zoom);
+            var (east, south) = WebMercator.ToWorldPixel(new GeoPoint(bounds.South, bounds.East), zoom);
+            if (east - west <= 900 && south - north <= 600)
+            {
+                break;
+            }
+
+            zoom--;
+        }
+
+        Map.ChangeViewCommand.Execute(new MapViewChange(bounds.Center, zoom));
+    }
+
     private void Refresh()
     {
+        Overlays.Refresh();
         var incident = _session.Incident;
         var units = incident.Forces
             .OrderBy(u => u.CallSign ?? u.Brigade, StringComparer.CurrentCultureIgnoreCase)

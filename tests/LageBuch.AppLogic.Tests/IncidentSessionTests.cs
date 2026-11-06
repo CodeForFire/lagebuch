@@ -594,8 +594,30 @@ internal sealed class FakeStore : IIncidentStore
         await SaveFileBytesAsync(path, storageFileName, ms.ToArray(), cancellationToken);
     }
 
-    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
+    /// <summary>When set, <see cref="TryReadFileBytesAsync"/> throws it, like a store that cannot be read.</summary>
+    public Exception? ReadFailure { get; set; }
+
+    /// <summary>
+    /// When set, <see cref="TryReadFileBytesAsync"/> looks the bytes up first and answers only once
+    /// this completes: a fetch that has already seen "missing" while the bytes arrive behind it.
+    /// </summary>
+    public Task? ReadGate { get; set; }
+
+    public async Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
+    {
+        if (ReadFailure is not null)
+        {
+            throw ReadFailure;
+        }
+
+        var bytes = _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
+        if (ReadGate is { } gate)
+        {
+            await gate;
+        }
+
+        return bytes;
+    }
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
     {

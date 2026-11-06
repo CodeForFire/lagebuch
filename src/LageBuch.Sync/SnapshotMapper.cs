@@ -7,6 +7,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
@@ -155,7 +156,9 @@ public static class SnapshotMapper
             LocationLatitude: incident.Location?.Latitude,
             LocationLongitude: incident.Location?.Longitude,
             NavOverrides: incident.NavOverrides.ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal),
-            ElFuehrungsfahrzeug: incident.LeadershipPost.Fuehrungsfahrzeug);
+            ElFuehrungsfahrzeug: incident.LeadershipPost.Fuehrungsfahrzeug,
+            MapOverlays: incident.MapOverlays.Select(o => new MapOverlayDto(
+                o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -287,7 +290,9 @@ public static class SnapshotMapper
                 Funkgruppen.FromRecord(snapshot.ElFunkgruppenTmo, snapshot.ElFunkgruppenDmo),
                 snapshot.ElFuehrungsfahrzeug),
             GeoPoint.TryCreate(snapshot.LocationLatitude, snapshot.LocationLongitude),
-            snapshot.NavOverrides);
+            snapshot.NavOverrides,
+            (snapshot.MapOverlays ?? []).Select(o => MapOverlay.Rehydrate(
+                o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

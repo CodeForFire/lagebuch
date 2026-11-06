@@ -27,6 +27,13 @@ public interface IFileDialogService
     /// </summary>
     Task<string?> PickAttachmentAsync();
 
+    /// <summary>
+    /// Lets the user pick a GeoJSON file or a zip of them to import as a Kartenebene; a local path
+    /// as <see cref="PickAttachmentAsync"/> returns one. Null where the platform has no picker for
+    /// it, which is what a test double gets without saying otherwise.
+    /// </summary>
+    Task<string?> PickMapOverlayAsync() => Task.FromResult<string?>(null);
+
     /// <summary>Opens a local file with the OS's/platform's default viewer for its type.</summary>
     Task OpenFileAsync(string path);
 

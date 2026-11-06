@@ -65,7 +65,7 @@ public sealed class IncidentRepository
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
                     "co_buildings", "co_dwellings", "co_readings", "involved_parties", "situation_reports",
-                    "issued_items", "command_nodes",
+                    "issued_items", "command_nodes", "map_overlays",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -122,6 +122,7 @@ public sealed class IncidentRepository
         WriteSituationReports(inserts, incident);
         WriteIssuedItems(inserts, incident);
         WriteCommandNodes(inserts, incident);
+        WriteMapOverlays(inserts, incident);
 
         tx.Commit();
     }
@@ -355,6 +356,29 @@ public sealed class IncidentRepository
                     p("$at", f.AddedAt.ToString(Iso));
                     p("$by", f.AddedBy);
                     p("$dn", f.DisplayName);
+                });
+        }
+    }
+
+    private static void WriteMapOverlays(InsertCommands inserts, Incident incident)
+    {
+        for (var i = 0; i < incident.MapOverlays.Count; i++)
+        {
+            var o = incident.MapOverlays[i];
+            Run(
+                inserts,
+                "INSERT INTO map_overlays (id, ordinal, file_id, name, imported_at, imported_by, frame_count, first_time, last_time) VALUES ($id,$o,$file,$name,$at,$by,$frames,$first,$last);",
+                p =>
+                {
+                    p("$id", o.Id.ToString());
+                    p("$o", i);
+                    p("$file", o.FileId.ToString());
+                    p("$name", o.Name);
+                    p("$at", o.ImportedAt.ToString(Iso));
+                    p("$by", o.ImportedBy);
+                    p("$frames", o.FrameCount);
+                    p("$first", (object?)o.FirstTime?.ToString(Iso) ?? DBNull.Value);
+                    p("$last", (object?)o.LastTime?.ToString(Iso) ?? DBNull.Value);
                 });
         }
     }
@@ -974,6 +998,25 @@ public sealed class IncidentRepository
                 FunkgruppenJson.Read(Str(r, 10)),
                 Str(r, 11)));
 
+        // A row whose ids do not read is dropped rather than refused: losing one Ebene beats an
+        // Einsatz that will not open.
+        var mapOverlays = ReadAll(
+            cn,
+            "SELECT id, file_id, name, imported_at, imported_by, frame_count, first_time, last_time FROM map_overlays ORDER BY ordinal;",
+            r => Guid.TryParse(Str(r, 0), out var id) && Guid.TryParse(Str(r, 1), out var fileId)
+                ? Domain.Map.MapOverlay.Rehydrate(
+                    id,
+                    fileId,
+                    Str(r, 2),
+                    ParseDate(r.GetString(3)),
+                    Str(r, 4),
+                    NullableInt(r, 5) ?? 1,
+                    NullableDate(r, 6),
+                    NullableDate(r, 7))
+                : null)
+            .OfType<Domain.Map.MapOverlay>()
+            .ToList();
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -1014,7 +1057,8 @@ public sealed class IncidentRepository
             new Domain.Leadership.LeadershipPost(
                 meta[14] as string, meta[15] as string, meta[16] as string, FunkgruppenJson.Read(meta[17] as string), meta[21] as string),
             Domain.ValueObjects.GeoPoint.TryCreate(Real(meta[18]), Real(meta[19])),
-            NavOverridesJson.Read(meta[20] as string));
+            NavOverridesJson.Read(meta[20] as string),
+            mapOverlays);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

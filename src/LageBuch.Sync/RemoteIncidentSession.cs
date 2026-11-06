@@ -10,6 +10,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -874,6 +875,68 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // file — so the caller can catch a rejection (closed incident, unknown id) and surface it.
     public Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default) =>
         SendAsync(new RemoveFileCommand(Op(), fileId), cancellationToken);
+
+    // The AddFileAsync split: metadata as a command, then the bytes as a PUT to the file id the
+    // command registered.
+    public async Task AddMapOverlayAsync(
+        string fileName, string contentType, byte[] bytes, MapOverlaySummary summary, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(summary);
+        if (bytes.LongLength > IncidentFile.MaxSizeBytes)
+        {
+            throw new ArgumentException(IncidentFile.TooLargeMessage, nameof(bytes));
+        }
+
+        var overlayId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        await SendAsync(
+            new AddMapOverlayCommand(
+                Op(),
+                overlayId,
+                fileId,
+                fileName,
+                contentType,
+                bytes.LongLength,
+                summary.Name,
+                summary.FrameCount,
+                summary.FirstTime,
+                summary.LastTime),
+            cancellationToken);
+
+        try
+        {
+            using var content = new ByteArrayContent(bytes);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            using var response = await _http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        {
+            // The Ebene is in the Einsatz now, with its ETB line, but without the file it is drawn
+            // from. Take it back out, so the import failed as a whole and can simply be repeated.
+            await TakeBackMapOverlayAsync(overlayId);
+            throw;
+        }
+    }
+
+    // Best effort, and deliberately not cancellable: the import's own token may be what failed. If
+    // the host cannot be reached for this either, every device shows the Ebene as "noch nicht
+    // verfügbar" with its remove button, which is where the Lagebuchführer finishes the job.
+    private async Task TakeBackMapOverlayAsync(Guid overlayId)
+    {
+        try
+        {
+            await SendAsync(new RemoveMapOverlayCommand(Op(), overlayId), CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or CommandRejectedException)
+        {
+            // Surfaces on the Ebene's row as described above; the upload's own failure is rethrown.
+        }
+    }
+
+    public Task RemoveMapOverlayAsync(Guid overlayId, CancellationToken cancellationToken = default) =>
+        SendAsync(new RemoveMapOverlayCommand(Op(), overlayId), cancellationToken);
 
     public void AddCoBuilding(
         string name,

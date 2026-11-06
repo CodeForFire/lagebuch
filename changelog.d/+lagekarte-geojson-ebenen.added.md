@@ -1,0 +1,1 @@
+The Lagekarte imports GeoJSON files, or a zip of them such as a DWD Ausbreitungsprognose, as Ebenen that are kept and synced with the Einsatz, recorded in the ETB and switched on and off beside the map, with the newest shown and the older ones kept on record.

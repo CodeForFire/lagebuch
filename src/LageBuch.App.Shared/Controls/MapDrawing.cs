@@ -26,10 +26,11 @@ public static class MapDrawing
     /// laid over it upright, a street's name along its street, and the
     /// <paramref name="waterPoints"/> over those: a name that would run under a water point's
     /// label is left out, since the label is what the crew is looking for. The
-    /// <paramref name="terrain"/> layer lies between the tiles and the names. All of it but the
-    /// terrain in the colours of the cache's <see cref="MapTileCache.Style"/>.
+    /// <paramref name="terrain"/> layer lies between the tiles and the names, and the
+    /// <paramref name="overlays"/> over the terrain, under the names. All of it but the
+    /// terrain and the Kartenebenen in the colours of the cache's <see cref="MapTileCache.Style"/>.
     /// </summary>
-    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null, TerrainTileCache? terrain = null)
+    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null, TerrainTileCache? terrain = null, IReadOnlyList<OverlayShape>? overlays = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(tiles);
@@ -42,13 +43,13 @@ public static class MapDrawing
         var style = tiles.Style;
         context.FillRectangle(style.Background, new Rect(size));
         var marks = waterPoints is null ? [] : LayOutWaterPoints(waterPoints, center, zoom, size, selected, rotation, style);
+        var labels = new List<(MapLabel Label, Point At)>();
         if (tiles.Source is { } source)
         {
             // Several packs are drawn one over the other. Each pack's tiles are cut to its area when
             // it is built, so outside it a pack draws nothing that could cover its neighbour's streets.
             IReadOnlyList<IMapTileSource> layers = source is CombinedMapTileSource combined ? combined.Layers : [source];
             var turn = Turn(size, rotation);
-            var labels = new List<(MapLabel Label, Point At)>();
             foreach (var layer in layers)
             {
                 DrawLayer(context, tiles, layer, center, zoom, size, turn, labels);
@@ -58,7 +59,17 @@ public static class MapDrawing
             {
                 DrawTerrain(context, terrain, center, zoom, size, turn, rotation);
             }
+        }
 
+        // Kartenebenen lie on the map and its terrain but under its names and the water points, so
+        // a plume never hides the street it reaches or the hydrant next to it.
+        if (overlays is { Count: > 0 })
+        {
+            DrawOverlays(context, overlays, center, zoom, size, rotation, style);
+        }
+
+        if (labels.Count > 0)
+        {
             // The names of every vector tile, over all tiles and unclipped, so none is cut at a tile's
             // edge. Only a labelled water point keeps names away: a bare dot is drawn over the name.
             var reserved = marks.Where(m => m.Text is not null).Select(m => m.Bounds).ToList();
@@ -294,6 +305,73 @@ public static class MapDrawing
                     }
                 }
             }
+        }
+    }
+
+    private static readonly IPen PointOutline = new ImmutablePen(Brushes.White, 1.5);
+
+    // Every shape whose bounds reach the screen, in the order the file gave them: areas filled
+    // even-odd so a hole stays open, lines stroked, points as dots with their name close up. The
+    // shapes keep the colours their file gave them by day and by night; a name sits in the same
+    // box a water point's does, so it reads on the Nachtkarte too.
+    private static void DrawOverlays(DrawingContext context, IReadOnlyList<OverlayShape> shapes, GeoPoint center, int zoom, Size size, double rotation, MapStyle style)
+    {
+        const double margin = 40;
+        Point[] corners = [new(-margin, -margin), new(size.Width + margin, -margin), new(-margin, size.Height + margin), new(size.Width + margin, size.Height + margin)];
+        var view = GeoBounds.Of(corners.Select(c => ToGeo(center, zoom, size, c, rotation)));
+        var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
+        var turn = Turn(size, rotation);
+        Point Screen(GeoPoint p)
+        {
+            var (x, y) = WebMercator.ToWorldPixel(p, zoom);
+            return turn.Transform(new Point(x - centerX + (size.Width / 2), y - centerY + (size.Height / 2)));
+        }
+
+        foreach (var shape in shapes)
+        {
+            if (!shape.Bounds.Intersects(view))
+            {
+                continue;
+            }
+
+            var fill = new ImmutableSolidColorBrush(Color.FromUInt32(shape.Style.FillArgb));
+            var stroke = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromUInt32(shape.Style.StrokeArgb)), shape.Style.StrokeWidth);
+            if (shape.Kind == OverlayShapeKind.Point)
+            {
+                foreach (var part in shape.Parts)
+                {
+                    var at = Screen(part[0]);
+                    context.DrawEllipse(new ImmutableSolidColorBrush(Color.FromUInt32(shape.Style.StrokeArgb)), PointOutline, at, 6, 6);
+                    if (shape.Label is { } label && zoom >= WaterPointLayer.LabelsMinZoom)
+                    {
+                        var text = new FormattedText(label, LabelCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), 11, style.WaterPointLabelText);
+                        var origin = new Point(at.X + 10, at.Y - (text.Height / 2));
+                        context.FillRectangle(style.WaterPointLabelBackground, new Rect(origin.X - 2, origin.Y, text.Width + 4, text.Height), 2);
+                        context.DrawText(text, origin);
+                    }
+                }
+
+                continue;
+            }
+
+            var area = shape.Kind == OverlayShapeKind.Area;
+            var geometry = new StreamGeometry();
+            using (var path = geometry.Open())
+            {
+                path.SetFillRule(FillRule.EvenOdd);
+                foreach (var part in shape.Parts)
+                {
+                    path.BeginFigure(Screen(part[0]), isFilled: area);
+                    for (var i = 1; i < part.Count; i++)
+                    {
+                        path.LineTo(Screen(part[i]));
+                    }
+
+                    path.EndFigure(isClosed: area);
+                }
+            }
+
+            context.DrawGeometry(area ? fill : null, stroke, geometry);
         }
     }
 

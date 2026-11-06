@@ -62,6 +62,10 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<bool> IsNightProperty =
         AvaloniaProperty.Register<MapCanvasControl, bool>(nameof(IsNight));
 
+    /// <summary>The shapes of the visible Kartenebenen, drawn over the tiles and under their names.</summary>
+    public static readonly StyledProperty<IReadOnlyList<OverlayShape>?> OverlaysProperty =
+        AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<OverlayShape>?>(nameof(Overlays));
+
     public static readonly StyledProperty<ICommand?> TappedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(TappedCommand));
 
@@ -94,7 +98,7 @@ public sealed class MapCanvasControl : Control
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty, IsNightProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty, IsNightProperty, OverlaysProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
@@ -164,6 +168,12 @@ public sealed class MapCanvasControl : Control
         set => SetValue(IsNightProperty, value);
     }
 
+    public IReadOnlyList<OverlayShape>? Overlays
+    {
+        get => GetValue(OverlaysProperty);
+        set => SetValue(OverlaysProperty, value);
+    }
+
     public bool WheelZoomNeedsControl
     {
         get => GetValue(WheelZoomNeedsControlProperty);
@@ -211,7 +221,7 @@ public sealed class MapCanvasControl : Control
         // Missing tiles are painted too, so the whole control stays hit-testable for a drag.
         _tiles.Use(TileSource);
         _terrain.Use(Elevation, TerrainStyle);
-        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint, _terrain);
+        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint, _terrain, Overlays);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

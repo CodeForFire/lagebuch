@@ -1124,7 +1124,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OpenRoleAssignmentDialog,
             OfferUndo);
 
-        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode);
+        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode, _dialogs, RequestConfirm, _clock);
 
         LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, Lagekarte, reopenTab);
 

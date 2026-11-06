@@ -81,7 +81,21 @@ public sealed record IncidentSnapshot(
     IReadOnlyDictionary<string, bool>? NavOverrides = null,
 
     // The Einsatzleitung's Führungsfahrzeug (#829); a snapshot without the key reads as none.
-    string? ElFuehrungsfahrzeug = null);
+    string? ElFuehrungsfahrzeug = null,
+
+    // The Kartenebenen, metadata only: the geometry is a file, fetched like any attachment. A
+    // snapshot without the key reads as no Ebenen.
+    IReadOnlyList<MapOverlayDto>? MapOverlays = null);
+
+public sealed record MapOverlayDto(
+    Guid Id,
+    Guid FileId,
+    string? Name,
+    DateTimeOffset ImportedAt,
+    string? ImportedBy,
+    int FrameCount,
+    DateTimeOffset? FirstTime,
+    DateTimeOffset? LastTime);
 
 public sealed record TimerDto(
     string Key,

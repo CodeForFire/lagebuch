@@ -6,6 +6,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -410,6 +411,48 @@ public sealed class LocalIncidentSession : IIncidentSession
         {
             await _store.FlushAsync(cancellationToken);
             await _store.DeleteFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
+        }
+        finally
+        {
+            Changed?.Invoke();
+        }
+    }
+
+    public async Task AddMapOverlayAsync(
+        string fileName, string contentType, byte[] bytes, MapOverlaySummary summary, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        var overlay = Incident.AddMapOverlay(
+            _clock, RequireOperator(), Guid.NewGuid(), Guid.NewGuid(), fileName, contentType, bytes.LongLength, summary);
+        var file = Incident.Files.First(f => f.Id == overlay.FileId);
+        Save();
+
+        // As AddFileAsync: the incident file must exist before the bytes go in, and Changed is
+        // raised even when that write fails, because the domain already holds the Ebene.
+        try
+        {
+            await _store.FlushAsync(cancellationToken);
+            await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes, cancellationToken);
+        }
+        finally
+        {
+            Changed?.Invoke();
+        }
+    }
+
+    public async Task RemoveMapOverlayAsync(Guid overlayId, CancellationToken cancellationToken = default)
+    {
+        var file = Incident.RemoveMapOverlay(_clock, RequireOperator(), overlayId);
+
+        // As RemoveFileAsync: the metadata removal is persisted before the bytes are wiped.
+        Save();
+        try
+        {
+            if (file is not null)
+            {
+                await _store.FlushAsync(cancellationToken);
+                await _store.DeleteFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
+            }
         }
         finally
         {

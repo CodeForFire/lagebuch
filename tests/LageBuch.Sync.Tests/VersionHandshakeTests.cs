@@ -348,7 +348,16 @@ public class VersionHandshakeTests
     {
         // 37 removes setFuehrungsstufe from the allowlist. A host at 37 refuses the command a client
         // at 36 may still send: a 36 and a 37 must not connect.
-        Assert.Equal(37, SyncProtocol.ProtocolVersion);
-        Assert.Equal(37, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 37, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 37, int.MaxValue);
+    }
+
+    [Fact]
+    public void Kartenebenen_raise_the_protocol_and_the_floor_to_thirty_eight()
+    {
+        // 38 lets a client send addMapOverlay and removeMapOverlay, which a host at 37 does not
+        // know: a 37 and a 38 must not connect.
+        Assert.Equal(38, SyncProtocol.ProtocolVersion);
+        Assert.Equal(38, SyncProtocol.MinimumProtocolVersion);
     }
 }
