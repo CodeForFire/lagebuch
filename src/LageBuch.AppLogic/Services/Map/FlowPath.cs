@@ -94,7 +94,7 @@ public static class FlowPath
                 continue;
             }
 
-            if (Spill(current, height, Height, visited, cancellationToken) is not { } way)
+            if (Spill(current, height, Height, visited, cancellationToken, out var offMap) is not { } way)
             {
                 end = FlowPathEnd.Senke;
                 break;
@@ -110,6 +110,13 @@ public static class FlowPath
             }
 
             end = water is null ? end : FlowPathEnd.Gewaesser;
+
+            // Stryker disable once Equality : a way out that runs past MaxLength before the map's edge needs a hollow kilometres across.
+            if (offMap && water is null && length < MaxLength)
+            {
+                end = FlowPathEnd.Kartenrand;
+                break;
+            }
 
             height = Height(current) ?? height;
         }
@@ -150,10 +157,12 @@ public static class FlowPath
     /// The way out of the hollow at <paramref name="pit"/>: the hollow is flooded lowest cell first
     /// until a cell lower than its bottom turns up beyond the rim, then the way there is followed back.
     /// Null when the water would have to rise more than <see cref="MaxFillDepth"/> or flood more
-    /// than <see cref="MaxFillCells"/> cells first.
+    /// than <see cref="MaxFillCells"/> cells first. <paramref name="edge"/> when the flood reaches
+    /// the end of the heights first: the way then leads to the map's edge, where the water leaves it.
     /// </summary>
-    private static List<(long X, long Y)>? Spill((long X, long Y) pit, double pitHeight, Func<(long X, long Y), double?> heightOf, HashSet<(long X, long Y)> route, CancellationToken cancellationToken)
+    private static List<(long X, long Y)>? Spill((long X, long Y) pit, double pitHeight, Func<(long X, long Y), double?> heightOf, HashSet<(long X, long Y)> route, CancellationToken cancellationToken, out bool edge)
     {
+        edge = false;
         var queue = new PriorityQueue<(long X, long Y), double>();
         var from = new Dictionary<(long X, long Y), (long X, long Y)>();
         var level = pitHeight;
@@ -165,14 +174,7 @@ public static class FlowPath
             if (h < pitHeight)
             {
                 // Lower than the hollow's bottom: the rim is behind, and from here it runs down again.
-                var way = new List<(long X, long Y)>();
-                for (var c = cell; c != pit; c = from[c])
-                {
-                    way.Add(c);
-                }
-
-                way.Reverse();
-                return way;
+                return WayTo(cell);
             }
 
             level = Math.Max(level, h);
@@ -189,15 +191,42 @@ public static class FlowPath
                 var neighbour = (cell.X + dx, cell.Y + dy);
 
                 // The route the water came along is not flooded again, so its way out never runs back over it.
-                if (!from.ContainsKey(neighbour) && !route.Contains(neighbour) && heightOf(neighbour) is { } nh)
+                if (from.ContainsKey(neighbour) || route.Contains(neighbour))
                 {
-                    from[neighbour] = cell;
-                    queue.Enqueue(neighbour, nh);
+                    continue;
                 }
+
+                if (heightOf(neighbour) is not { } nh)
+                {
+                    // Past the end of the heights, as in Steepest: water that had to rise to get here
+                    // leaves the map over this rim. On ground flat out to the edge nothing moves it.
+                    if (level > pitHeight)
+                    {
+                        edge = true;
+                        return WayTo(cell);
+                    }
+
+                    continue;
+                }
+
+                from[neighbour] = cell;
+                queue.Enqueue(neighbour, nh);
             }
         }
 
         return null;
+
+        List<(long X, long Y)> WayTo((long X, long Y) cell)
+        {
+            var way = new List<(long X, long Y)>();
+            for (var c = cell; c != pit; c = from[c])
+            {
+                way.Add(c);
+            }
+
+            way.Reverse();
+            return way;
+        }
     }
 
     private static double Distance((long X, long Y) a, (long X, long Y) b)

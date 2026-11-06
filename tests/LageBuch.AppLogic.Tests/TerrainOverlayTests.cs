@@ -328,22 +328,29 @@ public sealed class TerrainOverlayTests : IDisposable
     [Fact]
     public async Task A_trace_for_an_Einsatzort_that_moved_meanwhile_is_dropped()
     {
+        using var started = new ManualResetEventSlim();
         using var first = new ManualResetEventSlim();
+        FlowRoute? staleRoute = null;
         var terrain = new TerrainOverlay(
             new MapViewport { Zoom = 15, Center = TerrainFixture.Marktplatz },
             (elevation, at, water, cancellationToken) =>
             {
-                if (Equals(at, TerrainFixture.Marktplatz))
+                if (!Equals(at, TerrainFixture.Marktplatz))
                 {
-                    first.Wait(TimeSpan.FromSeconds(10), cancellationToken);
+                    return FlowPath.Trace(elevation, at, water, cancellationToken);
                 }
 
-                return FlowPath.Trace(elevation, at, water, cancellationToken);
+                // A trace too far along to notice it was cancelled: it still comes back with a route.
+                started.Set();
+                first.Wait(TimeSpan.FromSeconds(10), CancellationToken.None);
+                staleRoute = FlowPath.Trace(elevation, at, water, CancellationToken.None);
+                return staleRoute;
             });
         terrain.Show([TerrainFixture.Pack(_dir)]);
         terrain.Einsatzort = TerrainFixture.Marktplatz;
         terrain.Layer = TerrainLayer.Fliessweg;
         var stale = terrain.FlowSettled;
+        Assert.True(started.Wait(TimeSpan.FromSeconds(10)));
 
         // Moved to where there are no heights: the new trace finds nothing, the old one must not win.
         terrain.Einsatzort = new GeoPoint(52.52, 13.40);
@@ -351,6 +358,7 @@ public sealed class TerrainOverlayTests : IDisposable
         first.Set();
         await stale;
 
+        Assert.NotNull(staleRoute);
         Assert.Null(terrain.FlowRoute);
         Assert.Equal("Am Einsatzort gibt es keine Höhendaten.", terrain.LegendText);
     }

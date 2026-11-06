@@ -264,7 +264,7 @@ public sealed partial class TerrainOverlay : ObservableObject
     {
         using var cancel = new CancellationTokenSource();
         var token = cancel.Token;
-        _cancelFlow = () =>
+        Action stop = () =>
         {
             try
             {
@@ -275,6 +275,7 @@ public sealed partial class TerrainOverlay : ObservableObject
                 // The trace finished meanwhile; its result is dropped as stale anyway.
             }
         };
+        _cancelFlow = stop;
 
         FlowRoute? route = null;
         var failed = false;
@@ -291,13 +292,20 @@ public sealed partial class TerrainOverlay : ObservableObject
         {
             failed = true;
         }
+        finally
+        {
+            // Its token source goes with it, so a later Update has nothing left to cancel -- unless a
+            // newer trace has put its own in place meanwhile.
+            if (ReferenceEquals(_cancelFlow, stop))
+            {
+                _cancelFlow = null;
+            }
+        }
 
         if (generation != _flowGeneration)
         {
             return;
         }
-
-        _cancelFlow = null;
 
         (FlowRoute, _flowFailed) = (route, failed);
         IsTracingFlow = false;

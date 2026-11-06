@@ -118,6 +118,19 @@ public sealed class FlowPathTests : IDisposable
     }
 
     [Fact]
+    public void A_shallow_hollow_whose_rim_is_the_edge_of_the_heights_spills_off_the_map()
+    {
+        // Flat ground with a dip 1 m deep whose middle lies 20 m inside the heights' east edge: the
+        // water fills it and runs out over the side the map no longer shows.
+        var elevation = Terrain((e, n) => (float)(600 - Math.Max(0, 1 - (Math.Sqrt(((e - Origin.East - 480) * (e - Origin.East - 480)) + ((n - Origin.North) * (n - Origin.North))) / 60))));
+
+        var route = Assert.IsType<FlowRoute>(FlowPath.Trace(elevation, At(440, 0)));
+
+        Assert.Equal(FlowPathEnd.Kartenrand, route.End);
+        Assert.True(Utm32.FromGeo(route.Points[^1]).Easting > Origin.East + 490);
+    }
+
+    [Fact]
     public void The_route_is_followed_no_further_than_the_cap()
     {
         // Falling 1 m every 100 m across 4 km.
