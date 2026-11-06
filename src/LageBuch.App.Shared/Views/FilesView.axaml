@@ -11,11 +11,17 @@
          drag-over override could never win against an inline BorderBrush/BorderThickness. -->
     <Style Selector="Border#FilesDropZone">
       <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BorderThickness" Value="2" />
     </Style>
     <Style Selector="Border#FilesDropZone.drag-over">
       <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
       <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Border#FilesListFrame">
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    </Style>
+    <Style Selector="Border#FilesDropZone.drag-over Border#FilesListFrame">
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
 
     <!-- Hidden by default through a Style, never IsVisible="False" on the panel: a local value
@@ -92,9 +98,14 @@
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True"
             DragDrop.AllowDrop="{Binding !IsReadOnly}">
       <DockPanel>
-        <TextBlock DockPanel.Dock="Top" x:Name="EmptyText" Text="Keine Dateien angehängt."
-                   Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding !Files.Count}" />
-        <Border x:Name="FilesListFrame" Background="#0C1119" Padding="14" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusMd}"
+        <StackPanel x:Name="EmptyStatePanel" DockPanel.Dock="Top" Spacing="6" IsVisible="{Binding !Files.Count}">
+          <TextBlock x:Name="EmptyText" Text="Keine Dateien angehängt."
+                     Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding !Files.Count}" />
+          <TextBlock x:Name="EmptyInstructionText" Text="Dateien hierher ziehen oder über &quot;Datei hinzufügen&quot; anhängen."
+                     Foreground="{StaticResource TextSecondaryBrush}" Opacity="0.7" TextWrapping="Wrap"
+                     IsVisible="{Binding !IsReadOnly}" />
+        </StackPanel>
+        <Border x:Name="FilesListFrame" Background="#0C1119" Padding="14" BorderThickness="1" CornerRadius="{StaticResource RadiusMd}"
                 IsVisible="{Binding Files.Count}">
           <StackPanel Grid.IsSharedSizeScope="True">
             <!-- Column headers: the rename box below has no other visible label (#137). Columns share
