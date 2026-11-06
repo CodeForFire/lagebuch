@@ -18,6 +18,16 @@ public sealed class MapOverlaysViewModelTests : IDisposable
         ]}
         """;
 
+    // One DWD-shaped file: a plume of class 1 at 09:00 UTC, styled the way the DWD styles it.
+    private const string DwdForecast = """
+        {"type": "FeatureCollection", "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}}, "features": [
+          {"type": "Feature", "properties": {"pixelvalue": 1, "aegl": "stoff", "thr_ppm": "1e-08", "fill": "#228B22", "fill-opaci": 0.5, "ftime": "2026-03-14T09:00:00+00:00"},
+           "geometry": {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.1, 48.0], [11.1, 48.1], [11.0, 48.0]]]}}
+        ]}
+        """;
+
+    private static readonly TimeZoneInfo Berlin = TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin");
+
     private static readonly DateTimeOffset T0 = new(2026, 3, 14, 10, 20, 0, TimeSpan.FromHours(1));
 
     private readonly string _dir = Directory.CreateTempSubdirectory("lagebuch-overlay-").FullName;
@@ -121,7 +131,7 @@ public sealed class MapOverlaysViewModelTests : IDisposable
             await session.AddMapOverlayAsync($"{name}.geojson", "application/geo+json", await File.ReadAllBytesAsync(path), new MapOverlaySummary(name, 1, null, null));
         }
 
-        var reopened = new MapOverlaysViewModel(session, () => { }, dialogs, null, new FixedClock(T0), _ => { });
+        var reopened = new MapOverlaysViewModel(session, () => { }, dialogs, null, new FixedClock(T0), _ => { }, Berlin);
         await reopened.SettledAsync();
 
         Assert.Equal([false, false, true], reopened.Items.Select(i => i.IsVisible));
@@ -144,6 +154,128 @@ public sealed class MapOverlaysViewModelTests : IDisposable
         item.FrameIndex = 0;
 
         Assert.Equal(11.0, Assert.Single(vm.VisibleShapes).Parts[0][0].Longitude, precision: 6);
+    }
+
+    [Fact]
+    public async Task The_Zeitleiste_steps_through_the_forecast_and_says_the_time_in_local_time()
+    {
+        var (_, vm, dialogs, _) = Open();
+        dialogs.Next = Write("prognose.geojson", Forecast);
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+        var item = Assert.Single(vm.Items);
+
+        Assert.True(item.ShowsTimeline);
+        Assert.Equal(1, item.MaxFrameIndex);
+        Assert.Equal("Prognose 10:15 Uhr", item.FrameLabel);
+        Assert.False(item.NextFrameCommand.CanExecute(null));
+
+        item.PreviousFrameCommand.Execute(null);
+
+        Assert.Equal("Prognose 10:00 Uhr", item.FrameLabel);
+        Assert.False(item.PreviousFrameCommand.CanExecute(null));
+        Assert.Equal(11.0, Assert.Single(vm.VisibleShapes).Parts[0][0].Longitude, precision: 6);
+
+        item.FramePosition = 0.9;
+        Assert.Equal(1, item.FrameIndex);
+        item.FramePosition = 99;
+        Assert.Equal(1, item.FrameIndex);
+    }
+
+    [Fact]
+    public async Task A_summer_forecast_reopened_in_winter_still_says_its_summer_hour()
+    {
+        // The clock reads March (UTC+1); the forecast is for July (UTC+2).
+        var (_, vm, dialogs, _) = Open();
+        dialogs.Next = Write("sommer.geojson", Forecast.Replace("2026-03-14", "2026-07-01", StringComparison.Ordinal));
+
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+
+        Assert.Equal("Prognose 11:00 Uhr", Assert.Single(vm.Items).FrameLabel);
+    }
+
+    [Fact]
+    public async Task The_Zeitleiste_steps_stop_at_either_end()
+    {
+        var (_, vm, dialogs, _) = Open();
+        dialogs.Next = Write("prognose.geojson", Forecast);
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+        var item = Assert.Single(vm.Items);
+
+        item.FrameIndex = 0;
+        Assert.False(item.PreviousFrameCommand.CanExecute(null));
+        Assert.True(item.NextFrameCommand.CanExecute(null));
+
+        item.FrameIndex = item.MaxFrameIndex;
+        Assert.True(item.PreviousFrameCommand.CanExecute(null));
+        Assert.False(item.NextFrameCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task The_legend_shows_only_for_a_shown_Ebene_that_has_one()
+    {
+        var (_, vm, dialogs, _) = Open();
+        dialogs.Next = Write("d93_9.geojson", DwdForecast);
+        await vm.ImportCommand.ExecuteAsync(null);
+        dialogs.Next = Write("sperrgebiet.geojson", Sperrgebiet("x"));
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+        var (dwd, plain) = (vm.Items[0], vm.Items[1]);
+
+        Assert.False(dwd.IsVisible);
+        Assert.False(dwd.ShowsLegend);
+        Assert.True(plain.IsVisible);
+        Assert.Empty(plain.Legend);
+        Assert.False(plain.ShowsLegend);
+
+        dwd.IsVisible = true;
+        Assert.True(dwd.ShowsLegend);
+    }
+
+    [Fact]
+    public void An_Ebene_still_being_read_has_an_empty_legend()
+    {
+        var (session, _, _, _) = Open();
+        session.Incident.AddMapOverlay(
+            new FixedClock(T0), new SessionOperator("Bauer", "FFB 3"), Guid.NewGuid(), Guid.NewGuid(), "p.geojson", "application/geo+json", 10, new MapOverlaySummary("p", 1, null, null));
+
+        var item = new MapOverlaysViewModel(session, () => { }, null, null, new FixedClock(T0), _ => { }, Berlin).Items.Single();
+
+        Assert.Empty(item.Legend);
+        Assert.False(item.ShowsLegend);
+    }
+
+    [Fact]
+    public async Task A_hidden_Ebene_shows_no_Zeitleiste_and_a_plain_one_never_does()
+    {
+        var (_, vm, dialogs, _) = Open();
+        dialogs.Next = Write("prognose.geojson", Forecast);
+        await vm.ImportCommand.ExecuteAsync(null);
+        dialogs.Next = Write("sperrgebiet.geojson", Sperrgebiet("x"));
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+
+        Assert.False(vm.Items[0].ShowsTimeline);
+        Assert.False(vm.Items[1].ShowsTimeline);
+        Assert.Null(vm.Items[1].FrameLabel);
+    }
+
+    [Fact]
+    public async Task A_DWD_forecast_is_named_for_its_first_forecast_time_and_shows_its_legend()
+    {
+        var (session, vm, dialogs, _) = Open();
+        dialogs.Next = Write("d93_9.geojson", DwdForecast);
+
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync();
+
+        var item = Assert.Single(vm.Items);
+        Assert.Equal("Ausbreitungsprognose DWD 14.03.2026 10:00", item.Name);
+        Assert.True(item.ShowsLegend);
+        Assert.Equal("Stoff > 1e-08 ppm", Assert.Single(item.Legend).Label);
+        Assert.Equal("Kartenebene importiert: Ausbreitungsprognose DWD 14.03.2026 10:00 (Stand 10:00 Uhr)", session.Incident.Journal[^1].Text);
     }
 
     [Fact]
@@ -195,7 +327,7 @@ public sealed class MapOverlaysViewModelTests : IDisposable
     {
         var (session, _, dialogs, _) = Open();
         session.Close();
-        var vm = new MapOverlaysViewModel(session, () => { }, dialogs, null, new FixedClock(T0), _ => { });
+        var vm = new MapOverlaysViewModel(session, () => { }, dialogs, null, new FixedClock(T0), _ => { }, Berlin);
 
         Assert.False(vm.CanImport);
     }
@@ -211,7 +343,7 @@ public sealed class MapOverlaysViewModelTests : IDisposable
             Array.Empty<(string, bool)>());
         var changes = 0;
         var dialogs = new OverlayDialogs();
-        var vm = new MapOverlaysViewModel(session, () => changes++, dialogs, dialogs.RequestConfirm, new FixedClock(T0), _ => { });
+        var vm = new MapOverlaysViewModel(session, () => changes++, dialogs, dialogs.RequestConfirm, new FixedClock(T0), _ => { }, Berlin);
         session.Changed += vm.Refresh;
         return (session, vm, dialogs, () => changes);
     }

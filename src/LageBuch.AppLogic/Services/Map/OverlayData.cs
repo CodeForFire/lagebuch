@@ -3,9 +3,18 @@ using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.AppLogic.Services.Map;
 
-/// <summary>A Kartenebene as read from its file: one frame per point in time, oldest first.</summary>
+/// <summary>
+/// A Kartenebene as read from its file: one frame per point in time, oldest first. A DWD
+/// Ausbreitungsprognose (<see cref="IsDwdForecast"/>) also carries what its colours mean.
+/// </summary>
 public sealed record OverlayData(IReadOnlyList<OverlayFrame> Frames, GeoBounds Bounds)
 {
+    /// <summary>The file is a DWD Ausbreitungsprognose: features with a <c>pixelvalue</c> and a forecast time.</summary>
+    public bool IsDwdForecast { get; init; }
+
+    /// <summary>What each colour of the Ebene stands for; empty when the file does not say.</summary>
+    public IReadOnlyList<OverlayLegendEntry> Legend { get; init; } = [];
+
     /// <summary>What the Lagebuch records about this Ebene when it is imported under <paramref name="name"/>.</summary>
     public MapOverlaySummary Summary(string name) =>
         new(name, Frames.Count, Frames[0].Time, Frames[^1].Time);
@@ -28,6 +37,9 @@ public sealed record OverlayData(IReadOnlyList<OverlayFrame> Frames, GeoBounds B
         return index;
     }
 }
+
+/// <summary>One colour of an Ebene and what it means, such as „Stoff > 1e-08 ppm“.</summary>
+public sealed record OverlayLegendEntry(uint FillArgb, string Label);
 
 /// <summary>The shapes of a Kartenebene at one point in time; <see cref="Time"/> is null for a plain Ebene.</summary>
 public sealed record OverlayFrame(DateTimeOffset? Time, IReadOnlyList<OverlayShape> Shapes);

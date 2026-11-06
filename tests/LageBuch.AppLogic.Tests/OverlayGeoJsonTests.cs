@@ -74,8 +74,8 @@ public class OverlayGeoJsonTests
         var data = Parse(ThreeQuarterHours());
 
         Assert.Equal([Quarter0, Quarter0.AddMinutes(15), Quarter0.AddMinutes(30)], data.Frames.Select(f => f.Time));
-        Assert.All(data.Frames, f => Assert.Equal(2, f.Shapes.Count));
-        Assert.Equal(11.03, data.Frames[2].Shapes[1].Bounds.East, precision: 6);
+        Assert.All(data.Frames, f => Assert.Single(f.Shapes));
+        Assert.Equal(11.03, data.Frames[2].Shapes[0].Bounds.East, precision: 6);
     }
 
     [Fact]
@@ -101,17 +101,96 @@ public class OverlayGeoJsonTests
     [Fact]
     public void A_polygon_keeps_its_hole_and_a_multipolygon_all_its_rings_in_one_shape()
     {
-        var frame = Parse(Utf8(Forecast(Quarter0, 0.01))).Frames.Single();
+        var shapes = Parse(Utf8($$$"""
+            {"type": "FeatureCollection", "features": [
+              {"type": "Feature", "properties": {}, "geometry": {"type": "Polygon", "coordinates": [{{{Square}}}, {{{Square}}}]}},
+              {"type": "Feature", "properties": {}, "geometry": {"type": "MultiPolygon", "coordinates": [[{{{Square}}}], [{{{Square}}}, {{{Square}}}]]}}
+            ]}
+            """)).Frames.Single().Shapes;
 
-        Assert.Equal(OverlayShapeKind.Area, frame.Shapes[0].Kind);
-        Assert.Equal(2, frame.Shapes[0].Parts.Count);
-        Assert.Single(frame.Shapes[1].Parts);
+        Assert.Equal(OverlayShapeKind.Area, shapes[0].Kind);
+        Assert.Equal(2, shapes[0].Parts.Count);
+        Assert.Equal(3, shapes[1].Parts.Count);
+    }
+
+    [Fact]
+    public void A_DWD_forecast_drops_its_empty_frame_of_the_computed_area()
+    {
+        var data = Parse(Utf8(Forecast(Quarter0, 0.01)));
+
+        Assert.True(data.IsDwdForecast);
+        var plume = Assert.Single(data.Frames.Single().Shapes);
+        Assert.Equal(0x80228B22u, plume.Style.FillArgb);
+
+        // The bounds are the plume's, not the 1 by 1 degree area it was computed in.
+        Assert.Equal(48.05, data.Bounds.North, precision: 6);
+    }
+
+    [Fact]
+    public void A_DWD_forecast_explains_its_colour_by_substance_and_threshold()
+    {
+        var legend = Assert.Single(Parse(ThreeQuarterHours()).Legend);
+
+        Assert.Equal(0x80228B22u, legend.FillArgb);
+        Assert.Equal("Stoff > 1e-08 ppm", legend.Label);
+    }
+
+    [Theory]
+    [InlineData("\"aegl\": \"AEGL-2\", \"thr_ppm\": \"12\"", "AEGL-2 > 12 ppm")]
+    [InlineData("\"aegl\": \"stoff\", \"thr_ppm\": 0.5", "Stoff > 0.5 ppm")]
+    [InlineData("\"aegl\": \"stoff\"", "Stoff")]
+    [InlineData("\"aegl\": \" \", \"thr_ppm\": \"3\"", "Konzentration > 3 ppm")]
+    [InlineData("\"thr_ppm\": \" 3 \"", "Konzentration > 3 ppm")]
+    public void A_DWD_legend_names_the_class_and_its_threshold_as_far_as_the_file_says(string properties, string label)
+    {
+        var json = $$$"""{"type": "Feature", "properties": {"pixelvalue": 2, "ftime": "2026-03-14T09:00:00Z", {{{properties}}}}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        Assert.Equal(label, Assert.Single(Parse(Utf8(json)).Legend).Label);
+    }
+
+    [Fact]
+    public void A_DWD_legend_lists_each_colour_once_and_twelve_at_most()
+    {
+        var features = string.Join(",", Enumerable.Range(0, 14).Select(i =>
+            $$$"""{"type": "Feature", "properties": {"pixelvalue": {{{i + 1}}}, "ftime": "2026-03-14T09:00:00Z", "fill": "#0000{{{i:X2}}}"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}"""));
+        var repeated = $$$"""{"type": "Feature", "properties": {"pixelvalue": 1, "ftime": "2026-03-14T09:00:00Z", "fill": "#000000"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        var legend = Parse(Utf8($$$"""{"type": "FeatureCollection", "features": [{{{repeated}}}, {{{features}}}]}""")).Legend;
+
+        Assert.Equal(OverlayGeoJson.MaxLegendEntries, legend.Count);
+        Assert.Equal(legend.Count, legend.Select(e => e.FillArgb).Distinct().Count());
+    }
+
+    [Fact]
+    public void A_long_DWD_class_name_is_cut()
+    {
+        var json = $$$"""{"type": "Feature", "properties": {"pixelvalue": 1, "ftime": "2026-03-14T09:00:00Z", "aegl": "{{{new string('a', 300)}}}"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        Assert.Equal(OverlayGeoJson.MaxLabelLength, Assert.Single(Parse(Utf8(json)).Legend).Label.Length);
+    }
+
+    [Fact]
+    public void A_point_s_outline_is_its_marker_colour_not_a_stroke()
+    {
+        var json = """{"type": "Feature", "properties": {"marker-color": "#778899", "stroke": "#112233"}, "geometry": {"type": "Point", "coordinates": [11, 48]}}""";
+
+        Assert.Equal(0x778899u, Parse(Utf8(json)).Frames[0].Shapes[0].Style.StrokeArgb & 0xFFFFFF);
+    }
+
+    [Fact]
+    public void A_file_that_is_not_a_DWD_forecast_has_no_legend_and_keeps_every_feature()
+    {
+        var data = Parse(Utf8("""{"type": "Feature", "properties": {"pixelvalue": 0}, "geometry": {"type": "Point", "coordinates": [11, 48]}}"""));
+
+        Assert.False(data.IsDwdForecast);
+        Assert.Empty(data.Legend);
+        Assert.Single(data.Frames[0].Shapes);
     }
 
     [Fact]
     public void The_fill_and_its_shapefile_cut_opacity_are_read()
     {
-        var plume = Parse(Utf8(Forecast(Quarter0, 0.01))).Frames[0].Shapes[1];
+        var plume = Parse(Utf8(Forecast(Quarter0, 0.01))).Frames[0].Shapes[0];
 
         Assert.Equal(0x80228B22u, plume.Style.FillArgb);
         Assert.Equal(0xFF228B22u, plume.Style.StrokeArgb);
