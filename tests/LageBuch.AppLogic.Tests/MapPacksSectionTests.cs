@@ -57,6 +57,9 @@ public class MapPacksSectionTests
         Assert.False(section.InstallCommand.CanExecute(Row(section, "ffb")));
         Assert.True(section.InstallCommand.CanExecute(Row(section, "ll")));
         Assert.Equal([true, false, true], section.Packs.Select(p => p.ShowsRemove));
+        Assert.Equal([false, true, true], section.Packs.Select(p => p.ShowsAction));
+        Assert.False(section.RemoveCommand.CanExecute(Row(section, "ll")));
+        Assert.True(section.RemoveCommand.CanExecute(Row(section, "ffb")));
         Assert.Equal("2 installiert · 1 Update", section.RailSummary);
     }
 
