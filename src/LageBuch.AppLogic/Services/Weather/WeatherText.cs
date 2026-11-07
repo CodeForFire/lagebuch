@@ -1,3 +1,4 @@
+using System.Text;
 using LageBuch.Domain;
 
 namespace LageBuch.AppLogic.Services.Weather;
@@ -9,6 +10,11 @@ namespace LageBuch.AppLogic.Services.Weather;
 /// </summary>
 public static class WeatherText
 {
+    private const int MaxEntryLength = LageBuch.Domain.Etb.EtbEntry.MaxTextLength;
+
+    // Room kept for " 20 weitere Warnungen." once the warnings stop fitting.
+    private const int MoreWarningsReserve = 32;
+
     private static readonly string[] CompassPoints = ["Nord", "Nordost", "Ost", "Südost", "Süd", "Südwest", "West", "Nordwest"];
 
     /// <summary>
@@ -108,10 +114,26 @@ public static class WeatherText
         values.AddRange(DetailParts(reading, withPrecipitationWindow: false));
         var body = values.Count == 0 ? "keine Messwerte." : string.Join(", ", values) + ".";
 
-        var warnings = reading.Alerts.Select(a => a.Expires is { } expires
-            ? $" Warnung: {a.Event} bis {Formatting.DayAndTime(expires.ToOffset(localOffset))}."
-            : $" Warnung: {a.Event}.");
-        return head + body + string.Concat(warnings);
+        // The ETB takes at most EtbEntry.MaxTextLength characters. The reading always fits; warnings
+        // are added while they do, and the rest are counted rather than cut off mid-word.
+        var text = new StringBuilder(head + body);
+        for (var i = 0; i < reading.Alerts.Count; i++)
+        {
+            var alert = reading.Alerts[i];
+            var warning = alert.Expires is { } expires
+                ? $" Warnung: {alert.Event} bis {Formatting.DayAndTime(expires.ToOffset(localOffset))}."
+                : $" Warnung: {alert.Event}.";
+            if (text.Length + warning.Length + MoreWarningsReserve > MaxEntryLength)
+            {
+                var left = reading.Alerts.Count - i;
+                text.Append(left == 1 ? " Eine weitere Warnung." : $" {Formatting.Number(left)} weitere Warnungen.");
+                break;
+            }
+
+            text.Append(warning);
+        }
+
+        return text.ToString();
     }
 
     private static List<string> WindParts(WeatherReading reading)

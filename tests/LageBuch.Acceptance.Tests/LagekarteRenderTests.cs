@@ -377,7 +377,7 @@ public sealed class LagekarteRenderTests : IDisposable
         workspace.Dispose();
     }
 
-    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show(IWeatherSource? weather = null)
+    private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show(IWeatherSource? weather = null, bool narrow = false)
     {
         var root = Path.Join(_dir, "regions");
         FictionalRegionPack.Install(root);
@@ -388,7 +388,11 @@ public sealed class LagekarteRenderTests : IDisposable
         var vm = new LagekarteViewModel(session, () => { }, new RegionPackLibrary(_http, root), weather: weather, clock: new FixedClock { Now = new(2026, 11, 5, 22, 15, 0, TimeSpan.FromHours(1)) });
         vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 16));
         var view = new LagekarteView { DataContext = vm };
-        var window = new Window { Content = view, Width = 1280, Height = 800 };
+
+        // A phone lays out off the workspace's "narrow" class, as IncidentWorkspaceView sets it.
+        var workspace = new Panel { Name = "WorkspaceRoot", Children = { view } };
+        workspace.Classes.Set("narrow", narrow);
+        var window = new Window { Content = workspace, Width = narrow ? 412 : 1280, Height = narrow ? 900 : 800 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return (window, view, vm, session);
@@ -457,6 +461,31 @@ public sealed class LagekarteRenderTests : IDisposable
         var (_, view, _, _) = Show();
 
         Assert.False(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "WeatherButton").IsVisible);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false, 340, 240)]
+    [InlineData(true, 220, 140)]
+    public async Task Many_warnings_scroll_and_the_card_narrows_on_a_phone(bool narrow, double cardMaxWidth, double alertsMaxHeight)
+    {
+        var alerts = Enumerable.Range(1, 12)
+            .Select(i => new WeatherAlert($"WARNUNG {i}", $"Amtliche WARNUNG vor STURMBÖEN, Nummer {i}", WeatherAlertSeverity.Severe, null, null))
+            .ToList();
+        var reading = new WeatherReading(
+            new DateTimeOffset(2026, 11, 5, 21, 10, 0, TimeSpan.Zero), "Maisach-Galgen", 4576, 250, 24.1, 47.5, 6.3, "rain", 1.2, alerts);
+        var (window, view, vm, session) = Show(new CannedWeather(reading), narrow);
+        session.SetIncidentLocation(Marktplatz);
+        await vm.Weather.LoadCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var scroll = view.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "WeatherAlertsScroll");
+        Assert.True(scroll.Bounds.Height <= alertsMaxHeight + 0.5, $"warnings {scroll.Bounds.Height} px high");
+        Assert.True(scroll.Extent.Height > scroll.Viewport.Height, "twelve warnings should need scrolling");
+        var card = view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WeatherCard");
+        Assert.True(card.Bounds.Width <= cardMaxWidth + 0.5, $"card {card.Bounds.Width} px wide");
+
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(Shots(), narrow ? "fuehrung-karte-wetter-schmal.png" : "fuehrung-karte-wetter-warnungen.png"));
     }
 
     private sealed class CannedWeather(WeatherReading? reading) : IWeatherSource

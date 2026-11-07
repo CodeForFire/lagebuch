@@ -28,7 +28,8 @@ public sealed class BrightSkyClientTests : IDisposable
 
     private static readonly GeoPoint Fuerstenfeldbruck = new(48.17853, 11.25549);
 
-    private HttpClient? _http;
+    // Every client a test makes, disposed together; some tests make more than one.
+    private readonly List<HttpClient> _clients = [];
 
     /// <summary>Answers per path; records every request.</summary>
     private sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
@@ -126,11 +127,22 @@ public sealed class BrightSkyClientTests : IDisposable
     private (BrightSkyClient Client, FakeHandler Handler) Create(Func<HttpRequestMessage, HttpResponseMessage> respond)
     {
         var handler = new FakeHandler(respond);
-        _http = new HttpClient(handler);
-        return (new BrightSkyClient(_http, new Uri("https://brightsky.test/")), handler);
+        return (new BrightSkyClient(Own(new HttpClient(handler)), new Uri("https://brightsky.test/")), handler);
     }
 
-    public void Dispose() => _http?.Dispose();
+    public void Dispose()
+    {
+        foreach (var client in _clients)
+        {
+            client.Dispose();
+        }
+    }
+
+    private HttpClient Own(HttpClient client)
+    {
+        _clients.Add(client);
+        return client;
+    }
 
     [Fact]
     public async Task Reads_the_station_observation_the_service_answers_with()
@@ -285,9 +297,7 @@ public sealed class BrightSkyClientTests : IDisposable
     public async Task Without_an_endpoint_it_asks_the_public_bright_sky_instance()
     {
         var handler = new FakeHandler(Answer(CurrentWeather, NoAlerts));
-        _http = new HttpClient(handler);
-
-        await new BrightSkyClient(_http).LoadAsync(Fuerstenfeldbruck);
+        await new BrightSkyClient(Own(new HttpClient(handler))).LoadAsync(Fuerstenfeldbruck);
 
         Assert.All(handler.Requests, r => Assert.Equal("api.brightsky.dev", Assert.IsType<Uri>(r.RequestUri).Host));
     }
@@ -323,9 +333,8 @@ public sealed class BrightSkyClientTests : IDisposable
     public async Task A_service_that_never_answers_runs_into_the_clients_own_timeout()
     {
         var handler = new HangingHandler();
-        _http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         var time = new ManualTimeProvider();
-        var client = new BrightSkyClient(_http, new Uri("https://brightsky.test/"), time);
+        var client = new BrightSkyClient(Own(new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan }), new Uri("https://brightsky.test/"), time);
 
         var load = client.LoadAsync(Fuerstenfeldbruck);
         Assert.Equal(2, handler.Started);

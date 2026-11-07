@@ -113,6 +113,31 @@ public class WeatherTextTests
             WeatherText.EtbEntry(Maisach() with { Condition = "rain", PrecipitationMm = 1.2 }, Cet));
 
     [Fact]
+    public void Etb_entry_stays_within_the_ETB_limit_and_counts_the_warnings_left_out()
+    {
+        var longest = Enumerable.Range(0, 20)
+            .Select(i => Sturm with { Event = $"{i:D2}" + new string('X', 198), Expires = null })
+            .ToList();
+
+        var entry = WeatherText.EtbEntry(Maisach(longest), Cet);
+
+        Assert.True(entry.Length <= LageBuch.Domain.Etb.EtbEntry.MaxTextLength, $"{entry.Length} characters");
+        var shown = entry.Split(" Warnung: ").Length - 1;
+        Assert.InRange(shown, 1, 19);
+        Assert.EndsWith($" {20 - shown} weitere Warnungen.", entry, StringComparison.Ordinal);
+        Assert.Contains("00" + new string('X', 198) + ".", entry, StringComparison.Ordinal);
+
+        // One past what fits: the last is named as one.
+        var onePast = WeatherText.EtbEntry(Maisach(longest.Take(shown + 1).ToList()), Cet);
+        Assert.EndsWith(" Eine weitere Warnung.", onePast, StringComparison.Ordinal);
+        Assert.True(onePast.Length <= LageBuch.Domain.Etb.EtbEntry.MaxTextLength);
+
+        // Exactly what fits: nothing is said to be missing.
+        var fitting = WeatherText.EtbEntry(Maisach(longest.Take(shown).ToList()), Cet);
+        Assert.EndsWith(new string('X', 198) + ".", fitting, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Etb_entry_without_measurements_says_so() =>
         Assert.Equal("Wetter (DWD, 22:10 Uhr): keine Messwerte.", WeatherText.EtbEntry(Empty(), Cet));
 }

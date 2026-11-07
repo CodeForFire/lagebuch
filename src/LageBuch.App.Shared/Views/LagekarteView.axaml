@@ -134,9 +134,19 @@
       <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
       <Setter Property="BorderThickness" Value="2" />
     </Style>
-    <!-- On a phone the weather card leaves the legend its corner. -->
+    <!-- As Style setters, not local values, so the narrow layout below can outrank them. -->
+    <Style Selector="Border#WeatherCard">
+      <Setter Property="MaxWidth" Value="340" />
+    </Style>
+    <Style Selector="ScrollViewer#WeatherAlertsScroll">
+      <Setter Property="MaxHeight" Value="240" />
+    </Style>
+    <!-- On a phone the weather card leaves the legend its corner, and the warnings the map. -->
     <Style Selector="Panel#WorkspaceRoot.narrow Border#WeatherCard">
       <Setter Property="MaxWidth" Value="220" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ScrollViewer#WeatherAlertsScroll">
+      <Setter Property="MaxHeight" Value="140" />
     </Style>
   </UserControl.Styles>
 
@@ -515,16 +525,19 @@
                   IsVisible="{Binding Weather.Error, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding Weather.Error}" TextWrapping="Wrap" MaxWidth="420" />
           </Border>
-          <!-- The DWD's warnings for the Einsatzort, a severe or extreme one in the signal colour. -->
-          <ItemsControl x:Name="WeatherAlerts" ItemsSource="{Binding Weather.Alerts}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:WeatherAlertRow">
-                <Border Classes="map-banner weather-alert" Classes.severe="{Binding IsSevere}">
-                  <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="420" FontWeight="SemiBold" />
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <!-- The DWD's warnings for the Einsatzort, a severe or extreme one in the signal colour.
+               Scrolls once there are more than fit, so the last of them stays reachable. -->
+          <ScrollViewer x:Name="WeatherAlertsScroll" IsVisible="{Binding Weather.HasAlerts}">
+            <ItemsControl x:Name="WeatherAlerts" ItemsSource="{Binding Weather.Alerts}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:WeatherAlertRow">
+                  <Border Classes="map-banner weather-alert" Classes.severe="{Binding IsSevere}">
+                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="420" FontWeight="SemiBold" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
         </StackPanel>
 
         <!-- On the app's dark surface, so the buttons stand out against a light map. -->
@@ -737,7 +750,7 @@
         <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom">
           <!-- WETTER: what the nearest DWD station measured, and where and when. -->
           <Border Classes="map-banner" x:Name="WeatherCard" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                  MaxWidth="340" IsVisible="{Binding Weather.HasReading}">
+                  IsVisible="{Binding Weather.HasReading}">
             <StackPanel Spacing="2">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock x:Name="WeatherWindText" Text="{Binding Weather.WindText}" FontWeight="SemiBold"
