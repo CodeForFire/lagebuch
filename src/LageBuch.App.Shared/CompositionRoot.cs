@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.Services.Map;
+using LageBuch.AppLogic.Services.Weather;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
@@ -36,13 +37,14 @@ public static class CompositionRoot
         string? lastCrashReport = null,
         AlarmMute? alarmMute = null,
         IRegionPackLibrary? mapPacks = null,
-        MapNightMode? mapNightMode = null)
+        MapNightMode? mapNightMode = null,
+        IWeatherSource? weather = null)
     {
         // Every cue goes through the device's mute switch (#699); without a file to keep it in,
         // the switch still works for this run.
         alarmMute ??= new AlarmMute();
         alarm = new MutedAlarmService(alarm, alarmMute);
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport, alarmMute: alarmMute, mapPacks: mapPacks, mapNightMode: mapNightMode);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport, alarmMute: alarmMute, mapPacks: mapPacks, mapNightMode: mapNightMode, weather: weather);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService, mapPacks);
         return new MainWindowViewModel(home, editor, dialogs, appVersion, alarm, alarmMute, uiDispatcher);
     }

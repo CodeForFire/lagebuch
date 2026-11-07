@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using LageBuch.App.Services;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.Services.Map;
+using LageBuch.AppLogic.Services.Weather;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
@@ -68,7 +69,8 @@ internal static class Program
 #pragma warning disable CA2000
         var alarms = new SystemAlarmService();
 
-        // Only the Kartenpakete download through it, on the Lagebuchführer's request.
+        // Only the Kartenpakete and the Lagekarte's weather go through it, each on the
+        // Lagebuchführer's request.
         var http = new HttpClient();
 #pragma warning restore CA2000
 
@@ -105,7 +107,8 @@ internal static class Program
             lastCrashReport: CrashReports.TakePending(AppPaths.Root),
             alarmMute: new AlarmMute(AppPaths.AlarmMuteJsonPath),
             mapPacks: new RegionPackLibrary(http, AppPaths.RegionPacksDir),
-            mapNightMode: new MapNightMode(AppPaths.MapNightJsonPath));
+            mapNightMode: new MapNightMode(AppPaths.MapNightJsonPath),
+            weather: new BrightSkyClient(http));
         OpenLaunchedFile(mainViewModel);
         return mainViewModel;
     }

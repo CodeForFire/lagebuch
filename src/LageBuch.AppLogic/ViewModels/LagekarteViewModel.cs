@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.Services.Map;
+using LageBuch.AppLogic.Services.Weather;
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map;
@@ -59,6 +61,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         MapNightMode? nightMode = null,
         IFileDialogService? dialogs = null,
         Action<string, string, Action>? requestConfirm = null,
+        IWeatherSource? weather = null,
         IClock? clock = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -92,6 +95,11 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
                 OnPropertyChanged(nameof(MapShapes));
             }
         };
+        Weather = new WeatherOverlay(
+            weather,
+            Map,
+            clock ?? new SystemClock(),
+            IsReadOnly ? null : text => Run(() => _session.AddJournalEntry(EtbDirection.Internal, text)));
         Refresh();
         ShowPacks(InstalledPacks(mapPacks), centerOnPacks: true);
         if (session.Incident.Location is { } location)
@@ -125,6 +133,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
     /// <summary>The Kartenebenen: imported GeoJSON, such as an Ausbreitungsprognose.</summary>
     public MapOverlaysViewModel Overlays { get; }
+
+    /// <summary>WETTER: the DWD's reading at the Einsatzort, loaded on request.</summary>
+    public WeatherOverlay Weather { get; }
 
     /// <summary>Every unit of the Einsatz, by Funkrufname, each saying whether it is on the map.</summary>
     public ObservableCollection<LagekarteUnitRow> Units { get; } = new();
@@ -853,6 +864,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         EinsatzortPosition = incident.Location;
         Terrain.Einsatzort = incident.Location;
         RefreshProfile();
+        Weather.Einsatzort = incident.Location;
 
         // A unit that left the Einsatz while it was picked cannot be placed any more.
         if (Placing is { UnitId: { } picked } && units.All(u => u.Id != picked))
