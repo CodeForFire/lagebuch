@@ -100,9 +100,9 @@
       <DockPanel>
         <StackPanel x:Name="EmptyStatePanel" DockPanel.Dock="Top" Spacing="6" IsVisible="{Binding !Files.Count}">
           <TextBlock x:Name="EmptyText" Text="Keine Dateien angehängt."
-                     Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding !Files.Count}" />
-          <TextBlock x:Name="EmptyInstructionText" Text="Dateien hierher ziehen oder über &quot;Datei hinzufügen&quot; anhängen."
-                     Foreground="{StaticResource TextSecondaryBrush}" Opacity="0.7" TextWrapping="Wrap"
+                     Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock x:Name="EmptyInstructionText" Text="Dateien hierher ziehen oder über „Datei hinzufügen“ anhängen."
+                     Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                      IsVisible="{Binding !IsReadOnly}" />
         </StackPanel>
         <Border x:Name="FilesListFrame" Background="#0C1119" Padding="14" BorderThickness="1" CornerRadius="{StaticResource RadiusMd}"

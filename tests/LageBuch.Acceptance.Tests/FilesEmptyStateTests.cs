@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
+using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -18,30 +19,10 @@ public class FilesEmptyStateTests
     [AvaloniaFact]
     public void Empty_hint_and_list_switch_when_files_are_added_and_removed()
     {
-        var sessionOperator = new SessionOperator("Müller", "FFB 12/1");
-        var session = TestSession.StartNew(
-            new FakeStore(),
-            new FixedClock(),
-            sessionOperator,
-            "/x.lagebuch",
-            Array.Empty<(string, bool)>(),
-            Array.Empty<(string, bool)>());
-        using var workspace = new IncidentWorkspaceViewModel(
-            session,
-            new FixedClock(),
-            new NoopTicker(),
-            WorkspaceRenderHelper.MasterData(),
-            new FakeDialogs(),
-            new NoopAlarmService(),
-            new NoopIncidentHostController());
+        var (window, workspace, session) = ShowWorkspace();
+        using var workspaceLifetime = workspace;
         var vm = workspace.Files;
-        var window = new Window
-        {
-            Content = new IncidentWorkspaceView { DataContext = workspace },
-            Width = 1280,
-            Height = 800,
-        };
-        window.Show();
+        var sessionOperator = new SessionOperator("Müller", "FFB 12/1");
         try
         {
             Dispatcher.UIThread.RunJobs();
@@ -55,7 +36,7 @@ public class FilesEmptyStateTests
 
             // Empty state: hint and instruction visible, list frame hidden
             Assert.Equal("Keine Dateien angehängt.", hint.Text);
-            Assert.Equal("Dateien hierher ziehen oder über \"Datei hinzufügen\" anhängen.", instruction.Text);
+            Assert.Equal("Dateien hierher ziehen oder über „Datei hinzufügen“ anhängen.", instruction.Text);
             Assert.True(emptyPanel.IsVisible);
             Assert.True(hint.IsVisible);
             Assert.True(instruction.IsVisible);
@@ -124,30 +105,8 @@ public class FilesEmptyStateTests
     [AvaloniaFact]
     public void Read_only_incident_hides_drop_instruction_and_disallows_drop()
     {
-        var sessionOperator = new SessionOperator("Müller", "FFB 12/1");
-        var session = TestSession.StartNew(
-            new FakeStore(),
-            new FixedClock(),
-            sessionOperator,
-            "/x.lagebuch",
-            Array.Empty<(string, bool)>(),
-            Array.Empty<(string, bool)>());
-        session.Close();
-        using var workspace = new IncidentWorkspaceViewModel(
-            session,
-            new FixedClock(),
-            new NoopTicker(),
-            WorkspaceRenderHelper.MasterData(),
-            new FakeDialogs(),
-            new NoopAlarmService(),
-            new NoopIncidentHostController());
-        var window = new Window
-        {
-            Content = new IncidentWorkspaceView { DataContext = workspace },
-            Width = 1280,
-            Height = 800,
-        };
-        window.Show();
+        var (window, workspace, _) = ShowWorkspace(readOnly: true);
+        using var workspaceLifetime = workspace;
         try
         {
             Dispatcher.UIThread.RunJobs();
@@ -172,15 +131,55 @@ public class FilesEmptyStateTests
     [AvaloniaFact]
     public void Narrow_empty_state_renders_readable_wrapped_instruction()
     {
-        var sessionOperator = new SessionOperator("Müller", "FFB 12/1");
+        var (window, workspace, _) = ShowWorkspace(width: 420);
+        using var workspaceLifetime = workspace;
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
+            var view = window.GetVisualDescendants().OfType<FilesView>().Single();
+            var instruction = view.GetControl<TextBlock>("EmptyInstructionText");
+            Assert.True(instruction.IsVisible);
+            Assert.Equal(TextWrapping.Wrap, instruction.TextWrapping);
+            var singleLineHeight = instruction.Bounds.Height;
+            Assert.True(singleLineHeight > 0);
+            Assert.True(instruction.Bounds.Width <= view.Bounds.Width);
+            Capture(window, "files-narrow-empty.png");
+
+            // A 420px workspace can still measure this tab wider than the viewport.
+            // Constrain the actual drop target to exercise wrapping, not just its enum.
+            var dropZone = view.GetControl<Border>("FilesDropZone");
+            dropZone.Width = 240;
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(instruction.TextLayout.TextLines.Count > 1);
+            Assert.True(instruction.Bounds.Height > singleLineHeight);
+            Assert.True(instruction.Bounds.Width <= dropZone.Bounds.Width);
+            Capture(window, "files-wrapped-empty.png");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static (Window Window, IncidentWorkspaceViewModel Workspace, LocalIncidentSession Session) ShowWorkspace(
+        double width = 1280,
+        bool readOnly = false)
+    {
         var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
-            sessionOperator,
+            new SessionOperator("Müller", "FFB 12/1"),
             "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        using var workspace = new IncidentWorkspaceViewModel(
+        if (readOnly)
+        {
+            session.Close();
+        }
+
+        var workspace = new IncidentWorkspaceViewModel(
             session,
             new FixedClock(),
             new NoopTicker(),
@@ -191,24 +190,12 @@ public class FilesEmptyStateTests
         var window = new Window
         {
             Content = new IncidentWorkspaceView { DataContext = workspace },
-            Width = 420,
+            Width = width,
             Height = 800,
         };
         window.Show();
-        try
-        {
-            Dispatcher.UIThread.RunJobs();
-            WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
-            var view = window.GetVisualDescendants().OfType<FilesView>().Single();
-            var instruction = view.GetControl<TextBlock>("EmptyInstructionText");
-            Assert.True(instruction.IsVisible);
-            Assert.Equal(TextWrapping.Wrap, instruction.TextWrapping);
-            Capture(window, "files-narrow-empty.png");
-        }
-        finally
-        {
-            window.Close();
-        }
+        Dispatcher.UIThread.RunJobs();
+        return (window, workspace, session);
     }
 
     private static void AssertBoundsNear(Rect expected, Rect actual, double tolerance = 0.5)
