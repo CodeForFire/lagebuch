@@ -42,8 +42,8 @@ public sealed class MapStyle
         Cycleway = Solid(0x0000FF),
         Track = Solid(0x996600),
         Rail = Solid(0x707070),
-        WaterPointLabelBackground = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF)),
-        WaterPointLabelText = Solid(0x212121),
+        OverlayLabelBackground = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF)),
+        OverlayLabelText = Solid(0x212121),
         SelectedRing = Solid(0x212121),
         Landuse = new Dictionary<string, IImmutableBrush>(StringComparer.Ordinal)
         {
@@ -107,8 +107,8 @@ public sealed class MapStyle
         Cycleway = Solid(0x5070E0),
         Track = Solid(0x7A5A1A),
         Rail = Solid(0x8C8C8C),
-        WaterPointLabelBackground = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0x1E, 0x20, 0x23)),
-        WaterPointLabelText = Solid(0xE4E4E4),
+        OverlayLabelBackground = new ImmutableSolidColorBrush(Color.FromArgb(0xE6, 0x1E, 0x20, 0x23)),
+        OverlayLabelText = Solid(0xE4E4E4),
         SelectedRing = Solid(0xE4E4E4),
         Landuse = new Dictionary<string, IImmutableBrush>(StringComparer.Ordinal)
         {
@@ -196,12 +196,12 @@ public sealed class MapStyle
 
     public required IImmutableBrush Rail { get; init; }
 
-    /// <summary>The box behind a water point's name.</summary>
-    public required IImmutableBrush WaterPointLabelBackground { get; init; }
+    /// <summary>The box behind the name of a Kartenebene's point.</summary>
+    public required IImmutableBrush OverlayLabelBackground { get; init; }
 
-    public required IImmutableBrush WaterPointLabelText { get; init; }
+    public required IImmutableBrush OverlayLabelText { get; init; }
 
-    /// <summary>The ring around the water point whose card is open.</summary>
+    /// <summary>The outline of the water point whose card is open.</summary>
     public required IImmutableBrush SelectedRing { get; init; }
 
     /// <summary>OSM landuse kind -> fill; a kind not listed is not drawn.</summary>

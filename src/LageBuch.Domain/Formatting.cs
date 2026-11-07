@@ -11,6 +11,10 @@ public static class Formatting
     /// <summary>A whole number the way the user reads it (de-DE grouping).</summary>
     public static string Number(int value) => value.ToString("N0", De);
 
+    /// <summary>A whole number without grouping, "1600", as a map marker labels it.</summary>
+    // Stryker disable once String : an int's empty format is "G", so "" prints the same digits
+    public static string UngroupedNumber(int value) => value.ToString("0", De);
+
     /// <summary>A height or length in whole metres, without grouping: "554 m", as a map labels it.</summary>
     public static string Metres(double value) => Math.Round(value).ToString(De) + " m";
 

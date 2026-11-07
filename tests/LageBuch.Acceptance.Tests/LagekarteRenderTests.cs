@@ -100,7 +100,7 @@ public sealed class LagekarteRenderTests : IDisposable
         vm.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(4, view.GetVisualDescendants().OfType<MapCanvasControl>().Single().WaterPoints?.Count);
+        Assert.Equal(5, view.GetVisualDescendants().OfType<MapCanvasControl>().Single().WaterPoints?.Count);
         Assert.True(view.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "WaterPointsToggle").IsVisible);
         var note = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "WaterPointsNote");
         Assert.True(note.IsVisible);
@@ -170,7 +170,7 @@ public sealed class LagekarteRenderTests : IDisposable
         Assert.Same(hydrant, vm.SelectedWaterPoint);
         Assert.Same(hydrant, map.SelectedWaterPoint);
         Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WaterPointCard").IsVisible);
-        Assert.Equal(2, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "WaterPointDetails").ItemCount);
+        Assert.Equal(3, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "WaterPointDetails").ItemCount);
         Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WaterLegend").IsVisible);
         Assert.Null(session.Incident.Location);
 
