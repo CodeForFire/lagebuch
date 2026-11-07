@@ -1,31 +1,27 @@
 # Testing Lagebuch
 
-The SDK version is pinned in `global.json` and the application targets .NET 10.
+The application targets .NET 10. `global.json` requests SDK `10.0.0` with
+`rollForward: latestFeature`, allowing later .NET 10 feature bands rather than
+pinning an exact SDK. SDK differences can affect analyzer and formatting results.
 Run commands from the repository root. The UI uses German text; test names and
-code are English. Use fictional incident and master data only.
+code are English, with German terms of art (Atemschutz, Trupp, Kräfte) kept as
+they appear in the UI. Use fictional incident and master data only.
 
 ## Test projects
 
-There are currently nine test projects under `tests/`, plus the shared fictional
-Stammdaten fixture directory [`tests/Fixtures/`](../tests/Fixtures/) (`StammdatenFixture.cs`
-and `stammdaten-vollstaendig.json`, linked by `LageBuch.Persistence.Tests`,
-`LageBuch.AppLogic.Tests` and `LageBuch.Acceptance.Tests`).
+Test projects live under `tests/` and follow the application layers: domain rules,
+persistence, document generation, sync, hosting, app logic and platform integration.
+`LageBuch.Acceptance.Tests` covers real Avalonia controls, bindings, keyboard
+interaction and rendered layouts from `App.Shared`.
 
-| Project | What belongs here |
-| --- | --- |
-| `LageBuch.Domain.Tests` | Incident rules, entities, formatting and domain state transitions. |
-| `LageBuch.Persistence.Tests` | SQLite storage, migrations, incident files and master-data serialization. |
-| `LageBuch.Documents.Tests` | PDF/report content and document generation. |
-| `LageBuch.Sync.Tests` | Sync protocol, commands and snapshot behavior without the real host. |
-| `LageBuch.Sync.Hosting.Tests` | Host integration, connections, trust and transport behavior using real local sockets. |
-| `LageBuch.AppLogic.Tests` | View models, commands, services and orchestration without Avalonia. |
-| `LageBuch.Osm.Tests` | OpenStreetMap importing, geometry and map data behavior. |
-| `LageBuch.App.Tests` | Desktop-host behavior, including platform integration and wiring. |
-| `LageBuch.Acceptance.Tests` | Real Avalonia controls, bindings, keyboard interaction and rendered layouts from `App.Shared`. |
+Shared fictional Stammdaten fixtures live in
+[`tests/Fixtures/`](../tests/Fixtures/) (`StammdatenFixture.cs` and
+`stammdaten-vollstaendig.json`). Other fictional examples live in
+`AnonymizedExampleData` and `docs/samples/`.
 
-Acceptance uses **xunit.v3** and its own nested package configuration. The other
-eight projects use **xunit v2**. Copy the conventions of the project you are
-extending, not an attribute or package from another project.
+Acceptance uses **xunit.v3** and its own nested package configuration; the other
+test projects use **xunit v2**. Check the project files and copy the conventions
+of the project you are extending, not an attribute or package from another project.
 
 ## Run and narrow tests
 
@@ -37,8 +33,12 @@ make test PROJECT=tests/LageBuch.Domain.Tests FILTER=FullyQualifiedName~Formatti
 `make test` runs `LageBuch.Desktop.slnf`, excluding the Android application head.
 `PROJECT` selects one project; `FILTER` becomes `dotnet test --filter`. Supply
 both when narrowing: a filter applied across the whole solution can match no tests
-in other assemblies. Neither a zero exit nor `0 Error(s)` in the build tail proves
-the tests passed: a filter matching no tests can exit zero. Search the complete
+in other assemblies. The Makefile comment says these no-match assemblies fail,
+but the current locked v2 and v3 runners both exit zero for an unmatched filter
+in a direct project run. That comment is not a reliable guard; runner or
+configuration changes can also change this exit behavior. Do not rely on a
+solution-wide filter to give a consistent pass or failure. Neither a zero exit
+nor `0 Error(s)` in the build tail proves the tests passed. Search the complete
 log for `Test Run Failed`, and require the expected assemblies to report `Passed!`
 with non-zero test counts and no failed tests.
 
@@ -85,12 +85,13 @@ Use an absolute output path: test-host working directories need not be the
 repository root.
 
 ```bash
-RENDER_OUT=/tmp/lagebuch-render make test PROJECT=tests/LageBuch.Acceptance.Tests FILTER=FullyQualifiedName~FilesTabRenderTests
+RENDER_OUT="$HOME/lagebuch-render" make test PROJECT=tests/LageBuch.Acceptance.Tests FILTER=FullyQualifiedName~FilesTabRenderTests
 ```
 
 Open the generated PNGs and inspect the actual layout, text, contrast and crop.
-A file existing or a test passing is not a visual review. UI contributions need
-a before/after pair; use the same dimensions and fictional data for both.
-Headless screenshots do not prove native platform behavior, Android gestures or
-screen-reader usability. Diagnostic-only render probes are not production code;
-commit them only when they also provide a useful regression test.
+A file existing or a test passing is not a visual review. For the harness,
+before/after captures, diagnostic-only probes, attachment upload and clickable
+`[![alt](U)](U)` image wrapping, follow
+[AGENTS.md > Pull requests](../AGENTS.md#pull-requests) as the single source of
+truth. Headless screenshots do not prove native platform behavior, Android
+gestures or screen-reader usability.

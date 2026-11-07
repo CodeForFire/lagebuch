@@ -54,18 +54,18 @@ public class FocusEdgeTests
     }
 
     // A drawn edge covers most of the control's perimeter; text or an icon in a similar hue would not.
-    private static async Task AssertEdge(Window window, Control target)
+    private static void AssertEdge(Window window, Control target)
     {
         var perimeter = (int)(target.Bounds.Width + target.Bounds.Height);
 
         // A text input's edge fades in over a 150ms BrushTransition (Styles.axaml), and transitions
-        // run on the wall clock, not on render ticks. Awaiting an interval on the captured UI context
-        // allows the headless message loop and animation timer to advance between checks.
+        // run on the wall clock, not on render ticks. Captured at once, a fast enough machine sees
+        // no edge yet -- the Windows runner did, twice in a row (#622). So render until the edge is
+        // there, up to a cap far past the fade: a style that never draws it still fails.
         var settle = Stopwatch.StartNew();
         var found = FocusPixels(window, target);
         while (found < perimeter && settle.ElapsedMilliseconds < 1000)
         {
-            await Task.Delay(25);
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             Dispatcher.UIThread.RunJobs();
             found = FocusPixels(window, target);
@@ -96,7 +96,7 @@ public class FocusEdgeTests
     }
 
     [AvaloniaFact]
-    public async Task Every_control_in_the_Kraefte_dock_shows_the_focus_edge_when_tabbed_to()
+    public void Every_control_in_the_Kraefte_dock_shows_the_focus_edge_when_tabbed_to()
     {
         var (window, view) = ShowForces();
         Control[] chain =
@@ -118,7 +118,7 @@ public class FocusEdgeTests
         foreach (var control in chain)
         {
             window.AssertFocused(control);
-            await AssertEdge(window, control);
+            AssertEdge(window, control);
             window.Tab();
         }
     }
@@ -140,7 +140,7 @@ public class FocusEdgeTests
     // The custom-templated rail TabItem and ListBoxItem, and DataGrid's own per-cell ring, all draw
     // in the focus colour rather than Fluent's white.
     [AvaloniaFact]
-    public async Task Rail_tab_list_item_and_grid_cell_show_the_focus_edge_in_the_focus_colour()
+    public void Rail_tab_list_item_and_grid_cell_show_the_focus_edge_in_the_focus_colour()
     {
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
@@ -150,7 +150,7 @@ public class FocusEdgeTests
         Assert.False(railItem.IsSelected);
         railItem.Focus(NavigationMethod.Tab);
         Dispatcher.UIThread.RunJobs();
-        await AssertEdge(window, railItem);
+        AssertEdge(window, railItem);
 
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
         vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0];
@@ -161,7 +161,7 @@ public class FocusEdgeTests
         grid.Focus(NavigationMethod.Tab);
         Dispatcher.UIThread.RunJobs();
         var cell = grid.GetVisualDescendants().OfType<DataGridCell>().First(c => c.IsEffectivelyVisible);
-        await AssertEdge(window, cell);
+        AssertEdge(window, cell);
 
         var editor = new MasterDataEditorViewModel(new StaticMasterData(WorkspaceRenderHelper.MasterData()), new FakeDialogs(), new NoFiles());
         var editorWindow = new Window { Content = new MasterDataEditorView { DataContext = editor }, Width = 1080, Height = 680 };
@@ -171,7 +171,7 @@ public class FocusEdgeTests
         Assert.False(listItem.IsSelected);
         listItem.Focus(NavigationMethod.Tab);
         Dispatcher.UIThread.RunJobs();
-        await AssertEdge(editorWindow, listItem);
+        AssertEdge(editorWindow, listItem);
     }
 
     private sealed class StaticMasterData(MasterDataSet set) : IMasterDataProvider
