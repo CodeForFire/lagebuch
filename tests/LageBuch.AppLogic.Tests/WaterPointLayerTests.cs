@@ -52,6 +52,36 @@ public class WaterPointLayerTests
     }
 
     [Fact]
+    public void Of_two_equal_points_on_the_same_spot_the_later_one_drawn_over_the_other_is_meant()
+    {
+        var first = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100") { FlowLitresPerMinute = 1600 };
+        var second = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100") { FlowLitresPerMinute = 1600 };
+
+        Assert.Same(second, WaterPointLayer.At([first, second], Marktplatz, 17));
+    }
+
+    // Each edge of the full flag's body (mast 10, body 32 high, 100 wide), a finger's spare of 4 px
+    // beyond it: 2 px inside that reach still means the point, 2 px outside means none. Every tap is
+    // further from the foot than a fingertip, so only the flag can catch it.
+    [Theory]
+    [InlineData(-2, -44, true)]
+    [InlineData(-6, -44, false)]
+    [InlineData(102, -26, true)]
+    [InlineData(106, -26, false)]
+    [InlineData(50, -44, true)]
+    [InlineData(50, -48, false)]
+    [InlineData(50, -8, true)]
+    [InlineData(50, -4, false)]
+    public void A_tap_within_a_finger_of_the_flag_s_body_still_means_it(double right, double down, bool meant)
+    {
+        var hydrant = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100");
+
+        var found = WaterPointLayer.At([hydrant], Offset(Marktplatz, 18, right, down), 18);
+
+        Assert.Equal(meant, found is not null);
+    }
+
+    [Fact]
     public void Where_no_symbols_are_drawn_no_tap_means_one()
     {
         var hydrant = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100");
