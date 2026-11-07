@@ -47,12 +47,26 @@ public static class WaterPointLayer
     };
 
     /// <summary>
+    /// Where <paramref name="point"/>'s marker lies in the stack, lowest first: the one whose card
+    /// is open, <paramref name="selected"/>, on top, the others by <see cref="FlowClass"/>, so a
+    /// strong source lies over a weak one. The map draws its markers in this order, and a tap on
+    /// markers that share a spot means the one on top.
+    /// </summary>
+    public static int StackRank(WaterPoint point, WaterPoint? selected)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        var flowClass = (int)WaterPointMarking.Classify(point.FlowLitresPerMinute);
+        return ReferenceEquals(point, selected) ? (int)FlowClass.Ab3200 + 1 : flowClass;
+    }
+
+    /// <summary>
     /// The water point nearest to <paramref name="tap"/> whose marker the tap lands on, on a map at
     /// <paramref name="zoom"/> turned clockwise by <paramref name="rotation"/> degrees: within
     /// <see cref="HitRadiusPixels"/> of the point itself, or on its flag, which stays upright on a
-    /// turned map. Null when none is that close, or the map is too far out to show any.
+    /// turned map. Of points on the same spot, the one drawn on top, by <see cref="StackRank"/>.
+    /// Null when none is that close, or the map is too far out to show any.
     /// </summary>
-    public static WaterPoint? At(IReadOnlyList<WaterPoint> points, GeoPoint tap, int zoom, double rotation = 0)
+    public static WaterPoint? At(IReadOnlyList<WaterPoint> points, GeoPoint tap, int zoom, double rotation = 0, WaterPoint? selected = null)
     {
         ArgumentNullException.ThrowIfNull(points);
         ArgumentNullException.ThrowIfNull(tap);
@@ -76,7 +90,10 @@ public static class WaterPointLayer
             // Where the tap lies from the point on the screen, which the flag is upright on.
             var (screenX, screenY) = ((dx * cos) - (dy * sin), (dx * sin) + (dy * cos));
             var hit = squared <= HitRadiusPixels * HitRadiusPixels || (flag is not null && OnFlag(flag, screenX, screenY));
-            if (hit && squared < nearestSquared)
+
+            // Later markers of the same rank are drawn over earlier ones, so a tie goes to the later.
+            var onTop = nearest is not null && point.Position == nearest.Position && StackRank(point, selected) >= StackRank(nearest, selected);
+            if (hit && (squared < nearestSquared || onTop))
             {
                 nearest = point;
                 nearestSquared = squared;

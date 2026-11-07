@@ -145,7 +145,7 @@ public static class WaterPointMarkers
             markers.Add(Marker.For(point, level, at, ReferenceEquals(point, selected)));
         }
 
-        return [.. markers.OrderBy(m => m.IsSelected).ThenBy(m => m.FlowClass)];
+        return [.. markers.OrderBy(m => WaterPointLayer.StackRank(m.Point, selected))];
     }
 
     /// <summary>

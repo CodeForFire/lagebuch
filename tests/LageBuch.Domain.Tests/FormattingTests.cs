@@ -5,6 +5,13 @@ namespace LageBuch.Domain.Tests;
 public class FormattingTests
 {
     [Theory]
+    [InlineData(1600, "1600")]
+    [InlineData(-1600, "-1600")]
+    [InlineData(80, "80")]
+    public void A_whole_number_on_a_marker_is_ungrouped(int value, string expected) =>
+        Assert.Equal(expected, Formatting.UngroupedNumber(value));
+
+    [Theory]
     [InlineData(554.4, "554 m")]
     [InlineData(1234.6, "1235 m")]
     public void Metres_are_whole_and_ungrouped_as_a_map_labels_them(double value, string expected) =>

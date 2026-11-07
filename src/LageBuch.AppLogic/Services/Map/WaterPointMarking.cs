@@ -1,4 +1,4 @@
-using System.Globalization;
+using LageBuch.Domain;
 
 namespace LageBuch.AppLogic.Services.Map;
 
@@ -50,8 +50,6 @@ public static class WaterPointMarking
     /// <summary>The value shown where nothing is known.</summary>
     public const string Unknown = "?";
 
-    private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
-
     /// <summary>The class of <paramref name="litresPerMinute"/>; <see cref="FlowClass.Unbekannt"/> for null.</summary>
     public static FlowClass Classify(int? litresPerMinute) => litresPerMinute switch
     {
@@ -75,7 +73,7 @@ public static class WaterPointMarking
             return Unknown;
         }
 
-        var text = flow >= 10_000 ? $"{(flow / 1000).ToString("0", De)}k" : flow.ToString("0", De);
+        var text = flow >= 10_000 ? $"{Formatting.UngroupedNumber(flow / 1000)}k" : Formatting.UngroupedNumber(flow);
         return point.IsEstimated ? $"({text})" : text;
     }
 
@@ -95,6 +93,6 @@ public static class WaterPointMarking
     public static string DiameterText(WaterPoint point)
     {
         ArgumentNullException.ThrowIfNull(point);
-        return point.NominalDiameter is { } dn ? $"DN {dn.ToString("0", De)}" : $"DN {Unknown}";
+        return point.NominalDiameter is { } dn ? $"DN {Formatting.UngroupedNumber(dn)}" : $"DN {Unknown}";
     }
 }

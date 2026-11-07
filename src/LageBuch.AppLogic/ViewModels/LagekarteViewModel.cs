@@ -453,7 +453,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
 
         if (Placing is not { } target)
         {
-            SelectedWaterPoint = VisibleWaterPoints is { } water ? WaterPointLayer.At(water, point, Map.Zoom, Map.Rotation) : null;
+            SelectedWaterPoint = VisibleWaterPoints is { } water ? WaterPointLayer.At(water, point, Map.Zoom, Map.Rotation, SelectedWaterPoint) : null;
             return;
         }
 

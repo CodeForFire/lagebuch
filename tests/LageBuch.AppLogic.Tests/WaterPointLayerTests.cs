@@ -33,6 +33,25 @@ public class WaterPointLayerTests
     }
 
     [Fact]
+    public void Of_two_points_on_the_same_spot_the_stronger_one_drawn_on_top_is_meant()
+    {
+        var weak = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 80") { FlowLitresPerMinute = 600 };
+        var strong = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "ÜH 150") { FlowLitresPerMinute = 3200 };
+
+        Assert.Same(strong, WaterPointLayer.At([weak, strong], Marktplatz, 17));
+        Assert.Same(strong, WaterPointLayer.At([strong, weak], Marktplatz, 17));
+    }
+
+    [Fact]
+    public void Of_two_points_on_the_same_spot_the_open_one_drawn_on_top_is_meant()
+    {
+        var weak = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 80") { FlowLitresPerMinute = 600 };
+        var strong = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "ÜH 150") { FlowLitresPerMinute = 3200 };
+
+        Assert.Same(weak, WaterPointLayer.At([weak, strong], Marktplatz, 17, selected: weak));
+    }
+
+    [Fact]
     public void Where_no_symbols_are_drawn_no_tap_means_one()
     {
         var hydrant = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100");
@@ -56,7 +75,8 @@ public class WaterPointLayerTests
     public void A_tap_on_the_flag_s_body_up_and_right_of_the_point_means_it(int zoom)
     {
         var hydrant = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100");
-        var flag = WaterPointLayer.FlagFor(WaterPointLayer.LevelAt(zoom)!.Value)!;
+        var level = WaterPointLayer.LevelAt(zoom) ?? throw new InvalidOperationException("No marker at this zoom.");
+        var flag = WaterPointLayer.FlagFor(level) ?? throw new InvalidOperationException("No flag at this zoom.");
 
         // Towards the body's far end, well beyond a fingertip from the point.
         var onBody = Offset(Marktplatz, zoom, flag.NominalWidth - 6, -(flag.MastLength + (flag.BodyHeight / 2)));
