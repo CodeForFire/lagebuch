@@ -1,0 +1,1 @@
+On Android the launcher icon is now an adaptive icon with a monochrome layer, so it follows the system's themed icons on Android 13 and later instead of staying the only full-colour icon on the home screen.
