@@ -1012,10 +1012,16 @@ public sealed class LagekarteUnitRow
     public string Title => _unit.CallSign ?? _unit.Brigade;
 
     /// <summary>
-    /// The Status alone. The Feuerwehr is not repeated: the Funkrufname already names it, and a
-    /// unit without one has the Feuerwehr as its <see cref="Title"/>.
+    /// The Fahrzeugtyp, when known, and the Stärke: what the sign on the map leaves out, so a
+    /// crowded map stays readable. The Feuerwehr is not repeated: the Funkrufname already names
+    /// it, and a unit without one has the Feuerwehr as its <see cref="Title"/>.
     /// </summary>
-    public string Detail => _unit.Status ?? string.Empty;
+    public string Detail => _unit.VehicleType is { } type ? $"{type} · {_unit.StrengthText}" : _unit.StrengthText;
+
+    /// <summary>The Status, which the map no longer draws under the sign; null when none is set.</summary>
+    public string? Status => _unit.Status;
+
+    public bool HasStatus => Status is not null;
 
     public GeoPoint? Position => _unit.Position;
 
@@ -1027,13 +1033,11 @@ public sealed class LagekarteUnitRow
 /// <summary>A mark on the map: the Einsatzort, or a unit when <see cref="UnitId"/> is set.</summary>
 public sealed partial class LagekarteMarker : ObservableObject
 {
-    private LagekarteMarker(Guid? unitId, string title, string? subtitle, GeoPoint position, string? vehicleType = null, string? strength = null, LabelOffset? labelOffset = null)
+    private LagekarteMarker(Guid? unitId, string title, GeoPoint position, string? vehicleType = null, LabelOffset? labelOffset = null)
     {
         UnitId = unitId;
         Title = title;
-        Subtitle = subtitle;
         VehicleType = vehicleType;
-        Strength = strength;
         _position = position;
         _labelOffset = labelOffset;
     }
@@ -1044,13 +1048,8 @@ public sealed partial class LagekarteMarker : ObservableObject
 
     public string Title { get; }
 
-    public string? Subtitle { get; }
-
     /// <summary>The Kurzbezeichnung inside the sign (LF, DLK …); null draws the bare Kraftfahrzeug sign.</summary>
     public string? VehicleType { get; }
-
-    /// <summary>The Stärke under the sign, ZF/GF/Mannschaft/Gesamt (DV 102 §1.6: "darunter: Stärke").</summary>
-    public string? Strength { get; }
 
     /// <summary>Where the marker is drawn. Moves under the hand while dragged, before anything is stored.</summary>
     [ObservableProperty]
@@ -1068,12 +1067,12 @@ public sealed partial class LagekarteMarker : ObservableObject
 
     public string SignAutomationName => $"{Title}: taktisches Zeichen";
 
-    public static LagekarteMarker Einsatzort(GeoPoint location) => new(null, "Einsatzort", null, location);
+    public static LagekarteMarker Einsatzort(GeoPoint location) => new(null, "Einsatzort", location);
 
     public static LagekarteMarker For(ForceUnit unit)
     {
         ArgumentNullException.ThrowIfNull(unit);
         var position = unit.Position ?? throw new ArgumentException("Die Einheit steht nicht auf der Karte.", nameof(unit));
-        return new(unit.Id, unit.CallSign ?? unit.Brigade, unit.Status, position, unit.VehicleType, unit.StrengthText, unit.LabelOffset);
+        return new(unit.Id, unit.CallSign ?? unit.Brigade, position, unit.VehicleType, unit.LabelOffset);
     }
 }

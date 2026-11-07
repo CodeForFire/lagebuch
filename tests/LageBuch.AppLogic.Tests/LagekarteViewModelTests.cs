@@ -359,7 +359,6 @@ public class LagekarteViewModelTests
         var pin = Assert.Single(vm.Markers);
         Assert.Same(pin, Assert.Single(vm.Signs));
         Assert.Equal("HLF", pin.VehicleType);
-        Assert.Equal("0/0/6/6", pin.Strength);
         Assert.Null(pin.LabelOffset); // the map finds it a free place until it is dragged
         Assert.Equal("LF 10/1: taktisches Zeichen", pin.SignAutomationName);
     }
@@ -397,18 +396,36 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
-    public void A_unit_row_shows_only_the_status_under_its_title()
+    public void A_unit_row_shows_the_type_strength_and_status_the_map_no_longer_draws()
     {
-        var withCallSign = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1", status: "Im Einsatz");
+        var withCallSign = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1", status: "Im Einsatz", officerCount: 1)
+            .WithVehicleType("HLF");
         var withoutCallSign = ForceUnit.Create("FF Musterstadt", 9, status: "Im Einsatz");
-        var callSignOnly = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1");
         var bare = ForceUnit.Create("FF Musterstadt", 9);
 
-        Assert.Equal("Im Einsatz", new LagekarteUnitRow(withCallSign).Detail);
-        Assert.Equal(string.Empty, new LagekarteUnitRow(callSignOnly).Detail);
-        Assert.Equal("Im Einsatz", new LagekarteUnitRow(withoutCallSign).Detail);
+        var row = new LagekarteUnitRow(withCallSign);
+        Assert.Equal("LF 10/1", row.Title);
+        Assert.Equal("HLF · 0/1/8/9", row.Detail);
+        Assert.Equal("Im Einsatz", row.Status);
+        Assert.True(row.HasStatus);
+
+        // The Feuerwehr is not repeated: it already is the Title of a unit without a Funkrufname.
         Assert.Equal("FF Musterstadt", new LagekarteUnitRow(withoutCallSign).Title);
-        Assert.Equal(string.Empty, new LagekarteUnitRow(bare).Detail);
+        Assert.Equal("0/0/9/9", new LagekarteUnitRow(withoutCallSign).Detail);
+
+        Assert.Equal("0/0/9/9", new LagekarteUnitRow(bare).Detail);
+        Assert.Null(new LagekarteUnitRow(bare).Status);
+        Assert.False(new LagekarteUnitRow(bare).HasStatus);
+    }
+
+    [Fact]
+    public void A_status_change_reaches_the_unit_row_beside_the_map()
+    {
+        var (session, vm, _) = Open(units: ["LF 10/1"]);
+
+        session.UpdateForceUnit(session.Incident.Forces[0].Id, "Status 3", null);
+
+        Assert.Equal("Status 3", Assert.Single(vm.Units).Status);
     }
 
     [Fact]

@@ -519,10 +519,32 @@ public sealed class LagekarteRenderTests : IDisposable
         Assert.True(Math.Abs(at.X - 120 - anchor.X) <= 1 && Math.Abs(at.Y + 40 - anchor.Y) <= 1, $"sign at {anchor}, expected {at} + (-120, 40)");
         Assert.Equal("HLF", sign.VehicleType);
         Assert.Equal("Florian Musterstadt 40/1", sign.Title);
-        Assert.Equal("0/1/8/9", sign.Strength);
         Assert.Equal(new LabelOffset(-120, 40), MapMarkerPanel.GetResolvedOffset(sign));
         Assert.Equal("Florian Musterstadt 40/1: taktisches Zeichen", Avalonia.Automation.AutomationProperties.GetName(sign));
         Assert.Equal("Florian Musterstadt 40/1: Standort", Avalonia.Automation.AutomationProperties.GetName(pin.GetVisualDescendants().OfType<Panel>().First()));
+    }
+
+    [AvaloniaFact]
+    public void The_unit_list_shows_the_type_strength_and_status_the_sign_leaves_out()
+    {
+        var (_, view, _, session) = Show();
+        var unit = session.Incident.Forces[0];
+        session.UpdateForceUnit(unit.Id, "Status 3", unit.Notes);
+        session.PlaceForceUnit(unit.Id, Marktplatz);
+        Dispatcher.UIThread.RunJobs();
+
+        var list = view.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "UnitList");
+        string? Shown(string name) =>
+            list.GetVisualDescendants().OfType<TextBlock>()
+                .Where(t => t.Name == name && t.IsEffectivelyVisible && t.DataContext is LagekarteUnitRow row && row.UnitId == unit.Id)
+                .Select(t => t.Text).SingleOrDefault();
+        Assert.Equal("HLF · 0/1/8/9", Shown("UnitDetail"));
+        Assert.Equal("Status 3", Shown("UnitStatus"));
+
+        var sign = Assert.Single(view.GetVisualDescendants().OfType<TacticalSignControl>());
+
+        // Nothing stacked under the sign: it is no taller than the Grundzeichen and its wheels.
+        Assert.True(sign.DesiredSize.Height <= TacticalSignControl.BodyHeight + 8, $"sign is {sign.DesiredSize.Height} px tall");
     }
 
     [AvaloniaFact]

@@ -268,24 +268,29 @@
           <ItemsControl x:Name="UnitList" ItemsSource="{Binding Units}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:LagekarteUnitRow">
-                <!-- The name gets the whole width: a Funkrufname cut to "Florian Musterst…" names no one. -->
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+                <!-- The name gets the whole width: a Funkrufname cut to "Florian Musterst…" names no one.
+                     Fahrzeugtyp, Stärke and Status are here rather than on the map, which shows only the
+                     sign and the Funkrufname so a crowded Lage stays readable. -->
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,10">
                   <TextBlock Grid.ColumnSpan="4" Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                  <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Detail}" FontSize="12" VerticalAlignment="Center"
-                             Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Row="1" Grid.ColumnSpan="4" x:Name="UnitDetail" Text="{Binding Detail}" FontSize="12"
+                             Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="2" Grid.Column="0" x:Name="UnitStatus" Text="{Binding Status}" FontSize="12"
+                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                             IsVisible="{Binding HasStatus}" />
                   <!-- ReflectionBinding: the commands live on the ItemsControl's DataContext,
                        object-typed under compiled bindings. -->
-                  <Button Grid.Row="1" Grid.Column="1" Classes="ghost" Content="{Binding PlaceLabel}" Margin="6,0,0,0"
+                  <Button Grid.Row="2" Grid.Column="1" Classes="ghost" Content="{Binding PlaceLabel}" Margin="6,0,0,0"
                           IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.PlaceUnitCommand}"
                           CommandParameter="{Binding}" />
-                  <Button Grid.Row="1" Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Auf der Karte zeigen"
+                  <Button Grid.Row="2" Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Auf der Karte zeigen"
                           AutomationProperties.Name="Auf der Karte zeigen" IsVisible="{Binding IsPlaced}"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.CenterOnUnitCommand}"
                           CommandParameter="{Binding}">
                     <PathIcon Data="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />
                   </Button>
-                  <Button Grid.Row="1" Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Von der Karte nehmen"
+                  <Button Grid.Row="2" Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Von der Karte nehmen"
                           AutomationProperties.Name="Von der Karte nehmen" IsVisible="{Binding IsPlaced}"
                           IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveUnitCommand}"
@@ -376,7 +381,6 @@
             <DataTemplate x:DataType="vm:LagekarteMarker">
               <c:TacticalSignControl AutomationProperties.Name="{Binding SignAutomationName}"
                                      VehicleType="{Binding VehicleType}" Title="{Binding Title}"
-                                     Strength="{Binding Strength}" Status="{Binding Subtitle}"
                                      PointerPressed="OnSignPressed" PointerMoved="OnSignMoved"
                                      PointerReleased="OnSignReleased" PointerCaptureLost="OnSignCaptureLost" />
             </DataTemplate>
