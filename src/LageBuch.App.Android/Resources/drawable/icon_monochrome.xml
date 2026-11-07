@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon layer (Android 13+): the launcher keeps only the alpha and tints it to the
+     wallpaper palette. Same geometry as icon_foreground; both flames sit in one even-odd path,
+     so the inner flame is cut out of the outer one and the two still read apart in one colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="108dp" android:height="108dp"
+        android:viewportWidth="108" android:viewportHeight="108">
+  <group android:scaleX="0.08" android:scaleY="0.08" android:translateX="13.92" android:translateY="13.48">
+    <path android:fillColor="#FFFFFF" android:fillType="evenOdd"
+          android:pathData="M540,175 C545,330 660,400 682,520 C720,720 590,838 512,838 C414,838 320,742 320,604 C320,512 372,468 420,430 C452,512 442,556 492,578 C548,548 512,372 540,175 Z M512,470 C520,548 566,566 578,620 C600,712 546,760 500,760 C452,760 420,716 420,660 C420,616 452,596 476,578 C486,618 486,636 508,648 C528,632 506,540 512,470 Z" />
+  </group>
+</vector>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground: the flame of src/LageBuch.App/Assets/icon.svg in its 1024 px
+     coordinates, scaled by 0.08 and centred on the 108dp canvas. That makes it about 29 x 53 dp,
+     inside the 66dp safe zone that every launcher mask keeps. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:aapt="http://schemas.android.com/aapt"
+        android:width="108dp" android:height="108dp"
+        android:viewportWidth="108" android:viewportHeight="108">
+  <group android:scaleX="0.08" android:scaleY="0.08" android:translateX="13.92" android:translateY="13.48">
+    <path android:pathData="M540,175 C545,330 660,400 682,520 C720,720 590,838 512,838 C414,838 320,742 320,604 C320,512 372,468 420,430 C452,512 442,556 492,578 C548,548 512,372 540,175 Z">
+      <aapt:attr name="android:fillColor">
+        <gradient android:type="linear"
+                  android:startX="0" android:startY="838" android:endX="0" android:endY="175">
+          <item android:offset="0" android:color="#FF3D2E" />
+          <item android:offset="0.6" android:color="#FF5A3C" />
+          <item android:offset="1" android:color="#FFB23E" />
+        </gradient>
+      </aapt:attr>
+    </path>
+    <path android:fillColor="#FFD27A" android:fillAlpha="0.92"
+          android:pathData="M512,470 C520,548 566,566 578,620 C600,712 546,760 500,760 C452,760 420,716 420,660 C420,616 452,596 476,578 C486,618 486,636 508,648 C528,632 506,540 512,470 Z" />
+  </group>
+</vector>
