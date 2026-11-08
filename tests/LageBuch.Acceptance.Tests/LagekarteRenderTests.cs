@@ -538,13 +538,30 @@ public sealed class LagekarteRenderTests : IDisposable
             list.GetVisualDescendants().OfType<TextBlock>()
                 .Where(t => t.Name == name && t.IsEffectivelyVisible && t.DataContext is LagekarteUnitRow row && row.UnitId == unit.Id)
                 .Select(t => t.Text).SingleOrDefault();
-        Assert.Equal("HLF · 0/1/8/9", Shown("UnitDetail"));
-        Assert.Equal("Status 3", Shown("UnitStatus"));
+        Assert.Equal("HLF · 0/1/8/9 · Status 3", Shown("UnitDetail"));
 
         var sign = Assert.Single(view.GetVisualDescendants().OfType<TacticalSignControl>());
 
         // Nothing stacked under the sign: it is no taller than the Grundzeichen and its wheels.
         Assert.True(sign.DesiredSize.Height <= TacticalSignControl.BodyHeight + 8, $"sign is {sign.DesiredSize.Height} px tall");
+    }
+
+    [AvaloniaFact]
+    public void The_Ebenen_sit_folded_under_the_units_and_unfold_on_their_heading()
+    {
+        var (_, view, _, _) = Show();
+        var units = view.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "UnitList");
+        var panel = view.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Name == "OverlayPanel");
+        var hint = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "NoOverlaysHint");
+
+        Assert.True(panel.TranslatePoint(default, view)!.Value.Y >= units.TranslatePoint(new Point(0, units.Bounds.Height), view)!.Value.Y);
+        Assert.False(hint.IsEffectivelyVisible);
+
+        var toggle = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "OverlayToggle");
+        toggle.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(hint.IsEffectivelyVisible);
     }
 
     [AvaloniaFact]

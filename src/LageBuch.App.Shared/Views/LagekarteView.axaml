@@ -21,11 +21,11 @@
     <Style Selector="Panel#WorkspaceRoot.narrow Border#UnitPanel">
       <Setter Property="DockPanel.Dock" Value="Bottom" />
       <Setter Property="Width" Value="NaN" />
-      <Setter Property="MaxHeight" Value="260" />
+      <Setter Property="MaxHeight" Value="360" />
       <Setter Property="Margin" Value="0,12,0,0" />
     </Style>
-    <!-- The EBENEN list shares the panel with EINHEITEN. On a phone the panel is 260 px tall, so
-         the list gives up all but about one Ebene and scrolls; EINHEITEN keeps room for its own. -->
+    <!-- The EBENEN list, unfolded, shares the panel with EINHEITEN. On a phone the panel is 360 px
+         tall, so the list gives up all but about one Ebene and scrolls; EINHEITEN keeps its room. -->
     <Style Selector="ScrollViewer#OverlayScroll">
       <Setter Property="MaxHeight" Value="180" />
     </Style>
@@ -175,24 +175,48 @@
         </Grid>
 
         <!-- Kartenebenen: imported GeoJSON, such as a DWD Ausbreitungsprognose. Which one is
-             shown belongs to this screen; the Ebenen themselves are the Einsatz's. -->
-        <StackPanel DockPanel.Dock="Top" x:Name="OverlayPanel" Margin="0,0,0,14" Spacing="6">
+             shown belongs to this screen; the Ebenen themselves are the Einsatz's. At the foot of
+             the panel and folded away until needed, so every unit above stays in view. -->
+        <StackPanel DockPanel.Dock="Bottom" x:Name="OverlayPanel" Margin="0,10,0,0" Spacing="6">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="EBENEN" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+            <Button x:Name="OverlayToggle" Classes="ghost" HorizontalAlignment="Left" Padding="0,4"
+                    AutomationProperties.Name="Ebenen auf- oder zuklappen"
+                    Command="{Binding Overlays.ToggleExpandedCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <PathIcon Width="12" Height="12" IsVisible="{Binding !Overlays.IsExpanded}"
+                          Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                <PathIcon Width="12" Height="12" IsVisible="{Binding Overlays.IsExpanded}"
+                          Data="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+                <TextBlock Text="{Binding Overlays.Header}" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
             <Button Grid.Column="1" x:Name="ImportOverlayButton" Classes="ghost" Content="IMPORTIEREN"
                     ToolTip.Tip="GeoJSON oder ZIP als Kartenebene importieren"
                     IsVisible="{Binding Overlays.CanImport}"
                     IsEnabled="{Binding !Overlays.IsImporting}"
                     Command="{Binding Overlays.ImportCommand}" />
           </Grid>
-          <TextBlock x:Name="NoOverlaysHint" TextWrapping="Wrap" FontSize="12"
-                     Foreground="{StaticResource TextSecondaryBrush}"
-                     Text="Keine Ebenen. GeoJSON importieren, z. B. eine Ausbreitungsprognose."
-                     IsVisible="{Binding !Overlays.HasItems}" />
+          <!-- A failed import says so even while the list is folded away. -->
           <TextBlock x:Name="OverlayErrorText" Text="{Binding Overlays.Error}" TextWrapping="Wrap" FontSize="12"
                      Foreground="{StaticResource ErrorBrush}"
                      IsVisible="{Binding Overlays.Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <ScrollViewer x:Name="OverlayScroll" IsVisible="{Binding Overlays.HasItems}">
+          <TextBlock x:Name="NoOverlaysHint" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     Text="Keine Ebenen. GeoJSON importieren, z. B. eine Ausbreitungsprognose.">
+            <TextBlock.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="Overlays.IsExpanded" />
+                <Binding Path="!Overlays.HasItems" />
+              </MultiBinding>
+            </TextBlock.IsVisible>
+          </TextBlock>
+          <ScrollViewer x:Name="OverlayScroll">
+            <ScrollViewer.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="Overlays.IsExpanded" />
+                <Binding Path="Overlays.HasItems" />
+              </MultiBinding>
+            </ScrollViewer.IsVisible>
             <ItemsControl x:Name="OverlayList" ItemsSource="{Binding Overlays.Items}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:MapOverlayItem">
@@ -268,29 +292,33 @@
           <ItemsControl x:Name="UnitList" ItemsSource="{Binding Units}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:LagekarteUnitRow">
-                <!-- The name gets the whole width: a Funkrufname cut to "Florian Musterst…" names no one.
-                     Fahrzeugtyp, Stärke and Status are here rather than on the map, which shows only the
-                     sign and the Funkrufname so a crowded Lage stays readable. -->
-                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,10">
-                  <TextBlock Grid.ColumnSpan="4" Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                  <TextBlock Grid.Row="1" Grid.ColumnSpan="4" x:Name="UnitDetail" Text="{Binding Detail}" FontSize="12"
+                <!-- Two lines a unit, so the whole list stays in view: the Funkrufname, wrapped rather
+                     than cut ("Florian Musterst…" names no one), and under it Fahrzeugtyp, Stärke and
+                     Status, which the map leaves out so a crowded Lage stays readable. The actions are
+                     icons beside both lines. -->
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="1" x:Name="UnitDetail" Text="{Binding Detail}" FontSize="12"
                              Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
-                  <TextBlock Grid.Row="2" Grid.Column="0" x:Name="UnitStatus" Text="{Binding Status}" FontSize="12"
-                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                             IsVisible="{Binding HasStatus}" />
                   <!-- ReflectionBinding: the commands live on the ItemsControl's DataContext,
                        object-typed under compiled bindings. -->
-                  <Button Grid.Row="2" Grid.Column="1" Classes="ghost" Content="{Binding PlaceLabel}" Margin="6,0,0,0"
+                  <Button Grid.Column="1" Grid.RowSpan="2" x:Name="PlaceUnitButton" Classes="icon-btn" Margin="6,0,0,0"
+                          VerticalAlignment="Center"
+                          ToolTip.Tip="{Binding PlaceLabel}" AutomationProperties.Name="{Binding PlaceLabel}"
                           IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.PlaceUnitCommand}"
-                          CommandParameter="{Binding}" />
-                  <Button Grid.Row="2" Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Auf der Karte zeigen"
+                          CommandParameter="{Binding}">
+                    <PathIcon Data="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm4 8h-3v3h-2v-3H8V8h3V5h2v3h3v2z" />
+                  </Button>
+                  <Button Grid.Column="2" Grid.RowSpan="2" Classes="icon-btn" Margin="2,0,0,0" VerticalAlignment="Center"
+                          ToolTip.Tip="Auf der Karte zeigen"
                           AutomationProperties.Name="Auf der Karte zeigen" IsVisible="{Binding IsPlaced}"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.CenterOnUnitCommand}"
                           CommandParameter="{Binding}">
                     <PathIcon Data="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />
                   </Button>
-                  <Button Grid.Row="2" Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Von der Karte nehmen"
+                  <Button Grid.Column="3" Grid.RowSpan="2" Classes="icon-btn" Margin="2,0,0,0" VerticalAlignment="Center"
+                          ToolTip.Tip="Von der Karte nehmen"
                           AutomationProperties.Name="Von der Karte nehmen" IsVisible="{Binding IsPlaced}"
                           IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
                           Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveUnitCommand}"

@@ -1012,22 +1012,18 @@ public sealed class LagekarteUnitRow
     public string Title => _unit.CallSign ?? _unit.Brigade;
 
     /// <summary>
-    /// The Fahrzeugtyp, when known, and the Stärke: what the sign on the map leaves out, so a
-    /// crowded map stays readable. The Feuerwehr is not repeated: the Funkrufname already names
-    /// it, and a unit without one has the Feuerwehr as its <see cref="Title"/>.
+    /// The Fahrzeugtyp when known, the Stärke and the Status on one line: what the sign on the map
+    /// leaves out, so a crowded map stays readable. The Feuerwehr is not repeated: the Funkrufname
+    /// already names it, and a unit without one has the Feuerwehr as its <see cref="Title"/>.
     /// </summary>
-    public string Detail => _unit.VehicleType is { } type ? $"{type} · {_unit.StrengthText}" : _unit.StrengthText;
-
-    /// <summary>The Status, which the map no longer draws under the sign; null when none is set.</summary>
-    public string? Status => _unit.Status;
-
-    public bool HasStatus => Status is not null;
+    public string Detail => string.Join(" · ", new[] { _unit.VehicleType, _unit.StrengthText, _unit.Status }.OfType<string>());
 
     public GeoPoint? Position => _unit.Position;
 
     public bool IsPlaced => Position is not null;
 
-    public string PlaceLabel => IsPlaced ? "VERSETZEN" : "AUF KARTE";
+    /// <summary>What the place button does, for its tooltip and screen reader: it is an icon only.</summary>
+    public string PlaceLabel => IsPlaced ? "Versetzen" : "Auf Karte setzen";
 }
 
 /// <summary>A mark on the map: the Einsatzort, or a unit when <see cref="UnitId"/> is set.</summary>
