@@ -9,10 +9,18 @@ they appear in the UI. Use fictional incident and master data only.
 
 ## Test projects
 
-Test projects live under `tests/` and follow the application layers: domain rules,
-persistence, document generation, sync, hosting, app logic and platform integration.
-`LageBuch.Acceptance.Tests` covers real Avalonia controls, bindings, keyboard
-interaction and rendered layouts from `App.Shared`.
+Test projects live under `tests/`, one per application layer:
+
+- `LageBuch.Domain.Tests`: domain rules and invariants in `LageBuch.Domain`.
+- `LageBuch.Persistence.Tests`: storage and repositories in `LageBuch.Persistence`.
+- `LageBuch.Documents.Tests`: document generation in `LageBuch.Documents`.
+- `LageBuch.Sync.Tests`: synchronization logic in `LageBuch.Sync`.
+- `LageBuch.Sync.Hosting.Tests`: the sync server host in `LageBuch.Sync.Hosting`.
+- `LageBuch.Osm.Tests`: OpenStreetMap integration in `LageBuch.Osm`.
+- `LageBuch.AppLogic.Tests`: view models and application logic in `LageBuch.AppLogic`.
+- `LageBuch.App.Tests`: the desktop application head `LageBuch.App`.
+- `LageBuch.Acceptance.Tests`: real Avalonia controls, bindings, keyboard
+  interaction and rendered layouts from `App.Shared`.
 
 Shared fictional Stammdaten fixtures live in
 [`tests/Fixtures/`](../tests/Fixtures/) (`StammdatenFixture.cs` and
