@@ -57,7 +57,7 @@ Kein Konto, keine Anmeldung, keine Cloud, kein Server. Keine Telemetrie, keine A
 
 Alle Daten liegen im app-eigenen Bereich und werden beim Deinstallieren von Android entfernt. Der Hersteller erhält keinerlei Daten — CodeForFire betreibt keinen Dienst, an den etwas fließen könnte.
 
-Die ausführliche Fassung für Kommandantinnen, Kommandanten und kommunale Datenschutzbeauftragte: https://codeforfire.github.io/datenschutz/
+Die ausführliche Fassung für Kommandantinnen, Kommandanten und kommunale Datenschutzbeauftragte: https://codeforfire.github.io/lagebuch/datenschutz/
 
 OPEN SOURCE
 
@@ -77,8 +77,8 @@ Lagebuch ist eine private Anwendung zur Dokumentation und steht in keiner Verbin
 |---|---|
 | Kategorie | Produktivität |
 | Kontakt-E-Mail | *(vom Play-Konto)* |
-| Website | `https://codeforfire.github.io/` |
-| Datenschutzerklärung | `https://codeforfire.github.io/datenschutz/` |
+| Website | `https://codeforfire.github.io/lagebuch/` |
+| Datenschutzerklärung | `https://codeforfire.github.io/lagebuch/datenschutz/` |
 
 ## Hinweise für die Prüfung (App-Zugriff → Anleitung)
 
