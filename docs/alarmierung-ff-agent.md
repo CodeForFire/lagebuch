@@ -41,13 +41,26 @@ in den Ordner legen. Mit Microsoft 365 geht das ohne Programmierung über einen
 **Power-Automate-Flow**:
 
 1. **Auslöser:** *Beim Eintreffen einer neuen E-Mail (V3)* im Postfach, das die Alarm-Mails
-   bekommt.
-   - Filter *Betreff*: der Marker, den FF-Agent in den Betreff setzt, z. B. `#FFA-LB#`.
+   bekommt. Bei einem freigegebenen Postfach heißt der Auslöser *Beim Eintreffen einer neuen
+   E-Mail in einem freigegebenen Postfach (V2)*.
+   - *Von*: `do-not-reply@ff-agent.com`
+   - *Betrefffilter*: der Marker, den FF-Agent in den Betreff setzt, z. B. `#FFA-LB#`.
+   - *Anlagen einschließen*: Nein
 2. **Aktion:** *OneDrive for Business → Datei erstellen*.
    - *Ordnerpfad*: z. B. `/Alarmierung`.
-   - *Dateiname*: die *Nachrichten-ID* der Mail mit der Endung `.html`.
-   - *Dateiinhalt*: der *Text* (Body) der Mail.
-3. Den OneDrive-Ordner auf dem ELW-PC synchronisieren und in Lagebuch als Alarm-Ordner wählen.
+   - *Dateiname*: als Ausdruck
+     `concat(formatDateTime(utcNow(), 'yyyyMMdd-HHmmss'), '-', guid(), '.html')`.
+     Die Nachrichten-ID der Mail taugt nicht: Sie enthält `<` und `>`, die OneDrive in
+     Dateinamen ablehnt.
+   - *Dateiinhalt*: der *Text* (Body) der Mail, also das HTML mit dem Alarm darin.
+3. Auf dem ELW-PC mit demselben Konto bei OneDrive anmelden und den Ordner per Rechtsklick auf
+   **Immer auf diesem Gerät behalten** stellen, damit die Dateien wirklich lokal liegen.
+4. In Lagebuch diesen lokalen Ordner als Alarm-Ordner wählen, z. B.
+   `C:\Users\<Name>\OneDrive - <Organisation>\Alarmierung`.
+
+Die Aktionen *Office 365 Outlook* und *OneDrive for Business* sind Standard-Connectoren. In den
+üblichen Microsoft-365-Plänen braucht der Flow weder eine Premium-Lizenz noch die Zustimmung eines
+Administrators.
 
 Weil OneDrive beim Hochfahren nachsynchronisiert, wird auch eine Alarm-Mail angeboten, die
 eingetroffen ist, als der PC noch aus war.
