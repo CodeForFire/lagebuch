@@ -136,6 +136,8 @@ internal static class SchemaGuard
         new("incident_meta", "nav_overrides", "TEXT", false, null),
         new("incident_meta", "el_funkgruppen", "TEXT", false, null),
         new("incident_meta", "el_fuehrungsfahrzeug", "TEXT", false, null),
+        new("incident_meta", "dispatch_channel", "TEXT", false, null),
+        new("incident_meta", "lagefuehrung_node_id", "TEXT", false, null),
         new("incident_tasks", "completed_at", "TEXT", false, null),
         new("incident_tasks", "completed_by", "TEXT", false, null),
         new("incident_tasks", "source_entry_id", "TEXT", false, null),

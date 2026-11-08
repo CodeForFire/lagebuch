@@ -145,6 +145,25 @@ public sealed class Incident
     /// <summary>How the Einsatzleitung can be reached. Never null; <see cref="LeadershipPost.Empty"/> until filled.</summary>
     public LeadershipPost LeadershipPost { get; private set; } = LeadershipPost.Empty;
 
+    /// <summary>
+    /// The channel the ELW reaches the Leitstelle on (#926), as entered, e.g. "TMO WR_FFB"; null when
+    /// none is recorded.
+    /// </summary>
+    public string? DispatchChannel { get; private set; }
+
+    /// <summary>
+    /// The id of the partner Einsatzleitung recorded as holding the Lageführung (#926), as stored; null
+    /// for the Feuerwehr. Read <see cref="Lagefuehrung"/> to know who holds it now.
+    /// </summary>
+    public Guid? LagefuehrungNodeId { get; private set; }
+
+    /// <summary>
+    /// The partner Einsatzleitung that holds the Lageführung, or null when the Einsatzleitung
+    /// Feuerwehr does. An id that names no live partner (a file from elsewhere) reads as the Feuerwehr.
+    /// </summary>
+    public CommandNode? Lagefuehrung =>
+        LagefuehrungNodeId is { } id && FindCommandNode(id) is { IsLive: true, Kind: CommandNodeKind.Partner } node ? node : null;
+
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
 
@@ -223,10 +242,14 @@ public sealed class Incident
         GeoPoint? location = null,
         IReadOnlyDictionary<string, bool>? navOverrides = null,
         IEnumerable<MapOverlay>? mapOverlays = null,
-        IEnumerable<IncidentGas>? gases = null)
+        IEnumerable<IncidentGas>? gases = null,
+        string? dispatchChannel = null,
+        Guid? lagefuehrungNodeId = null)
     {
         var incident = new Incident
         {
+            DispatchChannel = CleanDispatchChannel(dispatchChannel),
+            LagefuehrungNodeId = lagefuehrungNodeId,
             Id = id,
             StartedAt = startedAt,
             State = state,
@@ -1062,6 +1085,68 @@ public sealed class Incident
         return updated;
     }
 
+    /// <summary>
+    /// Records the channel the ELW reaches the Leitstelle on (#926); null or blank clears it. Setting or
+    /// changing it reaches the ETB, clearing it stays silent, like a Führungsfahrzeug. Returns the
+    /// value as stored.
+    /// </summary>
+    public string? SetDispatchChannel(IClock clock, SessionOperator op, string? channel)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var updated = CommandNode.Clean(channel, CommandNode.MaxTextLength, "Kanal zur Leitstelle");
+        var previous = DispatchChannel;
+        DispatchChannel = updated;
+        if (FahrzeugChanged(previous, updated))
+        {
+            AppendSystemEntry(clock, op, $"Kanal zur Leitstelle: {updated}");
+        }
+
+        return updated;
+    }
+
+    /// <summary>
+    /// Hands the Lageführung (#926) to the partner Einsatzleitung <paramref name="nodeId"/>, or back to
+    /// the Einsatzleitung Feuerwehr when it is null. Only a live partner can hold it. Handing it to
+    /// whoever holds it already writes nothing.
+    /// </summary>
+    public void SetLagefuehrung(IClock clock, SessionOperator op, Guid? nodeId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        CommandNode? target = null;
+        if (nodeId is { } id)
+        {
+            target = FindCommandNode(id);
+            if (target is not { IsLive: true, Kind: CommandNodeKind.Partner })
+            {
+                throw new InvalidOperationException("Die Lageführung kann nur eine Einsatzleitung haben.");
+            }
+        }
+
+        if (Lagefuehrung?.Id == target?.Id)
+        {
+            LagefuehrungNodeId = target?.Id;
+            return;
+        }
+
+        LagefuehrungNodeId = target?.Id;
+        AppendSystemEntry(clock, op, LagefuehrungText(target));
+    }
+
+    private static string LagefuehrungText(CommandNode? holder) =>
+        $"Lageführung: Einsatzleitung {holder?.Name ?? "Feuerwehr"}";
+
+    private static string? CleanDispatchChannel(string? channel)
+    {
+        var trimmed = channel?.Trim();
+        return string.IsNullOrEmpty(trimmed) || trimmed.Length > CommandNode.MaxTextLength ? null : trimmed;
+    }
+
     /// <summary>The node with <paramref name="id"/>, or null when this incident has none by that id.</summary>
     public CommandNode? FindCommandNode(Guid id) => _commandNodes.Find(n => n.Id == id);
 
@@ -1325,9 +1410,16 @@ public sealed class Incident
             throw new InvalidOperationException("Abschnitt ist nicht leer.");
         }
 
+        var heldLagefuehrung = Lagefuehrung?.Id == nodeId;
         var dissolved = node.DissolvedAtTime(clock.Now);
         _commandNodes[index] = dissolved;
         AppendSystemEntry(clock, op, $"{KindLabel(dissolved.Kind)} aufgelöst: {dissolved.Name}");
+        if (heldLagefuehrung)
+        {
+            LagefuehrungNodeId = null;
+            AppendSystemEntry(clock, op, LagefuehrungText(null));
+        }
+
         return dissolved;
     }
 

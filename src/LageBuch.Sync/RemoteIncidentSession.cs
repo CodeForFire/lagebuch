@@ -555,6 +555,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
         Send(new UpdateLeadershipPostCommand(Op(), standort, rufname, telefon, funkgruppen?.Tmo, funkgruppen?.Dmo, fuehrungsfahrzeug));
 
+    public void SetDispatchChannel(string? channel) => Send(new SetDispatchChannelCommand(Op(), channel));
+
+    public void SetLagefuehrung(Guid? nodeId) => Send(new SetLagefuehrungCommand(Op(), nodeId));
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,

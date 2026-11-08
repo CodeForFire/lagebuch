@@ -946,6 +946,37 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void The_dispatch_channel_and_the_Lagefuehrung_apply_over_the_wire()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var client = new OperatorDto("Maier", "FFB 2");
+        var wr = incident.AddCommandNode(clock, new SessionOperator("Host"), CommandNodeKind.Partner, "Wasserrettung");
+
+        ApplyOverWire(new SetDispatchChannelCommand(client, "TMO WR_FFB"), incident, clock);
+        ApplyOverWire(new SetLagefuehrungCommand(client, wr.Id), incident, clock);
+
+        Assert.Equal("TMO WR_FFB", incident.DispatchChannel);
+        Assert.Equal(wr.Id, incident.Lagefuehrung?.Id);
+        Assert.Equal("Lageführung: Einsatzleitung Wasserrettung", incident.Journal[^1].Text);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Fact]
+    public void A_Lagefuehrung_for_an_Abschnitt_over_the_wire_is_refused_and_changes_nothing()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var client = new OperatorDto("Maier", "FFB 2");
+        var nord = incident.AddCommandNode(clock, new SessionOperator("Host"), CommandNodeKind.Abschnitt, "Nord");
+
+        Assert.Throws<InvalidOperationException>(
+            () => ApplyOverWire(new SetLagefuehrungCommand(client, nord.Id), incident, clock));
+
+        Assert.Null(incident.LagefuehrungNodeId);
+    }
+
+    [Fact]
     public void A_post_with_a_fourth_tmo_over_the_wire_is_refused_and_changes_nothing()
     {
         var clock = new FixedClock();

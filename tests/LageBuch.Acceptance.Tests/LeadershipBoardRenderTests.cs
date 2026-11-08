@@ -384,8 +384,7 @@ public class LeadershipBoardRenderTests
         var board = Show();
         var view = board.View;
 
-        var badge = view.GetControl<Border>("DispatchCentreBadge");
-        Assert.Equal("ILS", badge.GetVisualDescendants().OfType<TextBlock>().Single().Text);
+        Assert.Equal("ILS", view.GetControl<TextBlock>("DispatchCentreText").Text);
         Assert.Equal("Max Mustermann · Florian Emmering 1", Named<TextBlock>(view, "ElLeiterText").Text);
         Assert.Equal("Lukas Brandl", Named<TextBlock>(view, "ElMelderText").Text);
         Assert.Equal(["FW_EMMERING 1000"], Lines(view, "ElTmo"));
@@ -1489,6 +1488,101 @@ public class LeadershipBoardRenderTests
         var centre = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window);
         window.MouseMove(Assert.NotNull(centre));
         Dispatcher.UIThread.RunJobs();
+    }
+
+    // #926: a Wasserrettung leads, and the ELW reaches the ILS on the Wasserrettung's channel.
+    private static Board ShowWasserrettungLead() =>
+        Show(more: s =>
+        {
+            s.AddCommandNode(CommandNodeKind.Partner, "Wasserrettung", null, funkgruppen: new Funkgruppen(["WR_FFB"], null));
+            s.SetLagefuehrung(s.Incident.CommandNodes[^1].Id);
+            s.SetDispatchChannel("TMO WR_FFB");
+        });
+
+    private static bool IsShownOn(Border card, string name) =>
+        card.GetVisualDescendants().OfType<Control>().Any(c => c.Name == name && c.IsEffectivelyVisible);
+
+    private static Border ElCardBorder(Visual root) =>
+        root.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ElCard");
+
+    [AvaloniaFact]
+    public void The_Leitstelle_badge_shows_the_channel_and_the_partner_in_the_lead_carries_the_badge()
+    {
+        var board = ShowWasserrettungLead();
+        var view = board.View;
+
+        Assert.Equal("ILS · TMO WR_FFB", view.GetControl<TextBlock>("DispatchCentreText").Text);
+        var wr = Card(view, "Wasserrettung");
+        Assert.True(IsShownOn(wr, "NodeLagefuehrungBadge"));
+        Assert.False(IsShownOn(wr, "NodeTakeLagefuehrungButton"));
+        Assert.False(IsShownOn(Card(view, "Polizei"), "NodeLagefuehrungBadge"));
+        Assert.True(IsShownOn(Card(view, "Polizei"), "NodeTakeLagefuehrungButton"));
+        Assert.False(IsShownOn(Card(view, "Abschnitt 1 Nord"), "NodeTakeLagefuehrungButton"));
+        var el = ElCardBorder(view);
+        Assert.False(IsShownOn(el, "ElLagefuehrungBadge"));
+        Assert.True(IsShownOn(el, "ElTakeLagefuehrungButton"));
+
+        Capture(board.Window, "fuehrung-lagefuehrung-wasserrettung.png");
+    }
+
+    [AvaloniaFact]
+    public void Pressing_LAGEFUEHRUNG_on_the_Einsatzleitung_takes_it_back()
+    {
+        var board = ShowWasserrettungLead();
+        var view = board.View;
+
+        Press(Named<Button>(ElCardBorder(view), "ElTakeLagefuehrungButton"));
+
+        Assert.Null(board.Session!.Incident.Lagefuehrung);
+        Assert.True(IsShownOn(ElCardBorder(view), "ElLagefuehrungBadge"));
+        Assert.False(IsShownOn(Card(view, "Wasserrettung"), "NodeLagefuehrungBadge"));
+    }
+
+    [AvaloniaFact]
+    public void A_lone_Feuerwehr_shows_no_Lagefuehrung()
+    {
+        var board = Show(filled: false);
+
+        Assert.False(IsShownOn(ElCardBorder(board.View), "ElLagefuehrungBadge"));
+        Assert.False(IsShownOn(ElCardBorder(board.View), "ElTakeLagefuehrungButton"));
+        Assert.Equal("ILS", board.View.GetControl<TextBlock>("DispatchCentreText").Text);
+    }
+
+    [AvaloniaFact]
+    public void Pressing_the_Leitstelle_badge_opens_the_channel_dialog()
+    {
+        var board = ShowWasserrettungLead();
+
+        Press(board.View.GetControl<Button>("DispatchCentreBadge"));
+
+        var dialog = board.Workspace.PendingDispatchChannelDialog;
+        Assert.NotNull(dialog);
+        Assert.Equal("TMO WR_FFB", dialog.Channel);
+    }
+
+    [AvaloniaFact]
+    public void The_Leitstelle_badge_is_off_on_a_read_only_Einsatz()
+    {
+        var board = ShowReadOnly();
+
+        Assert.False(board.View.GetControl<Button>("DispatchCentreBadge").IsEffectivelyEnabled);
+    }
+
+    [AvaloniaFact]
+    public void The_channel_dialog_renders_with_the_recorded_channel()
+    {
+        var clock = new FixedClock();
+        var session = NewSession(new FakeStore(), clock);
+        session.SetDispatchChannel("TMO WR_FFB");
+        var vm = new DispatchChannelDialogViewModel(session, WorkspaceRenderHelper.MasterData());
+        var window = new Window { Content = new DispatchChannelDialogView { DataContext = vm }, Width = 900, Height = 520 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Kanal zur ILS", window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "DispatchChannelDialogTitle").Text);
+        Assert.Equal("TMO WR_FFB", window.GetVisualDescendants().OfType<AutoCompleteBox>().Single(b => b.Name == "DispatchChannelBox").Text);
+
+        Capture(window, "fuehrung-kanal-zur-ils-dialog.png");
     }
 
     private static void Capture(Window window, string name)

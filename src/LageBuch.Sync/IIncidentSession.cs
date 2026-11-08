@@ -160,6 +160,15 @@ public interface IIncidentSession
     void UpdateLeadershipPost(
         string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null);
 
+    /// <summary>Records the channel to the Leitstelle; null clears it. See <c>Incident.SetDispatchChannel</c>.</summary>
+    void SetDispatchChannel(string? channel);
+
+    /// <summary>
+    /// Hands the Lageführung to a partner Einsatzleitung, or back to the Feuerwehr when
+    /// <paramref name="nodeId"/> is null. See <c>Incident.SetLagefuehrung</c>.
+    /// </summary>
+    void SetLagefuehrung(Guid? nodeId);
+
     void AddForceUnit(
         string brigade,
         int personnelCount,

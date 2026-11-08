@@ -38,6 +38,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetNavVisibilityCommand), "setNavVisibility")]
 [JsonDerivedType(typeof(AddChecklistCommand), "addChecklist")]
 [JsonDerivedType(typeof(UpdateLeadershipPostCommand), "updateLeadershipPost")]
+[JsonDerivedType(typeof(SetDispatchChannelCommand), "setDispatchChannel")]
+[JsonDerivedType(typeof(SetLagefuehrungCommand), "setLagefuehrung")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
 [JsonDerivedType(typeof(UpdateForceStrengthCommand), "updateForceStrength")]
@@ -204,6 +206,12 @@ public sealed record UpdateLeadershipPostCommand(
     OperatorDto Operator, string? Standort, string? Rufname, string? Telefon,
     IReadOnlyList<string>? FunkgruppenTmo, IReadOnlyList<string>? FunkgruppenDmo,
     string? Fuehrungsfahrzeug = null) : SyncCommand;
+
+/// <summary>The channel the ELW reaches the Leitstelle on (#926); null clears it.</summary>
+public sealed record SetDispatchChannelCommand(OperatorDto Operator, string? Channel) : SyncCommand;
+
+/// <summary>The partner Einsatzleitung that takes the Lageführung (#926); null hands it back to the Feuerwehr.</summary>
+public sealed record SetLagefuehrungCommand(OperatorDto Operator, Guid? NodeId) : SyncCommand;
 
 // OfficerCount/ZugfuehrerCount default to 0 so a pre-#76/#216 payload (no such property on the
 // wire) deserializes as "keine Führungskraft/kein ZF erfasst" instead of failing the contract.

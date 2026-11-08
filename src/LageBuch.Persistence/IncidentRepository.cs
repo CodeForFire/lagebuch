@@ -74,7 +74,7 @@ public sealed class IncidentRepository
 
         Run(
             inserts,
-            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, el_standort, el_rufname, el_telefon, el_funkgruppen, location_lat, location_lon, nav_overrides, el_fuehrungsfahrzeug) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$houseNumber,$postalCode,$place,$elStandort,$elRufname,$elTelefon,$elFunkgruppen,$lat,$lon,$navOverrides,$elFahrzeug);",
+            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, el_standort, el_rufname, el_telefon, el_funkgruppen, location_lat, location_lon, nav_overrides, el_fuehrungsfahrzeug, dispatch_channel, lagefuehrung_node_id) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$houseNumber,$postalCode,$place,$elStandort,$elRufname,$elTelefon,$elFunkgruppen,$lat,$lon,$navOverrides,$elFahrzeug,$dispatchChannel,$lagefuehrung);",
             p =>
             {
                 p("$id", incident.Id.ToString());
@@ -102,6 +102,8 @@ public sealed class IncidentRepository
                 p("$lon", (object?)incident.Location?.Longitude ?? DBNull.Value);
                 p("$navOverrides", (object?)NavOverridesJson.Write(incident.NavOverrides) ?? DBNull.Value);
                 p("$elFahrzeug", (object?)incident.LeadershipPost.Fuehrungsfahrzeug ?? DBNull.Value);
+                p("$dispatchChannel", (object?)incident.DispatchChannel ?? DBNull.Value);
+                p("$lagefuehrung", (object?)incident.LagefuehrungNodeId?.ToString() ?? DBNull.Value);
             });
 
         for (var i = 0; i < incident.Checklists.Count; i++)
@@ -715,7 +717,7 @@ public sealed class IncidentRepository
 
         var meta = ReadRow(
             cn,
-            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, el_standort, el_rufname, el_telefon, el_funkgruppen, location_lat, location_lon, nav_overrides, el_fuehrungsfahrzeug FROM incident_meta LIMIT 1;");
+            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place, el_standort, el_rufname, el_telefon, el_funkgruppen, location_lat, location_lon, nav_overrides, el_fuehrungsfahrzeug, dispatch_channel, lagefuehrung_node_id FROM incident_meta LIMIT 1;");
 
         // One query per table, grouped in C# -- the same shape as editsByEntry below. Items whose
         // list_id matches no list row are dropped: V23 fills list_id for every row it finds, so a
@@ -1109,7 +1111,9 @@ public sealed class IncidentRepository
             Domain.ValueObjects.GeoPoint.TryCreate(Real(meta[18]), Real(meta[19])),
             NavOverridesJson.Read(meta[20] as string),
             mapOverlays,
-            gases);
+            gases,
+            meta[22] as string,
+            meta[23] is string lead && Guid.TryParse(lead, out var leadId) ? leadId : null);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

@@ -85,6 +85,11 @@ public static class FuehrungsorganisationSection
         var sub = entry.Depth + 1;
         if (entry.Kind == ReportingEntryKind.Einsatzleitung)
         {
+            if (incident.DispatchChannel is { } channel)
+            {
+                yield return (sub, $"Kanal zur Leitstelle: {channel}", false);
+            }
+
             foreach (var assistant in entry.Others)
             {
                 yield return (sub, $"Führungsunterstützung: {assistant.Role} {assistant.PersonName}", false);
@@ -140,6 +145,12 @@ public static class FuehrungsorganisationSection
             line += $" · Fahrzeug {fahrzeug}";
         }
 
+        // Only worth saying beside another Einsatzleitung (#926): alone, the Feuerwehr leads anyway.
+        if (incident.Lagefuehrung is null && incident.CommandNodes.Any(n => n.IsLive && n.Kind == CommandNodeKind.Partner))
+        {
+            line += " · Lageführung";
+        }
+
         return line;
     }
 
@@ -173,6 +184,11 @@ public static class FuehrungsorganisationSection
         if (!string.IsNullOrWhiteSpace(node.Fuehrungsfahrzeug))
         {
             text += $" – Führungsfahrzeug: {node.Fuehrungsfahrzeug}";
+        }
+
+        if (incident.Lagefuehrung?.Id == node.Id)
+        {
+            text += " – Lageführung";
         }
 
         // What the EAL leads: an Abschnitt's sum takes in its Unterabschnitte, as on the board.

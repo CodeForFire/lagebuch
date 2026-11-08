@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 43;
+    public const int CurrentVersion = 44;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -298,6 +298,11 @@ public static class Migrations
         if (version < 43)
         {
             ApplyV43(cn, tx);
+        }
+
+        if (version < 44)
+        {
+            ApplyV44(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1331,6 +1336,17 @@ public static class Migrations
                 tx,
                 SchemaHelpers.ColumnExists(cn, tx, "co_readings", "value") ? legacyReadings : legacyReadingsWithoutValue);
         }
+    }
+
+    // The channel to the Leitstelle and the Einsatzleitung holding the Lageführung (#926). Additive
+    // and nullable: an older file reads back with no channel and the Feuerwehr in the lead.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV44(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "dispatch_channel", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "lagefuehrung_node_id", "TEXT");
+
+        // Stryker restore all
     }
 
     [SuppressMessage(

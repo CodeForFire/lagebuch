@@ -820,6 +820,52 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void The_dispatch_channel_and_the_Lagefuehrung_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Wasserrettung");
+        var wr = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Wasserrettung");
+        incident.SetDispatchChannel(clock, op, "TMO WR_FFB");
+        incident.SetLagefuehrung(clock, op, wr.Id);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal("TMO WR_FFB", loaded.DispatchChannel);
+        Assert.Equal(wr.Id, loaded.Lagefuehrung?.Id);
+    }
+
+    [Fact]
+    public void A_file_without_a_channel_or_Lagefuehrung_reads_as_none_and_the_Feuerwehr()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        IncidentRepository.Save(_path, Incident.Start(clock, op, "Brand"));
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Null(loaded.DispatchChannel);
+        Assert.Null(loaded.LagefuehrungNodeId);
+    }
+
+    [Theory]
+    [InlineData("kein-guid")]
+    [InlineData("")]
+    public void A_garbled_Lagefuehrung_id_reads_as_the_Feuerwehr(string stored)
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        IncidentRepository.Save(_path, Incident.Start(clock, op, "Brand"));
+
+        ExecRaw($"UPDATE incident_meta SET lagefuehrung_node_id = '{stored}';");
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Null(loaded.LagefuehrungNodeId);
+        Assert.Null(loaded.Lagefuehrung);
+    }
+
+    [Fact]
     public void A_nodes_fuehrungsfahrzeug_round_trips_and_one_without_reads_as_none()
     {
         var clock = new Clock();

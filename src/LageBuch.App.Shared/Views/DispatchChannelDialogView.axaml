@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.DispatchChannelDialogView"
+             x:DataType="vm:DispatchChannelDialogViewModel">
+  <!-- The Abschnitt dialog's shell (MaxWidth, not Width; 16px scrim inset), with one field: the
+       channel the ELW reaches the Leitstelle on (#926). -->
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CancelCommand}" b:Overlay.PrimaryCommand="{Binding SaveCommand}">
+    <Border x:Name="DispatchChannelDialogCard" MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <StackPanel Margin="26,22,26,24" Spacing="12">
+          <TextBlock x:Name="DispatchChannelDialogTitle" Text="{Binding Title}" Classes="display" FontSize="20"
+                     TextWrapping="Wrap" />
+          <!-- The Stammdaten's Funkgruppen with their kind as suggestions, any other channel typed in. -->
+          <HeaderedContentControl Classes="field suggest" Header="FUNKGRUPPE">
+            <AutoCompleteBox x:Name="DispatchChannelBox" ItemsSource="{Binding ChannelOptions}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                             AutomationProperties.Name="Kanal zur Leitstelle"
+                             Text="{Binding Channel}" PlaceholderText="z. B. TMO WR_FFB" />
+          </HeaderedContentControl>
+          <TextBlock x:Name="DispatchChannelSaveError" Classes="field-error" TextWrapping="Wrap"
+                     Text="{Binding SaveError}"
+                     IsVisible="{Binding SaveError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <!-- Left, primary first (#694): the actions start under the field they save. -->
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0">
+            <Button x:Name="DispatchChannelSaveButton" Classes="signal" Content="SPEICHERN"
+                    Command="{Binding SaveCommand}" />
+            <Button x:Name="DispatchChannelCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

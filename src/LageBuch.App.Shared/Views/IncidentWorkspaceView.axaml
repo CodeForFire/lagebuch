@@ -1093,6 +1093,10 @@
     <ContentControl Content="{Binding PendingCommandNodeDialog}"
                     IsVisible="{Binding PendingCommandNodeDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
+    <!-- Channel to the Leitstelle overlay from the FÜHRUNG board's Leitstelle badge (#926) -->
+    <ContentControl Content="{Binding PendingDispatchChannelDialog}"
+                    IsVisible="{Binding PendingDispatchChannelDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
     <!-- Person overlay (Leiter, Melder, Führungsunterstützung, Fachberater) from the FÜHRUNG board -->
     <ContentControl Content="{Binding PendingLeadershipPersonDialog}"
                     IsVisible="{Binding PendingLeadershipPersonDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />

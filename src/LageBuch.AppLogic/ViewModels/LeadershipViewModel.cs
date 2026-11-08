@@ -33,6 +33,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     private readonly Action<CommandNodeDialogViewModel>? _openDialog;
     private readonly Action<LeadershipPersonDialogViewModel>? _openPersonDialog;
     private readonly Action<RoleAssignmentDialogViewModel>? _openAssignmentDialog;
+    private readonly Action<DispatchChannelDialogViewModel>? _openChannelDialog;
     private readonly Action<string, Action> _offerUndo;
     private readonly IClock _clock;
     private readonly FachberaterGroup _fachberaterGroup;
@@ -59,7 +60,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
     /// add and edit commands do nothing. <paramref name="openPersonDialog"/> does the same for the
     /// person dialog behind Leiter, Melder, Führungsunterstützung and Fachberater, and
     /// <paramref name="openAssignmentDialog"/> for the dialog that corrects or hands over a
-    /// Führungsunterstützung already held.
+    /// Führungsunterstützung already held. <paramref name="openChannelDialog"/> hands it the dialog
+    /// behind the Leitstelle badge (#926).
     /// </summary>
     public LeadershipViewModel(
         IIncidentSession session,
@@ -70,7 +72,8 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         Action<CommandNodeDialogViewModel>? openDialog = null,
         Action<LeadershipPersonDialogViewModel>? openPersonDialog = null,
         Action<RoleAssignmentDialogViewModel>? openAssignmentDialog = null,
-        Action<string, Action>? offerUndo = null)
+        Action<string, Action>? offerUndo = null,
+        Action<DispatchChannelDialogViewModel>? openChannelDialog = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clock);
@@ -83,11 +86,12 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         _openDialog = openDialog;
         _openPersonDialog = openPersonDialog;
         _openAssignmentDialog = openAssignmentDialog;
+        _openChannelDialog = openChannelDialog;
         _offerUndo = offerUndo ?? ((_, _) => { });
         _clock = clock;
         _incident = session.Incident;
         IsReadOnly = session.IsReadOnly;
-        El = new ElCard(EditPost, !IsReadOnly, slot => OpenPerson(null, slot), OpenAssignment);
+        El = new ElCard(EditPost, !IsReadOnly, slot => OpenPerson(null, slot), OpenAssignment, () => TakeLagefuehrung(null));
         DispatchCentreName = masterData.Settings.DispatchCentreName;
         _fachberaterGroup = new FachberaterGroup(Fachberater);
         Refresh();
@@ -139,6 +143,13 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
     /// <summary>The Leitstelle the Einsatzleitung reports to, from the Stammdaten (default "ILS").</summary>
     public string DispatchCentreName { get; }
+
+    /// <summary>
+    /// What the Leitstelle badge reads: its name, and the channel the ELW reaches it on once one is
+    /// recorded (#926), "ILS · TMO WR_FFB".
+    /// </summary>
+    [ObservableProperty]
+    private string _dispatchCentreText = string.Empty;
 
     public ElCard El { get; }
 
@@ -224,6 +235,13 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
         HasPartners = Partners.Count > 0;
         HasFachberater = Fachberater.Count > 0;
+        DispatchCentreText = incident.DispatchChannel is { } channel ? $"{DispatchCentreName} · {channel}" : DispatchCentreName;
+        var holder = incident.Lagefuehrung?.Id;
+        El.Lagefuehrung = LagefuehrungMark.For(holder is null, HasPartners, IsReadOnly);
+        foreach (var partner in Partners)
+        {
+            partner.Lagefuehrung = LagefuehrungMark.For(partner.Id == holder, HasPartners, IsReadOnly);
+        }
 
         // The tips change exactly when a preset's button turns on or off; a refresh that changed
         // neither raises nothing.
@@ -282,7 +300,12 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
             e =>
             {
                 var card = new BoardNodeCard(
-                    e.Node.Id, RequestDissolve, EditNode, AddUnterabschnitt, (c, slot) => OpenPerson(c.Id, slot));
+                    e.Node.Id,
+                    RequestDissolve,
+                    EditNode,
+                    AddUnterabschnitt,
+                    (c, slot) => OpenPerson(c.Id, slot),
+                    c => TakeLagefuehrung(c.Id));
                 UpdateCard(card, e, incident, hints, childrenOf);
                 return card;
             },
@@ -688,6 +711,13 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
     private void EditNode(BoardNodeCard card) =>
         _openDialog?.Invoke(CommandNodeDialogViewModel.ForEdit(_session, _masterData, card.Id, _onChanged));
+
+    /// <summary>Opens the dialog behind the Leitstelle badge: the channel the ELW reaches it on (#926).</summary>
+    [RelayCommand(CanExecute = nameof(CanAdd))]
+    private void EditDispatchChannel() =>
+        _openChannelDialog?.Invoke(new DispatchChannelDialogViewModel(_session, _masterData, _onChanged));
+
+    private void TakeLagefuehrung(Guid? partnerId) => Run(() => _session.SetLagefuehrung(partnerId));
 
     private void EditPost() =>
         _openDialog?.Invoke(CommandNodeDialogViewModel.ForPost(_session, _masterData, _onChanged));
