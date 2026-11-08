@@ -1077,7 +1077,7 @@ public sealed class Incident
             AppendSystemEntry(clock, op, FunkgruppenText("Einsatzleitung", updated.Funkgruppen));
         }
 
-        if (FahrzeugChanged(previous.Fuehrungsfahrzeug, updated.Fuehrungsfahrzeug))
+        if (SetOrSwapped(previous.Fuehrungsfahrzeug, updated.Fuehrungsfahrzeug))
         {
             AppendSystemEntry(clock, op, FahrzeugText("Einsatzleitung", updated.Fuehrungsfahrzeug));
         }
@@ -1099,7 +1099,7 @@ public sealed class Incident
         var updated = CommandNode.Clean(channel, CommandNode.MaxTextLength, "Kanal zur Leitstelle");
         var previous = DispatchChannel;
         DispatchChannel = updated;
-        if (FahrzeugChanged(previous, updated))
+        if (SetOrSwapped(previous, updated))
         {
             AppendSystemEntry(clock, op, $"Kanal zur Leitstelle: {updated}");
         }
@@ -1256,8 +1256,9 @@ public sealed class Incident
 
     private static string FunkgruppenText(string owner, Funkgruppen funkgruppen) => $"Funkgruppen {owner}: {funkgruppen.Text}";
 
-    // A Führungsfahrzeug set or swapped is worth the record; one taken away stays silent, like Funkgruppen.
-    private static bool FahrzeugChanged(string? previous, string? updated) =>
+    // A Führungsfahrzeug or Kanal zur Leitstelle set or swapped is worth the record; one taken away
+    // stays silent, like Funkgruppen.
+    private static bool SetOrSwapped(string? previous, string? updated) =>
         updated is not null && !string.Equals(previous, updated, StringComparison.Ordinal);
 
     private static string FahrzeugText(string owner, string? fahrzeug) => $"Führungsfahrzeug {owner}: {fahrzeug}";
@@ -1318,7 +1319,7 @@ public sealed class Incident
             AppendSystemEntry(clock, op, FunkgruppenText(updated.Name, updated.Funkgruppen));
         }
 
-        if (FahrzeugChanged(previous.Fuehrungsfahrzeug, updated.Fuehrungsfahrzeug))
+        if (SetOrSwapped(previous.Fuehrungsfahrzeug, updated.Fuehrungsfahrzeug))
         {
             AppendSystemEntry(clock, op, FahrzeugText(updated.Name, updated.Fuehrungsfahrzeug));
         }

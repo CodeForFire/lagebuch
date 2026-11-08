@@ -140,6 +140,16 @@ public class LagefuehrungTests
     }
 
     [Fact]
+    public void A_channel_of_exactly_the_cap_is_kept_on_rehydrate_and_on_set()
+    {
+        var atCap = new string('x', CommandNode.MaxTextLength);
+        var (incident, clock, op) = NewIncident();
+
+        Assert.Equal(atCap, Rehydrated([], atCap).DispatchChannel);
+        Assert.Equal(atCap, incident.SetDispatchChannel(clock, op, atCap));
+    }
+
+    [Fact]
     public void Setting_or_changing_the_channel_is_logged_and_clearing_it_is_not()
     {
         var (incident, clock, op) = NewIncident();
