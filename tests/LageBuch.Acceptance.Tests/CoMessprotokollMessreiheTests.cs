@@ -75,7 +75,8 @@ public class CoMessprotokollMessreiheTests
     }
 
     // #836: nothing in CO-MESSUNG could be copied. The Messreihe's time, value and Trupp are
-    // selectable now, as are the Haus and its summary line above the matrix.
+    // selectable now, as are the Haus and its summary line above the matrix. The gas column (#410)
+    // is the fourth cell, collapsed for a CO-only Einsatz but selectable like the rest.
     [AvaloniaFact]
     public void The_messreihe_and_the_haus_line_are_selectable()
     {
@@ -84,7 +85,7 @@ public class CoMessprotokollMessreiheTests
         OpenEg(vm);
 
         var row = view.GetControl<ItemsControl>("MessreiheList").GetVisualDescendants().OfType<TextBlock>().ToList();
-        Assert.Equal(3, row.Count);
+        Assert.Equal(4, row.Count);
         Assert.All(row, t => Assert.IsType<SelectableTextBlock>(t));
         Assert.IsType<SelectableTextBlock>(view.GetControl<TextBlock>("CoBuildingName"));
         Assert.IsType<SelectableTextBlock>(view.GetControl<TextBlock>("CoSummaryLine"));
@@ -123,7 +124,7 @@ public class CoMessprotokollMessreiheTests
         session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 45);
         OpenEg(vm);
 
-        vm.Editor!.CoValue = 999;
+        vm.Editor!.GasInputs[0].Value = 999;
         Dispatcher.UIThread.RunJobs();
         vm.CloseEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();

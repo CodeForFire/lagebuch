@@ -357,7 +357,16 @@ public class VersionHandshakeTests
     {
         // 38 lets a client send addMapOverlay and removeMapOverlay, which a host at 37 does not
         // know: a 37 and a 38 must not connect.
-        Assert.Equal(38, SyncProtocol.ProtocolVersion);
-        Assert.Equal(38, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 38, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 38, int.MaxValue);
+    }
+
+    [Fact]
+    public void Several_gases_raise_the_protocol_and_the_floor_to_thirty_nine()
+    {
+        // 39 replaces recordCoValue with recordGasValues and the snapshot's coValue with per-gas
+        // values (#410). A peer at 38 can neither send nor read a value, so the floor rises with it.
+        Assert.Equal(39, SyncProtocol.ProtocolVersion);
+        Assert.Equal(39, SyncProtocol.MinimumProtocolVersion);
     }
 }

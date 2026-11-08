@@ -148,7 +148,7 @@ public class CoMessprotokollEditorReachabilityTests
                 && ReferenceEquals(b.TemplatedParent, scroll));
         Assert.True(bar.IsEffectivelyVisible, "expected a visible vertical scrollbar with 25 readings.");
 
-        var input = view.GetControl<NumericUpDown>("CoValueInput");
+        var input = view.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Name == "GasValueInput");
         var inputRight = input.TranslatePoint(new Point(input.Bounds.Width, 0), scroll)!.Value.X;
         var barLeft = bar.TranslatePoint(new Point(0, 0), scroll)!.Value.X;
 

@@ -72,7 +72,7 @@ public class CoMessprotokollRenderTests
         session.RecordCoValue(buildingA.Id, 2, 4, 900);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         Assert.Equal(2, vm.CoMessprotokoll.BuildingOptions.Count);
         Assert.NotNull(vm.CoMessprotokoll.SelectedBuilding);
@@ -99,7 +99,7 @@ public class CoMessprotokollRenderTests
         session.SetDwellingStatus(haus, 1, 2, Domain.CoMeasurement.DwellingStatus.Searched);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         var cell = vm.CoMessprotokoll.MatrixRows.SelectMany(r => r.Cells).Single(c => c.FloorOrdinal == 2 && c.ApartmentNumber == 1);
         Assert.Equal("\uD83D\uDD11 14", cell.KeyDisplay);
@@ -129,13 +129,13 @@ public class CoMessprotokollRenderTests
         session.AddCoBuilding("Mehrfamilienhaus A", 1, 1);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         var cell = vm.CoMessprotokoll.MatrixRows[0].Cells[0];
         cell.OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        vm.CoMessprotokoll.Editor!.CoValue = 2500;
+        vm.CoMessprotokoll.Editor!.GasInputs[0].Value = 2500;
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(vm.CoMessprotokoll.Editor!.IsCoImplausible);
@@ -155,7 +155,7 @@ public class CoMessprotokollRenderTests
         session.SetApartmentCount(building.Id, 0, 6);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
 
         var egRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 0);
         var ogRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 1);
@@ -170,7 +170,7 @@ public class CoMessprotokollRenderTests
     public void The_add_dialog_offers_the_objekte_and_shows_what_a_pick_brings()
     {
         var (window, vm, _) = ShowWorkspace();
-        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
         vm.CoMessprotokoll.AddBuildingCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 

@@ -128,7 +128,7 @@ public class LayoutAlignmentTests
         var funktionen = LeftOfDockOnTab("FUNKTIONEN");
         Assert.Equal(funktionen, LeftOfDockOnTab("KRÄFTE"), precision: 0);
         Assert.Equal(funktionen, LeftOfDockOnTab("ATEMSCHUTZ"), precision: 0);
-        Assert.Equal(funktionen, LeftOfDockOnTab("CO-MESSUNG"), precision: 0);
+        Assert.Equal(funktionen, LeftOfDockOnTab("GASMESSUNG"), precision: 0);
         Assert.Equal(funktionen, LeftOfDockOnTab("DATEIEN"), precision: 0);
     }
 
