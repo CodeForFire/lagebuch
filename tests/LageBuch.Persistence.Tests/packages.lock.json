@@ -150,7 +150,7 @@
       "lagebuch.domain": {
         "type": "Project",
         "dependencies": {
-          "libphonenumber-csharp": "[9.0.41, )"
+          "libphonenumber-csharp": "[9.0.42, )"
         }
       },
       "lagebuch.persistence": {
@@ -162,9 +162,9 @@
       },
       "libphonenumber-csharp": {
         "type": "CentralTransitive",
-        "requested": "[9.0.41, )",
-        "resolved": "9.0.41",
-        "contentHash": "GpBGFg/L1OuHem8qpZ2Ca6Tm5pPqL81iDLiUwNIbfSWVIyiQpui5jqMOr7pgVKg9rD5ppK2iCHDfg9hvtQe1OQ=="
+        "requested": "[9.0.42, )",
+        "resolved": "9.0.42",
+        "contentHash": "QDwM5FoB/MIJt64ZkVjm2gN3ftCKAwJW1xPvwScctiPmZFARWu4OYYQyW77EXbqt17PjkTFV4twQ8zegGCvyBg=="
       }
     }
   }
