@@ -108,8 +108,24 @@ in the **Gasmessung**, at most eight, in the order every Einsatz shows them.
 
 Numbers may carry decimals (`20.9` in the file, `20,9` on screen). A gas without
 any band is recorded and shown without colour. A Stammdaten file without `gases`,
-or with an empty list, measures exactly what the app always did: `CO` in `ppm`,
-steigend, 30 / 200 / 800, plausible up to 2000.
+or with an empty list, measures `CO` in `ppm`, steigend, 20 / 60 / 200, plausible
+up to 2000. Those are the alarm thresholds A1 / A2 / A3 that DGUV FBFHB-021 gives a
+three-threshold CO meter (Dräger, *Alarmschwellen BOS*, 08/2024), so the tile turns
+when the crew's meter alarms. An Einsatzdatei from before the Messgase list keeps
+the bands the app used then, 30 / 200 / 800, so reopening it recolours nothing.
+
+The bands are meant to match the crew's own meters:
+
+| Band | Meter | Means |
+|---|---|---|
+| Erhöht | A1 | first alarm |
+| Gefährlich | A2 | second alarm |
+| Lebensgefährlich | A3, the highest threshold | Rückzug |
+
+A two-threshold meter alarms at A1 and A2 only (DGUV: 20 and 200 ppm for CO). Its
+A2 is the Rückzug threshold, so set Lebensgefährlich to it and leave Gefährlich
+empty: 20 / — / 200. Check the values against your own devices and Dienstanweisung
+before relying on them.
 
 The import rejects a file whose bands are out of order for their gas, because
 guessing which of them was meant would colour a Wohnung wrongly; a band that is

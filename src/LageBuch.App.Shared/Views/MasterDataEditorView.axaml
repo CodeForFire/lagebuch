@@ -1180,6 +1180,10 @@
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}"
                           ToolTip.Tip="Höchstens acht Messgase" />
+                  <!-- #791 review: crews know their meter's A1 / A2 / A3, not the band names. -->
+                  <TextBlock x:Name="GasBandsHint" DockPanel.Dock="Top" Classes="secondary" FontSize="12"
+                             TextWrapping="Wrap" Margin="0,0,0,8"
+                             Text="Erhöht ≈ A1, Gefährlich ≈ A2, Lebensgefährlich ≈ A3 des Messgeräts: Rückzug. Bänder an die eigenen Geräte anpassen." />
                   <Grid DockPanel.Dock="Top" Classes="pick-header" ColumnDefinitions="*,Auto,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="GAS" Classes="overline" FontSize="10" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
