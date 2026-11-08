@@ -67,8 +67,8 @@ TEST_FILTER := $(if $(FILTER),--filter "$(FILTER)",)
 # FILTER is quoted, so `|` and `&` reach dotnet test instead of the shell.
 # A FILTER that matches nothing runs no tests and currently still exits 0, so
 # narrow with PROJECT=tests/LageBuch.Domain.Tests and check for "Passed!".
-# Name~ matches the method name only; select a class with FullyQualifiedName~
-# (docs/testing.md).
+# The xunit adapters have no Name property, so Name~ matches nothing; use
+# FullyQualifiedName~ for a class or a method (docs/testing.md).
 TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .DEFAULT_GOAL := help

@@ -58,10 +58,12 @@ make test PROJECT=tests/LageBuch.Domain.Tests FILTER=FullyQualifiedName~Formatti
 When narrowing, always pass `PROJECT` as well as `FILTER`, and check that the
 project reports `Passed!` with a non-zero test count. A filter that matches
 nothing does not fail the run, it just runs nothing, so a typo looks green.
-The most common way to get there is `Name~`: it matches the test *method* name
-only, under both the xunit v2 projects and Acceptance's xunit.v3, so
-`FILTER=Name~FormattingTests` finds no tests. To select a class, use
-`FullyQualifiedName~FormattingTests`.
+The most common way to get there is `Name~`: the xunit adapters do not support
+a `Name` property, so `Name~…` matches no test at all, whether it names a class
+or a method, in the xunit v2 projects and in Acceptance's xunit.v3 alike. Use
+`FullyQualifiedName~`, which matches namespace, class and method, for example
+`FullyQualifiedName~FormattingTests` or
+`FullyQualifiedName~TimeOfDay_is_clock_time_only`.
 
 `FILTER` is passed quoted, so `|` combines filters:
 `FILTER='FullyQualifiedName~A|FullyQualifiedName~B'`.
