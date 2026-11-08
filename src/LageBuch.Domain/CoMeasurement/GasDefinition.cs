@@ -36,10 +36,15 @@ public sealed record GasDefinition(
     /// <summary>A reading keeps two decimals: 20,9 Vol-% O₂ needs one, %UEG sometimes two.</summary>
     public const int MaxDecimals = 2;
 
-    /// <summary>The gas every Einsatz had before #410, and what a Stammdaten without a Messgase
-    /// list still yields: CO in ppm with the bands the app always used, so a brigade that never
-    /// opens the new tab sees no change.</summary>
-    public static GasDefinition DefaultCo { get; } = new("CO", "ppm", GasDirection.Rising, 30m, 200m, 800m, 2000m);
+    /// <summary>What a Stammdaten without a Messgase list yields, and what a new Haus measures when
+    /// the list is empty: CO in ppm at the alarm thresholds DGUV FBFHB-021 gives a three-threshold
+    /// meter, A1 20 / A2 60 / A3 200 ppm, so the tile turns when the crew's meter alarms.</summary>
+    public static GasDefinition DefaultCo { get; } = new("CO", "ppm", GasDirection.Rising, 20m, 60m, 200m, 2000m);
+
+    /// <summary>The CO gas every Einsatz had before #410, with the bands the app used then. A file
+    /// from before the gas list keeps it, so reopening an old Einsatz recolours nothing. The V43
+    /// migration writes the same values in SQL.</summary>
+    public static GasDefinition LegacyCo { get; } = new("CO", "ppm", GasDirection.Rising, 30m, 200m, 800m, 2000m);
 
     /// <summary>What the editor offers for <see cref="Unit"/>; the unit itself stays free text.</summary>
     public static IReadOnlyList<string> UnitSuggestions { get; } = ["ppm", "%UEG", "Vol-%", "mg/m³"];

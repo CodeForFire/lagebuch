@@ -234,10 +234,10 @@ public class CoMessprotokollViewModelTests
         Assert.Equal(new[] { "10:48", "10:27", "10:00" }, vm.Editor.Readings.Select(r => r.Time));
         Assert.All(vm.Editor.Readings, r => Assert.Equal("Test", r.RecordedBy));
 
-        // Each row keeps its own reading's severity (bands: 30 / 200 / 800 ppm), so a value that
-        // has since fallen still reads as having been dangerous when it was taken.
-        Assert.True(vm.Editor.Readings[2].IsCoDangerous);
-        Assert.True(vm.Editor.Readings[1].IsCoElevated);
+        // Each row keeps its own reading's severity (bands: 20 / 60 / 200 ppm), so a value that
+        // has since fallen still reads as having been lethal when it was taken.
+        Assert.True(vm.Editor.Readings[2].IsCoLethal);
+        Assert.True(vm.Editor.Readings[1].IsCoDangerous);
         Assert.True(vm.Editor.Readings[0].IsCoElevated);
     }
 
@@ -512,10 +512,10 @@ public class CoMessprotokollViewModelTests
         var (_, vm) = CreateVm();
         var editor = OpenEditor(vm, 0, 1);
 
-        editor.GasInputs[0].Value = 799;
+        editor.GasInputs[0].Value = 199;
         Assert.False(editor.GasInputs[0].IsCoLethal);
 
-        editor.GasInputs[0].Value = 800;
+        editor.GasInputs[0].Value = 200;
         Assert.True(editor.GasInputs[0].IsCoLethal);
     }
 

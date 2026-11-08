@@ -110,7 +110,7 @@ public class GasesSectionTests
         var vm = new MasterDataEditorViewModel(provider, new FakeDialogs(), new NoFiles());
         var gases = vm.Sections.OfType<GasesSection>().Single();
 
-        gases.Rows[0].Lethal = 100; // below Gefährlich 200
+        gases.Rows[0].Lethal = 50; // below Gefährlich 60
 
         Assert.True(vm.HasGasConflicts);
         Assert.False(vm.SaveCommand.CanExecute(null));
@@ -213,7 +213,7 @@ public class GasesSectionTests
     [Fact]
     public void A_stored_list_with_a_conflict_is_flagged_as_soon_as_the_editor_opens()
     {
-        var provider = new Provider(MasterDataSet.Empty with { Gases = [GasDefinition.DefaultCo with { Lethal = 100 }] });
+        var provider = new Provider(MasterDataSet.Empty with { Gases = [GasDefinition.DefaultCo with { Lethal = 50 }] });
 
         var vm = new MasterDataEditorViewModel(provider, new FakeDialogs(), new NoFiles());
 

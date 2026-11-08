@@ -756,62 +756,106 @@ public class CoMeasurementTests
     }
 
     [Fact]
-    public void DefaultCo_SeverityOf_Null_IsNormal()
+    public void LegacyCo_SeverityOf_Null_IsNormal()
     {
-        Assert.Equal(CoSeverity.Normal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, null));
+        Assert.Equal(CoSeverity.Normal, GasSeverityClassifier.SeverityOf(GasDefinition.LegacyCo, null));
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(29)]
-    public void DefaultCo_SeverityOf_BelowElevatedThreshold_IsNormal(int ppm)
+    public void LegacyCo_SeverityOf_BelowElevatedThreshold_IsNormal(int ppm)
     {
-        Assert.Equal(CoSeverity.Normal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+        Assert.Equal(CoSeverity.Normal, GasSeverityClassifier.SeverityOf(GasDefinition.LegacyCo, ppm));
     }
 
     [Theory]
     [InlineData(30)]
     [InlineData(199)]
-    public void DefaultCo_SeverityOf_InElevatedRange_IsElevated(int ppm)
+    public void LegacyCo_SeverityOf_InElevatedRange_IsElevated(int ppm)
     {
-        Assert.Equal(CoSeverity.Elevated, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+        Assert.Equal(CoSeverity.Elevated, GasSeverityClassifier.SeverityOf(GasDefinition.LegacyCo, ppm));
     }
 
     [Theory]
     [InlineData(200)]
     [InlineData(799)]
-    public void DefaultCo_SeverityOf_InDangerousRange_IsDangerous(int ppm)
+    public void LegacyCo_SeverityOf_InDangerousRange_IsDangerous(int ppm)
     {
-        Assert.Equal(CoSeverity.Dangerous, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+        Assert.Equal(CoSeverity.Dangerous, GasSeverityClassifier.SeverityOf(GasDefinition.LegacyCo, ppm));
     }
 
     [Theory]
     [InlineData(800)]
     [InlineData(9999)]
-    public void DefaultCo_SeverityOf_AtOrAboveLethalThreshold_IsLethal(int ppm)
+    public void LegacyCo_SeverityOf_AtOrAboveLethalThreshold_IsLethal(int ppm)
     {
-        Assert.Equal(CoSeverity.Lethal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+        Assert.Equal(CoSeverity.Lethal, GasSeverityClassifier.SeverityOf(GasDefinition.LegacyCo, ppm));
     }
 
     [Fact]
-    public void DefaultCo_IsImplausible_Null_IsFalse()
+    public void LegacyCo_IsImplausible_Null_IsFalse()
     {
-        Assert.False(GasSeverityClassifier.IsImplausible(GasDefinition.DefaultCo, null));
+        Assert.False(GasSeverityClassifier.IsImplausible(GasDefinition.LegacyCo, null));
     }
 
     [Theory]
     [InlineData(2000)]
     [InlineData(800)]
-    public void DefaultCo_IsImplausible_AtOrBelowThreshold_IsFalse(int ppm)
+    public void LegacyCo_IsImplausible_AtOrBelowThreshold_IsFalse(int ppm)
     {
-        Assert.False(GasSeverityClassifier.IsImplausible(GasDefinition.DefaultCo, ppm));
+        Assert.False(GasSeverityClassifier.IsImplausible(GasDefinition.LegacyCo, ppm));
     }
 
     [Theory]
     [InlineData(2001)]
     [InlineData(9999)]
-    public void DefaultCo_IsImplausible_AboveThreshold_IsTrue(int ppm)
+    public void LegacyCo_IsImplausible_AboveThreshold_IsTrue(int ppm)
     {
-        Assert.True(GasSeverityClassifier.IsImplausible(GasDefinition.DefaultCo, ppm));
+        Assert.True(GasSeverityClassifier.IsImplausible(GasDefinition.LegacyCo, ppm));
+    }
+
+    // #791 review: the Stammdaten default follows DGUV FBFHB-021 on a three-threshold meter, A1 20 /
+    // A2 60 / A3 200 ppm, so the tile turns when the crew's meter alarms. Files from before #410 keep
+    // LegacyCo above.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(19)]
+    public void DefaultCo_SeverityOf_BelowA1_IsNormal(int ppm)
+    {
+        Assert.Equal(CoSeverity.Normal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+    }
+
+    [Theory]
+    [InlineData(20)]
+    [InlineData(25)]
+    [InlineData(59)]
+    public void DefaultCo_SeverityOf_From_A1_IsElevated(int ppm)
+    {
+        Assert.Equal(CoSeverity.Elevated, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+    }
+
+    [Theory]
+    [InlineData(60)]
+    [InlineData(199)]
+    public void DefaultCo_SeverityOf_From_A2_IsDangerous(int ppm)
+    {
+        Assert.Equal(CoSeverity.Dangerous, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+    }
+
+    [Theory]
+    [InlineData(200)]
+    [InlineData(9999)]
+    public void DefaultCo_SeverityOf_From_A3_IsLethal(int ppm)
+    {
+        Assert.Equal(CoSeverity.Lethal, GasSeverityClassifier.SeverityOf(GasDefinition.DefaultCo, ppm));
+    }
+
+    [Theory]
+    [InlineData(2000, false)]
+    [InlineData(2001, true)]
+    public void DefaultCo_IsImplausible_Above_two_thousand(int ppm, bool implausible)
+    {
+        Assert.Equal(implausible, GasSeverityClassifier.IsImplausible(GasDefinition.DefaultCo, ppm));
     }
 }

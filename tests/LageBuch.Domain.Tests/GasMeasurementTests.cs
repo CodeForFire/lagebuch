@@ -40,13 +40,16 @@ public class GasMeasurementTests
     }
 
     [Fact]
-    public void A_Haus_opened_without_Stammdaten_gases_measures_CO_as_before()
+    public void A_Haus_opened_without_Stammdaten_gases_measures_CO_at_the_DGUV_bands()
     {
         var incident = Incident.Start(_clock, _op);
 
         incident.AddCoBuilding(_clock, _op, "Haus A", 2, 3);
 
-        Assert.Equal(GasDefinition.DefaultCo, Assert.Single(incident.Gases).Definition);
+        var gas = Assert.Single(incident.Gases).Definition;
+        Assert.Equal(GasDefinition.DefaultCo, gas);
+        Assert.Equal((20m, 60m, 200m), (gas.Elevated, gas.Dangerous, gas.Lethal));
+        Assert.Equal(CoSeverity.Elevated, GasSeverityClassifier.SeverityOf(gas, 25));
     }
 
     [Fact]
@@ -261,7 +264,9 @@ public class GasMeasurementTests
     {
         var incident = Rehydrate([], buildings: true);
 
-        Assert.Equal(IncidentGas.LegacyCo, Assert.Single(incident.Gases));
+        var gas = Assert.Single(incident.Gases);
+        Assert.Equal(IncidentGas.LegacyCo, gas);
+        Assert.Equal((30m, 200m, 800m), (gas.Definition.Elevated, gas.Definition.Dangerous, gas.Definition.Lethal));
     }
 
     [Fact]

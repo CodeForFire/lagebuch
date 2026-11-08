@@ -1301,6 +1301,7 @@ public static class Migrations
 
         // Each backfill only where its table exists, the way AddColumnIfMissing skips a missing
         // table: a file need not carry every table an older step would have created.
+        // The values are GasDefinition.LegacyCo's, not DefaultCo's: an old file keeps its old bands.
         const string legacyGas = """
             INSERT INTO co_gases (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to)
                 SELECT $id, 0, 'CO', 'ppm', 0, '30', '200', '800', '2000'

@@ -17,5 +17,5 @@ public sealed record IncidentGas(Guid Id, GasDefinition Definition)
 
     public string Unit => Definition.Unit;
 
-    public static IncidentGas LegacyCo { get; } = new(LegacyCoId, GasDefinition.DefaultCo);
+    public static IncidentGas LegacyCo { get; } = new(LegacyCoId, GasDefinition.LegacyCo);
 }

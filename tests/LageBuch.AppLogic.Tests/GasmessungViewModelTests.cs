@@ -153,16 +153,16 @@ public sealed class GasmessungViewModelTests
     {
         var (_, vm) = CreateVm(GasDefinition.DefaultCo, H2S);
         var editor = OpenEditor(vm, 0, 1);
-        editor.GasInputs[0].Value = 250;
+        editor.GasInputs[0].Value = 100;
         editor.GasInputs[1].Value = 1;
         vm.ConfirmEditorCommand.Execute(null);
 
         var rows = Cell(vm, 0, 1).GasValueRows;
 
-        Assert.Equal(new[] { "CO 250 ppm", "H2S 1 ppm" }, rows.Select(r => r.Text));
+        Assert.Equal(new[] { "CO 100 ppm", "H2S 1 ppm" }, rows.Select(r => r.Text));
         Assert.True(rows[0].IsCoDangerous);
         Assert.False(rows[1].IsCoElevated || rows[1].IsCoDangerous || rows[1].IsCoLethal);
-        Assert.Contains("CO 250 ppm · H2S 1 ppm", Cell(vm, 0, 1).TileTooltip, StringComparison.Ordinal);
+        Assert.Contains("CO 100 ppm · H2S 1 ppm", Cell(vm, 0, 1).TileTooltip, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -280,7 +280,7 @@ public sealed class GasmessungViewModelTests
         Assert.True(input.IsCoElevated);
         Assert.False(input.IsCoDangerous);
 
-        input.Value = 250;
+        input.Value = 100;
         Assert.True(input.IsCoDangerous);
         Assert.False(input.IsCoElevated);
     }

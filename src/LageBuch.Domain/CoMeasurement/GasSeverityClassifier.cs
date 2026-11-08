@@ -1,8 +1,9 @@
 namespace LageBuch.Domain.CoMeasurement;
 
 /// <summary>Judges a reading against its own gas's bands (#410). Replaces the three CO constants
-/// that used to live here: every brigade now sets its own bands in the Stammdaten, and
-/// <see cref="GasDefinition.DefaultCo"/> carries the old ones for everybody who does not.</summary>
+/// that used to live here: every brigade now sets its own bands in the Stammdaten,
+/// <see cref="GasDefinition.DefaultCo"/> carries DGUV's for everybody who does not, and
+/// <see cref="GasDefinition.LegacyCo"/> the old ones for a file from before.</summary>
 public static class GasSeverityClassifier
 {
     /// <summary>The band a reading falls in, read in the gas's own direction: a rising gas is

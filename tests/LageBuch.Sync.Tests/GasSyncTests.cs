@@ -177,6 +177,29 @@ public class GasSyncTests
     }
 
     [Fact]
+    public void A_peer_snapshot_with_Haeuser_but_no_gases_keeps_the_legacy_bands()
+    {
+        var clock = new FixedClock();
+        var snapshot = SnapshotMapper.ToSnapshot(WithHaus(clock, H2S)) with { Gases = null };
+
+        var gas = Assert.Single(SnapshotMapper.FromSnapshot(snapshot).Gases);
+
+        Assert.Equal(IncidentGas.LegacyCo, gas);
+        Assert.Equal((30m, 200m, 800m), (gas.Definition.Elevated, gas.Definition.Dangerous, gas.Definition.Lethal));
+    }
+
+    [Fact]
+    public void A_Haus_from_a_peer_without_gases_measures_CO_at_the_DGUV_bands()
+    {
+        var clock = new FixedClock();
+
+        var gas = Assert.Single(WithHaus(clock).Gases).Definition;
+
+        Assert.Equal(GasDefinition.DefaultCo, gas);
+        Assert.Equal(20m, gas.Elevated);
+    }
+
+    [Fact]
     public void The_record_command_round_trips_with_its_decimal_values()
     {
         var gas = Guid.NewGuid();

@@ -22,10 +22,12 @@ public class MasterDataGasesTests : IDisposable
     private static MasterDataSet Parse(string json) => MasterDataJson.Parse(json);
 
     [Fact]
-    public void A_file_without_gases_measures_CO_with_the_old_bands()
+    public void A_file_without_gases_measures_CO_at_the_DGUV_bands()
     {
         Assert.Equal(GasDefinition.DefaultCo, Assert.Single(Parse("{}").Gases));
         Assert.Equal(GasDefinition.DefaultCo, Assert.Single(Parse("""{ "gases": [] }""").Gases));
+        var gas = Assert.Single(Parse("{}").Gases);
+        Assert.Equal(("CO", "ppm", 20m, 60m, 200m, 2000m), (gas.Name, gas.Unit, gas.Elevated, gas.Dangerous, gas.Lethal, gas.PlausibleUpTo));
     }
 
     [Fact]
@@ -42,7 +44,7 @@ public class MasterDataGasesTests : IDisposable
         Assert.Equal(
             new[]
             {
-                GasDefinition.DefaultCo,
+                GasDefinition.LegacyCo,
                 new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10.5m, null),
                 new GasDefinition("CO2", "Vol-%", GasDirection.Rising, null, null, null, null),
             },
