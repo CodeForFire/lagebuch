@@ -1,1 +1,1 @@
-Führung: the Leitstelle badge records the channel the ELW reaches the ILS on (e.g. TMO WR_FFB), and a LAGEFÜHRUNG button marks which Einsatzleitung, the Feuerwehr's or a partner's such as Wasserrettung or Polizei, holds the Lageführung, each change written to the ETB and both printed in the Bericht (#926).
+The Führung board records the channel the ELW uses to reach the ILS and shows which Einsatzleitung holds the Lageführung, and the Bericht prints both (#926).
