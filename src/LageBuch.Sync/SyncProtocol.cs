@@ -227,15 +227,21 @@ public static class SyncProtocol
     /// for the first Haus. A peer at 38 can neither send a value a host at 39 understands nor read
     /// one, so the floor rises to 39.
     /// </para>
+    /// <para>
+    /// 40: the channel to the Leitstelle and the Lageführung (#926). A client may send
+    /// <c>setDispatchChannel</c> and <c>setLagefuehrung</c>, which a host at 39 does not know, so the
+    /// floor rises to 40. The snapshot carries an optional <c>dispatchChannel</c> and
+    /// <c>lagefuehrungNodeId</c>.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 39;
+    public const int ProtocolVersion = 40;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 39;
+    public const int MinimumProtocolVersion = 40;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

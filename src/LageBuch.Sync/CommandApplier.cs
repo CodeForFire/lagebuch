@@ -141,6 +141,12 @@ public static class CommandApplier
                     new Funkgruppen(c.FunkgruppenTmo, c.FunkgruppenDmo),
                     c.Fuehrungsfahrzeug);
                 break;
+            case SetDispatchChannelCommand c:
+                incident.SetDispatchChannel(clock, Operator(c.Operator), c.Channel);
+                break;
+            case SetLagefuehrungCommand c:
+                incident.SetLagefuehrung(clock, Operator(c.Operator), c.NodeId);
+                break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(
                     clock,

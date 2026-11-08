@@ -225,6 +225,12 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
         Mutate(() => Incident.UpdateLeadershipPost(_clock, RequireOperator(), standort, rufname, telefon, funkgruppen, fuehrungsfahrzeug));
 
+    public void SetDispatchChannel(string? channel) =>
+        Mutate(() => Incident.SetDispatchChannel(_clock, RequireOperator(), channel));
+
+    public void SetLagefuehrung(Guid? nodeId) =>
+        Mutate(() => Incident.SetLagefuehrung(_clock, RequireOperator(), nodeId));
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,

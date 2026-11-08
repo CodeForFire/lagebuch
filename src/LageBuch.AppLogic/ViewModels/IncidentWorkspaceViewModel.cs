@@ -321,6 +321,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private CommandNodeDialogViewModel? _pendingCommandNodeDialog;
 
+    // The dialog behind the Führung board's Leitstelle badge, its channel (#926); null while closed.
+    [ObservableProperty]
+    private DispatchChannelDialogViewModel? _pendingDispatchChannelDialog;
+
     // The person dialog behind the Führung board (Leiter, Melder, Führungsunterstützung, Fachberater); null while closed.
     [ObservableProperty]
     private LeadershipPersonDialogViewModel? _pendingLeadershipPersonDialog;
@@ -414,6 +418,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     {
         dialog.Closed += (_, _) => PendingCommandNodeDialog = null;
         PendingCommandNodeDialog = dialog;
+    }
+
+    private void OpenDispatchChannelDialog(DispatchChannelDialogViewModel dialog)
+    {
+        dialog.Closed += (_, _) => PendingDispatchChannelDialog = null;
+        PendingDispatchChannelDialog = dialog;
     }
 
     // A dialog replaced or dropped without closing (the workspace torn down under it) must stop
@@ -769,7 +779,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         PendingPrompt is not null || PendingConfirm is not null || PendingTaskDialog is not null
         || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null
         || PendingSpellingHelper is not null
-        || PendingCommandNodeDialog is not null || PendingLeadershipPersonDialog is not null
+        || PendingCommandNodeDialog is not null || PendingDispatchChannelDialog is not null
+        || PendingLeadershipPersonDialog is not null
         || PendingRoleAssignmentDialog is not null;
 
     private bool StepRail(int step)
@@ -1125,7 +1136,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OpenCommandNodeDialog,
             OpenLeadershipPersonDialog,
             OpenRoleAssignmentDialog,
-            OfferUndo);
+            OfferUndo,
+            OpenDispatchChannelDialog);
 
         Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode, _dialogs, RequestConfirm, _weather, _clock);
 

@@ -1351,6 +1351,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         string? standort, string? rufname, string? telefon, Funkgruppen? funkgruppen, string? fuehrungsfahrzeug = null) =>
         _inner.UpdateLeadershipPost(standort, rufname, telefon, funkgruppen, fuehrungsfahrzeug);
 
+    public void SetDispatchChannel(string? channel) => _inner.SetDispatchChannel(channel);
+
+    public void SetLagefuehrung(Guid? nodeId) => _inner.SetLagefuehrung(nodeId);
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,

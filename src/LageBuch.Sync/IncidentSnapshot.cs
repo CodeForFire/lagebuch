@@ -90,7 +90,13 @@ public sealed record IncidentSnapshot(
     // Protocol 39 (#410): the Einsatz's own gas list. A joined client shows exactly this, never
     // its own Stammdaten. Null reads as no list, which Incident.Rehydrate turns into the legacy CO
     // gas once a Haus exists.
-    IReadOnlyList<IncidentGasDto>? Gases = null);
+    IReadOnlyList<IncidentGasDto>? Gases = null,
+
+    // Protocol 40 (#926): the channel to the Leitstelle and the partner holding the Lageführung.
+    // A snapshot without them reads as no channel and the Feuerwehr in the lead; an id naming no
+    // live partner reads as the Feuerwehr too.
+    string? DispatchChannel = null,
+    Guid? LagefuehrungNodeId = null);
 
 public sealed record MapOverlayDto(
     Guid Id,

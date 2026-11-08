@@ -17,12 +17,15 @@ public sealed partial class ElCard : ObservableObject
     /// <param name="canEdit">False on a read-only Einsatz.</param>
     /// <param name="onPerson">Opens the person dialog for the Einsatzleitung and the given post.</param>
     /// <param name="onAssistant">Opens the dialog that corrects or hands over a Führungsunterstützung.</param>
+    /// <param name="onTakeLagefuehrung">Hands the Lageführung back to the Einsatzleitung Feuerwehr (#926).</param>
     public ElCard(
         Action? onEditPost = null,
         bool canEdit = true,
         Action<RoleSlot>? onPerson = null,
-        Action<Guid, RoleAssignmentDialogMode>? onAssistant = null)
+        Action<Guid, RoleAssignmentDialogMode>? onAssistant = null,
+        Action? onTakeLagefuehrung = null)
     {
+        TakeLagefuehrungCommand = new RelayCommand(() => onTakeLagefuehrung?.Invoke(), () => canEdit);
         _onAssistant = canEdit ? onAssistant : null;
         EditPostCommand = new RelayCommand(() => onEditPost?.Invoke(), () => canEdit);
         SetLeiterCommand = new RelayCommand(() => onPerson?.Invoke(RoleSlot.Leiter), () => canEdit);
@@ -41,6 +44,13 @@ public sealed partial class ElCard : ObservableObject
 
     /// <summary>Adds a Führungsunterstützung (S1 to S6); off on a read-only Einsatz.</summary>
     public IRelayCommand AddAssistantCommand { get; }
+
+    /// <summary>Hands the Lageführung back to the Einsatzleitung Feuerwehr; off on a read-only Einsatz.</summary>
+    public IRelayCommand TakeLagefuehrungCommand { get; }
+
+    /// <summary>The Lageführung state of this card; see <see cref="LagefuehrungMark"/>.</summary>
+    [ObservableProperty]
+    private LagefuehrungMark _lagefuehrung = LagefuehrungMark.None;
 
     [ObservableProperty]
     private string? _standort;

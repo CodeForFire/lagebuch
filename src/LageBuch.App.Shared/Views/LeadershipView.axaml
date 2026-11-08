@@ -51,6 +51,30 @@
       <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
     <!-- An Unterabschnitt hangs below its Abschnitt a shade lighter, so the level reads at a glance. -->
+    <!-- The Einsatzleitung that holds the Lageführung (#926). Neutral, not signal red: it says who
+         leads, not that anything is wrong. -->
+    <!-- The Leitstelle badge keeps its look as a button: the same surface and border it had as a Border. -->
+    <Style Selector="Button.dispatch-centre">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="Padding" Value="12,4" />
+    </Style>
+    <Style Selector="Border.lagefuehrung-badge">
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="BorderBrush" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    </Style>
+    <Style Selector="Border.lagefuehrung-badge > TextBlock">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="0.6" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
     <Style Selector="Border.board-card.unterabschnitt">
       <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
       <Setter Property="Padding" Value="10,8" />
@@ -455,6 +479,11 @@
               <TextBlock Grid.Column="1" x:Name="ElDropHint" Classes="el-drop-hint" />
             </Grid>
             <SelectableTextBlock Classes="card-name" Text="Feuerwehr" />
+            <Border x:Name="ElLagefuehrungBadge" Classes="lagefuehrung-badge"
+                    IsVisible="{Binding Lagefuehrung.ShowsBadge}"
+                    ToolTip.Tip="Diese Einsatzleitung hat die Lageführung">
+              <TextBlock Text="LAGEFÜHRUNG" />
+            </Border>
           </StackPanel>
 
           <Grid ColumnDefinitions="96,*,Auto" ColumnSpacing="6">
@@ -526,9 +555,15 @@
                           ItemTemplate="{StaticResource FunkgruppeChipTemplate}" />
           </Grid>
 
-          <Button Classes="board-action" HorizontalAlignment="Left" Content="ERREICHBARKEIT BEARBEITEN"
-                  ToolTip.Tip="Standort, Führungsfahrzeug, Rufname, Telefon und Funkgruppen bearbeiten"
-                  Command="{Binding EditPostCommand}" />
+          <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
+            <Button Classes="board-action" Content="ERREICHBARKEIT BEARBEITEN"
+                    ToolTip.Tip="Standort, Führungsfahrzeug, Rufname, Telefon und Funkgruppen bearbeiten"
+                    Command="{Binding EditPostCommand}" />
+            <Button x:Name="ElTakeLagefuehrungButton" Classes="board-action" Content="LAGEFÜHRUNG"
+                    IsVisible="{Binding Lagefuehrung.ShowsTake}"
+                    ToolTip.Tip="Lageführung dieser Einsatzleitung zuweisen"
+                    Command="{Binding TakeLagefuehrungCommand}" />
+          </WrapPanel>
         </StackPanel>
       </Border>
     </DataTemplate>
@@ -578,6 +613,11 @@
             <StackPanel Grid.Column="0" Spacing="1">
               <TextBlock Classes="card-kind" Text="{Binding KindLabel}" />
               <SelectableTextBlock Classes="card-name" x:Name="NodeCardName" Text="{Binding Name}" />
+              <Border x:Name="NodeLagefuehrungBadge" Classes="lagefuehrung-badge"
+                      IsVisible="{Binding Lagefuehrung.ShowsBadge}"
+                      ToolTip.Tip="Diese Einsatzleitung hat die Lageführung">
+                <TextBlock Text="LAGEFÜHRUNG" />
+              </Border>
               <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap" Text="{Binding Auftrag}"
                          IsVisible="{Binding Auftrag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             </StackPanel>
@@ -709,6 +749,10 @@
                       ToolTip.Tip="Unterabschnitt bilden" Command="{Binding AddUnterabschnittCommand}" />
               <Button Classes="board-action" Content="+ FUNKTION"
                       ToolTip.Tip="Funktion hinzufügen" Command="{Binding AddMemberCommand}" />
+              <Button x:Name="NodeTakeLagefuehrungButton" Classes="board-action" Content="LAGEFÜHRUNG"
+                      IsVisible="{Binding Lagefuehrung.ShowsTake}"
+                      ToolTip.Tip="Lageführung dieser Einsatzleitung zuweisen"
+                      Command="{Binding TakeLagefuehrungCommand}" />
             </WrapPanel>
             <Border x:Name="NodeIntoStrip" Classes="node-drop-strip node-drop-into" Classes.abschnitt="{Binding IsAbschnitt}">
               <TextBlock Classes="secondary" FontSize="11" VerticalAlignment="Center" Text="hier als Unterabschnitt einordnen" />
@@ -733,12 +777,19 @@
                  Text="{Binding ActionError}"
                  IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-      <!-- The Leitstelle the Einsatzleitung reports to, at the head of the sheet. -->
-      <Border x:Name="DispatchCentreBadge" HorizontalAlignment="Left" Background="{StaticResource SurfaceTopBrush}"
-              BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
-              CornerRadius="{StaticResource RadiusSm}" Padding="12,4">
-        <TextBlock Classes="mono" Foreground="{StaticResource TextPrimaryBrush}" Text="{Binding DispatchCentreName}" />
-      </Border>
+      <!-- The Leitstelle the Einsatzleitung reports to, at the head of the sheet, with the channel
+           the ELW reaches it on (#926); a click edits the channel. -->
+      <Button x:Name="DispatchCentreBadge" Classes="dispatch-centre" HorizontalAlignment="Left"
+              Command="{Binding EditDispatchChannelCommand}"
+              ToolTip.Tip="Kanal zur Leitstelle eintragen"
+              AutomationProperties.Name="Kanal zur Leitstelle bearbeiten">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock x:Name="DispatchCentreText" Classes="mono" Foreground="{StaticResource TextPrimaryBrush}"
+                     VerticalAlignment="Center" Text="{Binding DispatchCentreText}" />
+          <PathIcon Width="12" Height="12" Foreground="{StaticResource TextSecondaryBrush}"
+                    Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+        </StackPanel>
+      </Button>
 
       <!-- The org chart, as on the A3 sheet: the Einsatzleitung with its peers beside it (dashed),
            then a line down to each Bereitstellung and Abschnitt, and from each Abschnitt down to its

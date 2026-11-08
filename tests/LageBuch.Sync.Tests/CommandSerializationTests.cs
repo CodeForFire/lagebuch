@@ -38,6 +38,10 @@ public class CommandSerializationTests
         new SetNavVisibilityCommand(Op, "lagekarte", false),
         new AddChecklistCommand(Op, Guid.NewGuid(), "Lagemeldung", [new ChecklistSeedItemDto("Punkt", true)]),
         new UpdateLeadershipPostCommand(Op, "Feuerwehrhaus", "Florian EL", "0172", ["TG 1"], ["301_F", "302_F"]),
+        new SetDispatchChannelCommand(Op, "TMO WR_FFB"),
+        new SetDispatchChannelCommand(Op, null),
+        new SetLagefuehrungCommand(Op, Guid.NewGuid()),
+        new SetLagefuehrungCommand(Op, null),
         new SetInvolvedPartyDwellingCommand(Guid.NewGuid(), Guid.NewGuid()),
         new SetInvolvedPartyDwellingCommand(Guid.NewGuid(), null),
         new SetInvolvedPartyWhereaboutsCommand(Guid.NewGuid(), "im RTW Rotkreuz Musterstadt 71/1"),
@@ -427,6 +431,8 @@ public class CommandSerializationTests
         Assert.Contains("\"$type\":\"setNavVisibility\"", SyncJson.Serialize<SyncCommand>(new SetNavVisibilityCommand(Op, "lagekarte", true)), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"addChecklist\"", SyncJson.Serialize<SyncCommand>(new AddChecklistCommand(Op, Guid.NewGuid(), "T", [])), StringComparison.Ordinal);
         Assert.Contains("\"$type\":\"updateLeadershipPost\"", SyncJson.Serialize<SyncCommand>(new UpdateLeadershipPostCommand(Op, null, null, null, null, null)), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"setDispatchChannel\"", SyncJson.Serialize<SyncCommand>(new SetDispatchChannelCommand(Op, "TMO WR_FFB")), StringComparison.Ordinal);
+        Assert.Contains("\"$type\":\"setLagefuehrung\"", SyncJson.Serialize<SyncCommand>(new SetLagefuehrungCommand(Op, null)), StringComparison.Ordinal);
     }
 
     [Fact]

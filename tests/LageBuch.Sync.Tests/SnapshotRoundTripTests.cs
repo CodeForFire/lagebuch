@@ -289,6 +289,43 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void Round_trip_preserves_the_dispatch_channel_and_the_Lagefuehrung()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var wr = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Wasserrettung");
+        incident.SetDispatchChannel(clock, op, "TMO WR_FFB");
+        incident.SetLagefuehrung(clock, op, wr.Id);
+
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident));
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Equal("TMO WR_FFB", r.DispatchChannel);
+        Assert.Equal(wr.Id, r.Lagefuehrung?.Id);
+        Assert.Contains("\"dispatchChannel\":\"TMO WR_FFB\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_snapshot_whose_Lagefuehrung_names_no_partner_reads_as_the_Feuerwehr()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var wire = SnapshotMapper.ToSnapshot(incident) with
+        {
+            LagefuehrungNodeId = nord.Id,
+            DispatchChannel = new string('x', CommandNode.MaxTextLength + 1),
+        };
+
+        var r = SnapshotMapper.FromSnapshot(wire);
+
+        Assert.Null(r.Lagefuehrung);
+        Assert.Null(r.DispatchChannel);
+    }
+
+    [Fact]
     public void A_hostile_snapshot_is_repaired_when_it_is_mapped_into_an_incident()
     {
         var clock = new FixedClock();

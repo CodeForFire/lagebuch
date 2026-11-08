@@ -159,7 +159,9 @@ public static class SnapshotMapper
             ElFuehrungsfahrzeug: incident.LeadershipPost.Fuehrungsfahrzeug,
             MapOverlays: incident.MapOverlays.Select(o => new MapOverlayDto(
                 o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)).ToList(),
-            Gases: incident.Gases.Select(g => new IncidentGasDto(g.Id, GasDefinitionDto.From(g.Definition))).ToList());
+            Gases: incident.Gases.Select(g => new IncidentGasDto(g.Id, GasDefinitionDto.From(g.Definition))).ToList(),
+            DispatchChannel: incident.DispatchChannel,
+            LagefuehrungNodeId: incident.LagefuehrungNodeId);
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -294,7 +296,9 @@ public static class SnapshotMapper
             snapshot.NavOverrides,
             (snapshot.MapOverlays ?? []).Select(o => MapOverlay.Rehydrate(
                 o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)),
-            snapshot.Gases?.Where(g => g?.Definition is not null).Select(g => new IncidentGas(g.Id, g.Definition.ToDefinition())));
+            snapshot.Gases?.Where(g => g?.Definition is not null).Select(g => new IncidentGas(g.Id, g.Definition.ToDefinition())),
+            snapshot.DispatchChannel,
+            snapshot.LagefuehrungNodeId);
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

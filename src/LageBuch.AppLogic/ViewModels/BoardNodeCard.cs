@@ -19,14 +19,18 @@ public sealed partial class BoardNodeCard : ObservableObject
     /// <param name="onEdit">Opens the edit dialog for the node.</param>
     /// <param name="onAddUnterabschnitt">Opens the dialog to form an Unterabschnitt in this Abschnitt.</param>
     /// <param name="onPerson">Opens the person dialog for this node and the given post.</param>
+    /// <param name="onTakeLagefuehrung">Hands the Lageführung to this partner Einsatzleitung (#926).</param>
     public BoardNodeCard(
         Guid id,
         Action<BoardNodeCard>? onDissolve = null,
         Action<BoardNodeCard>? onEdit = null,
         Action<BoardNodeCard>? onAddUnterabschnitt = null,
-        Action<BoardNodeCard, RoleSlot>? onPerson = null)
+        Action<BoardNodeCard, RoleSlot>? onPerson = null,
+        Action<BoardNodeCard>? onTakeLagefuehrung = null)
     {
         Id = id;
+        TakeLagefuehrungCommand = new RelayCommand(
+            () => onTakeLagefuehrung?.Invoke(this), () => !_isReadOnly && Kind == CommandNodeKind.Partner);
         DissolveCommand = new RelayCommand(() => onDissolve?.Invoke(this), () => CanDissolve);
         EditCommand = new RelayCommand(() => onEdit?.Invoke(this), () => !_isReadOnly);
         AddUnterabschnittCommand = new RelayCommand(
@@ -56,6 +60,13 @@ public sealed partial class BoardNodeCard : ObservableObject
 
     /// <summary>Dissolves the node; can execute exactly when <see cref="CanDissolve"/> is true.</summary>
     public IRelayCommand DissolveCommand { get; }
+
+    /// <summary>Hands the Lageführung to this partner Einsatzleitung; off on a read-only Einsatz and for any other node.</summary>
+    public IRelayCommand TakeLagefuehrungCommand { get; }
+
+    /// <summary>The Lageführung state of a partner card; always <see cref="LagefuehrungMark.None"/> on any other.</summary>
+    [ObservableProperty]
+    private LagefuehrungMark _lagefuehrung = LagefuehrungMark.None;
 
     public Guid Id { get; }
 
@@ -283,5 +294,6 @@ public sealed partial class BoardNodeCard : ObservableObject
         SetLeiterCommand.NotifyCanExecuteChanged();
         SetMelderCommand.NotifyCanExecuteChanged();
         AddMemberCommand.NotifyCanExecuteChanged();
+        TakeLagefuehrungCommand.NotifyCanExecuteChanged();
     }
 }

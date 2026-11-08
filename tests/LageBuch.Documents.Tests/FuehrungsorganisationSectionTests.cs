@@ -82,6 +82,47 @@ public class FuehrungsorganisationSectionTests
     }
 
     [Fact]
+    public void The_channel_to_the_Leitstelle_is_printed_under_the_Einsatzleitung()
+    {
+        var incident = Fresh();
+        El(incident);
+        incident.SetDispatchChannel(Clock, Op, "TMO WR_FFB");
+
+        PdfText.AssertInOrder(
+            Print(incident),
+            Heading,
+            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1)",
+            "Kanal zur Leitstelle: TMO WR_FFB");
+    }
+
+    [Fact]
+    public void The_Lagefuehrung_is_marked_on_the_partner_that_holds_it()
+    {
+        var incident = Fresh();
+        El(incident);
+        var wr = incident.AddCommandNode(Clock, Op, CommandNodeKind.Partner, "Wasserrettung");
+        incident.SetLagefuehrung(Clock, Op, wr.Id);
+
+        var text = Print(incident);
+
+        PdfText.AssertInOrder(text, "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1)", "Einsatzleitung Wasserrettung – Lageführung");
+        Assert.DoesNotContain("Florian Emmering 1) · Lageführung", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Feuerwehr_is_marked_with_the_Lagefuehrung_only_beside_a_partner()
+    {
+        var alone = Fresh();
+        El(alone);
+        var beside = Fresh();
+        El(beside);
+        beside.AddCommandNode(Clock, Op, CommandNodeKind.Partner, "Polizei");
+
+        Assert.DoesNotContain("Lageführung", Print(alone), StringComparison.Ordinal);
+        Assert.Contains("Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Lageführung", Print(beside), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_Einsatzleitungs_Melder_and_a_further_Leiter_typed_on_FUNKTIONEN_are_printed()
     {
         var incident = Fresh();

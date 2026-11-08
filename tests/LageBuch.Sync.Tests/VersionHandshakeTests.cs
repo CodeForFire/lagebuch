@@ -366,7 +366,16 @@ public class VersionHandshakeTests
     {
         // 39 replaces recordCoValue with recordGasValues and the snapshot's coValue with per-gas
         // values (#410). A peer at 38 can neither send nor read a value, so the floor rises with it.
-        Assert.Equal(39, SyncProtocol.ProtocolVersion);
-        Assert.Equal(39, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 39, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 39, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_dispatch_channel_and_the_Lagefuehrung_raise_the_protocol_and_the_floor_to_forty()
+    {
+        // 40 lets a client send setDispatchChannel and setLagefuehrung (#926), which a host at 39
+        // does not know: a 39 and a 40 must not connect.
+        Assert.Equal(40, SyncProtocol.ProtocolVersion);
+        Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
     }
 }
