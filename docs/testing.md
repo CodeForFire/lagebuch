@@ -22,10 +22,20 @@ Test projects live under `tests/`, one per application layer:
 - `LageBuch.Acceptance.Tests`: real Avalonia controls, bindings, keyboard
   interaction and rendered layouts from `App.Shared`.
 
-Shared fictional Stammdaten fixtures live in
-[`tests/Fixtures/`](../tests/Fixtures/) (`StammdatenFixture.cs` and
-`stammdaten-vollstaendig.json`). Other fictional examples live in
-`AnonymizedExampleData` and `docs/samples/`.
+Code shared between test projects is not a project of its own. Each project
+compiles the files it needs as links (`<Compile Include="..\…" Link="…" />` in
+its `.csproj`), so check those links before moving or renaming one:
+
+- [`tests/Fixtures/`](../tests/Fixtures/) holds the fictional Stammdaten
+  fixtures, `StammdatenFixture.cs` and `stammdaten-vollstaendig.json`.
+- [`tests/Shared/`](../tests/Shared/) holds helpers several projects use, such
+  as `CoOnlyIncidentExtensions.cs`. A new helper needed by more than one
+  project goes here, not into one project to be copied.
+- `VectorTileFixtures.cs` and `GeoTiffFixtures.cs` live in
+  `LageBuch.Persistence.Tests` but are linked into AppLogic and Acceptance
+  too; changing them changes those builds.
+
+Other fictional examples live in `AnonymizedExampleData` and `docs/samples/`.
 
 Acceptance uses **xunit.v3** and its own nested package configuration; the other
 test projects use **xunit v2**. Check the project files and copy the conventions
@@ -39,16 +49,17 @@ make test PROJECT=tests/LageBuch.Domain.Tests FILTER=FullyQualifiedName~Formatti
 ```
 
 `make test` runs `LageBuch.Desktop.slnf`, excluding the Android application head.
-`PROJECT` selects one project; `FILTER` becomes `dotnet test --filter`. Supply
-both when narrowing: a filter applied across the whole solution can match no tests
-in other assemblies. The Makefile comment says these no-match assemblies fail,
-but the current locked v2 and v3 runners both exit zero for an unmatched filter
-in a direct project run. That comment is not a reliable guard; runner or
-configuration changes can also change this exit behavior. Do not rely on a
-solution-wide filter to give a consistent pass or failure. Neither a zero exit
-nor `0 Error(s)` in the build tail proves the tests passed. Search the complete
-log for `Test Run Failed`, and require the expected assemblies to report `Passed!`
-with non-zero test counts and no failed tests.
+`PROJECT` selects one project; `FILTER` becomes `dotnet test --filter`.
+
+When narrowing, always pass `PROJECT` as well as `FILTER`, and check that the
+project reports `Passed!` with a non-zero test count. A filter that matches
+nothing does not fail the run, it just runs nothing, so a typo looks green.
+The most common way to get there is `Name~`: it matches the test *method* name
+only, so `FILTER=Name~FormattingTests` finds no tests. To select a class, use
+`FullyQualifiedName~FormattingTests`.
+
+For reading the output of a full run, see
+[AGENTS.md > Before you call it done](../AGENTS.md#before-you-call-it-done).
 
 `make test-all` uses the full `LageBuch.sln`, including the Android head. It needs
 the Android workload and a compatible JDK (21 or earlier), as explained in
@@ -56,11 +67,10 @@ the Android workload and a compatible JDK (21 or earlier), as explained in
 command on a machine without that setup. CI builds the full solution on Linux
 and the desktop filter on Windows.
 
-For the clean desktop build/test gate, the repository provides `make clean ci`.
-It restores, builds Release, and runs the tests without rebuilding. Formatting
-is a separate `make format-check` gate. Changes to C# also require `make codeql`
-([`../AGENTS.md#static-analysis`](../AGENTS.md#static-analysis)); ordinary tests
-do not replace CodeQL.
+Passing tests are one gate among several. The full list of what to run before
+opening a pull request, and why, is in
+[AGENTS.md > Before you call it done](../AGENTS.md#before-you-call-it-done) and
+[AGENTS.md > Static analysis](../AGENTS.md#static-analysis).
 
 ## Headless Avalonia tests
 

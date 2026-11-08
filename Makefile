@@ -64,8 +64,9 @@ PUBLISH_FLAGS := -c Release --self-contained true -p:PublishSingleFile=true \
 export DOTNET_ROOT ?= $(patsubst %/,%,$(dir $(realpath $(shell command -v $(DOTNET)))))
 
 TEST_FILTER := $(if $(FILTER),--filter $(FILTER),)
-# FILTER on its own fails in assemblies that match nothing, so narrow with
-# PROJECT=tests/LageBuch.Domain.Tests when filtering.
+# A FILTER that matches nothing runs no tests and still exits 0, so narrow with
+# PROJECT=tests/LageBuch.Domain.Tests and check for "Passed!". Name~ matches the
+# method name only; select a class with FullyQualifiedName~ (docs/testing.md).
 TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .DEFAULT_GOAL := help
@@ -94,7 +95,7 @@ build: ## Build everything except the Android head
 build-all: ## Build the full solution incl. Android (needs JDK <= 21)
 	$(DOTNET) build $(SLN) -c $(CONFIG)
 
-test: ## Run tests (PROJECT=path and/or FILTER=Name~Foo to narrow)
+test: ## Run tests (PROJECT=path FILTER=FullyQualifiedName~Foo to narrow)
 	$(DOTNET) test $(TEST_TARGET) -c $(CONFIG) $(TEST_FILTER)
 
 test-all: ## Run tests over the full solution (needs JDK <= 21)
