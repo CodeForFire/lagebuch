@@ -229,14 +229,22 @@ public class IncidentFileStoreTests : IDisposable
     [Fact]
     public async Task Saving_runs_off_the_callers_thread()
     {
+        // Off the caller's thread means the call hands back an unfinished task while the read is
+        // still held, not that the read ran on another thread id: the pool may run the queued read
+        // on the very thread that made the call once that thread is free again (37 == 37 on
+        // windows-latest). A save that read synchronously could not return before the gate opens,
+        // and would find it still shut when its read times out.
         var name = Attach("t.bin");
-        var callerThread = Environment.CurrentManagedThreadId;
-        using var source = new ThreadRecordingStream([1, 2, 3]);
+        using var source = new GatedStream([1, 2, 3]);
 
-        await _store.SaveStreamAsync(_incidentPath, name, source);
+        var save = _store.SaveStreamAsync(_incidentPath, name, source);
+        var returnedBeforeTheRead = !save.IsCompleted;
+        source.Open();
+        await save;
 
-        Assert.NotEqual(0, source.ReadThreadId);
-        Assert.NotEqual(callerThread, source.ReadThreadId);
+        Assert.True(returnedBeforeTheRead);
+        Assert.True(source.ReadWasLetThrough);
+        Assert.Equal(new byte[] { 1, 2, 3 }, await _store.TryReadBytesAsync(_incidentPath, name));
     }
 
     [Fact]
@@ -398,14 +406,30 @@ public class IncidentFileStoreTests : IDisposable
         public DateTimeOffset Now { get; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.Zero);
     }
 
-    private sealed class ThreadRecordingStream(byte[] bytes) : MemoryStream(bytes)
+    // A stream whose reads wait until the test opens it. The wait is capped so that a save that
+    // reads on the caller's thread fails the test instead of hanging it.
+    private sealed class GatedStream(byte[] bytes) : MemoryStream(bytes)
     {
-        public int ReadThreadId { get; private set; }
+        private readonly ManualResetEventSlim _gate = new();
+
+        public bool ReadWasLetThrough { get; private set; } = true;
+
+        public void Open() => _gate.Set();
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            ReadThreadId = Environment.CurrentManagedThreadId;
+            ReadWasLetThrough &= _gate.Wait(TimeSpan.FromSeconds(10));
             return base.Read(buffer, offset, count);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _gate.Dispose();
+            }
+
+            base.Dispose(disposing);
         }
     }
 
