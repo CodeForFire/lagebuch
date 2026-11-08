@@ -139,6 +139,43 @@ public sealed class MapOverlaysViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task The_Ebenen_start_folded_away_and_a_new_one_unfolds_them()
+    {
+        var (_, vm, dialogs, _) = Open();
+        Assert.False(vm.IsExpanded);
+        Assert.Equal("EBENEN", vm.Header);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        dialogs.Next = Write("sperrgebiet.geojson", Sperrgebiet("Sperrgebiet Süd"));
+        await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync(); // the Ebene is parsed off the test's thread and raises its own changes
+
+        Assert.True(vm.IsExpanded);
+        Assert.Equal("EBENEN (1)", vm.Header);
+        Assert.Contains(nameof(vm.Header), changed); // the heading on screen follows the count
+
+        vm.ToggleExpandedCommand.Execute(null);
+        Assert.False(vm.IsExpanded);
+    }
+
+    [Fact]
+    public async Task Reopening_an_Einsatz_keeps_its_Ebenen_folded_and_counts_them()
+    {
+        var (session, _, dialogs, _) = Open();
+        foreach (var name in new[] { "eins", "zwei" })
+        {
+            var path = Write($"{name}.geojson", Sperrgebiet(name));
+            await session.AddMapOverlayAsync($"{name}.geojson", "application/geo+json", await File.ReadAllBytesAsync(path), new MapOverlaySummary(name, 1, null, null));
+        }
+
+        var reopened = new MapOverlaysViewModel(session, () => { }, dialogs, null, new FixedClock(T0), _ => { }, Berlin);
+
+        Assert.False(reopened.IsExpanded);
+        Assert.Equal("EBENEN (2)", reopened.Header);
+    }
+
+    [Fact]
     public async Task A_forecast_opens_at_the_quarter_hour_that_has_begun()
     {
         var (_, vm, dialogs, _) = Open();

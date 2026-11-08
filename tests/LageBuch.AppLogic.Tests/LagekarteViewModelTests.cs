@@ -47,7 +47,7 @@ public class LagekarteViewModelTests
     {
         var (session, vm, _) = Open(units: ["LF 10/1"]);
         var row = Assert.Single(vm.Units);
-        Assert.Equal("AUF KARTE", row.PlaceLabel);
+        Assert.Equal("Auf Karte setzen", row.PlaceLabel);
 
         vm.PlaceUnitCommand.Execute(row);
         vm.MapTappedCommand.Execute(Amperbruecke);
@@ -56,7 +56,7 @@ public class LagekarteViewModelTests
         var marker = Assert.Single(vm.Markers);
         Assert.Equal("LF 10/1", marker.Title);
         Assert.Equal("LF 10/1: Standort", marker.AutomationName);
-        Assert.Equal("VERSETZEN", vm.Units.Single().PlaceLabel);
+        Assert.Equal("Versetzen", vm.Units.Single().PlaceLabel);
     }
 
     [Fact]
@@ -359,7 +359,6 @@ public class LagekarteViewModelTests
         var pin = Assert.Single(vm.Markers);
         Assert.Same(pin, Assert.Single(vm.Signs));
         Assert.Equal("HLF", pin.VehicleType);
-        Assert.Equal("0/0/6/6", pin.Strength);
         Assert.Null(pin.LabelOffset); // the map finds it a free place until it is dragged
         Assert.Equal("LF 10/1: taktisches Zeichen", pin.SignAutomationName);
     }
@@ -397,18 +396,30 @@ public class LagekarteViewModelTests
     }
 
     [Fact]
-    public void A_unit_row_shows_only_the_status_under_its_title()
+    public void A_unit_row_shows_the_type_strength_and_status_the_map_no_longer_draws_on_one_line()
     {
-        var withCallSign = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1", status: "Im Einsatz");
+        var withCallSign = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1", status: "Im Einsatz", officerCount: 1)
+            .WithVehicleType("HLF");
         var withoutCallSign = ForceUnit.Create("FF Musterstadt", 9, status: "Im Einsatz");
-        var callSignOnly = ForceUnit.Create("FF Musterstadt", 9, callSign: "LF 10/1");
         var bare = ForceUnit.Create("FF Musterstadt", 9);
 
-        Assert.Equal("Im Einsatz", new LagekarteUnitRow(withCallSign).Detail);
-        Assert.Equal(string.Empty, new LagekarteUnitRow(callSignOnly).Detail);
-        Assert.Equal("Im Einsatz", new LagekarteUnitRow(withoutCallSign).Detail);
+        Assert.Equal("LF 10/1", new LagekarteUnitRow(withCallSign).Title);
+        Assert.Equal("HLF · 0/1/8/9 · Im Einsatz", new LagekarteUnitRow(withCallSign).Detail);
+
+        // The Feuerwehr is not repeated: it already is the Title of a unit without a Funkrufname.
         Assert.Equal("FF Musterstadt", new LagekarteUnitRow(withoutCallSign).Title);
-        Assert.Equal(string.Empty, new LagekarteUnitRow(bare).Detail);
+        Assert.Equal("0/0/9/9 · Im Einsatz", new LagekarteUnitRow(withoutCallSign).Detail);
+        Assert.Equal("0/0/9/9", new LagekarteUnitRow(bare).Detail);
+    }
+
+    [Fact]
+    public void A_status_change_reaches_the_unit_row_beside_the_map()
+    {
+        var (session, vm, _) = Open(units: ["LF 10/1"]);
+
+        session.UpdateForceUnit(session.Incident.Forces[0].Id, "Status 3", null);
+
+        Assert.Equal("0/0/6/6 · Status 3", Assert.Single(vm.Units).Detail);
     }
 
     [Fact]

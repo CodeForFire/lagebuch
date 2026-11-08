@@ -10,8 +10,9 @@ namespace LageBuch.App.Shared.Controls;
 /// <summary>
 /// A unit's taktisches Zeichen after DV 102: the Kraftfahrzeug Grundzeichen in Feuerwehr red with
 /// the mark of its Fahrzeugtyp inside (<see cref="VehicleTypes.SignFor"/>: the Löschfahrzeug's fork,
-/// the DLK's ladder, the RTW's cross …) and its Kurzbezeichnung, the Funkrufname to its right and the Stärke, then the Status, beneath
-/// it (§1.6: "rechts daneben: Bezeichnung der Einheit", "darunter: Stärke"). Drawn rather than
+/// the DLK's ladder, the RTW's cross …) and its Kurzbezeichnung, and the Funkrufname to its right
+/// (§1.6: "rechts daneben: Bezeichnung der Einheit"). The Stärke §1.6 puts beneath it, and the
+/// Status, are left to the unit list beside the map, so a crowded map stays readable. Drawn rather than
 /// loaded from SVG, after the CC0 set of jonas-koeritz/Taktische-Zeichen, so it needs no package
 /// and draws the same on a phone. The sign's body sits at the top left, and from
 /// <see cref="SymbolCenter"/> it draws the Verbindungsstrich back to the unit's pin, which stands
@@ -30,12 +31,6 @@ public sealed class TacticalSignControl : Control
 
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<TacticalSignControl, string?>(nameof(Title));
-
-    public static readonly StyledProperty<string?> StrengthProperty =
-        AvaloniaProperty.Register<TacticalSignControl, string?>(nameof(Strength));
-
-    public static readonly StyledProperty<string?> StatusProperty =
-        AvaloniaProperty.Register<TacticalSignControl, string?>(nameof(Status));
 
     private const double WheelRadius = 2.4;
     private const double SymbolHeight = BodyHeight + 7;
@@ -74,8 +69,8 @@ public sealed class TacticalSignControl : Control
 
     static TacticalSignControl()
     {
-        AffectsMeasure<TacticalSignControl>(VehicleTypeProperty, TitleProperty, StrengthProperty, StatusProperty);
-        AffectsRender<TacticalSignControl>(VehicleTypeProperty, TitleProperty, StrengthProperty, StatusProperty, MapMarkerPanel.ResolvedOffsetProperty);
+        AffectsMeasure<TacticalSignControl>(VehicleTypeProperty, TitleProperty);
+        AffectsRender<TacticalSignControl>(VehicleTypeProperty, TitleProperty, MapMarkerPanel.ResolvedOffsetProperty);
     }
 
     /// <summary>The body's middle: where the sign is anchored to its offset from the pin.</summary>
@@ -92,18 +87,6 @@ public sealed class TacticalSignControl : Control
     {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
-    }
-
-    public string? Strength
-    {
-        get => GetValue(StrengthProperty);
-        set => SetValue(StrengthProperty, value);
-    }
-
-    public string? Status
-    {
-        get => GetValue(StatusProperty);
-        set => SetValue(StatusProperty, value);
     }
 
     protected override Size MeasureOverride(Size availableSize) => Layout().Size;
@@ -284,12 +267,10 @@ public sealed class TacticalSignControl : Control
         return geometry;
     }
 
-    // Where each text goes: the code in the body, the Funkrufname right of it, Stärke and Status
-    // stacked beneath. Recomputed per pass; a handful of signs on a map is cheap to lay out.
+    // Where each text goes: the code in the body, the Funkrufname right of it. Recomputed per pass; a handful of signs on a map is cheap to lay out.
     private SignLayout Layout()
     {
         var bold = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Bold);
-        var regular = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Normal);
 
         // Where the code goes depends on the mark: in the middle of a bare sign, small above the
         // line of one that has a line, and nowhere on the ladder and the hose, which say it already.
@@ -322,7 +303,6 @@ public sealed class TacticalSignControl : Control
 
         var lines = new List<(FormattedText Text, Point Origin)>();
         var width = SymbolWidth;
-        var height = SymbolHeight;
         if (!string.IsNullOrWhiteSpace(Title))
         {
             var title = new FormattedText(Title, Culture, FlowDirection.LeftToRight, bold, 12, TextInk);
@@ -331,22 +311,7 @@ public sealed class TacticalSignControl : Control
             width = Math.Max(width, origin.X + title.Width + 2);
         }
 
-        var y = SymbolHeight + 1;
-        foreach (var below in new[] { Strength, Status })
-        {
-            if (string.IsNullOrWhiteSpace(below))
-            {
-                continue;
-            }
-
-            var text = new FormattedText(below, Culture, FlowDirection.LeftToRight, regular, 10, TextInk);
-            lines.Add((text, new Point(2, y)));
-            width = Math.Max(width, text.Width + 4);
-            y += text.Height;
-            height = y;
-        }
-
-        return new SignLayout(code, codeIsSmall, lines, new Size(width, height));
+        return new SignLayout(code, codeIsSmall, lines, new Size(width, SymbolHeight));
     }
 
     private sealed record SignLayout(FormattedText? Code, bool CodeIsSmall, IReadOnlyList<(FormattedText Text, Point Origin)> Lines, Size Size);

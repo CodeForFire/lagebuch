@@ -32,6 +32,9 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     // after the clocks changed must still say the hour it said on the day.
     private readonly TimeZoneInfo _timeZone;
 
+    // False while the constructor reads the Ebenen the Einsatz already had: those stay folded away.
+    private readonly bool _opened;
+
     // Read and parsed once per file and session: the file never changes, only whether it is shown.
     private readonly Dictionary<Guid, Task<(OverlayData? Data, string? Error, bool Parsed)>> _loads = [];
 
@@ -62,12 +65,23 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         _showBounds = showBounds;
         _timeZone = timeZone ?? TimeZoneInfo.Local;
         Refresh();
+        _opened = true;
     }
 
     /// <summary>The Ebenen, oldest first, as the Einsatz has them.</summary>
     public ObservableCollection<MapOverlayItem> Items { get; } = new();
 
     public bool HasItems => Items.Count > 0;
+
+    /// <summary>The section's heading, with how many Ebenen it holds while it is folded away.</summary>
+    public string Header => HasItems ? $"EBENEN ({Items.Count})" : "EBENEN";
+
+    /// <summary>
+    /// Whether the list of Ebenen is open. Folded away at first, so the units beside the map keep
+    /// the room; a new Ebene, imported here or arriving from another device, opens it.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isExpanded;
 
     /// <summary>Importing needs an open Einsatz and a picker on this platform.</summary>
     public bool CanImport => !_session.IsReadOnly && _dialogs is not null;
@@ -82,6 +96,9 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     /// <summary>Why the last import or removal failed, in German.</summary>
     [ObservableProperty]
     private string? _error;
+
+    [RelayCommand]
+    private void ToggleExpanded() => IsExpanded = !IsExpanded;
 
     /// <summary>
     /// Brings the list in line with the Einsatz, keeping what this screen shows of each Ebene. Runs
@@ -131,7 +148,13 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             }
         }
 
+        if (_opened && Items.Count > 0 && !known.ContainsKey(Items[^1].Id))
+        {
+            IsExpanded = true;
+        }
+
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(Header));
         UpdateVisibleShapes();
     }
 
