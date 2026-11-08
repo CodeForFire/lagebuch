@@ -110,6 +110,9 @@ dotnet build
 dotnet test
 ```
 
+See [Testing Lagebuch](docs/testing.md) for the test-project map, focused runs
+and headless render output.
+
 Run the desktop app:
 
 ```bash
