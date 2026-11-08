@@ -258,6 +258,39 @@ Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
   [Datenschutz und Sicherheit](docs/datenschutz-und-sicherheit.md).
 - **Sicherheitslücken** bitte nicht öffentlich melden → [SECURITY.md](SECURITY.md).
 
+### Danke
+
+Lagebuch lebt von allen, die mitmachen – mit Code, Fehlermeldungen, Tests bei
+der Übung oder Ideen aus dem ELW.
+
+<!-- ALL-CONTRIBUTORS-LIST:START -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/DeepDiver1975"><img src="https://avatars.githubusercontent.com/u/1005065?s=80" width="80px;" alt="Thomas Müller"/><br /><sub><b>Thomas Müller</b></sub></a><br /><a href="https://github.com/CodeForFire/lagebuch/commits?author=DeepDiver1975" title="Code">💻</a> <a href="https://github.com/CodeForFire/lagebuch/commits?author=DeepDiver1975" title="Doku">📖</a> <a href="#ideas-DeepDiver1975" title="Ideen und Feedback">🤔</a> <a href="#maintenance-DeepDiver1975" title="Pflege">🚧</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/ChrArlt"><img src="https://avatars.githubusercontent.com/u/77838277?s=80" width="80px;" alt="Christian Arlt"/><br /><sub><b>Christian Arlt</b></sub></a><br /><a href="https://github.com/CodeForFire/lagebuch/issues?q=author%3AChrArlt" title="Fehler gemeldet">🐛</a> <a href="#ideas-ChrArlt" title="Ideen und Feedback">🤔</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/candavere"><img src="https://avatars.githubusercontent.com/u/304146049?s=80" width="80px;" alt="candavere"/><br /><sub><b>candavere</b></sub></a><br /><a href="https://github.com/CodeForFire/lagebuch/commits?author=candavere" title="Code">💻</a> <a href="https://github.com/CodeForFire/lagebuch/commits?author=candavere" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/sri-santhosh-tk"><img src="https://avatars.githubusercontent.com/u/291651187?s=80" width="80px;" alt="Sri Santhosh Tiruppur Kanagaraj"/><br /><sub><b>Sri Santhosh Tiruppur Kanagaraj</b></sub></a><br /><a href="https://github.com/CodeForFire/lagebuch/commits?author=sri-santhosh-tk" title="Code">💻</a> <a href="https://github.com/CodeForFire/lagebuch/commits?author=sri-santhosh-tk" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/berkcantmr"><img src="https://avatars.githubusercontent.com/u/72012560?s=80" width="80px;" alt="Berkcan"/><br /><sub><b>Berkcan</b></sub></a><br /><a href="https://github.com/CodeForFire/lagebuch/commits?author=berkcantmr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/illya228666"><img src="https://avatars.githubusercontent.com/u/96683927?s=80" width="80px;" alt="illya228666"/><br /><sub><b>illya228666</b></sub></a><br /><a href="https://github.com/CodeForFire/lagebuch/commits?author=illya228666" title="Tests">⚠️</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+💻 Code · ⚠️ Tests · 📖 Doku · 🐛 Fehler gemeldet · 🤔 Ideen und Feedback ·
+🧪 Bei Übung oder Einsatz getestet · 🌍 Übersetzung · 🚧 Pflege
+
+Hier fehlt jemand – auch eine Wehr, die bei der Übung getestet hat? Schreibt es
+in die [Discussions](../../discussions) oder in euren Pull Request. Wir tragen
+nur ein, wer zugestimmt hat.
+
 ---
 
 ## For developers

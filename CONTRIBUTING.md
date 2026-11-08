@@ -368,6 +368,29 @@ Please use the issue templates:
 Security vulnerabilities do **not** belong in public issues — see
 [`SECURITY.md`](SECURITY.md).
 
+## Recognition
+
+The README's *Danke* section credits everyone who helps, not only people who
+commit code. Bug reports, testing at an Übung and ideas from the ELW count as
+well. The list is generated from [`.all-contributorsrc`](.all-contributorsrc)
+in the [all-contributors](https://allcontributors.org) format. Someone is added
+only after they agree.
+
+To add someone or a contribution, run the CLI locally, then commit as usual,
+signed and signed off:
+
+```bash
+npx all-contributors-cli@6.26.1 add <github-login> <type>[,<type>…]
+npx all-contributors-cli@6.26.1 generate
+```
+
+These are the types the README's legend explains: `code`, `test`, `doc`, `bug`,
+`ideas`, `userTesting`, `translation` and `maintenance`. Their German labels are
+set in `.all-contributorsrc`.
+
+Do not install the all-contributors bot. Its commits carry no `Signed-off-by`
+and are not signed, so `main`'s branch protection rejects them.
+
 ## AI-assisted contributions
 
 Contributions made with coding agents are welcome, provided they follow the
