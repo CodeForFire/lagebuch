@@ -304,6 +304,91 @@ public sealed class DispatchInboxViewModelTests : IDisposable
         Assert.Equal("Neuer Alarm: THL 2 T2917 – auf der Startseite anlegen", shell.DispatchNotice);
     }
 
+    // ALARM-DATEI ÖFFNEN: a saved alarm mail picked by hand is offered whatever its age.
+    [Fact]
+    public async Task An_alarm_file_picked_by_hand_is_offered_however_old()
+    {
+        var path = Path.Join(_folder, "alt.eml");
+        await File.WriteAllTextAsync(path, DispatchSamples.Eml(DispatchSamples.Html(DispatchSamples.Xml(alarmedAt: "2026-11-07 03:12"))));
+        var inbox = Inbox(new FakeDialogs { AlarmFilePath = path });
+        Assert.Null(inbox.Offer);
+
+        await inbox.OpenAlarmFileCommand.ExecuteAsync(null);
+
+        Assert.Equal(DispatchSamples.IncidentNumber, inbox.Offer?.Alarm.IncidentNumber);
+        Assert.Null(inbox.Error);
+    }
+
+    [Fact]
+    public async Task An_alarm_picked_by_hand_stays_on_offer_across_scans()
+    {
+        var path = Path.Join(_folder, "alt.html");
+        await File.WriteAllTextAsync(path, DispatchSamples.Html(DispatchSamples.Xml(alarmedAt: "2026-11-07 03:12")));
+        var inbox = Inbox(new FakeDialogs { AlarmFilePath = path });
+        await inbox.OpenAlarmFileCommand.ExecuteAsync(null);
+        var offer = inbox.Offer;
+
+        inbox.Scan();
+
+        Assert.Same(offer, inbox.Offer);
+    }
+
+    [Fact]
+    public async Task Once_a_hand_picked_alarm_is_answered_the_folder_is_offered_again()
+    {
+        Drop();
+        var path = Path.Join(Directory.CreateTempSubdirectory("dispatch-hand-").FullName, "alt.html");
+        await File.WriteAllTextAsync(path, DispatchSamples.Html(DispatchSamples.Xml(incidentNumber: "T 7", alarmedAt: "2026-11-07 03:12")));
+        var inbox = Inbox(new FakeDialogs { AlarmFilePath = path });
+        await inbox.OpenAlarmFileCommand.ExecuteAsync(null);
+        Assert.Equal("T 7", inbox.Offer?.Alarm.IncidentNumber);
+
+        inbox.DismissCommand.Execute(null);
+        inbox.Scan();
+
+        Assert.Equal(DispatchSamples.IncidentNumber, inbox.Offer?.Alarm.IncidentNumber);
+        Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+    }
+
+    [Fact]
+    public async Task A_picked_file_without_an_alarm_says_so()
+    {
+        var path = Path.Join(_folder, "dienstplan.html");
+        await File.WriteAllTextAsync(path, "<html><body>Dienstplan November</body></html>");
+        var inbox = Inbox(new FakeDialogs { AlarmFilePath = path });
+
+        await inbox.OpenAlarmFileCommand.ExecuteAsync(null);
+
+        Assert.Null(inbox.Offer);
+        Assert.Equal("Keine Alarmierung in dienstplan.html gefunden.", inbox.Error);
+    }
+
+    [Fact]
+    public async Task A_cancelled_alarm_file_picker_changes_nothing()
+    {
+        Drop();
+        var inbox = Inbox(new FakeDialogs { AlarmFilePath = null });
+        var offer = inbox.Offer;
+
+        await inbox.OpenAlarmFileCommand.ExecuteAsync(null);
+
+        Assert.Same(offer, inbox.Offer);
+        Assert.Null(inbox.Error);
+    }
+
+    [Fact]
+    public async Task An_alarm_file_can_be_opened_without_a_folder_set()
+    {
+        _store.Folder = null;
+        var path = Path.Join(_folder, "alarm.eml");
+        await File.WriteAllTextAsync(path, DispatchSamples.Eml());
+        var inbox = Inbox(new FakeDialogs { AlarmFilePath = path });
+
+        await inbox.OpenAlarmFileCommand.ExecuteAsync(null);
+
+        Assert.NotNull(inbox.Offer);
+    }
+
     // Production scans on a pool thread and posts the result back; nothing is offered before the post.
     [Fact]
     public void The_scan_runs_in_the_background_and_its_result_is_posted_to_the_ui()

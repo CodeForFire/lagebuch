@@ -31,6 +31,9 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     private static readonly FilePickerFileType MapOverlay =
         new("GeoJSON oder ZIP") { Patterns = new[] { "*.geojson", "*.json", "*.zip" } };
 
+    private static readonly FilePickerFileType AlarmMail =
+        new("Alarm-Mail") { Patterns = new[] { "*.eml", "*.html", "*.htm", "*.xml" } };
+
     private readonly Func<TopLevel?> _topLevel;
 
     public StorageProviderFileDialogService(Func<TopLevel?> topLevel) => _topLevel = topLevel;
@@ -196,6 +199,23 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
             SuggestedStartLocation = await ResolveStartLocation(top, initialFolder),
         });
         return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<string?> PickAlarmFileAsync()
+    {
+        var top = _topLevel();
+        if (top is null)
+        {
+            return null;
+        }
+
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Alarm-Mail öffnen",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { AlarmMail },
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
     public Task OpenFileAsync(string path)

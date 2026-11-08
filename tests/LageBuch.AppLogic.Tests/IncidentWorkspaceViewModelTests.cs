@@ -2698,6 +2698,11 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public Task<string?> PickFolderAsync(string? initialFolder = null) => Task.FromResult(FolderPath);
 
+    /// <summary>What <see cref="PickAlarmFileAsync"/> answers; null stands in for a cancelled picker.</summary>
+    public string? AlarmFilePath { get; set; }
+
+    public Task<string?> PickAlarmFileAsync() => Task.FromResult(AlarmFilePath);
+
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
     public Task<string?> PickExportPdfAsync(string suggestedFileName)

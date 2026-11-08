@@ -11,9 +11,9 @@ namespace LageBuch.AppLogic.Services.Dispatch;
 
 /// <summary>
 /// Reads the <c>&lt;einsatz version="1"&gt;</c> XML that FF-Agent's "Alarm Webhook und Mail" sends,
-/// either bare or as the HTML mail body it arrives in: there the XML is HTML-escaped, every line
-/// ends in a <c>&lt;br&gt;</c>, and the Funkrufnamen inside <c>&lt;gefordert&gt;</c> are separated
-/// by real <c>&lt;br&gt;</c> tags.
+/// bare, as the HTML mail body, or as a whole saved mail (.eml, see <see cref="MimeMail"/>). In the
+/// body the XML is HTML-escaped, every line ends in a <c>&lt;br&gt;</c>, and the Funkrufnamen inside
+/// <c>&lt;gefordert&gt;</c> are separated by real <c>&lt;br&gt;</c> tags.
 /// <para>
 /// The content comes out of a folder anything can write to, so it is hostile input: it is
 /// size-capped before it is looked at, no DTD is processed and nothing is resolved, and every field
@@ -42,7 +42,11 @@ public static partial class FfAgentDispatchParser
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(zone);
         alarm = null;
-        if (content.Length > MaxContentLength || ExtractXml(content) is not { } xml)
+
+        // A saved mail (.eml) carries the HTML body base64- or quoted-printable-encoded; anything
+        // else is the body or the XML itself.
+        if (content.Length > MaxContentLength
+            || ExtractXml(MimeMail.TryGetText(content, out var mailText) ? mailText : content) is not { } xml)
         {
             return false;
         }

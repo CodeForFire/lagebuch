@@ -38,6 +38,14 @@ public sealed class DispatchFolderScannerTests : IDisposable
     }
 
     [Fact]
+    public void A_saved_alarm_mail_is_offered()
+    {
+        Drop("alarm.eml", DispatchSamples.Eml());
+
+        Assert.Equal(DispatchSamples.IncidentNumber, Scan().Newest?.IncidentNumber);
+    }
+
+    [Fact]
     public void An_alarm_older_than_two_hours_is_not_offered()
     {
         Drop("alarm.html", DispatchSamples.Html(DispatchSamples.Xml(alarmedAt: "2026-11-08 15:30")), written: Now.AddMinutes(-20));

@@ -30,6 +30,9 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
     private int _ticks;
     private bool _scanning;
 
+    // The offer came from ALARM-DATEI ÖFFNEN, not from the folder, so a scan must not replace it.
+    private bool _offerIsHandPicked;
+
     public DispatchInboxViewModel(
         IDispatchInboxStore store,
         IMasterDataProvider masterData,
@@ -156,15 +159,45 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
 
         Error = scan.Error;
 
+        // A file picked by hand stays on offer until it is answered; the folder waits behind it.
         // The same alarm again keeps the offer on screen as it is, ticks and all.
-        if (scan.Newest?.Key != Offer?.Alarm.Key)
+        if (!_offerIsHandPicked && scan.Newest?.Key != Offer?.Alarm.Key)
         {
             Offer = scan.Newest is { } alarm ? new DispatchOfferViewModel(alarm, _masterData.Get().Vehicles) : null;
         }
     }
 
+    partial void OnOfferChanged(DispatchOfferViewModel? value)
+    {
+        if (value is null)
+        {
+            _offerIsHandPicked = false;
+        }
+    }
+
     [RelayCommand]
     private void Accept() => CreateRequested?.Invoke();
+
+    // ALARM-DATEI ÖFFNEN: one saved alarm mail, offered whatever its age, e.g. an alarm that came
+    // in before the PC was started hours later, or one to try the import with.
+    [RelayCommand]
+    private async Task OpenAlarmFileAsync()
+    {
+        if (await _dialogs.PickAlarmFileAsync() is not { } path)
+        {
+            return;
+        }
+
+        if (!_scanner.TryReadFile(path, out var alarm))
+        {
+            Error = $"Keine Alarmierung in {Path.GetFileName(path)} gefunden.";
+            return;
+        }
+
+        Error = null;
+        Offer = new DispatchOfferViewModel(alarm, _masterData.Get().Vehicles);
+        _offerIsHandPicked = true;
+    }
 
     [RelayCommand]
     private void Dismiss()

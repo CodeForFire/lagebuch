@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -122,6 +123,15 @@ public sealed class HomeDispatchTests : IDisposable
             Assert.Equal([false, false, true, true], boxes.Select(b => b.IsChecked == true));
             Assert.Equal("Florian Musterstadt Wache 2", AutomationProperties.GetName(boxes[0]));
             Assert.False(ByName<Border>(window, "DispatchProbeTag").IsVisible);
+
+            // Every folder action stays inside the card, at phone width too.
+            var card = ByName<Border>(window, "DispatchFolderCard");
+            foreach (var button in ByName<WrapPanel>(window, "DispatchFolderActions").Children.OfType<Button>())
+            {
+                var right = button.TranslatePoint(new Point(button.Bounds.Width, 0), card)?.X;
+                Assert.True(right <= card.Bounds.Width, $"{button.Name} ends at {right}, past the card's {card.Bounds.Width}");
+            }
+
             window.Close();
         }
     }
@@ -155,6 +165,7 @@ public sealed class HomeDispatchTests : IDisposable
 
         Assert.False(ByName<Panel>(window, "DispatchOfferPanel").IsVisible);
         Assert.True(ByName<TextBlock>(window, "DispatchFolderHint").IsEffectivelyVisible);
+        Assert.True(ByName<Button>(window, "OpenAlarmFileButton").IsEffectivelyVisible);
         Assert.False(ByName<Button>(window, "ClearDispatchFolderButton").IsVisible);
     }
 

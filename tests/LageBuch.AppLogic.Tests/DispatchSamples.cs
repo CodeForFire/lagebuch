@@ -81,6 +81,72 @@ internal static class DispatchSamples
             + "</p>Ihr FF-Agent Dienst<br>08.11.2026, 17:18:00</div></body></html>";
     }
 
+    /// <summary>
+    /// The mail as a saved <c>.eml</c>, the way FF-Agent sends it: one <c>text/html</c> part,
+    /// base64 in 76-character lines, headers folded as Exchange folds them.
+    /// </summary>
+    public static string Eml(string? html = null)
+    {
+        var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html ?? Html()));
+        var lines = Enumerable.Range(0, (base64.Length + 75) / 76)
+            .Select(i => base64.Substring(i * 76, Math.Min(76, base64.Length - (i * 76))));
+        return "MIME-Version: 1.0\r\n"
+            + "Date: Sun, 8 Nov 2026 17:18:03 +0100\r\n"
+            + "From: FF-Agent <do-not-reply@ff-agent.example>\r\n"
+            + "Subject:\r\n =?utf-8?Q?#FFA-LB#_|_THL_2_T2917_|_12345_Musterstadt?=\r\n"
+            + "To: Max Mustermann <max.mustermann@ff-musterstadt.example>\r\n"
+            + "Content-Transfer-Encoding: base64\r\n"
+            + "Content-Type: text/html; charset=\"utf-8\"\r\n"
+            + "\r\n"
+            + string.Join("\r\n", lines) + "\r\n";
+    }
+
+    /// <summary>
+    /// The mail as a mail client forwards or saves it: multipart/alternative, a plain-text part
+    /// first, then the HTML part in quoted-printable with soft line breaks.
+    /// </summary>
+    public static string MultipartEml(string? html = null)
+    {
+        const string boundary = "----=_Part_42_Musterstadt";
+        return "MIME-Version: 1.0\r\n"
+            + "Subject: WG: #FFA-LB# | THL 2 T2917\r\n"
+            + $"Content-Type: multipart/alternative;\r\n\tboundary=\"{boundary}\"\r\n"
+            + "\r\n"
+            + "This is a multi-part message in MIME format.\r\n"
+            + $"--{boundary}\r\n"
+            + "Content-Type: text/plain; charset=utf-8\r\n"
+            + "\r\n"
+            + "Automatische Benachrichtigung\r\n"
+            + $"--{boundary}\r\n"
+            + "Content-Type: text/html; charset=utf-8\r\n"
+            + "Content-Transfer-Encoding: quoted-printable\r\n"
+            + "\r\n"
+            + QuotedPrintable(html ?? Html()) + "\r\n"
+            + $"--{boundary}--\r\n";
+    }
+
+    // Encodes as a mail client does: '=' and every non-ASCII byte as =XX, lines cut at 76 with a
+    // soft break "=" at the end.
+    private static string QuotedPrintable(string text)
+    {
+        var encoded = new System.Text.StringBuilder();
+        var line = 0;
+        foreach (var b in System.Text.Encoding.UTF8.GetBytes(text))
+        {
+            var token = b is (byte)'=' or > 126 or < 32 ? $"={b:X2}" : ((char)b).ToString();
+            if (line + token.Length > 75)
+            {
+                encoded.Append("=\r\n");
+                line = 0;
+            }
+
+            encoded.Append(token);
+            line += token.Length;
+        }
+
+        return encoded.ToString();
+    }
+
     private static string EscapeKeepingBreaks(string line) =>
         string.Join("<br>", line.Split("<br>").Select(part => part
             .Replace("&", "&amp;", StringComparison.Ordinal)

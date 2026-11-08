@@ -24,9 +24,14 @@ Läuft gerade ein Einsatz, unterbricht ein neuer Alarm nicht. Oben in der Leiste
 ## Was Lagebuch liest – und was nicht
 
 Lagebuch liest den `<einsatz>`-Block, den FF-Agent mit „Alarm Webhook und Mail“ verschickt. Er darf
-als Mail-Text (`.html`/`.htm`) oder als reines XML (`.xml`) im Ordner liegen.
+als gespeicherte Mail (`.eml`), als Mail-Text (`.html`/`.htm`) oder als reines XML (`.xml`) im
+Ordner liegen.
 
-- Angeboten werden nur Alarme der letzten **2 Stunden**. Ältere Dateien bleiben unbeachtet.
+- Aus dem Ordner angeboten werden nur Alarme der letzten **2 Stunden**. Ältere Dateien bleiben
+  unbeachtet.
+- **ALARM-DATEI ÖFFNEN** bietet eine einzelne gespeicherte Alarm-Mail an, egal wie alt. So lässt
+  sich ein späterer Alarm von Hand übernehmen oder die Übernahme ausprobieren. Die Mail lässt sich
+  dazu z. B. aus Outlook im Web als `.eml` speichern.
 - **Mitteiler** und **Patient** werden nie gelesen und landen nicht im Lagebuch.
 - Die Dateien im Ordner werden nur gelesen. Lagebuch verschiebt und löscht nichts.
 - Ein Probealarm ist als **PROBEALARM** gekennzeichnet.

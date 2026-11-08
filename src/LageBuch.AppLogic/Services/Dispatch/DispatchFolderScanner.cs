@@ -28,7 +28,7 @@ public sealed class DispatchFolderScanner
     // A PC clock a few minutes behind the Leitstelle's must not make a fresh alarm look future.
     private static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(15);
 
-    private static readonly string[] Extensions = [".html", ".htm", ".xml"];
+    private static readonly string[] Extensions = [".html", ".htm", ".xml", ".eml"];
 
     private readonly IClock _clock;
     private readonly TimeZoneInfo _zone;
@@ -82,6 +82,23 @@ public sealed class DispatchFolderScanner
         }
 
         return new DispatchScan(newest, null);
+    }
+
+    /// <summary>
+    /// The alarm in one file picked by hand, read under the same rules as the folder (a plain
+    /// file, size-capped) but whatever its age and whether or not it was answered before; false
+    /// when the file is unreadable or holds no alarm.
+    /// </summary>
+    public bool TryReadFile(string path, [NotNullWhen(true)] out DispatchAlarm? alarm)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        alarm = null;
+        var file = new FileInfo(path);
+        return file.Exists
+            && IsPlainFile(file)
+            && file.Length <= MaxFileBytes
+            && TryRead(file, out var content)
+            && TryParse(content, out alarm);
     }
 
     // The parser refuses what it knows to be no alarm. Should a file still find a way to make it

@@ -352,14 +352,18 @@
                          Foreground="{StaticResource AmberBrush}"
                          Text="{Binding Error}"
                          IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-              <StackPanel Orientation="Horizontal" Spacing="8">
+              <!-- Wraps: three buttons do not fit side by side at phone width. -->
+              <WrapPanel x:Name="DispatchFolderActions" ItemSpacing="8" LineSpacing="8">
                 <Button x:Name="PickDispatchFolderButton" Content="ORDNER WÄHLEN"
                         Command="{Binding PickFolderCommand}" />
+                <Button x:Name="OpenAlarmFileButton" Classes="ghost" Content="ALARM-DATEI ÖFFNEN"
+                        ToolTip.Tip="Eine gespeicherte Alarm-Mail als Einsatz anbieten, auch wenn sie älter als 2 Stunden ist"
+                        Command="{Binding OpenAlarmFileCommand}" />
                 <Button x:Name="ClearDispatchFolderButton" Classes="ghost" Content="AUSSCHALTEN"
                         ToolTip.Tip="Keine Alarm-Mails mehr übernehmen"
                         IsVisible="{Binding HasFolder}"
                         Command="{Binding ClearFolderCommand}" />
-              </StackPanel>
+              </WrapPanel>
             </StackPanel>
           </Border>
         </Panel>

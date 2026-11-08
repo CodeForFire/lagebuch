@@ -40,6 +40,12 @@ public interface IFileDialogService
     /// </summary>
     Task<string?> PickFolderAsync(string? initialFolder = null) => Task.FromResult<string?>(null);
 
+    /// <summary>
+    /// Lets the user pick one saved alarm mail (.eml, .html, .htm or .xml); a local path, or null
+    /// when cancelled or where the platform has no picker for it.
+    /// </summary>
+    Task<string?> PickAlarmFileAsync() => Task.FromResult<string?>(null);
+
     /// <summary>Opens a local file with the OS's/platform's default viewer for its type.</summary>
     Task OpenFileAsync(string path);
 
