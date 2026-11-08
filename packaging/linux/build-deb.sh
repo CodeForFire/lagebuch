@@ -190,7 +190,7 @@ cat > "$ROOT/usr/share/metainfo/de.codeforfire.$PKG.metainfo.xml" <<METAINFO
     </p>
   </description>
   <launchable type="desktop-id">$PKG.desktop</launchable>
-  <url type="homepage">https://codeforfire.github.io/</url>
+  <url type="homepage">https://codeforfire.github.io/lagebuch/</url>
   <url type="bugtracker">https://github.com/CodeForFire/lagebuch/issues</url>
   <url type="vcs-browser">https://github.com/CodeForFire/lagebuch</url>
   <provides>

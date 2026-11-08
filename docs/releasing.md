@@ -65,8 +65,8 @@ none of which towncrier does for you:
   merged, run `make screenshots demo-gif` on the release branch and commit what
   changed. A pull request is meant to re-render the views it touches, but only
   the ones it touches, so without this the README grid, the GIF and
-  codeforfire.github.io (which copies them nightly for its landing page and
-  Rundgang) show whatever the last re-render saw — 0.8.0 shipped with 11 of 13
+  codeforfire.github.io (which copies them nightly for its Lagebuch start
+  page and Rundgang) show whatever the last re-render saw — 0.8.0 shipped with 11 of 13
   images from before 0.7.0 (#571). It needs the .NET SDK for the headless
   harness and ImageMagick and ffmpeg for the GIF. A file that differs by a few
   hundred pixels has only had its clock move; commit or revert it, either is
@@ -448,7 +448,7 @@ it an x86_64 system image is too slow to drive.)
 These are answered once and must be answered the same way every time; re-deciding
 them per release is how a Data-safety section drifts away from what the app does.
 
-- **Privacy policy**: <https://codeforfire.github.io/datenschutz/>, built from
+- **Privacy policy**: <https://codeforfire.github.io/lagebuch/datenschutz/>, built from
   [`datenschutz-und-sicherheit.md`](datenschutz-und-sicherheit.md), so it stays
   current on its own.
 - **Data safety — no data collected, no data shared.** The app has no account, no

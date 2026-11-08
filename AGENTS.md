@@ -649,8 +649,10 @@ unique so two PRs citing the same ticket cannot collide.
 
 The user-facing website lives in a separate repository,
 [`CodeForFire/codeforfire.github.io`](https://github.com/CodeForFire/codeforfire.github.io)
-(Astro Starlight, served at <https://codeforfire.github.io/>). Two things
-follow for work in *this* repository.
+(Astro Starlight, served at <https://codeforfire.github.io/>). The site covers
+all CodeForFire apps; Lagebuch's pages live under
+<https://codeforfire.github.io/lagebuch/>. Two things follow for work in
+*this* repository.
 
 **Some of its content is built from here.** Its build copies
 `docs/datenschutz-und-sicherheit.md`, `docs/logo/`, `docs/demo/einsatz-flow.gif`
@@ -664,9 +666,9 @@ in the same pull request pair:
 
 | Here | There |
 |---|---|
-| README's *Warum Lagebuch?* claims | `src/content/docs/index.mdx` |
-| README's *Lagebuch im Vergleich* table | `src/content/docs/vergleich.md` |
-| README's *Installation* and *Downloads prüfen* | `src/content/docs/download.md` |
+| README's *Warum Lagebuch?* claims | `src/content/docs/lagebuch/index.mdx` |
+| README's *Lagebuch im Vergleich* table | `src/content/docs/lagebuch/vergleich.md` |
+| README's *Installation* and *Downloads prüfen* | `src/content/docs/lagebuch/download.md` |
 
 A price, a platform or a competitor claim that changes in one and not the other
 is the failure mode to avoid: the comparison table cites sources and is the
