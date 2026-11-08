@@ -144,12 +144,15 @@ public sealed class MapOverlaysViewModelTests : IDisposable
         var (_, vm, dialogs, _) = Open();
         Assert.False(vm.IsExpanded);
         Assert.Equal("EBENEN", vm.Header);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
         dialogs.Next = Write("sperrgebiet.geojson", Sperrgebiet("Sperrgebiet Süd"));
         await vm.ImportCommand.ExecuteAsync(null);
 
         Assert.True(vm.IsExpanded);
         Assert.Equal("EBENEN (1)", vm.Header);
+        Assert.Contains(nameof(vm.Header), changed); // the heading on screen follows the count
 
         vm.ToggleExpandedCommand.Execute(null);
         Assert.False(vm.IsExpanded);
