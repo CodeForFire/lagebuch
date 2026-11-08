@@ -55,6 +55,7 @@ public class OverlayContractTests
         new("Workspace.IncidentDataDialog", typeof(IncidentWorkspaceViewModel), typeof(IncidentDataDialogViewModel), OpenWorkspaceIncidentDataDialog),
         new("Workspace.SpellingHelper", typeof(IncidentWorkspaceViewModel), typeof(SpellingHelperDialogViewModel), OpenWorkspaceSpellingHelper),
         new("Workspace.CommandNodeDialog", typeof(IncidentWorkspaceViewModel), typeof(CommandNodeDialogViewModel), OpenWorkspaceCommandNodeDialog),
+        new("Workspace.DispatchChannelDialog", typeof(IncidentWorkspaceViewModel), typeof(DispatchChannelDialogViewModel), OpenWorkspaceDispatchChannelDialog),
         new("Workspace.LeadershipPersonDialog", typeof(IncidentWorkspaceViewModel), typeof(LeadershipPersonDialogViewModel), OpenWorkspaceLeadershipPersonDialog),
         new("Workspace.RoleAssignmentDialog", typeof(IncidentWorkspaceViewModel), typeof(RoleAssignmentDialogViewModel), OpenWorkspaceRoleAssignmentDialog),
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
@@ -346,6 +347,16 @@ public class OverlayContractTests
         var opener = Named<Button>(window, "LeadershipAddAbschnittButton");
         Activate(opener);
         return new(window, opener, ViewOf<CommandNodeDialogView>(window), () => vm.PendingCommandNodeDialog is null, () => vm.PendingCommandNodeDialog?.CancelCommand.Execute(null));
+    }
+
+    // Cancel leaves the channel as it was: none.
+    private static Opened OpenWorkspaceDispatchChannelDialog()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "FÜHRUNG");
+        var opener = Named<Button>(window, "DispatchCentreBadge");
+        Activate(opener);
+        return new(window, opener, ViewOf<DispatchChannelDialogView>(window), () => vm.PendingDispatchChannelDialog is null && vm.Leadership.DispatchCentreText == "ILS", () => vm.PendingDispatchChannelDialog?.CancelCommand.Execute(null));
     }
 
     private static Opened OpenWorkspaceLeadershipPersonDialog()
