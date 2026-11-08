@@ -149,6 +149,7 @@ public sealed class MapOverlaysViewModelTests : IDisposable
 
         dialogs.Next = Write("sperrgebiet.geojson", Sperrgebiet("Sperrgebiet Süd"));
         await vm.ImportCommand.ExecuteAsync(null);
+        await vm.SettledAsync(); // the Ebene is parsed off the test's thread and raises its own changes
 
         Assert.True(vm.IsExpanded);
         Assert.Equal("EBENEN (1)", vm.Header);
