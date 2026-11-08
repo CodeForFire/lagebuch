@@ -23,14 +23,18 @@ Test projects live under `tests/`, one per application layer:
   interaction and rendered layouts from `App.Shared`.
 
 Code shared between test projects is not a project of its own. Each project
-compiles the files it needs as links (`<Compile Include="..\…" Link="…" />` in
-its `.csproj`), so check those links before moving or renaming one:
+pulls in the files it needs as links in its `.csproj`: source files as
+`<Compile Include="..\…" Link="…" />`, data files as
+`<None Include="..\…" Link="…" CopyToOutputDirectory="PreserveNewest" />` so
+they reach the test output. Search for `Link=` before moving or renaming one:
 
 - [`tests/Fixtures/`](../tests/Fixtures/) holds the fictional Stammdaten
-  fixtures, `StammdatenFixture.cs` and `stammdaten-vollstaendig.json`.
-- [`tests/Shared/`](../tests/Shared/) holds helpers several projects use, such
-  as `CoOnlyIncidentExtensions.cs`. A new helper needed by more than one
-  project goes here, not into one project to be copied.
+  fixtures, `StammdatenFixture.cs` and `stammdaten-vollstaendig.json` (a
+  `<None>` link).
+- [`tests/Shared/`](../tests/Shared/) holds helpers several projects use,
+  `CoOnlyIncidentExtensions.cs` and `CoOnlySessionExtensions.cs`; every file
+  there is linked into more than one project. A new helper needed by more than
+  one project goes here, not into one project to be copied.
 - `VectorTileFixtures.cs` and `GeoTiffFixtures.cs` live in
   `LageBuch.Persistence.Tests` but are linked into AppLogic and Acceptance
   too; changing them changes those builds.
@@ -55,10 +59,15 @@ When narrowing, always pass `PROJECT` as well as `FILTER`, and check that the
 project reports `Passed!` with a non-zero test count. A filter that matches
 nothing does not fail the run, it just runs nothing, so a typo looks green.
 The most common way to get there is `Name~`: it matches the test *method* name
-only, so `FILTER=Name~FormattingTests` finds no tests. To select a class, use
+only, under both the xunit v2 projects and Acceptance's xunit.v3, so
+`FILTER=Name~FormattingTests` finds no tests. To select a class, use
 `FullyQualifiedName~FormattingTests`.
 
-For reading the output of a full run, see
+`FILTER` is passed quoted, so `|` combines filters:
+`FILTER='FullyQualifiedName~A|FullyQualifiedName~B'`.
+
+On a full run, do not trust the tail of the log: it says `0 Error(s)` even when
+a test assembly failed. Search the whole log for `Test Run Failed`; see
 [AGENTS.md > Before you call it done](../AGENTS.md#before-you-call-it-done).
 
 `make test-all` uses the full `LageBuch.sln`, including the Android head. It needs
@@ -67,8 +76,10 @@ the Android workload and a compatible JDK (21 or earlier), as explained in
 command on a machine without that setup. CI builds the full solution on Linux
 and the desktop filter on Windows.
 
-Passing tests are one gate among several. The full list of what to run before
-opening a pull request, and why, is in
+Passing tests are one gate among several. Formatting is its own: `make ci`
+does not run `dotnet format`, but CI does, so run `make format-check` before
+pushing. The full list of what to run before opening a pull request, and why,
+is in
 [AGENTS.md > Before you call it done](../AGENTS.md#before-you-call-it-done) and
 [AGENTS.md > Static analysis](../AGENTS.md#static-analysis).
 
