@@ -10,12 +10,18 @@
          XAML attributes on the border below — a local value always outranks a style setter, so the
          drag-over override could never win against an inline BorderBrush/BorderThickness. -->
     <Style Selector="Border#FilesDropZone">
-      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="2" />
     </Style>
     <Style Selector="Border#FilesDropZone.drag-over">
       <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
       <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Border#FilesListFrame">
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    </Style>
+    <Style Selector="Border#FilesDropZone.drag-over Border#FilesListFrame">
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
 
     <!-- Hidden by default through a Style, never IsVisible="False" on the panel: a local value
@@ -88,83 +94,95 @@
 
     <!-- Files can also be dropped anywhere on this panel (#262 UX follow-up); handlers wired in
          code-behind toggle the "drag-over" class and call FilesViewModel.AddFilesAsync on drop. -->
-    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="FilesDropZone" Background="#0C1119"
-            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="FilesDropZone" Background="Transparent"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True"
             DragDrop.AllowDrop="{Binding !IsReadOnly}">
-      <StackPanel Grid.IsSharedSizeScope="True">
-        <!-- Column headers: the rename box below has no other visible label (#137). Columns share
-             a SharedSizeGroup with the row template below so headers line up with their data even
-             though each row sizes its Auto columns to its own content. -->
-        <Grid x:Name="FilesHeaderRow" Margin="0,0,0,8">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
-            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
-          </Grid.ColumnDefinitions>
-          <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
-          <TextBlock Grid.Column="1" Text="GRÖSSE" Classes="overline" FontSize="10" Margin="10,0" />
-          <TextBlock Grid.Column="2" Text="HINZUGEFÜGT" Classes="overline" FontSize="10" Margin="10,0" />
-          <TextBlock Grid.Column="3" Text="VON" Classes="overline" FontSize="10" Margin="10,0" />
-        </Grid>
-        <ScrollViewer>
-        <ItemsControl x:Name="FilesList" ItemsSource="{Binding Files}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:IncidentFileRow">
-              <Grid Margin="0,0,0,10" RowDefinitions="Auto,Auto">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
-                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
-                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
-                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
-                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
-                </Grid.ColumnDefinitions>
-                <!-- Committing per keystroke saved the whole incident file on every character
-                     typed (#33). UpdateSourceTrigger=LostFocus pushes once, when the operator
-                     actually leaves the field. Mirrors ForcesView's Bemerkung fix. -->
-                <TextBox Grid.Column="0" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                         PlaceholderText="{x:Static md:AnonymizedExampleData.FileNamePlaceholder}"
-                         BorderThickness="0" Background="Transparent" Padding="0"
-                         VerticalAlignment="Center" IsReadOnly="{Binding IsReadOnly}" />
-                <TextBlock Grid.Column="1" Classes="mono file-meta-column" Text="{Binding SizeDisplay}" Margin="10,0"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="2" Classes="mono file-meta-column" Text="{Binding AddedAtDisplay}" Margin="10,0"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="3" Classes="file-meta-column" Text="{Binding AddedBy}" Margin="10,0"
-                           VerticalAlignment="Center" />
-                <!-- The same three values, on their own line, for the width where they have no
-                     columns to live in. Default hidden; the narrow style above shows it. -->
-                <WrapPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6" Classes="file-meta-line"
-                           Orientation="Horizontal" ItemSpacing="12" LineSpacing="2" Margin="0,2,0,0">
-                  <TextBlock Classes="mono" FontSize="11" Text="{Binding SizeDisplay}" />
-                  <TextBlock Classes="mono" FontSize="11" Text="{Binding AddedAtDisplay}" />
-                  <TextBlock Classes="secondary" FontSize="11" Text="{Binding AddedBy}" />
-                </WrapPanel>
-                <!-- ReflectionBinding: OpenFileCommand lives on the parent ItemsControl's
-                     DataContext (FilesViewModel), whose static type is object under compiled
-                     bindings, so a compiled $parent cast path won't resolve. -->
-                <Button Grid.Column="4" Content="ÖFFNEN"
-                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenFileCommand}"
-                        CommandParameter="{Binding}" />
-                <!-- The delete affordance (#262 UX): row identity lives on IncidentFileRow itself,
-                     so — unlike ÖFFNEN above — this binds its own RemoveCommand directly, no
-                     ReflectionBinding needed. Same icon-btn/cross-glyph idiom as ForcesView's
-                     remove button. -->
-                <Button Grid.Column="5" Classes="icon-btn" Margin="6,0,0,0"
-                        IsVisible="{Binding !IsReadOnly}"
-                        Command="{Binding RemoveCommand}"
-                        ToolTip.Tip="Datei entfernen" AutomationProperties.Name="Datei entfernen">
-                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                </Button>
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        </ScrollViewer>
-      </StackPanel>
+      <DockPanel>
+        <StackPanel x:Name="EmptyStatePanel" DockPanel.Dock="Top" Spacing="6" IsVisible="{Binding !Files.Count}">
+          <TextBlock x:Name="EmptyText" Text="Keine Dateien angehängt."
+                     Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock x:Name="EmptyInstructionText" Text="Dateien hierher ziehen oder über „Datei hinzufügen“ anhängen."
+                     Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding !IsReadOnly}" />
+        </StackPanel>
+        <Border x:Name="FilesListFrame" Background="#0C1119" Padding="14" BorderThickness="1" CornerRadius="{StaticResource RadiusMd}"
+                IsVisible="{Binding Files.Count}">
+          <StackPanel Grid.IsSharedSizeScope="True">
+            <!-- Column headers: the rename box below has no other visible label (#137). Columns share
+                 a SharedSizeGroup with the row template below so headers line up with their data even
+                 though each row sizes its Auto columns to its own content. -->
+            <Grid x:Name="FilesHeaderRow" Margin="0,0,0,8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+                <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
+              <TextBlock Grid.Column="1" Text="GRÖSSE" Classes="overline" FontSize="10" Margin="10,0" />
+              <TextBlock Grid.Column="2" Text="HINZUGEFÜGT" Classes="overline" FontSize="10" Margin="10,0" />
+              <TextBlock Grid.Column="3" Text="VON" Classes="overline" FontSize="10" Margin="10,0" />
+            </Grid>
+            <ScrollViewer>
+            <ItemsControl x:Name="FilesList" ItemsSource="{Binding Files}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:IncidentFileRow">
+                  <Grid Margin="0,0,0,10" RowDefinitions="Auto,Auto">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
+                    </Grid.ColumnDefinitions>
+                    <!-- Committing per keystroke saved the whole incident file on every character
+                         typed (#33). UpdateSourceTrigger=LostFocus pushes once, when the operator
+                         actually leaves the field. Mirrors ForcesView's Bemerkung fix. -->
+                    <TextBox Grid.Column="0" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.FileNamePlaceholder}"
+                             BorderThickness="0" Background="Transparent" Padding="0"
+                             VerticalAlignment="Center" IsReadOnly="{Binding IsReadOnly}" />
+                    <TextBlock Grid.Column="1" Classes="mono file-meta-column" Text="{Binding SizeDisplay}" Margin="10,0"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Classes="mono file-meta-column" Text="{Binding AddedAtDisplay}" Margin="10,0"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="3" Classes="file-meta-column" Text="{Binding AddedBy}" Margin="10,0"
+                               VerticalAlignment="Center" />
+                    <!-- The same three values, on their own line, for the width where they have no
+                         columns to live in. Default hidden; the narrow style above shows it. -->
+                    <WrapPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6" Classes="file-meta-line"
+                               Orientation="Horizontal" ItemSpacing="12" LineSpacing="2" Margin="0,2,0,0">
+                      <TextBlock Classes="mono" FontSize="11" Text="{Binding SizeDisplay}" />
+                      <TextBlock Classes="mono" FontSize="11" Text="{Binding AddedAtDisplay}" />
+                      <TextBlock Classes="secondary" FontSize="11" Text="{Binding AddedBy}" />
+                    </WrapPanel>
+                    <!-- ReflectionBinding: OpenFileCommand lives on the parent ItemsControl's
+                         DataContext (FilesViewModel), whose static type is object under compiled
+                         bindings, so a compiled $parent cast path won't resolve. -->
+                    <Button Grid.Column="4" Content="ÖFFNEN"
+                            Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenFileCommand}"
+                            CommandParameter="{Binding}" />
+                    <!-- The delete affordance (#262 UX): row identity lives on IncidentFileRow itself,
+                         so — unlike ÖFFNEN above — this binds its own RemoveCommand directly, no
+                         ReflectionBinding needed. Same icon-btn/cross-glyph idiom as ForcesView's
+                         remove button. -->
+                    <Button Grid.Column="5" Classes="icon-btn" Margin="6,0,0,0"
+                            IsVisible="{Binding !IsReadOnly}"
+                            Command="{Binding RemoveCommand}"
+                            ToolTip.Tip="Datei entfernen" AutomationProperties.Name="Datei entfernen">
+                      <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </Button>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </ScrollViewer>
+          </StackPanel>
+        </Border>
+      </DockPanel>
     </Border>
   </DockPanel>
 </UserControl>
