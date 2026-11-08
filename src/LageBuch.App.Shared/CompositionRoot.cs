@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Dispatch;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.Services.Weather;
 using LageBuch.AppLogic.ViewModels;
@@ -15,6 +17,7 @@ namespace LageBuch.App.Shared;
 /// </summary>
 public static class CompositionRoot
 {
+    [SuppressMessage("Reliability", "CA2000", Justification = "The alarm inbox lives as long as the Home screen it is handed to, which is the app's lifetime; its only resource is a ticker subscription that ends with the process.")]
     public static MainWindowViewModel CreateMainWindowViewModel(
         IIncidentStore store,
         IMasterDataProvider masterData,
@@ -38,13 +41,17 @@ public static class CompositionRoot
         AlarmMute? alarmMute = null,
         IRegionPackLibrary? mapPacks = null,
         MapNightMode? mapNightMode = null,
-        IWeatherSource? weather = null)
+        IWeatherSource? weather = null,
+        IDispatchInboxStore? dispatchInbox = null)
     {
         // Every cue goes through the device's mute switch (#699); without a file to keep it in,
         // the switch still works for this run.
         alarmMute ??= new AlarmMute();
         alarm = new MutedAlarmService(alarm, alarmMute);
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport, alarmMute: alarmMute, mapPacks: mapPacks, mapNightMode: mapNightMode, weather: weather);
+        var dispatch = dispatchInbox is null
+            ? null
+            : new DispatchInboxViewModel(dispatchInbox, masterData, dialogs, clock, ticker, uiDispatcher, work => _ = Task.Run(work));
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport, alarmMute: alarmMute, mapPacks: mapPacks, mapNightMode: mapNightMode, weather: weather, dispatch: dispatch);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService, mapPacks);
         return new MainWindowViewModel(home, editor, dialogs, appVersion, alarm, alarmMute, uiDispatcher);
     }

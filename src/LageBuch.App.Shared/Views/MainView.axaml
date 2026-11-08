@@ -86,6 +86,14 @@
             </StackPanel>
           </StackPanel>
 
+          <!-- An alarm that came in during an Einsatz: a quiet line, never a dialog over the incident
+               being documented. ÜBERSICHT leads to the offer, which waits on the Home screen. -->
+          <TextBlock Grid.Column="1" x:Name="DispatchNotice" Text="{Binding DispatchNotice}"
+                     IsVisible="{Binding DispatchNotice, Converter={x:Static ObjectConverters.IsNotNull}}"
+                     Foreground="{StaticResource SignalBrush}" FontWeight="SemiBold"
+                     TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding DispatchNotice}"
+                     VerticalAlignment="Center" HorizontalAlignment="Center" Margin="16,0" />
+
           <!-- Actions -->
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
             <StackPanel x:Name="WideActions" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">

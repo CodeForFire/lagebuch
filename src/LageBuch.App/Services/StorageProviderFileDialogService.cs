@@ -181,6 +181,23 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
+    public async Task<string?> PickFolderAsync(string? initialFolder = null)
+    {
+        var top = _topLevel();
+        if (top is null)
+        {
+            return null;
+        }
+
+        var folders = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Alarm-Ordner wählen",
+            AllowMultiple = false,
+            SuggestedStartLocation = await ResolveStartLocation(top, initialFolder),
+        });
+        return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    }
+
     public Task OpenFileAsync(string path)
     {
         // Belt-and-suspenders, like OpenUrlAsync below: LaunchWithOsDefault runs the OS's registered

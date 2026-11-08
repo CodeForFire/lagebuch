@@ -2682,7 +2682,21 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public string? LastSuggestedExportName { get; private set; }
 
-    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
+    public string? LastSuggestedSaveName { get; private set; }
+
+    /// <summary>What <see cref="PickSaveAsync"/> answers; null stands in for a cancelled picker.</summary>
+    public string? SavePath { get; set; } = "/x.lagebuch";
+
+    /// <summary>What <see cref="PickFolderAsync"/> answers; null stands in for a cancelled picker.</summary>
+    public string? FolderPath { get; set; }
+
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
+    {
+        LastSuggestedSaveName = suggestedFileName;
+        return Task.FromResult(SavePath);
+    }
+
+    public Task<string?> PickFolderAsync(string? initialFolder = null) => Task.FromResult(FolderPath);
 
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 

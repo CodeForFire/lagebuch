@@ -1,0 +1,1 @@
+Alarmierung: the desktop app watches a folder for FF-Agent alarm mails and offers each new alarm on the Home screen as an Einsatz, opened with its Einsatznummer, Stichwort, address, Einsatzort on the Lagekarte, a first ETB entry and the ticked Einsatzmittel as Kräfte.
