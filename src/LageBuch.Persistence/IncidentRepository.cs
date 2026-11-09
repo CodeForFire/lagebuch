@@ -139,9 +139,22 @@ public sealed class IncidentRepository
     // co_gases and co_dwellings.gas_values keep them.
     private static void WriteMeasurementLog(InsertCommands inserts, MeasurementLog log)
     {
-        for (var i = 0; i < log.Points.Count; i++)
+        WriteMeasuringPoints(inserts, log.Points);
+        WriteMeasuringDevices(inserts, log.Devices);
+        WriteMeasurementChannels(inserts, log.Channels);
+        for (var i = 0; i < log.Measurements.Count; i++)
         {
-            var point = log.Points[i];
+            WriteMeasurement(inserts, log.Measurements[i], i);
+        }
+
+        WriteWeatherObservations(inserts, log.Weather);
+    }
+
+    private static void WriteMeasuringPoints(InsertCommands inserts, IReadOnlyList<MeasuringPoint> points)
+    {
+        for (var i = 0; i < points.Count; i++)
+        {
+            var point = points[i];
             Run(
                 inserts,
                 "INSERT INTO measuring_points (id, ordinal, name, location, zone) VALUES ($id,$o,$n,$loc,$z);",
@@ -154,10 +167,13 @@ public sealed class IncidentRepository
                     p("$z", (int)point.Zone);
                 });
         }
+    }
 
-        for (var i = 0; i < log.Devices.Count; i++)
+    private static void WriteMeasuringDevices(InsertCommands inserts, IReadOnlyList<MeasuringDevice> devices)
+    {
+        for (var i = 0; i < devices.Count; i++)
         {
-            var device = log.Devices[i];
+            var device = devices[i];
             Run(
                 inserts,
                 "INSERT INTO measuring_devices (id, ordinal, kind, name, number, vehicle, last_check) VALUES ($id,$o,$k,$n,$nr,$v,$c);",
@@ -172,10 +188,13 @@ public sealed class IncidentRepository
                     p("$c", (object?)device.Check ?? DBNull.Value);
                 });
         }
+    }
 
-        for (var i = 0; i < log.Channels.Count; i++)
+    private static void WriteMeasurementChannels(InsertCommands inserts, IReadOnlyList<MeasurementChannel> channels)
+    {
+        for (var i = 0; i < channels.Count; i++)
         {
-            var channel = log.Channels[i];
+            var channel = channels[i];
             var gas = channel.Definition;
             Run(
                 inserts,
@@ -196,15 +215,13 @@ public sealed class IncidentRepository
                     p("$note", (object?)channel.Note ?? DBNull.Value);
                 });
         }
+    }
 
-        for (var i = 0; i < log.Measurements.Count; i++)
+    private static void WriteWeatherObservations(InsertCommands inserts, IReadOnlyList<WeatherObservation> weather)
+    {
+        for (var i = 0; i < weather.Count; i++)
         {
-            WriteMeasurement(inserts, log.Measurements[i], i);
-        }
-
-        for (var i = 0; i < log.Weather.Count; i++)
-        {
-            var w = log.Weather[i];
+            var w = weather[i];
             Run(
                 inserts,
                 "INSERT INTO weather_observations (id, ordinal, observed_at, wind, wind_speed_kmh, temperature_celsius, clouds, precipitation, source) " + "VALUES ($id,$o,$at,$w,$s,$t,$c,$p,$src);",
