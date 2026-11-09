@@ -99,28 +99,52 @@ public class MasterDataJsonTests
     [Theory]
     [InlineData("""{ "dispatchPlaceNames": [{ "abbreviation": "FFB" }] }""")]
     [InlineData("""{ "dispatchPlaceNames": [{ "name": "Fürstenfeldbruck" }] }""")]
-    [InlineData("""{ "dispatchPlaceNames": [{ "name": null, "abbreviation": "FFB" }] }""")]
-    [InlineData("""{ "dispatchPlaceNames": [{ "name": "Fürstenfeldbruck", "abbreviation": null }] }""")]
     public void Parse_refuses_a_place_name_without_both_fields(string json)
     {
-        Assert.ThrowsAny<Exception>(() => Parse(json));
+        Assert.Throws<KeyNotFoundException>(() => Parse(json));
     }
 
-    [Fact]
-    public void Parse_refuses_a_place_name_over_the_cap()
+    // An explicit null is a malformed document, said in German in the one exception type the
+    // joining client already turns into a banner.
+    [Theory]
+    [InlineData("""{ "dispatchPlaceNames": [{ "name": null, "abbreviation": "FFB" }] }""", "Ortsname in der Alarmierung: \"name\" darf nicht null sein.")]
+    [InlineData("""{ "dispatchPlaceNames": [{ "name": "Fürstenfeldbruck", "abbreviation": null }] }""", "Ortsname in der Alarmierung: \"abbreviation\" darf nicht null sein.")]
+    public void Parse_refuses_a_null_place_name_field_and_says_which(string json, string message)
     {
-        var json = $$"""{ "dispatchPlaceNames": [{ "name": "{{new string('x', DispatchPlaceName.MaxLength + 1)}}", "abbreviation": "X" }] }""";
+        Assert.Equal(message, Assert.Throws<JsonException>(() => Parse(json)).Message);
+    }
 
-        Assert.Throws<JsonException>(() => Parse(json));
+    [Theory]
+    [InlineData("name", "X")]
+    [InlineData("X", "name")]
+    public void Parse_refuses_a_place_name_over_the_cap(string name, string abbreviation)
+    {
+        var tooLong = new string('x', DispatchPlaceName.MaxLength + 1);
+        var json = $$"""{ "dispatchPlaceNames": [{ "name": "{{(name == "name" ? tooLong : name)}}", "abbreviation": "{{(abbreviation == "name" ? tooLong : abbreviation)}}" }] }""";
+
+        Assert.Equal(
+            $"Ortsname in der Alarmierung: höchstens {DispatchPlaceName.MaxLength} Zeichen.",
+            Assert.Throws<JsonException>(() => Parse(json)).Message);
     }
 
     [Fact]
     public void A_place_name_at_the_cap_is_read()
     {
-        var name = new string('x', DispatchPlaceName.MaxLength);
-        var json = $$"""{ "dispatchPlaceNames": [{ "name": "X", "abbreviation": "{{name}}" }] }""";
+        var atCap = new string('x', DispatchPlaceName.MaxLength);
+        var json = $$"""{ "dispatchPlaceNames": [{ "name": "{{atCap}}", "abbreviation": "{{atCap}}" }] }""";
 
-        Assert.Equal(name, Assert.Single(Parse(json).DispatchPlaceNames).Abbreviation);
+        var read = Assert.Single(Parse(json).DispatchPlaceNames);
+
+        Assert.Equal(atCap, read.Name);
+        Assert.Equal(atCap, read.Abbreviation);
+    }
+
+    [Theory]
+    [InlineData("""{ "dispatchPlaceNames": 5 }""")]
+    [InlineData("""{ "dispatchPlaceNames": { "name": "Fürstenfeldbruck" } }""")]
+    public void Place_names_that_are_no_list_read_as_none(string json)
+    {
+        Assert.Empty(Parse(json).DispatchPlaceNames);
     }
 
     [Fact]

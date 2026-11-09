@@ -155,26 +155,58 @@ public sealed record DispatchImport(DispatchAlarm Alarm, IReadOnlyList<DispatchU
     private static string Normalize(string? value) =>
         string.Join(' ', (value ?? string.Empty).Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
 
-    // Every whole-word occurrence of a place name, in any case, becomes its short form. Longest
-    // first, so "Musterstadt Nord" is not first cut down to "MST Nord".
+    // Every whole-word occurrence of a place name, in any case, becomes its short form, in one
+    // pass over the alarm's own words: at each word the place with the most words wins, so
+    // "Musterstadt Nord" is not cut down to "MST Nord". A short form is never read again. The
+    // place names come from Stammdaten an import or a sync peer may have written, and rewriting
+    // the output of one entry with the next ("a" -> "b b", "b" -> "c c", ...) would grow the
+    // name exponentially; one pass keeps it to the alarm's words times the longest short form.
     private static string Abbreviate(string name, IReadOnlyList<DispatchPlaceName> placeNames)
     {
-        var padded = $" {name} ";
-        foreach (var place in placeNames
-            .Select(p => (Name: Normalize(p.Name), Abbreviation: Normalize(p.Abbreviation)))
-            .Where(p => p.Name.Length > 0 && p.Abbreviation.Length > 0)
-            .OrderByDescending(p => p.Name.Length))
+        var places = placeNames
+            .Select(p => (Words: Normalize(p.Name).Split(' ', StringSplitOptions.RemoveEmptyEntries), Abbreviation: Normalize(p.Abbreviation)))
+
+            // An empty place would match at every word without moving past it.
+            .Where(p => p.Words.Length > 0 && p.Abbreviation.Length > 0)
+            .OrderByDescending(p => p.Words.Length)
+            .ToList();
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var result = new List<string>(words.Length);
+        var at = 0;
+        while (at < words.Length)
         {
-            var from = $" {place.Name} ";
-            var at = padded.IndexOf(from, StringComparison.OrdinalIgnoreCase);
-            while (at >= 0)
+            var place = places.Find(p => StartsAt(words, at, p.Words));
+            if (place.Words is null)
             {
-                padded = string.Concat(padded.AsSpan(0, at), $" {place.Abbreviation} ", padded.AsSpan(at + from.Length));
-                at = padded.IndexOf(from, at + place.Abbreviation.Length + 1, StringComparison.OrdinalIgnoreCase);
+                result.Add(words[at]);
+                at++;
+            }
+            else
+            {
+                result.Add(place.Abbreviation);
+                at += place.Words.Length;
             }
         }
 
-        return padded.Trim();
+        return string.Join(' ', result);
+    }
+
+    private static bool StartsAt(string[] words, int at, string[] place)
+    {
+        if (at + place.Length > words.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < place.Length; i++)
+        {
+            if (!string.Equals(words[at + i], place[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool EndsWithWord(string longer, string shorter) =>

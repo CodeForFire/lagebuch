@@ -87,6 +87,39 @@ public class DispatchImportTests
     }
 
     [Fact]
+    public void A_place_at_the_start_of_the_name_is_abbreviated_too()
+    {
+        Assert.Same(MstHlf, DispatchImport.Match("Musterstadt 2/40/1", [MstHlf], [Mst]));
+    }
+
+    // A blank entry would match at every word (or wipe the place out); it is passed over.
+    [Fact]
+    public void A_place_name_entry_with_a_blank_field_is_ignored()
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+
+        var found = DispatchImport.Match("Florian Musterstadt 2/40/1", [full], [new DispatchPlaceName(" ", "MST"), new DispatchPlaceName("Musterstadt", " ")]);
+
+        Assert.Same(full, found);
+    }
+
+    // Stammdaten from an import or a sync peer are hostile input. Each entry rewriting the output
+    // of the one before doubled the name per entry: forty chained entries are 2^40 words. One
+    // pass over the alarm's own words applies the first entry only.
+    [Fact]
+    public void Chained_place_names_are_applied_once_and_never_to_their_own_output()
+    {
+        var chain = Enumerable.Range(0, 40).Select(i => new DispatchPlaceName($"P{i}", $"P{i + 1} P{i + 1}")).ToList();
+        var once = new Vehicle("Wache", "P1 P1 40/1", 9);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var found = DispatchImport.Match("Florian P0 40/1", [once], chain);
+
+        Assert.Same(once, found);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(1), $"took {watch.Elapsed}");
+    }
+
+    [Fact]
     public void A_nachbarwehr_still_matches_by_its_own_name()
     {
         Assert.Same(Nachbar, DispatchImport.Match("Florian Beispielried 43/2", [MstHlf, Nachbar], [Mst]));

@@ -44,6 +44,15 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_second_save_replaces_the_place_names_instead_of_adding_to_them()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { DispatchPlaceNames = new[] { new DispatchPlaceName("Fürstenfeldbruck", "FFB") } });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { DispatchPlaceNames = new[] { new DispatchPlaceName("Musterstadt", "MST") } });
+
+        Assert.Equal(new[] { new DispatchPlaceName("Musterstadt", "MST") }, MasterDataStore.GetOrCreate(_path).DispatchPlaceNames);
+    }
+
+    [Fact]
     public void Save_then_GetOrCreate_round_trips_every_category_including_personnel()
     {
         var set = MasterDataSet.Empty with
