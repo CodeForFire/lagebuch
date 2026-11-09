@@ -139,6 +139,12 @@ public class MeasurementLogRenderTests
         Dispatcher.UIThread.RunJobs();
     }
 
+    private static void OpenComposer(MeasurementLogView view)
+    {
+        Named<Button>(view, "OpenComposerButton").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     private static void Capture(Window window, string name)
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
@@ -190,9 +196,31 @@ public class MeasurementLogRenderTests
         Assert.Equal("08:55", list.Items.Cast<MeasurementRow>().First().TimeText);
         Assert.True(Named<Border>(view, "MeasurementTablePanel").IsEffectivelyVisible);
         Assert.False(Named<Border>(view, "MeasurementCardPanel").IsEffectivelyVisible);
+        Assert.False(Named<Border>(view, "InputDock").IsEffectivelyVisible);
+        Assert.True(Named<Button>(view, "OpenComposerButton").IsEffectivelyVisible);
+        Capture(window, "messprotokoll-messreihe.png");
+
+        OpenComposer(view);
         Assert.True(Named<Border>(view, "InputDock").IsEffectivelyVisible);
         Assert.True(Named<Button>(view, "RecordMeasurementButton").IsEffectivelyVisible);
-        Capture(window, "messprotokoll-messreihe.png");
+        Assert.True(Named<Button>(view, "CloseComposerButton").IsEffectivelyVisible);
+        Assert.False(Named<Button>(view, "OpenComposerButton").IsEffectivelyVisible);
+        Capture(window, "messprotokoll-neue-messung.png");
+    }
+
+    // The four-row form, docked open for good, took every pixel below the Messpunkt chips on a
+    // laptop and left the Messreihe 0 px tall. Closed until asked for, the table keeps the room.
+    [AvaloniaFact]
+    public void On_a_laptop_the_messreihe_keeps_its_room_below_the_tiles()
+    {
+        var (window, _) = ShowWorkspace(width: 1366, height: 768);
+        var view = OpenLog(window);
+        window.UpdateLayout();
+
+        Assert.True(
+            Named<Border>(view, "MeasurementTablePanel").Bounds.Height >= 200,
+            $"The Messreihe is {Named<Border>(view, "MeasurementTablePanel").Bounds.Height} px tall.");
+        Capture(window, "messprotokoll-laptop.png");
     }
 
     // The band is written out on the tile and under the value, never left to the colour.
@@ -265,6 +293,7 @@ public class MeasurementLogRenderTests
         var (window, vm) = ShowWorkspace();
         var view = OpenLog(window);
         var log = vm.MeasurementLog;
+        OpenComposer(view);
         var newest = Named<ItemsControl>(view, "MeasurementList").GetRealizedContainers().First();
 
         Named<Button>(newest, "AssessButton").Command!.Execute(null);
@@ -427,6 +456,7 @@ public class MeasurementLogRenderTests
     {
         var (window, _) = ShowWorkspace(seeded: false);
         var view = OpenLog(window);
+        OpenComposer(view);
 
         Assert.Equal("Noch keine Messung.", Named<TextBlock>(view, "MeasurementEmptyText").Text);
         Assert.True(Named<TextBlock>(view, "MeasurementEmptyText").IsEffectivelyVisible);
@@ -440,6 +470,7 @@ public class MeasurementLogRenderTests
         var (window, vm) = ShowWorkspace();
         var view = OpenLog(window);
         var log = vm.MeasurementLog;
+        OpenComposer(view);
 
         log.NewPointName = "Kellerabgang";
         log.ValueInputs[0].Text = "viel";

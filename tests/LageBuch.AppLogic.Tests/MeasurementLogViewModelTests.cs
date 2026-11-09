@@ -263,15 +263,18 @@ public sealed class MeasurementLogViewModelTests
         Assert.Equal(["Kellerabgang", "Hofeinfahrt"], vm.PointNameOptions);
     }
 
+    // Under "Alle" a harmless later reading at one Messpunkt must never hide a dangerous one at
+    // another: each tile shows the worst of the Messpunkte' latest values.
     [Fact]
-    public void The_tiles_show_each_messgroesse_at_its_latest_value_and_the_point_filter_narrows_them()
+    public void The_tiles_show_each_messgroesse_at_its_worst_latest_value_and_the_point_filter_narrows_them()
     {
         var vm = NewVm(NewSession());
         Record(vm, "Kellerabgang", "14:05", co: "38");
         Record(vm, "Hofeinfahrt", "14:10", co: "5", ex: "2");
 
-        Assert.Equal(["5 ppm", "2 %UEG"], vm.Tiles.Select(t => t.ValueText));
-        Assert.Equal("Hofeinfahrt · 14:10", vm.Tiles[0].Footer);
+        Assert.Equal(["38 ppm", "2 %UEG"], vm.Tiles.Select(t => t.ValueText));
+        Assert.Equal("Kellerabgang · 14:05", vm.Tiles[0].Footer);
+        Assert.Equal("Hofeinfahrt · 14:10", vm.Tiles[1].Footer);
 
         var keller = vm.PointFilterOptions.Single(o => o.Label == "Kellerabgang");
         vm.NewPointName = null;
@@ -284,6 +287,20 @@ public sealed class MeasurementLogViewModelTests
         Assert.Equal("Kellerabgang #1", Assert.Single(vm.Rows).PointText);
         Assert.Equal("Kellerabgang", vm.NewPointName); // the form follows the filter
         Assert.Equal("Alle", vm.PointFilterOptions[0].Label);
+    }
+
+    [Fact]
+    public void Under_alle_a_tie_in_band_goes_to_the_newer_value_and_a_point_counts_only_with_its_latest()
+    {
+        var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:00", co: "250");
+        Record(vm, "Kellerabgang", "14:05", co: "4");
+        Record(vm, "Hofeinfahrt", "14:10", co: "6");
+        Record(vm, "Absperrgrenze", "14:02", co: "7");
+
+        // Kellerabgang's 250 is superseded there; three Normal values remain, the newest wins.
+        Assert.Equal("6 ppm", vm.Tiles[0].ValueText);
+        Assert.Equal("Hofeinfahrt · 14:10", vm.Tiles[0].Footer);
     }
 
     [Fact]
@@ -744,16 +761,16 @@ public sealed class MeasurementLogViewModelTests
         Assert.True(vm.IsCorrectionOpen);
     }
 
-    // A phone opens the form on demand, as the Ausgabeliste does; a saved Messung closes it again,
-    // and a Bewertung or Korrektur takes its place on any width.
-    [Fact]
-    public void On_a_phone_the_form_opens_on_demand_and_closes_once_the_messung_is_saved()
+    // The form opens on demand on every width: open for good, its four rows left the Messreihe
+    // no room at all on a laptop. A saved Messung closes it again, and a Bewertung or Korrektur
+    // takes its place.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void The_form_opens_on_demand_and_closes_once_the_messung_is_saved(bool narrow)
     {
         var vm = NewVm(NewSession());
-        Assert.True(vm.ShowComposer);
-        Assert.False(vm.ShowComposerButton);
-
-        vm.IsNarrow = true;
+        vm.IsNarrow = narrow;
         Assert.False(vm.ShowComposer);
         Assert.True(vm.ShowComposerButton);
 
@@ -762,16 +779,22 @@ public sealed class MeasurementLogViewModelTests
         Assert.False(vm.ShowComposerButton);
         Record(vm, "Kellerabgang", "14:05", co: "38");
         Assert.False(vm.IsComposerOpen);
+        Assert.False(vm.ShowComposer);
         Assert.True(vm.ShowComposerButton);
 
-        vm.IsNarrow = false;
+        vm.OpenComposerCommand.Execute(null);
         vm.Rows[0].AssessCommand.Execute(null);
         Assert.False(vm.ShowComposer);
+        Assert.False(vm.ShowComposerButton);
         vm.CancelAssessmentCommand.Execute(null);
         vm.Rows[0].Cells[0].CorrectCommand.Execute(null);
         Assert.False(vm.ShowComposer);
         vm.CancelCorrectionCommand.Execute(null);
         Assert.True(vm.ShowComposer);
+
+        vm.CloseComposerCommand.Execute(null);
+        Assert.False(vm.ShowComposer);
+        Assert.True(vm.ShowComposerButton);
     }
 
     [Fact]
@@ -782,6 +805,7 @@ public sealed class MeasurementLogViewModelTests
         var vm = NewVm(session);
 
         Assert.False(vm.ShowComposer);
+        Assert.False(vm.ShowComposerButton);
         vm.IsNarrow = true;
         Assert.False(vm.ShowComposerButton);
         Assert.False(vm.OpenComposerCommand.CanExecute(null));

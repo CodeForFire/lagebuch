@@ -88,20 +88,21 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
     [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
     private bool _isNarrow;
 
-    /// <summary>Whether the phone's entry form is open; the wide layout always shows it.</summary>
+    /// <summary>Whether the entry form is open, on any width.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowComposer))]
     [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
     private bool _isComposerOpen;
 
     /// <summary>
-    /// Whether the entry form is on screen: always when wide, only while composing on a phone, and
-    /// never while a Bewertung or a Korrektur takes its place, as IssuedItemsViewModel does it.
+    /// Whether the entry form is on screen: only while composing, and never while a Bewertung or a
+    /// Korrektur takes its place. Unlike the one-line forms elsewhere it is closed by default on a
+    /// wide window too: open for good, its four rows left the Messreihe no room on a laptop.
     /// </summary>
-    public bool ShowComposer => CanEdit && !IsAssessmentOpen && !IsCorrectionOpen && (!IsNarrow || IsComposerOpen);
+    public bool ShowComposer => CanEdit && !IsAssessmentOpen && !IsCorrectionOpen && IsComposerOpen;
 
-    /// <summary>The phone's "+ MESSUNG" button, shown exactly when the form could open and is not.</summary>
-    public bool ShowComposerButton => CanEdit && IsNarrow && !IsComposerOpen && !IsAssessmentOpen && !IsCorrectionOpen;
+    /// <summary>The "+ MESSUNG ERFASSEN" button, shown exactly when the form could open and is not.</summary>
+    public bool ShowComposerButton => CanEdit && !IsComposerOpen && !IsAssessmentOpen && !IsCorrectionOpen;
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
     private void OpenComposer() => IsComposerOpen = true;
@@ -1090,10 +1091,14 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
         var pointId = SelectedPointFilter?.PointId;
         var pointsById = log.Points.ToDictionary(p => p.Id);
 
-        // Per Messgröße the newest of its latest values, across the Messpunkte the filter covers.
+        // Per Messgröße the worst of the Messpunkte' latest values, the newer on a tie: under "Alle"
+        // a harmless later reading at one Messpunkt must not hide a dangerous one at another.
+        var channelsById = log.Channels.ToDictionary(c => c.Id);
         var latest = MeasurementRules.Latest(log, pointId)
             .GroupBy(l => l.ChannelId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(l => l.MeasuredAt).Last());
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(l => MeasurementRules.SeverityOf(channelsById[l.ChannelId], l.Value)).ThenBy(l => l.MeasuredAt).Last());
         var devicesById = log.Devices.ToDictionary(d => d.Id);
         Tiles.Clear();
         foreach (var channel in log.Channels.Where(c => c.IsActive))
