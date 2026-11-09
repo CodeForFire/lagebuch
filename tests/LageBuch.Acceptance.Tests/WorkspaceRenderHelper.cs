@@ -197,7 +197,7 @@ internal static class WorkspaceRenderHelper
         SelectedTabContent(window).GetVisualDescendants().OfType<TabControl>()
             .Single(t => t.Classes.Contains("module-tabs"));
 
-    private static readonly string[] FuehrungTabs = ["ORGANISATION", "FUNKTIONEN", "KRÄFTE"];
+    private static readonly string[] FuehrungTabs = ["ORGANISATION", "FUNKTIONEN", "KRÄFTE", "LAGEKARTE"];
 
     /// <summary>The tab strip inside the FÜHRUNG rail entry; FÜHRUNG must be the open entry.</summary>
     public static TabControl LeadershipTabStrip(Window window) =>

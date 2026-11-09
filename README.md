@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo/einsatz-flow.gif" width="960" alt="Ein Einsatz in Lagebuch: Einsatzdaten, ETB, Kräfte, Atemschutz, Aufgaben, CO-Messung, PDF" />
+  <img src="docs/demo/einsatz-flow.gif" width="960" alt="Ein Einsatz in Lagebuch: Einsatzdaten, ETB, Lagemeldung, Führung, Lagekarte, Kräfte, Atemschutz, Aufgaben, Gasmessung, Beteiligte, Ausgabe, PDF" />
 </p>
 
 Lagebuch ist das digitale Einsatztagebuch für den Einsatzleitwagen: eine
