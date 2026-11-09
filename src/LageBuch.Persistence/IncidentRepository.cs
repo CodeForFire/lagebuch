@@ -1405,11 +1405,21 @@ public sealed class IncidentRepository
             kv => new[] { GasDefinitionJson.ToText(kv.Value.Low), GasDefinitionJson.ToText(kv.Value.High) }));
 
     // The reverse. An entry whose key, shape or numbers do not read is dropped rather than failing
-    // the whole file, the way GasValues treats co_dwellings.gas_values.
+    // the whole file, the way GasValues treats co_dwellings.gas_values; text that is no such JSON at
+    // all costs the Messung its values.
     private static Dictionary<Guid, MeasuredValue> ReadMeasuredValues(string json)
     {
-        var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?[]?>>(json) ?? [];
         var values = new Dictionary<Guid, MeasuredValue>();
+        Dictionary<string, string?[]?> raw;
+        try
+        {
+            raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?[]?>>(json) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return values;
+        }
+
         foreach (var (key, ends) in raw)
         {
             if (Guid.TryParse(key, out var channelId)

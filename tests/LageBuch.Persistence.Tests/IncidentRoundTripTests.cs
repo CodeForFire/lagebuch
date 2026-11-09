@@ -1226,6 +1226,23 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(WindDirection.Variable, weather.Wind);
     }
 
+    // measured_values that are no JSON, or JSON of another shape, cost that Messung its values,
+    // never the Einsatz.
+    [Theory]
+    [InlineData("kein json")]
+    [InlineData("[1]")]
+    [InlineData("{\"x\":{\"a\":1}}")]
+    public void A_hostile_files_measured_values_that_do_not_read_cost_only_the_values(string json)
+    {
+        var clock = new Clock();
+        IncidentRepository.Save(_path, IncidentWithMeasurementLog(clock));
+        ExecRaw($"UPDATE measurements SET measured_values = '{json}';");
+
+        var measurement = Assert.Single(IncidentRepository.Load(_path).MeasurementLog.Measurements);
+
+        Assert.Empty(measurement.Values);
+    }
+
     // Record equality compares the collections by reference, so both sides get the same empty ones
     // and the collections are compared on their own.
     private static Measurement WithoutCollections(Measurement m) =>
