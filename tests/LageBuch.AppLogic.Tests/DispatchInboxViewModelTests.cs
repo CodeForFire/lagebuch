@@ -82,9 +82,9 @@ public sealed class DispatchInboxViewModelTests : IDisposable
         inbox.Offer!.Units[0].IsSelected = true;
         inbox.Offer.Units[2].IsSelected = false;
 
-        var import = inbox.CurrentImport();
+        var import = inbox.Offer.ToImport();
 
-        Assert.Equal(["Florian Musterstadt Wache 2"], import!.Units.Select(u => u.Name));
+        Assert.Equal(["Florian Musterstadt Wache 2"], import.Units.Select(u => u.Name));
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public sealed class DispatchInboxViewModelTests : IDisposable
         IncidentWorkspaceViewModel? opened = null;
         home.WorkspaceOpened = ws => opened = ws;
 
-        var import = home.Dispatch!.CurrentImport();
+        var import = home.Dispatch!.Offer?.ToImport();
         home.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), import));
 
         Assert.NotNull(opened);
@@ -230,7 +230,7 @@ public sealed class DispatchInboxViewModelTests : IDisposable
         Drop();
         var home = new HomeViewModel(new FakeStore(), new VehicleMasterData(), new FakeRecent(), new FakeDialogs { SavePath = null }, new FixedClock(Now), _ticker, new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", dispatch: Inbox());
 
-        home.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), home.Dispatch!.CurrentImport()));
+        home.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), home.Dispatch!.Offer?.ToImport()));
 
         Assert.NotNull(home.Dispatch.Offer);
         Assert.Empty(_store.Handled);
@@ -302,6 +302,66 @@ public sealed class DispatchInboxViewModelTests : IDisposable
 
         Assert.IsType<IncidentWorkspaceViewModel>(shell.CurrentView);
         Assert.Equal("Neuer Alarm: THL 2 T2917 – auf der Startseite anlegen", shell.DispatchNotice);
+    }
+
+    // The offer can change while the Lagebuchführer is asked for: a scan that finds the file
+    // locked by the sync client drops it, a newer alarm replaces it. The alarm accepted is the one
+    // taken up, ticks and all.
+    [Fact]
+    public void The_alarm_accepted_is_taken_up_even_when_a_scan_loses_it_during_the_prompt()
+    {
+        Drop();
+        var (shell, store) = Shell();
+        var home = Assert.IsType<HomeViewModel>(shell.CurrentView);
+        home.Dispatch!.AcceptCommand.Execute(null);
+
+        File.Delete(Path.Join(_folder, "alarm.html"));
+        for (var i = 0; i < DispatchInboxViewModel.TicksPerScan; i++)
+        {
+            _ticker.Fire();
+        }
+
+        Assert.Null(home.Dispatch.Offer);
+        ConfirmOperator(shell);
+
+        Assert.Equal(DispatchSamples.IncidentNumber, store.Load("/x.lagebuch").IncidentNumber?.Value);
+        Assert.Single(_store.Handled);
+    }
+
+    [Fact]
+    public void A_cancelled_prompt_forgets_the_accepted_alarm()
+    {
+        Drop();
+        var (shell, store) = Shell();
+        var home = Assert.IsType<HomeViewModel>(shell.CurrentView);
+        home.Dispatch!.AcceptCommand.Execute(null);
+        shell.CancelOperatorCommand.Execute(null);
+
+        shell.RequestNewIncidentCommand.Execute(null);
+        ConfirmOperator(shell);
+
+        Assert.Null(store.Load("/x.lagebuch").IncidentNumber);
+        Assert.Empty(_store.Handled);
+    }
+
+    // A picked file can be a OneDrive placeholder or sit on a share: reading it may download or
+    // stall, so it is read off the UI thread like the folder.
+    [Fact]
+    public async Task An_alarm_file_picked_by_hand_is_read_in_the_background()
+    {
+        var path = Path.Join(_folder, "alt.html");
+        await File.WriteAllTextAsync(path, DispatchSamples.Html());
+        var background = new Queue<Action>();
+        var ui = new QueueingDispatcher();
+        var inbox = new DispatchInboxViewModel(new FakeInbox(), new VehicleMasterData(), new FakeDialogs { AlarmFilePath = path }, new FixedClock(Now), _ticker, ui, background.Enqueue, Cet);
+
+        await inbox.OpenAlarmFileCommand.ExecuteAsync(null);
+        Assert.Null(inbox.Offer);
+        background.Dequeue()();
+        Assert.Null(inbox.Offer);
+        ui.RunAll();
+
+        Assert.Equal(DispatchSamples.IncidentNumber, inbox.Offer?.Alarm.IncidentNumber);
     }
 
     // ALARM-DATEI ÖFFNEN: a saved alarm mail picked by hand is offered whatever its age.
@@ -413,6 +473,27 @@ public sealed class DispatchInboxViewModelTests : IDisposable
         Assert.Equal("Alarm-Ordner: Datenträger voll", Inbox().Error);
     }
 
+    // An ACL on dispatch-inbox.json throws UnauthorizedAccessException, not IOException; at start
+    // or on a tick during an Einsatz it must not take the app down.
+    [Fact]
+    public void A_store_denied_to_the_app_is_reported_not_thrown()
+    {
+        _store.Failure = new UnauthorizedAccessException("Zugriff verweigert");
+
+        Assert.Equal("Alarm-Ordner: Zugriff verweigert", Inbox().Error);
+    }
+
+    [Fact]
+    public void A_folder_setting_that_cannot_be_read_leaves_alarm_import_off_and_says_why()
+    {
+        _store.FolderFailure = new UnauthorizedAccessException("Zugriff verweigert");
+
+        var inbox = Inbox();
+
+        Assert.Null(inbox.Folder);
+        Assert.Equal("Alarm-Ordner: Zugriff verweigert", inbox.Error);
+    }
+
     [Fact]
     public async Task A_folder_that_cannot_be_saved_is_reported_and_not_taken()
     {
@@ -512,7 +593,10 @@ public sealed class DispatchInboxViewModelTests : IDisposable
         /// <summary>When set, every read and write after the folder throws it, like a full or locked disk.</summary>
         public Exception? Failure { get; set; }
 
-        public string? GetFolder() => Folder;
+        /// <summary>When set, reading the folder setting throws it.</summary>
+        public Exception? FolderFailure { get; set; }
+
+        public string? GetFolder() => FolderFailure is null ? Folder : throw FolderFailure;
 
         public void SetFolder(string? folder) => Folder = Failure is null ? folder : throw Failure;
 

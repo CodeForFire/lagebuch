@@ -125,9 +125,11 @@ public sealed class DispatchFolderScanner
         IsRecent(new DateTimeOffset(utc, TimeSpan.Zero), now);
 
     // A link or a device reports its own size, not what reading it yields: a link to /dev/zero is
-    // "0 bytes" and never ends. Only plain files are alarm mails.
+    // "0 bytes" and never ends. Only plain files are alarm mails. LinkTarget names symlinks and
+    // junctions; any other reparse point passes, because OneDrive keeps every file it syncs as
+    // one, and those are exactly the files the documented setup delivers.
     private static bool IsPlainFile(FileInfo file) =>
-        file.LinkTarget is null && (file.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Device)) == 0;
+        file.LinkTarget is null && (file.Attributes & FileAttributes.Device) == 0;
 
     // A file still being written by the sync client, or locked by it, is read on the next poll
     // a few seconds later; until then it is simply not an alarm yet.

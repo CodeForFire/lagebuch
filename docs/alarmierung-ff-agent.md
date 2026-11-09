@@ -27,11 +27,16 @@ Lagebuch liest den `<einsatz>`-Block, den FF-Agent mit „Alarm Webhook und Mail
 als gespeicherte Mail (`.eml`), als Mail-Text (`.html`/`.htm`) oder als reines XML (`.xml`) im
 Ordner liegen.
 
-- Aus dem Ordner angeboten werden nur Alarme der letzten **2 Stunden**. Ältere Dateien bleiben
-  unbeachtet.
+- Aus dem Ordner angeboten werden nur Alarme der letzten **2 Stunden**, gemessen an der
+  Alarmierungszeit in der Mail. Ältere Dateien bleiben unbeachtet. Fehlt die Alarmierungszeit,
+  zählt, wann die Datei gespeichert wurde: Ein alter Alarm, der eben erst im Ordner gelandet ist,
+  wird dann noch angeboten.
 - **ALARM-DATEI ÖFFNEN** bietet eine einzelne gespeicherte Alarm-Mail an, egal wie alt. So lässt
   sich ein späterer Alarm von Hand übernehmen oder die Übernahme ausprobieren. Die Mail lässt sich
   dazu z. B. aus Outlook im Web als `.eml` speichern.
+- Eine Datei darf höchstens **250 KB** groß sein, sonst meldet Lagebuch „Keine Alarmierung …
+  gefunden“. Eine gespeicherte Mail mit Anhängen ist schnell größer; dann nur den Mail-Text als
+  `.html` speichern.
 - **Mitteiler** und **Patient** werden nie gelesen und landen nicht im Lagebuch.
 - Die Dateien im Ordner werden nur gelesen. Lagebuch verschiebt und löscht nichts.
 - Ein Probealarm ist als **PROBEALARM** gekennzeichnet.
@@ -45,22 +50,25 @@ Lagebuch greift nicht selbst auf Outlook oder das Postfach zu. Etwas anderes mus
 in den Ordner legen. Mit Microsoft 365 geht das ohne Programmierung über einen
 **Power-Automate-Flow**:
 
-1. **Auslöser:** *Beim Eintreffen einer neuen E-Mail (V3)* im Postfach, das die Alarm-Mails
+1. **Ordner anlegen:** in OneDrive (z. B. auf office.com → OneDrive → *Neu → Ordner*) einen
+   Ordner `Alarmierung` anlegen. Erst dann lässt er sich im Flow auswählen und auf dem ELW-PC
+   lokal halten.
+2. **Auslöser:** *Beim Eintreffen einer neuen E-Mail (V3)* im Postfach, das die Alarm-Mails
    bekommt. Bei einem freigegebenen Postfach heißt der Auslöser *Beim Eintreffen einer neuen
    E-Mail in einem freigegebenen Postfach (V2)*.
    - *Von*: `do-not-reply@ff-agent.com`
    - *Betrefffilter*: der Marker, den FF-Agent in den Betreff setzt, z. B. `#FFA-LB#`.
    - *Anlagen einschließen*: Nein
-2. **Aktion:** *OneDrive for Business → Datei erstellen*.
+3. **Aktion:** *OneDrive for Business → Datei erstellen*.
    - *Ordnerpfad*: z. B. `/Alarmierung`.
    - *Dateiname*: als Ausdruck
      `concat(formatDateTime(utcNow(), 'yyyyMMdd-HHmmss'), '-', guid(), '.html')`.
      Die Nachrichten-ID der Mail taugt nicht: Sie enthält `<` und `>`, die OneDrive in
      Dateinamen ablehnt.
    - *Dateiinhalt*: der *Text* (Body) der Mail, also das HTML mit dem Alarm darin.
-3. Auf dem ELW-PC mit demselben Konto bei OneDrive anmelden und den Ordner per Rechtsklick auf
+4. Auf dem ELW-PC mit demselben Konto bei OneDrive anmelden und den Ordner per Rechtsklick auf
    **Immer auf diesem Gerät behalten** stellen, damit die Dateien wirklich lokal liegen.
-4. In Lagebuch diesen lokalen Ordner als Alarm-Ordner wählen, z. B.
+5. In Lagebuch diesen lokalen Ordner als Alarm-Ordner wählen, z. B.
    `C:\Users\<Name>\OneDrive - <Organisation>\Alarmierung`.
 
 Die Aktionen *Office 365 Outlook* und *OneDrive for Business* sind Standard-Connectoren. In den

@@ -123,7 +123,9 @@ public sealed record DispatchImport(DispatchAlarm Alarm, IReadOnlyList<DispatchU
 
         session.AddJournalEntry(EtbDirection.Incoming, JournalText(), from: JournalSender);
 
-        foreach (var unit in Units)
+        // One unit ticked under two names ("2/40/1" and its full Funkrufname, or another case)
+        // is still one unit; recording it twice would double the Stärke.
+        foreach (var unit in Units.DistinctBy(u => u.Vehicle?.CallSign ?? u.Name, StringComparer.OrdinalIgnoreCase))
         {
             if (unit.Vehicle is { } vehicle)
             {

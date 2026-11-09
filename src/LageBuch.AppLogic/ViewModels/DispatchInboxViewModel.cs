@@ -11,7 +11,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// <summary>
 /// Alarm import on the Home screen: the folder alarm mails land in, and the newest alarm there
 /// still to be answered. EINSATZ ANLEGEN hands the alarm to the shell, which asks for the
-/// Lagebuchführer as for any new incident and then takes it up with <see cref="CurrentImport"/>;
+/// Lagebuchführer as for any new incident and then takes up the offer it accepted;
 /// VERWERFEN answers it without an incident. Either way it is never offered again.
 /// </summary>
 public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposable
@@ -54,12 +54,12 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
         _scanner = new DispatchFolderScanner(clock, zone);
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         _runInBackground = runInBackground ?? (work => work());
-        _folder = store.GetFolder();
+        _folder = ReadFolderSetting();
         _tick = ticker.Subscribe(OnTick);
         Scan();
     }
 
-    /// <summary>Raised by EINSATZ ANLEGEN; the shell asks for the Lagebuchführer, then reads <see cref="CurrentImport"/>.</summary>
+    /// <summary>Raised by EINSATZ ANLEGEN; the shell keeps <see cref="Offer"/>, asks for the Lagebuchführer, then takes that offer up.</summary>
     public Action? CreateRequested { get; set; }
 
     /// <summary>The alarm folder, or null while alarm import is off.</summary>
@@ -91,7 +91,7 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
         {
             handled = _store.GetHandled();
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             _scanning = false;
             Error = $"Alarm-Ordner: {ex.Message}";
@@ -121,8 +121,20 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
         }
     }
 
-    /// <summary>The offered alarm with the Einsatzmittel as ticked right now, or null when there is none.</summary>
-    public DispatchImport? CurrentImport() => Offer?.ToImport();
+    // An unreadable setting (an ACL on dispatch-inbox.json) leaves alarm import off for this
+    // start and says why, instead of failing the start.
+    private string? ReadFolderSetting()
+    {
+        try
+        {
+            return _store.GetFolder();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Error = $"Alarm-Ordner: {ex.Message}";
+            return null;
+        }
+    }
 
     /// <summary>
     /// Records <paramref name="alarm"/> as taken up once its incident exists. Not before: a
@@ -188,7 +200,32 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
             return;
         }
 
-        if (!_scanner.TryReadFile(path, out var alarm))
+        // Read off the UI thread like the folder: a OneDrive placeholder downloads on first read,
+        // and a share can stall.
+        _runInBackground(() =>
+        {
+            var alarm = ReadFileSafely(path);
+            _uiDispatcher.Post(() => OfferPicked(path, alarm));
+        });
+    }
+
+    // Runs on a pool thread, where an escaping exception would vanish without a word.
+    [SuppressMessage("Design", "CA1031", Justification = "A file that cannot be read is reported through the bound Error string as holding no alarm.")]
+    private DispatchAlarm? ReadFileSafely(string path)
+    {
+        try
+        {
+            return _scanner.TryReadFile(path, out var alarm) ? alarm : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private void OfferPicked(string path, DispatchAlarm? alarm)
+    {
+        if (alarm is null)
         {
             Error = $"Keine Alarmierung in {Path.GetFileName(path)} gefunden.";
             return;

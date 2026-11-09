@@ -143,6 +143,25 @@ public class DispatchImportTests
         Assert.Equal(0, unit.PersonnelCount);
     }
 
+    // "2/40/1" and the full Funkrufname both find the HLF; a Leitstelle listing a unit twice in
+    // another case is the same unit. Recording either twice would double the Stärke.
+    [Fact]
+    public void A_unit_ticked_under_two_names_is_recorded_once()
+    {
+        var session = Session();
+
+        new DispatchImport(
+            Alarm(),
+            [
+                new DispatchUnit("Florian Musterstadt 2/40/1", Hlf),
+                new DispatchUnit("2/40/1", Hlf),
+                new DispatchUnit("Florian Musterstadt 1", null),
+                new DispatchUnit("florian musterstadt 1", null),
+            ]).ApplyTo(session, []);
+
+        Assert.Equal(["Florian Musterstadt 2/40/1", "Florian Musterstadt 1"], session.Incident.Forces.Select(f => f.CallSign));
+    }
+
     [Fact]
     public void Units_left_unticked_are_not_recorded()
     {

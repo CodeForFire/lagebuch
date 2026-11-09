@@ -26,6 +26,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IUiDispatcher? _uiDispatcher;
     private PendingAction _pending = PendingAction.None;
 
+    // The alarm offer EINSATZ ANLEGEN accepted, until its operator prompt is answered.
+    private DispatchOfferViewModel? _pendingOffer;
+
     // Set by CancelJoin() and consumed by ConfirmOperatorAsync (#196): a cancelled join leaves
     // HomeViewModel.JoinError null exactly like a successful one, so "JoinError is null" alone can't
     // tell the two apart. This flag is the only way ConfirmOperatorAsync knows the abort was
@@ -191,10 +194,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         askEvenIfReadOnly: true);
 
     // EINSATZ ANLEGEN on the Home screen's alarm: the same operator prompt as a new incident. The
-    // alarm itself is read only once the Lagebuchführer is confirmed, so the ticks set meanwhile count.
+    // offer is kept as it was accepted, since a scan meanwhile may drop or replace it; its ticks are
+    // read only once the Lagebuchführer is confirmed, so the ones set meanwhile count.
     private void RequestNewIncidentFromDispatch()
     {
         _pending = PendingAction.NewFromDispatch;
+        _pendingOffer = _home.Dispatch?.Offer;
         PendingPrompt = new OperatorPromptViewModel(callSignOptions: _home.CallSignOptions, personnel: _home.Personnel);
     }
 
@@ -290,7 +295,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             PendingPrompt = null;
             _pending = PendingAction.None;
-            var dispatch = action == PendingAction.NewFromDispatch ? _home.Dispatch?.CurrentImport() : null;
+            var dispatch = _pendingOffer?.ToImport(); // set only by EINSATZ ANLEGEN
+            _pendingOffer = null;
             _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, dispatch));
             return;
         }
@@ -342,6 +348,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         PendingPrompt = null;
         _pending = PendingAction.None;
+        _pendingOffer = null;
         CurrentView = _home;
 
         // A join dialog closed after its host was reached: release that connection (#459).
