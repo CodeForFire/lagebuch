@@ -6,7 +6,7 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// Section-selection overlay shown before a PDF export (#262): lets the operator uncheck any of
-/// the 8 report sections rather than always rendering everything. "Exportieren" stays open with a
+/// the report sections rather than always rendering everything. "Exportieren" stays open with a
 /// busy banner (mirroring <see cref="OperatorPromptViewModel.IsBusy"/>) while the host's callback
 /// runs (dialog picker + generation + write + share), then raises <see cref="Closed"/> so the host
 /// removes the overlay regardless of outcome.
@@ -32,6 +32,7 @@ public sealed partial class PdfExportOptionsViewModel : ObservableObject
             new PdfSectionOptionViewModel(IncidentPdfSections.Tasks, "Aufgaben", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Atemschutz, "Atemschutzüberwachung", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.CoMessprotokoll, "Gasmessprotokoll", NotifyCanExecuteChanged),
+            new PdfSectionOptionViewModel(IncidentPdfSections.Messprotokoll, "Messprotokoll", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Files, "Angehängte Dateien", NotifyCanExecuteChanged),
         };
     }

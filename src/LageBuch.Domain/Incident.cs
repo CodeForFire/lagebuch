@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Equipment;
@@ -6,6 +7,7 @@ using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Map;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
@@ -49,6 +51,11 @@ public sealed class Incident
     private readonly List<IssuedItem> _issuedItems = new();
     private readonly List<CommandNode> _commandNodes = new();
     private readonly List<MapOverlay> _mapOverlays = new();
+    private readonly List<MeasuringPoint> _measuringPoints = new();
+    private readonly List<MeasuringDevice> _measuringDevices = new();
+    private readonly List<MeasurementChannel> _measurementChannels = new();
+    private readonly List<Measurement> _measurements = new();
+    private readonly List<WeatherObservation> _weatherObservations = new();
 
     private Incident()
     {
@@ -141,6 +148,31 @@ public sealed class Incident
 
     /// <summary>Abschnitte, Unterabschnitte, Bereitstellungen and partner Einsatzleitungen in creation order, dissolved ones included.</summary>
     public IReadOnlyList<CommandNode> CommandNodes => _commandNodes;
+
+    /// <summary>The Messpunkte of the Messprotokoll (#930), in creation order.</summary>
+    public IReadOnlyList<MeasuringPoint> MeasuringPoints => _measuringPoints;
+
+    /// <summary>The Messgeräte of the Messprotokoll (#930), in creation order.</summary>
+    public IReadOnlyList<MeasuringDevice> MeasuringDevices => _measuringDevices;
+
+    /// <summary>The Messgrößen of the Messprotokoll (#930), in display order: a copy of the
+    /// Stammdaten Messgase taken with the first Messpunkt or Messgröße, never a reference into
+    /// them. Separate from <see cref="Gases"/>, which belongs to the Gasmessprotokoll.</summary>
+    public IReadOnlyList<MeasurementChannel> MeasurementChannels => _measurementChannels;
+
+    /// <summary>The Messungen of the Messprotokoll (#930), in the order they were recorded.</summary>
+    public IReadOnlyList<Measurement> Measurements => _measurements;
+
+    /// <summary>The Wetterbeobachtungen of the Messprotokoll (#930), in the order they were recorded.</summary>
+    public IReadOnlyList<WeatherObservation> WeatherObservations => _weatherObservations;
+
+    /// <summary>The whole Messprotokoll as one bundle, copied, so it stays as it was when taken.</summary>
+    public MeasurementLog MeasurementLog => new(
+        _measuringPoints.ToList(),
+        _measuringDevices.ToList(),
+        _measurementChannels.ToList(),
+        _measurements.ToList(),
+        _weatherObservations.ToList());
 
     /// <summary>How the Einsatzleitung can be reached. Never null; <see cref="LeadershipPost.Empty"/> until filled.</summary>
     public LeadershipPost LeadershipPost { get; private set; } = LeadershipPost.Empty;
@@ -244,7 +276,8 @@ public sealed class Incident
         IEnumerable<MapOverlay>? mapOverlays = null,
         IEnumerable<IncidentGas>? gases = null,
         string? dispatchChannel = null,
-        Guid? lagefuehrungNodeId = null)
+        Guid? lagefuehrungNodeId = null,
+        MeasurementLog? measurementLog = null)
     {
         var incident = new Incident
         {
@@ -293,6 +326,12 @@ public sealed class Incident
         incident._issuedItems.AddRange(issuedItems ?? []);
         incident._commandNodes.AddRange(CommandNodeRepair.Resolve(commandNodes ?? Enumerable.Empty<CommandNode>()));
         incident._mapOverlays.AddRange((mapOverlays ?? []).DistinctBy(o => o.Id).Take(MaxMapOverlays));
+        var log = (measurementLog ?? MeasurementLog.Empty).Sanitized();
+        incident._measuringPoints.AddRange(log.Points);
+        incident._measuringDevices.AddRange(log.Devices);
+        incident._measurementChannels.AddRange(log.Channels);
+        incident._measurements.AddRange(log.Measurements);
+        incident._weatherObservations.AddRange(log.Weather);
         return incident;
     }
 
@@ -2872,6 +2911,530 @@ public sealed class Incident
             clock,
             op,
             $"CO-Struktur geändert: {building.Name}, {CoMeasurementLabels.FloorLabel(floorOrdinal)} jetzt {survivors.Count} Wohnungen, entfernt: {string.Join(", ", removedLabels)}");
+    }
+
+    /// <summary>
+    /// Opens a Messpunkt of the Messprotokoll (#930). The first Messpunkt or Messgröße of an
+    /// Einsatz copies <paramref name="seedGases"/> (the Stammdaten Messgase) in as its Messgrößen,
+    /// the way the first Haus does for the Gasmessprotokoll; after that the Einsatz keeps its own
+    /// list and <paramref name="seedGases"/> is ignored.
+    /// </summary>
+    public MeasuringPoint AddMeasuringPoint(
+        IClock clock,
+        SessionOperator op,
+        string name,
+        string? location,
+        MeasurementZone zone,
+        IEnumerable<GasDefinition>? seedGases = null)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        if (_measuringPoints.Count >= MeasuringPoint.MaxCount)
+        {
+            throw new InvalidOperationException($"Höchstens {MeasuringPoint.MaxCount} Messpunkte.");
+        }
+
+        var point = NewMeasuringPoint(Guid.NewGuid(), name, location, zone);
+        if (_measurementChannels.Count == 0)
+        {
+            _measurementChannels.AddRange(SeedMeasurementChannels(seedGases));
+        }
+
+        _measuringPoints.Add(point);
+        AppendSystemEntry(clock, op, $"Messpunkt angelegt: {point.Name} ({MeasurementLabels.Zone(point.Zone)})");
+        return point;
+    }
+
+    /// <summary>Corrects a Messpunkt in place. Writes an ETB line only when something changed.</summary>
+    public MeasuringPoint UpdateMeasuringPoint(
+        IClock clock, SessionOperator op, Guid pointId, string name, string? location, MeasurementZone zone)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        var index = FindMeasuringPointIndex(pointId);
+        var previous = _measuringPoints[index];
+        var updated = NewMeasuringPoint(pointId, name, location, zone);
+        if (updated == previous)
+        {
+            return previous;
+        }
+
+        _measuringPoints[index] = updated;
+        var renamed = string.Equals(previous.Name, updated.Name, StringComparison.Ordinal) ? updated.Name : $"{previous.Name} → {updated.Name}";
+        AppendSystemEntry(clock, op, $"Messpunkt geändert: {renamed} ({MeasurementLabels.Zone(updated.Zone)})");
+        return updated;
+    }
+
+    /// <summary>Adds a Messgerät to the Messprotokoll (#930). Silent: a Gerät is equipment, not an
+    /// event worth an ETB line.</summary>
+    public MeasuringDevice AddMeasuringDevice(DeviceKind kind, string name, string? number, string? vehicle, string? check)
+    {
+        EnsureOpen();
+        if (_measuringDevices.Count >= MeasuringDevice.MaxCount)
+        {
+            throw new InvalidOperationException($"Höchstens {MeasuringDevice.MaxCount} Messgeräte.");
+        }
+
+        var device = NewMeasuringDevice(Guid.NewGuid(), kind, name, number, vehicle, check);
+        _measuringDevices.Add(device);
+        return device;
+    }
+
+    /// <summary>Corrects a Messgerät in place, keeping its id and position.</summary>
+    public MeasuringDevice UpdateMeasuringDevice(Guid deviceId, DeviceKind kind, string name, string? number, string? vehicle, string? check)
+    {
+        EnsureOpen();
+        var index = FindMeasuringDeviceIndex(deviceId);
+        var updated = NewMeasuringDevice(deviceId, kind, name, number, vehicle, check);
+        _measuringDevices[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Takes a Messgerät out of the list. Every Messgröße it measured stays, unlinked.</summary>
+    public void RemoveMeasuringDevice(Guid deviceId)
+    {
+        EnsureOpen();
+        _measuringDevices.RemoveAt(FindMeasuringDeviceIndex(deviceId));
+        for (var i = 0; i < _measurementChannels.Count; i++)
+        {
+            if (_measurementChannels[i].DeviceId == deviceId)
+            {
+                _measurementChannels[i] = _measurementChannels[i] with { DeviceId = null };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a Messgröße to the Messprotokoll (#930). An Einsatz without any first copies
+    /// <paramref name="seedGases"/> in, as <see cref="AddMeasuringPoint"/> does, then adds this
+    /// one. Throws when the name is taken (case-insensitive) or <see cref="MeasurementChannel.MaxCount"/>
+    /// is reached; a failed call changes nothing.
+    /// </summary>
+    public MeasurementChannel AddMeasurementChannel(
+        IClock clock,
+        SessionOperator op,
+        GasDefinition definition,
+        Guid? deviceId,
+        string? note,
+        IEnumerable<GasDefinition>? seedGases = null)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ArgumentNullException.ThrowIfNull(definition);
+        var clean = definition.Sanitized() ?? throw new ArgumentException("Messgröße darf nicht leer sein.", nameof(definition));
+        EnsureMeasuringDeviceKnown(deviceId);
+
+        var seeded = _measurementChannels.Count == 0 ? SeedMeasurementChannels(seedGases) : [];
+        var existing = _measurementChannels.Concat(seeded).ToList();
+        if (existing.Count >= MeasurementChannel.MaxCount)
+        {
+            throw new InvalidOperationException($"Höchstens {MeasurementChannel.MaxCount} Messgrößen.");
+        }
+
+        EnsureChannelNameFree(existing, clean.Name, exceptId: null);
+
+        var channel = new MeasurementChannel(Guid.NewGuid(), clean, deviceId, IsActive: true, MeasurementText.Clean(note, MeasurementChannel.MaxNoteLength));
+        _measurementChannels.AddRange(seeded);
+        _measurementChannels.Add(channel);
+        var unit = channel.Unit.Length == 0 ? string.Empty : $" ({channel.Unit})";
+        AppendSystemEntry(clock, op, $"Messgröße angelegt: {channel.Name}{unit}");
+        return channel;
+    }
+
+    /// <summary>
+    /// Changes a Messgröße's Gerät, whether it is still measured, and its note. Its gas
+    /// (<paramref name="definition"/>, null keeps it) can change only while it has no readings:
+    /// after that the bands are what the recorded values were judged by.
+    /// </summary>
+    public MeasurementChannel UpdateMeasurementChannel(Guid channelId, Guid? deviceId, bool isActive, string? note, GasDefinition? definition = null)
+    {
+        EnsureOpen();
+        var index = FindMeasurementChannelIndex(channelId);
+        var previous = _measurementChannels[index];
+        EnsureMeasuringDeviceKnown(deviceId);
+
+        var newDefinition = previous.Definition;
+        if (definition is not null)
+        {
+            var clean = definition.Sanitized() ?? throw new ArgumentException("Messgröße darf nicht leer sein.", nameof(definition));
+            if (clean != previous.Definition)
+            {
+                if (ChannelHasReadings(channelId))
+                {
+                    throw new InvalidOperationException("Messgröße hat Messwerte – Gas, Einheit und Bänder bleiben.");
+                }
+
+                EnsureChannelNameFree(_measurementChannels, clean.Name, exceptId: channelId);
+                newDefinition = clean;
+            }
+        }
+
+        var updated = previous with
+        {
+            Definition = newDefinition,
+            DeviceId = deviceId,
+            IsActive = isActive,
+            Note = MeasurementText.Clean(note, MeasurementChannel.MaxNoteLength),
+        };
+        _measurementChannels[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Takes a Messgröße out of the list. Refused once any Messung carries a value or a
+    /// correction of it: such a Messgröße is deactivated instead, so no reading loses its gas.</summary>
+    public void RemoveMeasurementChannel(Guid channelId)
+    {
+        EnsureOpen();
+        var index = FindMeasurementChannelIndex(channelId);
+        if (ChannelHasReadings(channelId))
+        {
+            throw new InvalidOperationException("Messgröße hat Messwerte – nur deaktivieren.");
+        }
+
+        _measurementChannels.RemoveAt(index);
+    }
+
+    /// <summary>
+    /// Records one Messung (#930) and writes it to the ETB as a measurement, never hidden:
+    /// "Messung MA 04 · Kellerabgang #3 (Florian Musterstadt 40/1 · Angriffstrupp, PA + Form 1,
+    /// abgesetzt (Messtrupp)): CO 38 ppm (Erhöht), O₂ 20,1 Vol-% – Geruch wahrnehmbar". It must say
+    /// something: a value, a smell, a deposit or a note. Values may only name active Messgrößen.
+    /// </summary>
+    public Measurement RecordMeasurement(
+        IClock clock,
+        SessionOperator op,
+        DateTimeOffset measuredAt,
+        string? order,
+        Guid pointId,
+        string? team,
+        ProtectiveEquipment protection,
+        MeasurementMode mode,
+        bool odour,
+        bool deposits,
+        string? note,
+        IReadOnlyDictionary<Guid, MeasuredValue> values)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ArgumentNullException.ThrowIfNull(values);
+        ThrowIfUndefined(protection, nameof(protection));
+        ThrowIfUndefined(mode, nameof(mode));
+        if (_measurements.Count >= Measurement.MaxCount)
+        {
+            throw new InvalidOperationException($"Höchstens {Measurement.MaxCount} Messungen.");
+        }
+
+        _ = FindMeasuringPointIndex(pointId);
+        if (values.Keys.Any(id => !_measurementChannels.Exists(c => c.Id == id && c.IsActive)))
+        {
+            throw new ArgumentException("Messwert für eine unbekannte oder deaktivierte Messgröße.", nameof(values));
+        }
+
+        var measurement = new Measurement(
+            Guid.NewGuid(),
+            measuredAt,
+            MeasurementText.Clean(order, Measurement.MaxOrderLength),
+            pointId,
+            MeasurementText.Clean(team, Measurement.MaxTeamLength),
+            protection,
+            mode,
+            odour,
+            deposits,
+            MeasurementText.Clean(note, Measurement.MaxNoteLength),
+            values.ToDictionary(v => v.Key, v => v.Value),
+            MeasurementStatus.Unconfirmed,
+            Assessment: null,
+            Corrections: [],
+            clock.Now,
+            MeasurementText.Clean(op.Display, Measurement.MaxRecordedByLength) ?? string.Empty);
+        if (!measurement.HasContent)
+        {
+            throw new ArgumentException("Eine Messung braucht einen Messwert, Geruch, Niederschlag oder eine Bemerkung.", nameof(values));
+        }
+
+        _measurements.Add(measurement);
+        AppendMeasurementEntry(clock, op, RecordedMeasurementText(measurement));
+        return measurement;
+    }
+
+    /// <summary>Judges a Messung: bestätigt, Ausreißer, or back to unbestätigt (#930). Replaces the
+    /// previous assessment and writes "Messung … #n bewertet: bestätigt – {text} ({by})" to the ETB.
+    /// <paramref name="by"/> is required: an assessment is only worth what its author is.</summary>
+    public Measurement AssessMeasurement(
+        IClock clock, SessionOperator op, Guid measurementId, MeasurementStatus status, string by, string? text)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ThrowIfUndefined(status, nameof(status));
+
+        var assessment = new MeasurementAssessment(
+            status,
+            MeasurementText.Required(by, MeasurementAssessment.MaxByLength, "Bewertet von", nameof(by)),
+            MeasurementText.Clean(text, MeasurementAssessment.MaxTextLength),
+            clock.Now);
+        var index = FindMeasurementIndex(measurementId);
+        var updated = _measurements[index] with { Status = status, Assessment = assessment };
+        _measurements[index] = updated;
+
+        var comment = assessment.Text is null ? string.Empty : $" – {assessment.Text}";
+        AppendMeasurementEntry(
+            clock,
+            op,
+            $"Messung {MeasurementHead(updated)} bewertet: {MeasurementLabels.Status(status)}{comment} ({assessment.By})");
+        return updated;
+    }
+
+    /// <summary>
+    /// Corrects one value of a Messung (#930): <paramref name="value"/> replaces it, null takes it
+    /// out, and a value the Messung did not have is added. The previous value is kept in
+    /// <see cref="Measurement.Corrections"/> and the ETB says "Messwert korrigiert: … CO 140 → 14 ppm
+    /// (Grund: Ablesefehler)". A reason is required, and the value has to actually change.
+    /// </summary>
+    public Measurement CorrectMeasurementValue(
+        IClock clock, SessionOperator op, Guid measurementId, Guid channelId, MeasuredValue? value, string reason)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        var cleanReason = MeasurementText.Required(reason, MeasurementCorrection.MaxReasonLength, "Grund", nameof(reason));
+        var index = FindMeasurementIndex(measurementId);
+        var measurement = _measurements[index];
+        var channel = _measurementChannels[FindMeasurementChannelIndex(channelId)];
+        var previous = measurement.Values.TryGetValue(channelId, out var old) ? old : null;
+        if (previous == value)
+        {
+            throw new ArgumentException("Der Messwert ist unverändert.", nameof(value));
+        }
+
+        if (previous is null && !channel.IsActive)
+        {
+            throw new ArgumentException("Messgröße ist deaktiviert.", nameof(channelId));
+        }
+
+        if (measurement.Corrections.Count >= Measurement.MaxCorrectionCount)
+        {
+            throw new InvalidOperationException($"Höchstens {Measurement.MaxCorrectionCount} Korrekturen je Messung.");
+        }
+
+        var values = measurement.Values.ToDictionary(v => v.Key, v => v.Value);
+        if (value is null)
+        {
+            values.Remove(channelId);
+        }
+        else
+        {
+            values[channelId] = value;
+        }
+
+        var correction = new MeasurementCorrection(
+            channelId,
+            previous,
+            value,
+            cleanReason,
+            MeasurementText.Clean(op.Display, MeasurementCorrection.MaxByLength) ?? string.Empty,
+            clock.Now);
+        var updated = measurement with { Values = values, Corrections = [.. measurement.Corrections, correction] };
+        _measurements[index] = updated;
+
+        var change = (previous, value) switch
+        {
+            ({ } p, { } v) => $"{channel.Name} {MeasurementLabels.Number(p)} → {MeasurementLabels.Value(channel, v)}",
+            (null, { } v) => $"{channel.Name} {MeasurementLabels.Value(channel, v)} nachgetragen",
+            ({ } p, null) => $"{channel.Name} {MeasurementLabels.Value(channel, p)} gelöscht",
+            (null, null) => throw new UnreachableException(),
+        };
+        AppendMeasurementEntry(clock, op, $"Messwert korrigiert: {MeasurementHead(updated)}: {change} (Grund: {cleanReason})");
+        return updated;
+    }
+
+    /// <summary>Records what the weather was (#930) and writes it to the ETB as a measurement:
+    /// "Wetter: Wind aus W, 12 km/h, 14 °C, klar, kein Niederschlag (Handwindmesser)".</summary>
+    public WeatherObservation AddWeatherObservation(
+        IClock clock,
+        SessionOperator op,
+        DateTimeOffset observedAt,
+        WindDirection wind,
+        decimal? windSpeedKmh,
+        decimal? temperatureCelsius,
+        CloudCover clouds,
+        Precipitation precipitation,
+        string? source)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ThrowIfUndefined(wind, nameof(wind));
+        ThrowIfUndefined(clouds, nameof(clouds));
+        ThrowIfUndefined(precipitation, nameof(precipitation));
+        if (_weatherObservations.Count >= WeatherObservation.MaxCount)
+        {
+            throw new InvalidOperationException($"Höchstens {WeatherObservation.MaxCount} Wetterbeobachtungen.");
+        }
+
+        decimal? speed = windSpeedKmh is { } s
+            ? WeatherObservation.NormalizeWindSpeed(s)
+                ?? throw new ArgumentOutOfRangeException(nameof(windSpeedKmh), $"Windgeschwindigkeit liegt außerhalb von 0 bis {Formatting.Measurement(WeatherObservation.MaxWindSpeedKmh, "km/h")}.")
+            : null;
+        decimal? temperature = temperatureCelsius is { } t
+            ? WeatherObservation.NormalizeTemperature(t)
+                ?? throw new ArgumentOutOfRangeException(nameof(temperatureCelsius), "Temperatur liegt außerhalb von −60 bis 60 °C.")
+            : null;
+
+        var observation = new WeatherObservation(
+            Guid.NewGuid(),
+            observedAt,
+            wind,
+            speed,
+            temperature,
+            clouds,
+            precipitation,
+            MeasurementText.Clean(source, WeatherObservation.MaxSourceLength));
+        _weatherObservations.Add(observation);
+        AppendMeasurementEntry(clock, op, WeatherText(observation));
+        return observation;
+    }
+
+    private static void ThrowIfUndefined<TEnum>(TEnum value, string paramName)
+        where TEnum : struct, Enum
+    {
+        if (!Enum.IsDefined(value))
+        {
+            throw new ArgumentOutOfRangeException(paramName);
+        }
+    }
+
+    private static MeasuringPoint NewMeasuringPoint(Guid id, string name, string? location, MeasurementZone zone) =>
+        Enum.IsDefined(zone)
+            ? new MeasuringPoint(
+                id,
+                MeasurementText.Required(name, MeasuringPoint.MaxNameLength, "Messpunkt", nameof(name)),
+                MeasurementText.Clean(location, MeasuringPoint.MaxLocationLength),
+                zone)
+            : throw new ArgumentOutOfRangeException(nameof(zone));
+
+    private static MeasuringDevice NewMeasuringDevice(Guid id, DeviceKind kind, string name, string? number, string? vehicle, string? check) =>
+        Enum.IsDefined(kind)
+            ? new MeasuringDevice(
+                id,
+                kind,
+                MeasurementText.Required(name, MeasuringDevice.MaxNameLength, "Messgerät", nameof(name)),
+                MeasurementText.Clean(number, MeasuringDevice.MaxNumberLength),
+                MeasurementText.Clean(vehicle, MeasuringDevice.MaxVehicleLength),
+                MeasurementText.Clean(check, MeasuringDevice.MaxCheckLength))
+            : throw new ArgumentOutOfRangeException(nameof(kind));
+
+    // The Stammdaten Messgase, copied by value like AddCoBuilding copies them into _gases; CO at
+    // the DGUV bands when the Stammdaten have none.
+    private static List<MeasurementChannel> SeedMeasurementChannels(IEnumerable<GasDefinition>? seedGases)
+    {
+        var copied = GasDefinition.SanitizeList(seedGases);
+        return (copied.Count > 0 ? copied : [GasDefinition.DefaultCo])
+            .Select(g => new MeasurementChannel(Guid.NewGuid(), g, DeviceId: null, IsActive: true, Note: null))
+            .ToList();
+    }
+
+    private static void EnsureChannelNameFree(IEnumerable<MeasurementChannel> channels, string name, Guid? exceptId)
+    {
+        if (channels.Any(c => c.Id != exceptId && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"Messgröße {name} gibt es schon.");
+        }
+    }
+
+    private void EnsureMeasuringDeviceKnown(Guid? deviceId)
+    {
+        if (deviceId is { } id)
+        {
+            _ = FindMeasuringDeviceIndex(id);
+        }
+    }
+
+    private bool ChannelHasReadings(Guid channelId) =>
+        _measurements.Exists(m => m.Values.ContainsKey(channelId) || m.Corrections.Any(c => c.ChannelId == channelId));
+
+    // "MA 04 · Kellerabgang #3": the Messauftrag when there is one, the Messpunkt and the
+    // Messung's number there, so every ETB line about one Messung starts the same way.
+    private string MeasurementHead(Measurement measurement)
+    {
+        var point = _measuringPoints[FindMeasuringPointIndex(measurement.PointId)];
+        var order = measurement.Order is { } o ? $"{o} · " : string.Empty;
+        return $"{order}{point.Name} #{MeasurementRules.RunningNumber(_measurements, measurement)}";
+    }
+
+    // Empty parts are left out: no Trupp, no values, nothing smelled.
+    private string RecordedMeasurementText(Measurement measurement)
+    {
+        string?[] details = [measurement.Team, MeasurementLabels.Protection(measurement.Protection), MeasurementLabels.Mode(measurement.Mode)];
+        var values = _measurementChannels
+            .Where(c => measurement.Values.ContainsKey(c.Id))
+            .Select(c => MeasurementLabels.NamedValue(c, measurement.Values[c.Id]))
+            .ToList();
+        string?[] remarks =
+        [
+            measurement.Odour ? "Geruch wahrnehmbar" : null,
+            measurement.Deposits ? "Ruß/Niederschlag sichtbar" : null,
+            measurement.Note,
+        ];
+
+        var head = $"Messung {MeasurementHead(measurement)} ({string.Join(", ", details.OfType<string>())})";
+        var valueText = values.Count > 0 ? $": {string.Join(", ", values)}" : string.Empty;
+        return head + valueText + string.Concat(remarks.OfType<string>().Select(r => $" – {r}"));
+    }
+
+    private static string WeatherText(WeatherObservation observation)
+    {
+        var parts = new List<string>
+        {
+            observation.Wind switch
+            {
+                WindDirection.Calm => "Windstille",
+                WindDirection.Variable => "Wind umlaufend",
+                _ => $"Wind aus {MeasurementLabels.Wind(observation.Wind)}",
+            },
+        };
+        if (observation.WindSpeedKmh is { } speed)
+        {
+            parts.Add(Formatting.Measurement(speed, "km/h"));
+        }
+
+        if (observation.TemperatureCelsius is { } temperature)
+        {
+            parts.Add(Formatting.Measurement(temperature, "°C"));
+        }
+
+        parts.Add(MeasurementLabels.Clouds(observation.Clouds));
+        parts.Add(MeasurementLabels.Precipitation(observation.Precipitation));
+        var source = observation.Source is { } s ? $" ({s})" : string.Empty;
+        return $"Wetter: {string.Join(", ", parts)}{source}";
+    }
+
+    private int FindMeasuringPointIndex(Guid pointId)
+    {
+        var index = _measuringPoints.FindIndex(p => p.Id == pointId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Messpunkt {pointId} nicht gefunden.");
+    }
+
+    private int FindMeasuringDeviceIndex(Guid deviceId)
+    {
+        var index = _measuringDevices.FindIndex(d => d.Id == deviceId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Messgerät {deviceId} nicht gefunden.");
+    }
+
+    private int FindMeasurementChannelIndex(Guid channelId)
+    {
+        var index = _measurementChannels.FindIndex(c => c.Id == channelId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Messgröße {channelId} nicht gefunden.");
+    }
+
+    private int FindMeasurementIndex(Guid measurementId)
+    {
+        var index = _measurements.FindIndex(m => m.Id == measurementId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Messung {measurementId} nicht gefunden.");
     }
 
     // A file or snapshot hands its gas list over as stored, so it is sanitised and capped like any

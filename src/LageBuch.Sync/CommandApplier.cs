@@ -4,6 +4,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Map;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 
@@ -336,6 +337,62 @@ public static class CommandApplier
             case RemoveDwellingsCommand c:
                 incident.RemoveDwellings(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumbers);
                 break;
+            case AddMeasuringPointCommand c:
+                incident.AddMeasuringPoint(clock, Operator(c.Operator), c.Name, c.Location, c.Zone, SeedGases(c.Gases));
+                break;
+            case UpdateMeasuringPointCommand c:
+                incident.UpdateMeasuringPoint(clock, Operator(c.Operator), c.PointId, c.Name, c.Location, c.Zone);
+                break;
+            case AddMeasuringDeviceCommand c:
+                incident.AddMeasuringDevice(c.Kind, c.Name, c.Number, c.Vehicle, c.Check);
+                break;
+            case UpdateMeasuringDeviceCommand c:
+                incident.UpdateMeasuringDevice(c.DeviceId, c.Kind, c.Name, c.Number, c.Vehicle, c.Check);
+                break;
+            case RemoveMeasuringDeviceCommand c:
+                incident.RemoveMeasuringDevice(c.DeviceId);
+                break;
+            case AddMeasurementChannelCommand c:
+                incident.AddMeasurementChannel(
+                    clock,
+                    Operator(c.Operator),
+                    (c.Definition ?? throw new ArgumentException("Messgröße fehlt.", nameof(command))).ToDefinition(),
+                    c.DeviceId,
+                    c.Note,
+                    SeedGases(c.Gases));
+                break;
+            case UpdateMeasurementChannelCommand c:
+                incident.UpdateMeasurementChannel(c.ChannelId, c.DeviceId, c.IsActive, c.Note, c.Definition?.ToDefinition());
+                break;
+            case RemoveMeasurementChannelCommand c:
+                incident.RemoveMeasurementChannel(c.ChannelId);
+                break;
+            case RecordMeasurementCommand c:
+                incident.RecordMeasurement(
+                    clock,
+                    Operator(c.Operator),
+                    c.MeasuredAt,
+                    c.Order,
+                    c.PointId,
+                    c.Team,
+                    c.Protection,
+                    c.Mode,
+                    c.Odour,
+                    c.Deposits,
+                    c.Note,
+                    MeasuredValues(c.Values));
+                break;
+            case AssessMeasurementCommand c:
+                incident.AssessMeasurement(clock, Operator(c.Operator), c.MeasurementId, c.Status, c.By, c.Text);
+                break;
+            case CorrectMeasurementValueCommand c:
+                incident.CorrectMeasurementValue(
+                    clock, Operator(c.Operator), c.MeasurementId, c.ChannelId, c.Value is { } v ? Value(v.Low, v.High) : null, c.Reason);
+                break;
+            case AddWeatherObservationCommand c:
+                incident.AddWeatherObservation(
+                    clock, Operator(c.Operator), c.ObservedAt, c.Wind, c.WindSpeedKmh, c.TemperatureCelsius, c.Clouds, c.Precipitation, c.Source);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(command),
@@ -373,6 +430,39 @@ public static class CommandApplier
             ? null
             : LabelOffset.TryCreate(dx, dy)
                 ?? throw new ArgumentException("Ungültiger Versatz.", nameof(dx));
+
+    // The sender's Stammdaten Messgase; a null entry is skipped, and Incident sanitises and caps the rest.
+    private static IEnumerable<GasDefinition>? SeedGases(IReadOnlyList<GasDefinitionDto>? gases) =>
+        gases?.OfType<GasDefinitionDto>().Select(g => g.ToDefinition());
+
+    // A reading from a peer has to be one: a negative or oversized end is refused like any other bad
+    // command, never clamped into a number the Messtrupp did not read.
+    private static MeasuredValue Value(decimal low, decimal high) =>
+        MeasuredValue.TryCreate(low, high, out var value)
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(low), "Ungültiger Messwert.");
+
+    // One Messung's values, capped before anything is built from them: more than a Messprotokoll
+    // has Messgrößen, or one Messgröße named twice, is a malformed command. Incident.RecordMeasurement
+    // checks the ids against the Einsatz's own active Messgrößen.
+    private static Dictionary<Guid, MeasuredValue> MeasuredValues(IReadOnlyList<MeasurementValueDto>? values)
+    {
+        if (values is null || values.Count > MeasurementChannel.MaxCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(values), $"Höchstens {MeasurementChannel.MaxCount} Messwerte.");
+        }
+
+        var result = new Dictionary<Guid, MeasuredValue>();
+        foreach (var value in values)
+        {
+            if (value is null || !result.TryAdd(value.ChannelId, Value(value.Low, value.High)))
+            {
+                throw new ArgumentException("Messgröße doppelt oder leer.", nameof(values));
+            }
+        }
+
+        return result;
+    }
 
     // A peer's list, capped before anything is built from it: more than eight values, or one gas
     // named twice, is a malformed command and is refused as one (ArgumentException, which the host

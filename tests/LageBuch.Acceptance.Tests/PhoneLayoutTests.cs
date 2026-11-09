@@ -156,7 +156,7 @@ public class PhoneLayoutTests
     [InlineData("AUFGABEN")]
     [InlineData("FUNKTIONEN")]
     [InlineData("DATEIEN")]
-    [InlineData("GASMESSUNG")]
+    [InlineData("MESSUNG")]
     [InlineData("LINKS")]
     [InlineData("BETEILIGTE")]
     [InlineData("KONTAKTE")]

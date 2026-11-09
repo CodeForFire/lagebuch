@@ -1,0 +1,1304 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
+             x:Class="LageBuch.App.Shared.Views.MeasurementLogView"
+             x:DataType="vm:MeasurementLogViewModel">
+  <!-- The MESSPROTOKOLL tab (#930): a general ABC/Gefahrstoff Messprotokoll, not bound to a
+       building. Four pages behind one row of chips: the Messreihe with its tiles and entry form,
+       the Messpunkte with the weather log, the Messgrößen, and the Geräte. Widths and the narrow
+       layout are Style setters, never attributes: a local value in XAML outranks a Style setter,
+       so the phone styles could never change them (as in IssuedItemsView). -->
+  <UserControl.Styles>
+    <!-- The page switch: CoMessprotokollView's filter chip, a raised surface and brighter text for
+         "selected", deliberately not Button.signal: red is what a lethal reading is painted in. -->
+    <Style Selector="Button.page">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.page.chipon /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.page.chipon">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- The Messpunkt filter is a ListBox, so the selection is the view model's own
+         SelectedPointFilter, drawn as the same chips. The app's ListBoxItem draws a spaced card
+         with a red tick (Styles.axaml), so the items get a bare template, as ListBox.triage does. -->
+    <Style Selector="ListBox.chips">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <WrapPanel ItemSpacing="6" LineSpacing="6" />
+        </ItemsPanelTemplate>
+      </Setter>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ItemsPresenter x:Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem">
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}" />
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox.chips Border.chip">
+      <Setter Property="Height" Value="{StaticResource ControlHeight}" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    </Style>
+    <Style Selector="ListBox.chips Border.chip > TextBlock">
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem:selected Border.chip">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem:selected Border.chip > TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- The bands, CoMessprotokollView's coValue colours: amber, then the hot red a step below the
+         full alarm red with weight. The band is always written out beside them as well. -->
+    <Style Selector="TextBlock.coValue">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.coValue.elevated">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <Style Selector="TextBlock.coValue.dangerous">
+      <Setter Property="Foreground" Value="{StaticResource SignalHotBrush}" />
+    </Style>
+    <Style Selector="TextBlock.coValue.lethal">
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <!-- A tile's left edge carries its band, as an Ausgabe card's amber edge carries "still out". -->
+    <Style Selector="Border.tile">
+      <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="BorderThickness" Value="3,1,1,1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+      <Setter Property="Padding" Value="10,8" />
+    </Style>
+    <Style Selector="Border.tile.elevated">
+      <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <Style Selector="Border.tile.dangerous">
+      <Setter Property="BorderBrush" Value="{StaticResource SignalHotBrush}" />
+    </Style>
+    <Style Selector="Border.tile.lethal">
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
+    </Style>
+
+    <!-- A value in the Messreihe is a button: a tap opens its correction. It keeps the look of a
+         cell, and a closed Einsatz keeps it legible rather than greyed out like a disabled button. -->
+    <Style Selector="Button.cell">
+      <Setter Property="Height" Value="NaN" />
+      <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.cell:disabled">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.cell:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.value-col">
+      <Setter Property="Width" Value="104" />
+    </Style>
+    <Style Selector="TextBlock.mark">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.implausible">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+
+    <!-- Status: the word is always there; the colour only repeats it. -->
+    <Style Selector="TextBlock.status">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.status.confirmed">
+      <Setter Property="Foreground" Value="{StaticResource ActiveBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.status.outlier">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- An Ausreißer stays in the list, struck through and greyed; it no longer counts for the
+         tiles. Declared after the band colours, so it wins over them: Avalonia weighs styles by
+         order. -->
+    <Style Selector="Border.outlier TextBlock.strike">
+      <Setter Property="TextDecorations" Value="Strikethrough" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+      <Setter Property="FontWeight" Value="Normal" />
+    </Style>
+    <Style Selector="Border.outlier.row-card">
+      <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
+      <Setter Property="BorderThickness" Value="3,1,1,1" />
+    </Style>
+
+    <!-- Entry docks, IssuedItemsView's idiom: side by side on a wide window, stacked on a phone. -->
+    <Style Selector="WrapPanel.dock-fields">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="ItemSpacing" Value="8" />
+      <Setter Property="LineSpacing" Value="6" />
+    </Style>
+    <Style Selector=":is(Control).w-xs, :is(Control).w-s, :is(Control).w-m, :is(Control).w-l, :is(Control).w-xl, :is(Control).w-text">
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector=":is(Control).w-xs">
+      <Setter Property="Width" Value="90" />
+    </Style>
+    <Style Selector=":is(Control).w-s">
+      <Setter Property="Width" Value="130" />
+    </Style>
+    <Style Selector=":is(Control).w-m">
+      <Setter Property="Width" Value="190" />
+    </Style>
+    <Style Selector=":is(Control).w-l">
+      <Setter Property="Width" Value="240" />
+    </Style>
+    <Style Selector=":is(Control).w-xl">
+      <Setter Property="Width" Value="320" />
+    </Style>
+    <Style Selector=":is(Control).w-text">
+      <Setter Property="Width" Value="640" />
+    </Style>
+    <Style Selector="Border.dock">
+      <Setter Property="Background" Value="#0F141D" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMd}" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="ScrollViewer#EntryScroll">
+      <Setter Property="MaxHeight" Value="420" />
+    </Style>
+
+    <!-- The two halves of MESSPUNKTE & WETTER sit side by side, and stack on a phone. -->
+    <Style Selector="StackPanel#PointsBlock">
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.Row" Value="0" />
+    </Style>
+    <Style Selector="StackPanel#WeatherBlock">
+      <Setter Property="Grid.Column" Value="1" />
+      <Setter Property="Grid.Row" Value="0" />
+    </Style>
+
+    <!-- The narrow layout, keyed off the workspace's "narrow" class (#685). -->
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#MeasurementTablePanel">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#MeasurementCardPanel">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow WrapPanel.dock-fields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow :is(Control).w-xs, Panel#WorkspaceRoot.narrow :is(Control).w-s, Panel#WorkspaceRoot.narrow :is(Control).w-m, Panel#WorkspaceRoot.narrow :is(Control).w-l, Panel#WorkspaceRoot.narrow :is(Control).w-xl, Panel#WorkspaceRoot.narrow :is(Control).w-text">
+      <!-- Explicit rather than NaN, as CoMessprotokollView does it: a stacked WrapPanel makes each
+           column as wide as its widest field, so NaN leaves every box the width of its content. -->
+      <Setter Property="Width" Value="300" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow HeaderedContentControl.field">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
+    <!-- The form gets what is left above the bottom bar and scrolls inside it. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow ScrollViewer#EntryScroll">
+      <Setter Property="MaxHeight" Value="Infinity" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#PointsBlock">
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#WeatherBlock">
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.Row" Value="1" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+    </Style>
+  </UserControl.Styles>
+
+  <UserControl.DataTemplates>
+    <!-- One value of the Messreihe. The band is written under the number, never left to the
+         colour; "korrigiert" marks a value changed after it was recorded. -->
+    <DataTemplate DataType="vm:MeasurementCell">
+      <Button Classes="cell" Command="{Binding CorrectCommand}" HorizontalAlignment="Stretch"
+              ToolTip.Tip="{Binding CorrectionText}">
+        <AutomationProperties.Name>
+          <MultiBinding StringFormat="{}{0}: {1} – korrigieren">
+            <Binding Path="ChannelName" />
+            <Binding Path="Text" />
+          </MultiBinding>
+        </AutomationProperties.Name>
+        <StackPanel Spacing="0">
+          <TextBlock x:Name="CellValue" Classes="mono coValue strike" FontSize="14"
+                     Classes.elevated="{Binding IsElevated}"
+                     Classes.dangerous="{Binding IsDangerous}"
+                     Classes.lethal="{Binding IsLethal}"
+                     Text="{Binding Text}" />
+          <TextBlock x:Name="CellSeverity" Classes="coValue strike" FontSize="10"
+                     Classes.elevated="{Binding IsElevated}"
+                     Classes.dangerous="{Binding IsDangerous}"
+                     Classes.lethal="{Binding IsLethal}"
+                     Text="{Binding SeverityText}"
+                     IsVisible="{Binding SeverityText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock x:Name="CorrectedMark" Classes="mark" Text="korrigiert" IsVisible="{Binding IsCorrected}" />
+          <TextBlock Classes="implausible" Text="⚠ prüfen" IsVisible="{Binding IsImplausible}" />
+        </StackPanel>
+      </Button>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
+    <!-- The page switch. Chips, not a second tab strip: the MESSUNG entry's GEBÄUDE |
+         MESSPROTOKOLL strip already sits right above. -->
+    <WrapPanel x:Name="PageSwitch" DockPanel.Dock="Top" ItemSpacing="6" LineSpacing="6" Margin="0,0,0,12"
+               KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
+      <Button x:Name="MessreihePageButton" Classes="page" Content="MESSREIHE"
+              Classes.chipon="{Binding IsMessreihePage}"
+              Command="{Binding SelectPageCommand}" CommandParameter="{x:Static vm:MeasurementLogPage.Messreihe}" />
+      <Button x:Name="MesspunkteWetterPageButton" Classes="page" Content="MESSPUNKTE &amp; WETTER"
+              Classes.chipon="{Binding IsMesspunkteWetterPage}"
+              Command="{Binding SelectPageCommand}" CommandParameter="{x:Static vm:MeasurementLogPage.MesspunkteWetter}" />
+      <Button x:Name="MessgroessenPageButton" Classes="page" Content="MESSGRÖSSEN"
+              Classes.chipon="{Binding IsMessgroessenPage}"
+              Command="{Binding SelectPageCommand}" CommandParameter="{x:Static vm:MeasurementLogPage.Messgroessen}" />
+      <Button x:Name="GeraetePageButton" Classes="page" Content="GERÄTE"
+              Classes.chipon="{Binding IsGeraetePage}"
+              Command="{Binding SelectPageCommand}" CommandParameter="{x:Static vm:MeasurementLogPage.Geraete}" />
+    </WrapPanel>
+
+    <!-- Why the last change from a list row (AKTIV, ENTFERNEN) was refused. -->
+    <TextBlock x:Name="RowErrorText" DockPanel.Dock="Top" Classes="field-error" Margin="0,0,0,8"
+               TextWrapping="Wrap" Text="{Binding Error}"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
+      <!-- ============================== MESSREIHE ============================== -->
+      <DockPanel x:Name="MessreihePage" IsVisible="{Binding IsMessreihePage}">
+        <!-- One tile per active Messgröße: its latest value that is not an Ausreißer. -->
+        <ItemsControl x:Name="TileList" DockPanel.Dock="Top" ItemsSource="{Binding Tiles}" Margin="0,0,0,12">
+          <ItemsControl.IsVisible>
+            <!-- A phone that is composing gives the form the room the tiles took. -->
+            <MultiBinding Converter="{x:Static BoolConverters.Or}">
+              <Binding Path="!IsNarrow" />
+              <Binding Path="!IsComposerOpen" />
+            </MultiBinding>
+          </ItemsControl.IsVisible>
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <ctrl:EqualWidthWrapPanel MinItemWidth="150" ItemSpacing="8" LineSpacing="8" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:MeasurementTile">
+              <Border x:Name="Tile" Classes="tile" HorizontalAlignment="Stretch"
+                      Classes.elevated="{Binding IsElevated}"
+                      Classes.dangerous="{Binding IsDangerous}"
+                      Classes.lethal="{Binding IsLethal}">
+                <StackPanel Spacing="1">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                    <TextBlock Grid.Column="1" Text="{Binding DeviceName}" FontSize="10" Margin="8,0,0,0"
+                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                  </Grid>
+                  <TextBlock x:Name="TileValue" Classes="mono coValue" FontSize="22" FontWeight="SemiBold"
+                             TextTrimming="CharacterEllipsis"
+                             Classes.elevated="{Binding IsElevated}"
+                             Classes.dangerous="{Binding IsDangerous}"
+                             Classes.lethal="{Binding IsLethal}"
+                             Text="{Binding ValueText}" />
+                  <TextBlock x:Name="TileSeverity" Classes="coValue" FontSize="12" FontWeight="SemiBold"
+                             Classes.elevated="{Binding IsElevated}"
+                             Classes.dangerous="{Binding IsDangerous}"
+                             Classes.lethal="{Binding IsLethal}"
+                             Text="{Binding SeverityText}"
+                             IsVisible="{Binding SeverityText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <TextBlock Classes="implausible" FontSize="11" Text="⚠ Ungewöhnlich hoher Wert – prüfen"
+                             TextWrapping="Wrap" IsVisible="{Binding IsImplausible}" />
+                  <TextBlock Text="{Binding Footer}" FontSize="11" TextTrimming="CharacterEllipsis"
+                             Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Which Messpunkt the tiles and the list show. -->
+        <ListBox x:Name="PointFilter" DockPanel.Dock="Top" Classes="chips" Margin="0,0,0,12"
+                 AutomationProperties.Name="Messpunkt filtern"
+                 ItemsSource="{Binding PointFilterOptions}"
+                 SelectedItem="{Binding SelectedPointFilter}">
+          <ListBox.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.Or}">
+              <Binding Path="!IsNarrow" />
+              <Binding Path="!IsComposerOpen" />
+            </MultiBinding>
+          </ListBox.IsVisible>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:PointFilterOption">
+              <Border Classes="chip">
+                <TextBlock Text="{Binding Label}" />
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- The phone's way in to the form, at the bottom edge where the thumb already is, as on
+             the Ausgabeliste: a form always open would leave no room for the Messreihe. -->
+        <Button x:Name="OpenComposerButton" DockPanel.Dock="Bottom" Classes="signal"
+                Margin="0,12,0,0" HorizontalAlignment="Stretch"
+                Height="{StaticResource ControlHeightTouch}"
+                Content="+ MESSUNG ERFASSEN"
+                IsVisible="{Binding ShowComposerButton}"
+                Command="{Binding OpenComposerCommand}" />
+
+        <!-- The entry form, at the bottom edge where every other module records. Enter submits
+             from every field (#540). Hidden on a closed Einsatz, and while a Bewertung or a
+             Korrektur takes its place. -->
+        <Border x:Name="InputDock" DockPanel.Dock="Bottom" Classes="dock" Margin="0,12,0,0"
+                IsVisible="{Binding ShowComposer}"
+                b:EntryForm.SubmitCommand="{Binding RecordMeasurementCommand}"
+                b:EntryForm.FirstField="{Binding #NewTimeBox}">
+          <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
+               bottom of the window to the soft keyboard. -->
+          <ScrollViewer x:Name="EntryScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                        AllowAutoHide="False">
+            <StackPanel Spacing="8">
+              <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="NEUE MESSUNG" Classes="overline" VerticalAlignment="Center" />
+                <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                        AutomationProperties.Name="Eingabe schließen"
+                        ToolTip.Tip="Eingabe schließen"
+                        IsVisible="{Binding IsNarrow}"
+                        Command="{Binding CloseComposerCommand}">
+                  <PathIcon Width="13" Height="13"
+                            Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+                </Button>
+              </Grid>
+              <WrapPanel x:Name="EntryFields" Classes="dock-fields">
+                <HeaderedContentControl Classes="field required" Header="UHRZEIT">
+                  <TextBox x:Name="NewTimeBox" Classes="mono w-xs" Text="{Binding NewTime}"
+                           MaxLength="5" PlaceholderText="14:05"
+                           AutomationProperties.Name="Uhrzeit" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field suggest" Header="MESSAUFTRAG">
+                  <AutoCompleteBox x:Name="NewOrderBox" Classes="w-s" Text="{Binding NewOrder}"
+                                   ItemsSource="{Binding OrderOptions}"
+                                   FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                   MaxLength="{x:Static vm:MeasurementLogViewModel.MaxOrderLength}"
+                                   PlaceholderText="MA 01"
+                                   AutomationProperties.Name="Messauftrag" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field suggest required" Header="MESSPUNKT">
+                  <AutoCompleteBox x:Name="NewPointBox" Classes="w-m" Text="{Binding NewPointName}"
+                                   ItemsSource="{Binding PointNameOptions}"
+                                   FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                   MaxLength="{x:Static vm:MeasurementLogViewModel.MaxPointNameLength}"
+                                   PlaceholderText="z. B. Kellerabgang"
+                                   AutomationProperties.Name="Messpunkt" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field suggest" Header="TRUPP">
+                  <AutoCompleteBox x:Name="NewTeamBox" Classes="w-l" Text="{Binding NewTeam}"
+                                   ItemsSource="{Binding TeamOptions}"
+                                   FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                   MaxLength="{x:Static vm:MeasurementLogViewModel.MaxTeamLength}"
+                                   PlaceholderText="Funkrufname · Trupp"
+                                   AutomationProperties.Name="Trupp" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="PSA">
+                  <ComboBox x:Name="NewProtectionBox" Classes="w-m"
+                            ItemsSource="{x:Static vm:MeasurementLogViewModel.ProtectionOptions}"
+                            SelectedValue="{Binding NewProtection}" SelectedValueBinding="{Binding Value}"
+                            AutomationProperties.Name="Schutzausrüstung">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ProtectionOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="MESSART">
+                  <ComboBox x:Name="NewModeBox" Classes="w-m"
+                            ItemsSource="{x:Static vm:MeasurementLogViewModel.ModeOptions}"
+                            SelectedValue="{Binding NewMode}" SelectedValueBinding="{Binding Value}"
+                            AutomationProperties.Name="Messart">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ModeOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </HeaderedContentControl>
+              </WrapPanel>
+              <TextBlock x:Name="NewPointHint" Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                         Text="Neuer Messpunkt – wird mit der Messung angelegt."
+                         IsVisible="{Binding IsNewPoint}" />
+
+              <!-- One input per active Messgröße: "12,5" or a range "8–14"; blank is not measured. -->
+              <ItemsControl x:Name="ValueInputList" ItemsSource="{Binding ValueInputs}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Classes="dock-fields" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:MeasurementValueInput">
+                    <HeaderedContentControl Classes="field" Header="{Binding Label}"
+                                            Classes.invalid="{Binding HasError}"
+                                            ctrl:Field.Error="{Binding Error}">
+                      <TextBox x:Name="ValueInput" Classes="mono w-s" Text="{Binding Text}"
+                               AutomationProperties.Name="{Binding Label}">
+                        <TextBox.InnerRightContent>
+                          <TextBlock Text="{Binding Unit}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                     FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                        </TextBox.InnerRightContent>
+                      </TextBox>
+                    </HeaderedContentControl>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock x:Name="NoChannelsHint" Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                         Text="{Binding NoChannelsHint}"
+                         IsVisible="{Binding NoChannelsHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+              <WrapPanel x:Name="EntryExtras" Classes="dock-fields">
+                <CheckBox x:Name="NewOdourBox" Content="Geruch wahrnehmbar" IsChecked="{Binding NewOdour}"
+                          VerticalAlignment="Bottom" />
+                <CheckBox x:Name="NewDepositsBox" Content="Ruß/Niederschlag" IsChecked="{Binding NewDeposits}"
+                          VerticalAlignment="Bottom" />
+                <HeaderedContentControl Classes="field" Header="BEMERKUNG">
+                  <TextBox x:Name="NewNoteBox" Classes="w-xl" Text="{Binding NewNote}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxNoteLength}"
+                           AutomationProperties.Name="Bemerkung" />
+                </HeaderedContentControl>
+              </WrapPanel>
+              <TextBlock x:Name="EntryErrorText" Classes="field-error" TextWrapping="Wrap"
+                         Text="{Binding EntryError}"
+                         IsVisible="{Binding EntryError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <Button x:Name="RecordMeasurementButton" Classes="signal dock-action" Content="SPEICHERN"
+                      HorizontalAlignment="Left"
+                      Command="{Binding RecordMeasurementCommand}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+
+        <!-- Bewertung, in the form's place at the bottom. An inline panel under the overlay
+             keyboard contract (#538): Esc cancels, Enter saves. -->
+        <Border x:Name="AssessmentPanel" DockPanel.Dock="Bottom" Classes="dock" Margin="0,12,0,0"
+                IsVisible="{Binding IsAssessmentOpen}"
+                b:Overlay.IsInline="True"
+                b:Overlay.CancelCommand="{Binding CancelAssessmentCommand}"
+                b:Overlay.PrimaryCommand="{Binding ConfirmAssessmentCommand}"
+                b:Overlay.InitialFocus="{Binding #AssessmentStatusBox}"
+                b:Overlay.FallbackFocus="{Binding #MessreihePageButton}">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" MaxHeight="420">
+            <StackPanel Spacing="8">
+              <TextBlock Text="MESSUNG BEWERTEN" Classes="overline" />
+              <TextBlock x:Name="AssessmentHeading" TextWrapping="Wrap" FontWeight="SemiBold"
+                         Text="{Binding AssessmentTarget.Heading}" />
+              <HeaderedContentControl Classes="field" Header="ERGEBNIS">
+                <ListBox x:Name="AssessmentStatusBox" Classes="triage"
+                         ItemsSource="{x:Static vm:MeasurementLogViewModel.StatusOptions}"
+                         SelectedValue="{Binding AssessmentStatus}" SelectedValueBinding="{Binding Value}"
+                         AutomationProperties.Name="Ergebnis der Bewertung">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:StatusOption">
+                      <Border Classes="seg low"><TextBlock Text="{Binding Label}" /></Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </HeaderedContentControl>
+              <HeaderedContentControl Classes="field required" Header="BEWERTET DURCH">
+                <TextBox x:Name="AssessmentByBox" Classes="w-l" Text="{Binding AssessmentBy}"
+                         MaxLength="{x:Static vm:MeasurementLogViewModel.MaxAssessorLength}"
+                         AutomationProperties.Name="Bewertet durch" />
+              </HeaderedContentControl>
+              <HeaderedContentControl Classes="field" Header="BEWERTUNG / MASSNAHME">
+                <TextBox x:Name="AssessmentTextBox" Classes="w-text" Text="{Binding AssessmentText}"
+                         TextWrapping="Wrap" AcceptsReturn="True" MinHeight="64"
+                         MaxLength="{x:Static vm:MeasurementLogViewModel.MaxAssessmentTextLength}"
+                         AutomationProperties.Name="Bewertung und Maßnahme" />
+              </HeaderedContentControl>
+              <TextBlock x:Name="AssessmentErrorText" Classes="field-error" TextWrapping="Wrap"
+                         Text="{Binding AssessmentError}"
+                         IsVisible="{Binding AssessmentError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button x:Name="ConfirmAssessmentButton" Classes="signal dock-action" Content="SPEICHERN"
+                        Command="{Binding ConfirmAssessmentCommand}" />
+                <Button x:Name="CancelAssessmentButton" Classes="dock-action" Content="ABBRECHEN"
+                        Command="{Binding CancelAssessmentCommand}" />
+              </WrapPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+
+        <!-- Korrektur of one value: the old one stays on record beside the reason. -->
+        <Border x:Name="CorrectionPanel" DockPanel.Dock="Bottom" Classes="dock" Margin="0,12,0,0"
+                IsVisible="{Binding IsCorrectionOpen}"
+                b:Overlay.IsInline="True"
+                b:Overlay.CancelCommand="{Binding CancelCorrectionCommand}"
+                b:Overlay.PrimaryCommand="{Binding ConfirmCorrectionCommand}"
+                b:Overlay.InitialFocus="{Binding #CorrectionValueBox}"
+                b:Overlay.FallbackFocus="{Binding #MessreihePageButton}">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" MaxHeight="420">
+            <StackPanel Spacing="8">
+              <TextBlock Text="MESSWERT KORRIGIEREN" Classes="overline" />
+              <TextBlock x:Name="CorrectionHeadingText" TextWrapping="Wrap" FontWeight="SemiBold"
+                         Text="{Binding CorrectionHeading}" />
+              <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                         Text="{Binding CorrectionTarget.CorrectionText}"
+                         IsVisible="{Binding CorrectionTarget.IsCorrected, FallbackValue=False}" />
+              <WrapPanel Classes="dock-fields">
+                <HeaderedContentControl Classes="field" Header="NEUER WERT">
+                  <TextBox x:Name="CorrectionValueBox" Classes="mono w-m" Text="{Binding CorrectionValue}"
+                           PlaceholderText="leer = kein Wert"
+                           AutomationProperties.Name="Neuer Messwert" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field required" Header="GRUND">
+                  <TextBox x:Name="CorrectionReasonBox" Classes="w-xl" Text="{Binding CorrectionReason}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxReasonLength}"
+                           PlaceholderText="z. B. Ablesefehler"
+                           AutomationProperties.Name="Grund der Korrektur" />
+                </HeaderedContentControl>
+              </WrapPanel>
+              <TextBlock x:Name="CorrectionErrorText" Classes="field-error" TextWrapping="Wrap"
+                         Text="{Binding CorrectionError}"
+                         IsVisible="{Binding CorrectionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button x:Name="ConfirmCorrectionButton" Classes="signal dock-action" Content="SPEICHERN"
+                        Command="{Binding ConfirmCorrectionCommand}" />
+                <Button x:Name="CancelCorrectionButton" Classes="dock-action" Content="ABBRECHEN"
+                        Command="{Binding CancelCorrectionCommand}" />
+              </WrapPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock x:Name="MeasurementEmptyText" DockPanel.Dock="Top" Text="{Binding EmptyText}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   IsVisible="{Binding !HasRows}" />
+
+        <!-- The Messreihe, newest first: a table on a wide window and cards on a phone, as the
+             Ausgabeliste does. The header and the rows share their Auto columns through the scope
+             on the DockPanel; every Messgröße is a fixed-width column, so they line up however
+             many there are, and the table scrolls sideways once ten of them no longer fit. The
+             visibility sits on the Panel: the narrow styles switch the two Borders. -->
+        <Panel IsVisible="{Binding HasRows}">
+          <Border x:Name="MeasurementTablePanel"
+                  Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+            <ScrollViewer x:Name="MeasurementTableScroll" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled" AllowAutoHide="False">
+              <DockPanel Grid.IsSharedSizeScope="True">
+                <Border DockPanel.Dock="Top" x:Name="MeasurementTableHeader" Padding="11,8,8,6"
+                        BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1">
+                  <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Time" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Order" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Point" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Team" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Observation" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Values" />
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="ZEIT" Classes="overline" FontSize="10" VerticalAlignment="Bottom" />
+                    <TextBlock Grid.Column="1" Text="AUFTRAG" Classes="overline" FontSize="10" VerticalAlignment="Bottom" />
+                    <TextBlock Grid.Column="2" Text="MESSPUNKT" Classes="overline" FontSize="10" VerticalAlignment="Bottom" />
+                    <TextBlock Grid.Column="3" Text="TRUPP · PSA · MESSART" Classes="overline" FontSize="10" VerticalAlignment="Bottom" />
+                    <TextBlock Grid.Column="4" Text="BEOB." Classes="overline" FontSize="10" VerticalAlignment="Bottom" />
+                    <ItemsControl Grid.Column="5" x:Name="MeasurementColumnHeads" ItemsSource="{Binding Columns}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MeasurementColumn">
+                          <Border Classes="value-col" Padding="6,0">
+                            <StackPanel VerticalAlignment="Bottom">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Text="{Binding Unit}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                              <TextBlock Text="inaktiv" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
+                                         IsVisible="{Binding !IsActive}" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Grid.Column="6" Text="BEWERTUNG" Classes="overline" FontSize="10" VerticalAlignment="Bottom" />
+                  </Grid>
+                </Border>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl x:Name="MeasurementList" ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:MeasurementRow">
+                        <Border x:Name="MeasurementRowBorder" Padding="11,6,8,8"
+                                BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
+                                Classes.outlier="{Binding IsOutlier}">
+                          <StackPanel Spacing="4">
+                            <Grid ColumnSpacing="12">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Time" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Order" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Point" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Team" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Observation" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Values" />
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Status" />
+                              </Grid.ColumnDefinitions>
+                              <TextBlock Grid.Column="0" Classes="mono strike" FontSize="13" FontWeight="SemiBold"
+                                         VerticalAlignment="Top" Margin="0,6,0,0" Text="{Binding TimeText}" />
+                              <TextBlock Grid.Column="1" Classes="mono" FontSize="12" VerticalAlignment="Top" Margin="0,7,0,0"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         Text="{Binding Order, TargetNullValue='–'}" />
+                              <StackPanel Grid.Column="2" VerticalAlignment="Top" Margin="0,4,0,0" MaxWidth="200">
+                                <TextBlock Classes="strike" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding PointText}" />
+                                <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Text="{Binding ZoneText}" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="3" VerticalAlignment="Top" Margin="0,4,0,0" MaxWidth="220">
+                                <TextBlock TextWrapping="Wrap" Text="{Binding Team, TargetNullValue='–'}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="{Binding ProtectionText}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                                           Text="{Binding ModeText}" />
+                              </StackPanel>
+                              <TextBlock Grid.Column="4" FontSize="12" TextWrapping="Wrap" MaxWidth="110"
+                                         VerticalAlignment="Top" Margin="0,6,0,0"
+                                         Foreground="{StaticResource AmberBrush}"
+                                         Text="{Binding ObservationText}" />
+                              <ItemsControl Grid.Column="5" ItemsSource="{Binding Cells}" VerticalAlignment="Top">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                  </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="vm:MeasurementCell">
+                                    <Border Classes="value-col">
+                                      <ContentControl Content="{Binding}" />
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <StackPanel Grid.Column="6" VerticalAlignment="Top" Spacing="4" Margin="0,2,0,0">
+                                <TextBlock x:Name="RowStatus" Classes="status"
+                                           Classes.confirmed="{Binding IsConfirmed}"
+                                           Classes.outlier="{Binding IsOutlier}"
+                                           Text="{Binding StatusText}" />
+                                <Button x:Name="AssessButton" Content="BEWERTEN"
+                                        Command="{Binding AssessCommand}"
+                                        IsVisible="{Binding !IsReadOnly}" />
+                              </StackPanel>
+                            </Grid>
+                            <TextBlock FontSize="12" TextWrapping="Wrap" MaxWidth="900" HorizontalAlignment="Left"
+                                       Text="{Binding Note}"
+                                       IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <TextBlock x:Name="RowAssessment" FontSize="12" TextWrapping="Wrap" MaxWidth="900" HorizontalAlignment="Left"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       IsVisible="{Binding HasAssessment}">
+                              <TextBlock.Text>
+                                <MultiBinding StringFormat="{}Bewertung {0} ({1}): {2}">
+                                  <Binding Path="AssessmentTimeText" />
+                                  <Binding Path="AssessmentBy" />
+                                  <Binding Path="AssessmentText" TargetNullValue="–" />
+                                </MultiBinding>
+                              </TextBlock.Text>
+                            </TextBlock>
+                            <ItemsControl ItemsSource="{Binding Cells}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MeasurementCell">
+                                  <TextBlock FontSize="11" TextWrapping="Wrap" MaxWidth="900" HorizontalAlignment="Left"
+                                             Foreground="{StaticResource TextSecondaryBrush}"
+                                             IsVisible="{Binding IsCorrected}">
+                                    <TextBlock.Text>
+                                      <MultiBinding StringFormat="{}{0} {1}">
+                                        <Binding Path="ChannelName" />
+                                        <Binding Path="CorrectionText" />
+                                      </MultiBinding>
+                                    </TextBlock.Text>
+                                  </TextBlock>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </DockPanel>
+            </ScrollViewer>
+          </Border>
+
+          <!-- The phone: one card per Messung, the values wrapping under their names. -->
+          <Border x:Name="MeasurementCardPanel" Classes="narrow-only"
+                  Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <ItemsControl x:Name="MeasurementCards" ItemsSource="{Binding Rows}" Margin="8">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:MeasurementRow">
+                    <Border x:Name="MeasurementCard" Classes="row-card" Classes.outlier="{Binding IsOutlier}">
+                      <StackPanel Spacing="4">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                          <StackPanel Grid.Column="0">
+                            <TextBlock Classes="strike" FontWeight="SemiBold" TextWrapping="Wrap">
+                              <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} · {1}">
+                                  <Binding Path="TimeText" />
+                                  <Binding Path="PointText" />
+                                </MultiBinding>
+                              </TextBlock.Text>
+                            </TextBlock>
+                            <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}">
+                              <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} · {1}">
+                                  <Binding Path="Order" TargetNullValue="ohne Auftrag" />
+                                  <Binding Path="ZoneText" />
+                                </MultiBinding>
+                              </TextBlock.Text>
+                            </TextBlock>
+                          </StackPanel>
+                          <TextBlock Grid.Column="1" x:Name="CardStatus" Classes="status" VerticalAlignment="Top"
+                                     Classes.confirmed="{Binding IsConfirmed}"
+                                     Classes.outlier="{Binding IsOutlier}"
+                                     Text="{Binding StatusText}" />
+                        </Grid>
+                        <TextBlock FontSize="12" TextWrapping="Wrap">
+                          <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0} · {1} · {2}">
+                              <Binding Path="Team" TargetNullValue="ohne Trupp" />
+                              <Binding Path="ProtectionText" />
+                              <Binding Path="ModeText" />
+                            </MultiBinding>
+                          </TextBlock.Text>
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding Cells}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MeasurementCell">
+                              <Border Classes="value-col" Background="{StaticResource SurfaceRaisedBrush}"
+                                      CornerRadius="{StaticResource RadiusSm}">
+                                <StackPanel>
+                                  <TextBlock Text="{Binding ChannelName}" FontSize="10" Margin="6,4,6,0"
+                                             TextTrimming="CharacterEllipsis"
+                                             Foreground="{StaticResource TextSecondaryBrush}" />
+                                  <ContentControl Content="{Binding}" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource AmberBrush}"
+                                   Text="{Binding ObservationText}"
+                                   IsVisible="{Binding ObservationText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding Note}"
+                                   IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                                   IsVisible="{Binding HasAssessment}">
+                          <TextBlock.Text>
+                            <MultiBinding StringFormat="{}Bewertung {0} ({1}): {2}">
+                              <Binding Path="AssessmentTimeText" />
+                              <Binding Path="AssessmentBy" />
+                              <Binding Path="AssessmentText" TargetNullValue="–" />
+                            </MultiBinding>
+                          </TextBlock.Text>
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding Cells}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MeasurementCell">
+                              <TextBlock FontSize="11" TextWrapping="Wrap"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         IsVisible="{Binding IsCorrected}">
+                                <TextBlock.Text>
+                                  <MultiBinding StringFormat="{}{0} {1}">
+                                    <Binding Path="ChannelName" />
+                                    <Binding Path="CorrectionText" />
+                                  </MultiBinding>
+                                </TextBlock.Text>
+                              </TextBlock>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button x:Name="CardAssessButton" Content="BEWERTEN" HorizontalAlignment="Right"
+                                Height="{StaticResource ControlHeightTouch}"
+                                Command="{Binding AssessCommand}"
+                                IsVisible="{Binding !IsReadOnly}" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+        </Panel>
+      </DockPanel>
+
+      <!-- ========================= MESSPUNKTE & WETTER ========================= -->
+      <ScrollViewer x:Name="MesspunkteWetterPage" IsVisible="{Binding IsMesspunkteWetterPage}"
+                    HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                    AllowAutoHide="False">
+        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="16" Margin="0,0,4,0">
+          <StackPanel x:Name="PointsBlock" Spacing="8">
+            <TextBlock Text="MESSPUNKTE" Classes="overline" />
+            <TextBlock x:Name="PointsEmptyText" Text="Noch kein Messpunkt."
+                       Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding !Points.Count}" />
+            <ItemsControl x:Name="PointList" ItemsSource="{Binding Points}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MeasuringPointRow">
+                  <Border Classes="row-card">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                      <StackPanel Grid.Column="0" Spacing="1">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}">
+                          <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0} · {1}">
+                              <Binding Path="ZoneText" />
+                              <Binding Path="CountText" />
+                            </MultiBinding>
+                          </TextBlock.Text>
+                        </TextBlock>
+                        <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding Location}"
+                                   IsVisible="{Binding Location, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      </StackPanel>
+                      <Button Grid.Column="1" x:Name="EditPointButton" Content="BEARBEITEN" VerticalAlignment="Top"
+                              Command="{Binding EditCommand}" IsVisible="{Binding !IsReadOnly}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border x:Name="PointForm" Classes="dock" IsVisible="{Binding CanEdit}"
+                    b:EntryForm.SubmitCommand="{Binding SavePointCommand}"
+                    b:EntryForm.FirstField="{Binding #PointNameBox}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="NEUER MESSPUNKT" Classes="overline" IsVisible="{Binding !IsEditingPoint}" />
+                <TextBlock Text="MESSPUNKT BEARBEITEN" Classes="overline" IsVisible="{Binding IsEditingPoint}" />
+                <WrapPanel Classes="dock-fields">
+                  <HeaderedContentControl Classes="field required" Header="NAME">
+                    <TextBox x:Name="PointNameBox" Classes="w-m" Text="{Binding PointName}"
+                             MaxLength="{x:Static vm:MeasurementLogViewModel.MaxPointNameLength}"
+                             PlaceholderText="z. B. Kellerabgang"
+                             AutomationProperties.Name="Name des Messpunkts" />
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field" Header="ORT / BESCHREIBUNG">
+                    <TextBox x:Name="PointLocationBox" Classes="w-l" Text="{Binding PointLocation}"
+                             MaxLength="{x:Static vm:MeasurementLogViewModel.MaxLocationLength}"
+                             AutomationProperties.Name="Ort des Messpunkts" />
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field" Header="BEREICH">
+                    <ComboBox x:Name="PointZoneBox" Classes="w-m"
+                              ItemsSource="{x:Static vm:MeasurementLogViewModel.ZoneOptions}"
+                              SelectedValue="{Binding PointZone}" SelectedValueBinding="{Binding Value}"
+                              AutomationProperties.Name="Bereich des Messpunkts">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ZoneOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </HeaderedContentControl>
+                </WrapPanel>
+                <TextBlock x:Name="PointErrorText" Classes="field-error" TextWrapping="Wrap" Text="{Binding PointError}"
+                           IsVisible="{Binding PointError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <WrapPanel ItemSpacing="8" LineSpacing="8">
+                  <Button x:Name="SavePointButton" Classes="signal dock-action" Content="{Binding PointSubmitLabel}"
+                          Command="{Binding SavePointCommand}" />
+                  <Button x:Name="CancelPointEditButton" Classes="dock-action" Content="ABBRECHEN"
+                          Command="{Binding CancelPointEditCommand}" IsVisible="{Binding IsEditingPoint}" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <StackPanel x:Name="WeatherBlock" Spacing="8">
+            <TextBlock Text="WETTER" Classes="overline" />
+            <Border x:Name="WeatherForm" Classes="dock" IsVisible="{Binding CanEdit}"
+                    b:EntryForm.SubmitCommand="{Binding AddWeatherCommand}"
+                    b:EntryForm.FirstField="{Binding #WeatherTimeBox}">
+              <StackPanel Spacing="8">
+                <WrapPanel Classes="dock-fields">
+                  <HeaderedContentControl Classes="field required" Header="UHRZEIT">
+                    <TextBox x:Name="WeatherTimeBox" Classes="mono w-xs" Text="{Binding WeatherTime}"
+                             MaxLength="5" AutomationProperties.Name="Uhrzeit der Wetterbeobachtung" />
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field" Header="WIND AUS">
+                    <ComboBox x:Name="WeatherWindBox" Classes="w-s"
+                              ItemsSource="{x:Static vm:MeasurementLogViewModel.WindOptions}"
+                              SelectedValue="{Binding WeatherWind}" SelectedValueBinding="{Binding Value}"
+                              AutomationProperties.Name="Windrichtung">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WindOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field" Header="WIND (KM/H)">
+                    <TextBox x:Name="WeatherSpeedBox" Classes="mono w-xs" Text="{Binding WeatherSpeed}"
+                             AutomationProperties.Name="Windgeschwindigkeit in km/h" />
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field" Header="TEMPERATUR (°C)">
+                    <TextBox x:Name="WeatherTemperatureBox" Classes="mono w-xs" Text="{Binding WeatherTemperature}"
+                             AutomationProperties.Name="Temperatur in Grad Celsius" />
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field" Header="BEWÖLKUNG">
+                    <ComboBox x:Name="WeatherCloudsBox" Classes="w-m"
+                              ItemsSource="{x:Static vm:MeasurementLogViewModel.CloudOptions}"
+                              SelectedValue="{Binding WeatherClouds}" SelectedValueBinding="{Binding Value}"
+                              AutomationProperties.Name="Bewölkung">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CloudOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field" Header="NIEDERSCHLAG">
+                    <ComboBox x:Name="WeatherPrecipitationBox" Classes="w-m"
+                              ItemsSource="{x:Static vm:MeasurementLogViewModel.PrecipitationOptions}"
+                              SelectedValue="{Binding WeatherPrecipitation}" SelectedValueBinding="{Binding Value}"
+                              AutomationProperties.Name="Niederschlag">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PrecipitationOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </HeaderedContentControl>
+                  <HeaderedContentControl Classes="field suggest" Header="QUELLE">
+                    <AutoCompleteBox x:Name="WeatherSourceBox" Classes="w-m" Text="{Binding WeatherSource}"
+                                     ItemsSource="{x:Static vm:MeasurementLogViewModel.WeatherSourceSuggestions}"
+                                     FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                     MaxLength="{x:Static vm:MeasurementLogViewModel.MaxSourceLength}"
+                                     AutomationProperties.Name="Quelle der Wetterbeobachtung" />
+                  </HeaderedContentControl>
+                </WrapPanel>
+                <TextBlock x:Name="WeatherErrorText" Classes="field-error" TextWrapping="Wrap" Text="{Binding WeatherError}"
+                           IsVisible="{Binding WeatherError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <Button x:Name="AddWeatherButton" Classes="signal dock-action" Content="WETTER ERFASSEN"
+                        HorizontalAlignment="Left" Command="{Binding AddWeatherCommand}" />
+              </StackPanel>
+            </Border>
+            <TextBlock x:Name="WeatherEmptyText" Text="Noch keine Wetterbeobachtung."
+                       Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding !HasWeather}" />
+            <ItemsControl x:Name="WeatherList" ItemsSource="{Binding Weather}" Grid.IsSharedSizeScope="True">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:WeatherRow">
+                  <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="0,6">
+                    <Grid ColumnSpacing="12">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="WeatherTime" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" Classes="mono" FontWeight="SemiBold" Text="{Binding TimeText}" />
+                      <StackPanel Grid.Column="1">
+                        <TextBlock TextWrapping="Wrap">
+                          <TextBlock.Text>
+                            <MultiBinding StringFormat="{}Wind aus {0} · {1} · {2}">
+                              <Binding Path="WindText" />
+                              <Binding Path="SpeedText" />
+                              <Binding Path="TemperatureText" />
+                            </MultiBinding>
+                          </TextBlock.Text>
+                        </TextBlock>
+                        <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}">
+                          <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0} · {1} · {2}">
+                              <Binding Path="CloudsText" />
+                              <Binding Path="PrecipitationText" />
+                              <Binding Path="Source" TargetNullValue="ohne Quelle" />
+                            </MultiBinding>
+                          </TextBlock.Text>
+                        </TextBlock>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+
+      <!-- ============================== MESSGRÖSSEN ============================== -->
+      <ScrollViewer x:Name="MessgroessenPage" IsVisible="{Binding IsMessgroessenPage}"
+                    HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                    AllowAutoHide="False">
+        <StackPanel Spacing="8" Margin="0,0,4,0">
+          <TextBlock Text="MESSGRÖSSEN" Classes="overline" />
+          <TextBlock x:Name="SeedHintText" Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                     Text="{Binding SeedHint}"
+                     IsVisible="{Binding SeedHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock x:Name="ChannelsEmptyText" Text="Noch keine Messgröße."
+                     Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding !Channels.Count}" />
+          <ItemsControl x:Name="ChannelList" ItemsSource="{Binding Channels}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:MeasurementChannelRow">
+                <Border Classes="row-card">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <StackPanel Grid.Column="0" Spacing="1">
+                      <TextBlock FontWeight="SemiBold" TextWrapping="Wrap">
+                        <TextBlock.Text>
+                          <MultiBinding StringFormat="{}{0} {1}">
+                            <Binding Path="Name" />
+                            <Binding Path="Unit" />
+                          </MultiBinding>
+                        </TextBlock.Text>
+                      </TextBlock>
+                      <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}">
+                        <TextBlock.Text>
+                          <MultiBinding StringFormat="{}{0} · {1}">
+                            <Binding Path="DirectionText" />
+                            <Binding Path="BandsText" />
+                          </MultiBinding>
+                        </TextBlock.Text>
+                      </TextBlock>
+                      <TextBlock FontSize="12" TextWrapping="Wrap"
+                                 Text="{Binding DeviceName, StringFormat='Gerät: {0}'}"
+                                 IsVisible="{Binding DeviceName, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      <TextBlock FontSize="12" Text="ohne Gerät" Foreground="{StaticResource TextSecondaryBrush}"
+                                 IsVisible="{Binding DeviceName, Converter={x:Static ObjectConverters.IsNull}}" />
+                      <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding Note}"
+                                 IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                                 Text="{Binding RemoveHint}"
+                                 IsVisible="{Binding RemoveHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top">
+                      <CheckBox x:Name="ChannelActiveBox" Content="Aktiv" IsChecked="{Binding IsActive}"
+                                IsEnabled="{Binding !IsReadOnly}" />
+                      <Button x:Name="RemoveChannelButton" Content="ENTFERNEN"
+                              Command="{Binding RemoveCommand}" IsVisible="{Binding !IsReadOnly}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border x:Name="ChannelForm" Classes="dock" IsVisible="{Binding CanEdit}">
+            <StackPanel Spacing="10">
+              <TextBlock Text="MESSGRÖSSE HINZUFÜGEN" Classes="overline" />
+              <WrapPanel Classes="dock-fields">
+                <HeaderedContentControl Classes="field" Header="GERÄT">
+                  <ComboBox x:Name="NewChannelDeviceBox" Classes="w-l" ItemsSource="{Binding DeviceChoices}"
+                            SelectedItem="{Binding NewChannelDevice}"
+                            AutomationProperties.Name="Gerät der Messgröße">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:DeviceChoice"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="BEMERKUNG">
+                  <TextBox x:Name="NewChannelNoteBox" Classes="w-xl" Text="{Binding NewChannelNote}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxChannelNoteLength}"
+                           AutomationProperties.Name="Bemerkung zur Messgröße" />
+                </HeaderedContentControl>
+              </WrapPanel>
+
+              <!-- From the Stammdaten Messgase the Einsatz does not measure yet. -->
+              <WrapPanel x:Name="GasChoiceRow" Classes="dock-fields">
+                <HeaderedContentControl Classes="field" Header="AUS DEN STAMMDATEN">
+                  <ComboBox x:Name="GasChoiceBox" Classes="w-l" ItemsSource="{Binding GasChoices}"
+                            SelectedItem="{Binding SelectedGasChoice}"
+                            PlaceholderText="Messgas wählen …"
+                            AutomationProperties.Name="Messgas aus den Stammdaten">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:GasChoice"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </HeaderedContentControl>
+                <Button x:Name="AddGasChoiceButton" Classes="signal dock-action" Content="HINZUFÜGEN"
+                        VerticalAlignment="Bottom" Command="{Binding AddGasChoiceCommand}" />
+              </WrapPanel>
+
+              <!-- Or a Messgröße of its own, with the Stammdaten editor's rules (#410). -->
+              <TextBlock Text="EIGENE MESSGRÖSSE" Classes="overline" FontSize="10" Margin="0,4,0,0" />
+              <WrapPanel x:Name="CustomChannelRow" Classes="dock-fields"
+                         b:EntryForm.SubmitCommand="{Binding AddCustomChannelCommand}"
+                         b:EntryForm.FirstField="{Binding #NewChannelNameBox}">
+                <HeaderedContentControl Classes="field required" Header="NAME">
+                  <TextBox x:Name="NewChannelNameBox" Classes="w-s" Text="{Binding NewChannelName}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxChannelNameLength}"
+                           PlaceholderText="z. B. HCN"
+                           AutomationProperties.Name="Name der Messgröße" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field suggest" Header="EINHEIT">
+                  <AutoCompleteBox x:Name="NewChannelUnitBox" Classes="w-s" Text="{Binding NewChannelUnit}"
+                                   ItemsSource="{x:Static vm:MeasurementLogViewModel.UnitSuggestions}"
+                                   FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                   MaxLength="{x:Static vm:MeasurementLogViewModel.MaxChannelUnitLength}"
+                                   AutomationProperties.Name="Einheit der Messgröße" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="RICHTUNG">
+                  <ComboBox x:Name="NewChannelDirectionBox" Classes="w-s"
+                            ItemsSource="{x:Static vm:MeasurementLogViewModel.DirectionOptions}"
+                            SelectedValue="{Binding NewChannelDirection}" SelectedValueBinding="{Binding Value}"
+                            AutomationProperties.Name="Richtung der Messgröße">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:GasDirectionOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="ERHÖHT AB">
+                  <NumericUpDown Classes="decimal w-s" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                 ClipValueToMinMax="True" Value="{Binding NewChannelElevated}"
+                                 AutomationProperties.Name="Erhöht ab" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="GEFÄHRLICH AB">
+                  <NumericUpDown Classes="decimal w-s" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                 ClipValueToMinMax="True" Value="{Binding NewChannelDangerous}"
+                                 AutomationProperties.Name="Gefährlich ab" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="LEBENSGEF. AB">
+                  <NumericUpDown Classes="decimal w-s" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                 ClipValueToMinMax="True" Value="{Binding NewChannelLethal}"
+                                 AutomationProperties.Name="Lebensgefährlich ab" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="PLAUSIBEL BIS">
+                  <NumericUpDown Classes="decimal w-s" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
+                                 ClipValueToMinMax="True" Value="{Binding NewChannelPlausibleUpTo}"
+                                 AutomationProperties.Name="Plausibel bis" />
+                </HeaderedContentControl>
+                <Button x:Name="AddCustomChannelButton" Classes="signal dock-action" Content="ANLEGEN"
+                        VerticalAlignment="Bottom" Command="{Binding AddCustomChannelCommand}" />
+              </WrapPanel>
+              <TextBlock x:Name="ChannelCapText" FontSize="12" TextWrapping="Wrap"
+                         Foreground="{StaticResource AmberBrush}"
+                         Text="{x:Static vm:MeasurementLogViewModel.ChannelCapMessage}"
+                         IsVisible="{Binding IsChannelCapReached}" />
+              <TextBlock x:Name="ChannelErrorText" Classes="field-error" TextWrapping="Wrap" Text="{Binding ChannelError}"
+                         IsVisible="{Binding ChannelError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- ============================== GERÄTE ============================== -->
+      <ScrollViewer x:Name="GeraetePage" IsVisible="{Binding IsGeraetePage}"
+                    HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                    AllowAutoHide="False">
+        <StackPanel Spacing="8" Margin="0,0,4,0">
+          <TextBlock Text="MESSGERÄTE" Classes="overline" />
+          <TextBlock x:Name="DevicesEmptyText" Text="Noch kein Messgerät."
+                     Foreground="{StaticResource TextSecondaryBrush}" IsVisible="{Binding !Devices.Count}" />
+          <ItemsControl x:Name="DeviceList" ItemsSource="{Binding Devices}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:MeasuringDeviceRow">
+                <Border Classes="row-card">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <StackPanel Grid.Column="0" Spacing="1">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                                 Text="{Binding KindText}" />
+                      <TextBlock FontSize="12" TextWrapping="Wrap"
+                                 Text="{Binding Number, StringFormat='Nr. {0}'}"
+                                 IsVisible="{Binding Number, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <TextBlock FontSize="12" TextWrapping="Wrap"
+                                 Text="{Binding Vehicle, StringFormat='Fahrzeug: {0}'}"
+                                 IsVisible="{Binding Vehicle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                      <TextBlock FontSize="12" TextWrapping="Wrap"
+                                 Text="{Binding Check, StringFormat='Prüfung: {0}'}"
+                                 IsVisible="{Binding Check, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top" IsVisible="{Binding !IsReadOnly}">
+                      <Button x:Name="EditDeviceButton" Content="BEARBEITEN" HorizontalAlignment="Stretch"
+                              Command="{Binding EditCommand}" />
+                      <Button x:Name="RemoveDeviceButton" Content="ENTFERNEN" HorizontalAlignment="Stretch"
+                              Command="{Binding RemoveCommand}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border x:Name="DeviceForm" Classes="dock" IsVisible="{Binding CanEdit}"
+                  b:EntryForm.SubmitCommand="{Binding SaveDeviceCommand}"
+                  b:EntryForm.FirstField="{Binding #NewDeviceNameBox}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="NEUES MESSGERÄT" Classes="overline" IsVisible="{Binding !IsEditingDevice}" />
+              <TextBlock Text="MESSGERÄT BEARBEITEN" Classes="overline" IsVisible="{Binding IsEditingDevice}" />
+              <WrapPanel Classes="dock-fields">
+                <HeaderedContentControl Classes="field" Header="ART">
+                  <ComboBox x:Name="NewDeviceKindBox" Classes="w-l"
+                            ItemsSource="{x:Static vm:MeasurementLogViewModel.DeviceKindOptions}"
+                            SelectedValue="{Binding NewDeviceKind}" SelectedValueBinding="{Binding Value}"
+                            AutomationProperties.Name="Art des Messgeräts">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:DeviceKindOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field required" Header="BEZEICHNUNG">
+                  <TextBox x:Name="NewDeviceNameBox" Classes="w-m" Text="{Binding NewDeviceName}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxDeviceNameLength}"
+                           PlaceholderText="z. B. MGM 1"
+                           AutomationProperties.Name="Bezeichnung des Messgeräts" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="GERÄTE-NR. / CHARGE">
+                  <TextBox x:Name="NewDeviceNumberBox" Classes="mono w-m" Text="{Binding NewDeviceNumber}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxDeviceDetailLength}"
+                           AutomationProperties.Name="Gerätenummer oder Charge" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="FAHRZEUG">
+                  <TextBox x:Name="NewDeviceVehicleBox" Classes="w-m" Text="{Binding NewDeviceVehicle}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxDeviceDetailLength}"
+                           AutomationProperties.Name="Fahrzeug des Messgeräts" />
+                </HeaderedContentControl>
+                <HeaderedContentControl Classes="field" Header="PRÜFUNG / HALTBARKEIT">
+                  <TextBox x:Name="NewDeviceCheckBox" Classes="w-l" Text="{Binding NewDeviceCheck}"
+                           MaxLength="{x:Static vm:MeasurementLogViewModel.MaxDeviceDetailLength}"
+                           PlaceholderText="z. B. Bump-Test 08:40"
+                           AutomationProperties.Name="Prüfung oder Haltbarkeit" />
+                </HeaderedContentControl>
+              </WrapPanel>
+              <TextBlock x:Name="DeviceErrorText" Classes="field-error" TextWrapping="Wrap" Text="{Binding DeviceError}"
+                         IsVisible="{Binding DeviceError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button x:Name="SaveDeviceButton" Classes="signal dock-action" Content="{Binding DeviceSubmitLabel}"
+                        Command="{Binding SaveDeviceCommand}" />
+                <Button x:Name="CancelDeviceEditButton" Classes="dock-action" Content="ABBRECHEN"
+                        Command="{Binding CancelDeviceEditCommand}" IsVisible="{Binding IsEditingDevice}" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Panel>
+  </DockPanel>
+</UserControl>

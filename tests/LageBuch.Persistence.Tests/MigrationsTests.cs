@@ -588,4 +588,41 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(0) && r.IsDBNull(2));
         Assert.Equal(("Florian EL", "Hof"), (r.GetString(1), r.GetString(3)));
     }
+
+    [Fact]
+    public void V44_database_upgrades_to_v45_and_gains_the_messprotokoll_tables()
+    {
+        // A V44 file: today's schema minus the Messprotokoll tables.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                DROP TABLE measuring_points; DROP TABLE measuring_devices; DROP TABLE measurement_channels;
+                DROP TABLE measurements; DROP TABLE measurement_corrections; DROP TABLE weather_observations;
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (44);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = """
+            SELECT (SELECT count(*) FROM pragma_table_info('measuring_points')),
+                   (SELECT count(*) FROM pragma_table_info('measuring_devices')),
+                   (SELECT count(*) FROM pragma_table_info('measurement_channels')),
+                   (SELECT count(*) FROM pragma_table_info('measurements')),
+                   (SELECT count(*) FROM pragma_table_info('measurement_corrections')),
+                   (SELECT count(*) FROM pragma_table_info('weather_observations')),
+                   (SELECT count(*) FROM measurements);
+            """;
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.Equal((5L, 7L, 12L, 19L, 11L, 9L, 0L), (r.GetInt64(0), r.GetInt64(1), r.GetInt64(2), r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6)));
+    }
 }

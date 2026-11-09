@@ -8,6 +8,7 @@ using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Map;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
@@ -161,7 +162,8 @@ public static class SnapshotMapper
                 o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)).ToList(),
             Gases: incident.Gases.Select(g => new IncidentGasDto(g.Id, GasDefinitionDto.From(g.Definition))).ToList(),
             DispatchChannel: incident.DispatchChannel,
-            LagefuehrungNodeId: incident.LagefuehrungNodeId);
+            LagefuehrungNodeId: incident.LagefuehrungNodeId,
+            MeasurementLog: ToDto(incident.MeasurementLog));
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -298,7 +300,105 @@ public static class SnapshotMapper
                 o.Id, o.FileId, o.Name, o.ImportedAt, o.ImportedBy, o.FrameCount, o.FirstTime, o.LastTime)),
             snapshot.Gases?.Where(g => g?.Definition is not null).Select(g => new IncidentGas(g.Id, g.Definition.ToDefinition())),
             snapshot.DispatchChannel,
-            snapshot.LagefuehrungNodeId);
+            snapshot.LagefuehrungNodeId,
+            FromDto(snapshot.MeasurementLog));
+    }
+
+    private static MeasurementLogDto ToDto(MeasurementLog log) => new(
+        log.Points.Select(p => new MeasuringPointDto(p.Id, p.Name, p.Location, p.Zone)).ToList(),
+        log.Devices.Select(d => new MeasuringDeviceDto(d.Id, d.Kind, d.Name, d.Number, d.Vehicle, d.Check)).ToList(),
+        log.Channels.Select(c => new MeasurementChannelDto(c.Id, GasDefinitionDto.From(c.Definition), c.DeviceId, c.IsActive, c.Note)).ToList(),
+        log.Measurements.Select(m => new MeasurementDto(
+            m.Id,
+            m.MeasuredAt,
+            m.Order,
+            m.PointId,
+            m.Team,
+            m.Protection,
+            m.Mode,
+            m.Odour,
+            m.Deposits,
+            m.Note,
+            m.Values.Select(v => new MeasurementValueDto(v.Key, v.Value.Low, v.Value.High)).ToList(),
+            m.Status,
+            m.Assessment is { } a ? new MeasurementAssessmentDto(a.Status, a.By, a.Text, a.At) : null,
+            m.Corrections.Select(c => new MeasurementCorrectionDto(
+                c.ChannelId,
+                c.Previous is { } p ? MeasuredValueDto.From(p) : null,
+                c.Value is { } v ? MeasuredValueDto.From(v) : null,
+                c.Reason,
+                c.By,
+                c.At)).ToList(),
+            m.RecordedAt,
+            m.RecordedBy)).ToList(),
+        log.Weather.Select(w => new WeatherObservationDto(
+            w.Id, w.ObservedAt, w.Wind, w.WindSpeedKmh, w.TemperatureCelsius, w.Clouds, w.Precipitation, w.Source)).ToList());
+
+    // A host's Messprotokoll is hostile like the rest of its snapshot. Only what cannot be built at
+    // all is dropped here -- a null entry, a gas-less Messgröße, a number that is no reading;
+    // Incident.Rehydrate then applies every other rule through MeasurementLog.Sanitized.
+    private static MeasurementLog? FromDto(MeasurementLogDto? log) => log is null
+        ? null
+        : new MeasurementLog(
+            (log.Points ?? []).OfType<MeasuringPointDto>()
+                .Select(p => new MeasuringPoint(p.Id, p.Name ?? string.Empty, p.Location, p.Zone))
+                .ToList(),
+            (log.Devices ?? []).OfType<MeasuringDeviceDto>()
+                .Select(d => new MeasuringDevice(d.Id, d.Kind, d.Name ?? string.Empty, d.Number, d.Vehicle, d.Check))
+                .ToList(),
+            (log.Channels ?? []).OfType<MeasurementChannelDto>()
+                .Select(c => c.Definition is { } gas ? new MeasurementChannel(c.Id, gas.ToDefinition(), c.DeviceId, c.IsActive, c.Note) : null)
+                .OfType<MeasurementChannel>()
+                .ToList(),
+            (log.Measurements ?? []).OfType<MeasurementDto>().Select(FromDto).ToList(),
+            (log.Weather ?? []).OfType<WeatherObservationDto>()
+                .Select(w => new WeatherObservation(
+                    w.Id, w.ObservedAt, w.Wind, w.WindSpeedKmh, w.TemperatureCelsius, w.Clouds, w.Precipitation, w.Source))
+                .ToList());
+
+    private static Measurement FromDto(MeasurementDto m)
+    {
+        var values = new Dictionary<Guid, MeasuredValue>();
+        foreach (var v in (m.Values ?? []).OfType<MeasurementValueDto>())
+        {
+            if (MeasuredValue.TryCreate(v.Low, v.High, out var value))
+            {
+                values.TryAdd(v.ChannelId, value);
+            }
+        }
+
+        return new Measurement(
+            m.Id,
+            m.MeasuredAt,
+            m.Order,
+            m.PointId,
+            m.Team,
+            m.Protection,
+            m.Mode,
+            m.Odour,
+            m.Deposits,
+            m.Note,
+            values,
+            m.Status,
+            m.Assessment is { } a ? new MeasurementAssessment(a.Status, a.By ?? string.Empty, a.Text, a.At) : null,
+            (m.Corrections ?? []).OfType<MeasurementCorrectionDto>().Select(FromDto).OfType<MeasurementCorrection>().ToList(),
+            m.RecordedAt,
+            m.RecordedBy ?? string.Empty);
+    }
+
+    // A correction whose value does not read is dropped whole: reading that value as missing would
+    // turn the correction into one that took the value out.
+    private static MeasurementCorrection? FromDto(MeasurementCorrectionDto c)
+    {
+        MeasuredValue? previous = null;
+        MeasuredValue? value = null;
+        if ((c.Previous is { } p && !MeasuredValue.TryCreate(p.Low, p.High, out previous))
+            || (c.Value is { } v && !MeasuredValue.TryCreate(v.Low, v.High, out value)))
+        {
+            return null;
+        }
+
+        return new MeasurementCorrection(c.ChannelId, previous, value, c.Reason ?? string.Empty, c.By ?? string.Empty, c.At);
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

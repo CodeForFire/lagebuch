@@ -81,7 +81,7 @@ public class GasmessungRenderTests
         var window = new Window { Content = view, Width = width, Height = height };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         Dispatcher.UIThread.RunJobs();
         return (window, view, vm);
     }

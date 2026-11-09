@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using LageBuch.Domain;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -67,6 +68,8 @@ public sealed class IncidentRepository
                     "incident_timers", "incident_files", "incident_tasks",
                     "co_buildings", "co_dwellings", "co_readings", "co_gases", "involved_parties", "situation_reports",
                     "issued_items", "command_nodes", "map_overlays",
+                    "measuring_points", "measuring_devices", "measurement_channels", "measurements",
+                    "measurement_corrections", "weather_observations",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -127,8 +130,149 @@ public sealed class IncidentRepository
         WriteIssuedItems(inserts, incident);
         WriteCommandNodes(inserts, incident);
         WriteMapOverlays(inserts, incident);
+        WriteMeasurementLog(inserts, incident.MeasurementLog);
 
         tx.Commit();
+    }
+
+    // The Messprotokoll (#930), each list in its own order. Decimals as invariant text, the way
+    // co_gases and co_dwellings.gas_values keep them.
+    private static void WriteMeasurementLog(InsertCommands inserts, MeasurementLog log)
+    {
+        for (var i = 0; i < log.Points.Count; i++)
+        {
+            var point = log.Points[i];
+            Run(
+                inserts,
+                "INSERT INTO measuring_points (id, ordinal, name, location, zone) VALUES ($id,$o,$n,$loc,$z);",
+                p =>
+                {
+                    p("$id", point.Id.ToString());
+                    p("$o", i);
+                    p("$n", point.Name);
+                    p("$loc", (object?)point.Location ?? DBNull.Value);
+                    p("$z", (int)point.Zone);
+                });
+        }
+
+        for (var i = 0; i < log.Devices.Count; i++)
+        {
+            var device = log.Devices[i];
+            Run(
+                inserts,
+                "INSERT INTO measuring_devices (id, ordinal, kind, name, number, vehicle, last_check) VALUES ($id,$o,$k,$n,$nr,$v,$c);",
+                p =>
+                {
+                    p("$id", device.Id.ToString());
+                    p("$o", i);
+                    p("$k", (int)device.Kind);
+                    p("$n", device.Name);
+                    p("$nr", (object?)device.Number ?? DBNull.Value);
+                    p("$v", (object?)device.Vehicle ?? DBNull.Value);
+                    p("$c", (object?)device.Check ?? DBNull.Value);
+                });
+        }
+
+        for (var i = 0; i < log.Channels.Count; i++)
+        {
+            var channel = log.Channels[i];
+            var gas = channel.Definition;
+            Run(
+                inserts,
+                "INSERT INTO measurement_channels (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to, device_id, is_active, note) " + "VALUES ($id,$o,$n,$u,$d,$e,$g,$l,$p,$dev,$act,$note);",
+                p =>
+                {
+                    p("$id", channel.Id.ToString());
+                    p("$o", i);
+                    p("$n", gas.Name);
+                    p("$u", gas.Unit);
+                    p("$d", (int)gas.Direction);
+                    p("$e", (object?)GasDefinitionJson.ToText(gas.Elevated) ?? DBNull.Value);
+                    p("$g", (object?)GasDefinitionJson.ToText(gas.Dangerous) ?? DBNull.Value);
+                    p("$l", (object?)GasDefinitionJson.ToText(gas.Lethal) ?? DBNull.Value);
+                    p("$p", (object?)GasDefinitionJson.ToText(gas.PlausibleUpTo) ?? DBNull.Value);
+                    p("$dev", (object?)channel.DeviceId?.ToString() ?? DBNull.Value);
+                    p("$act", channel.IsActive ? 1 : 0);
+                    p("$note", (object?)channel.Note ?? DBNull.Value);
+                });
+        }
+
+        for (var i = 0; i < log.Measurements.Count; i++)
+        {
+            WriteMeasurement(inserts, log.Measurements[i], i);
+        }
+
+        for (var i = 0; i < log.Weather.Count; i++)
+        {
+            var w = log.Weather[i];
+            Run(
+                inserts,
+                "INSERT INTO weather_observations (id, ordinal, observed_at, wind, wind_speed_kmh, temperature_celsius, clouds, precipitation, source) " + "VALUES ($id,$o,$at,$w,$s,$t,$c,$p,$src);",
+                p =>
+                {
+                    p("$id", w.Id.ToString());
+                    p("$o", i);
+                    p("$at", w.ObservedAt.ToString(Iso));
+                    p("$w", (int)w.Wind);
+                    p("$s", (object?)GasDefinitionJson.ToText(w.WindSpeedKmh) ?? DBNull.Value);
+                    p("$t", (object?)GasDefinitionJson.ToText(w.TemperatureCelsius) ?? DBNull.Value);
+                    p("$c", (int)w.Clouds);
+                    p("$p", (int)w.Precipitation);
+                    p("$src", (object?)w.Source ?? DBNull.Value);
+                });
+        }
+    }
+
+    private static void WriteMeasurement(InsertCommands inserts, Measurement m, int ordinal)
+    {
+        var assessment = m.Assessment;
+        Run(
+            inserts,
+            "INSERT INTO measurements (id, ordinal, measured_at, order_ref, point_id, team, protection, mode, odour, deposits, note, measured_values, status, assessment_status, assessed_by, assessment_text, assessed_at, recorded_at, recorded_by) " + "VALUES ($id,$o,$at,$ord,$pt,$team,$prot,$mode,$odour,$dep,$note,$vals,$st,$ast,$aby,$atxt,$aat,$rat,$rby);",
+            p =>
+            {
+                p("$id", m.Id.ToString());
+                p("$o", ordinal);
+                p("$at", m.MeasuredAt.ToString(Iso));
+                p("$ord", (object?)m.Order ?? DBNull.Value);
+                p("$pt", m.PointId.ToString());
+                p("$team", (object?)m.Team ?? DBNull.Value);
+                p("$prot", (int)m.Protection);
+                p("$mode", (int)m.Mode);
+                p("$odour", m.Odour ? 1 : 0);
+                p("$dep", m.Deposits ? 1 : 0);
+                p("$note", (object?)m.Note ?? DBNull.Value);
+                p("$vals", WriteMeasuredValues(m.Values));
+                p("$st", (int)m.Status);
+                p("$ast", assessment is null ? DBNull.Value : (int)assessment.Status);
+                p("$aby", (object?)assessment?.By ?? DBNull.Value);
+                p("$atxt", (object?)assessment?.Text ?? DBNull.Value);
+                p("$aat", (object?)assessment?.At.ToString(Iso) ?? DBNull.Value);
+                p("$rat", m.RecordedAt.ToString(Iso));
+                p("$rby", m.RecordedBy);
+            });
+
+        for (var j = 0; j < m.Corrections.Count; j++)
+        {
+            var c = m.Corrections[j];
+            Run(
+                inserts,
+                "INSERT INTO measurement_corrections (id, measurement_id, ordinal, channel_id, previous_low, previous_high, value_low, value_high, reason, corrected_by, corrected_at) " + "VALUES ($id,$mid,$o,$ch,$pl,$ph,$vl,$vh,$r,$by,$at);",
+                p =>
+                {
+                    p("$id", Guid.NewGuid().ToString());
+                    p("$mid", m.Id.ToString());
+                    p("$o", j);
+                    p("$ch", c.ChannelId.ToString());
+                    p("$pl", (object?)GasDefinitionJson.ToText(c.Previous?.Low) ?? DBNull.Value);
+                    p("$ph", (object?)GasDefinitionJson.ToText(c.Previous?.High) ?? DBNull.Value);
+                    p("$vl", (object?)GasDefinitionJson.ToText(c.Value?.Low) ?? DBNull.Value);
+                    p("$vh", (object?)GasDefinitionJson.ToText(c.Value?.High) ?? DBNull.Value);
+                    p("$r", c.Reason);
+                    p("$by", c.By);
+                    p("$at", c.At.ToString(Iso));
+                });
+        }
     }
 
     private static void WriteJournal(InsertCommands inserts, Incident incident)
@@ -1069,6 +1213,8 @@ public sealed class IncidentRepository
             .OfType<Domain.Map.MapOverlay>()
             .ToList();
 
+        var measurementLog = ReadMeasurementLog(cn);
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -1113,7 +1259,168 @@ public sealed class IncidentRepository
             mapOverlays,
             gases,
             meta[22] as string,
-            meta[23] is string lead && Guid.TryParse(lead, out var leadId) ? leadId : null);
+            meta[23] is string lead && Guid.TryParse(lead, out var leadId) ? leadId : null,
+            measurementLog);
+    }
+
+    // The Messprotokoll (#930). A file is hostile input, so nothing here trusts it: a row whose id
+    // does not read is dropped, a number that is no reading is dropped, and Incident.Rehydrate
+    // sanitises what is left (MeasurementLog.Sanitized) -- caps, unknown Messpunkte, unknown
+    // Messgrößen and duplicate ids. A Messprotokoll that opens imperfectly beats an Einsatz that
+    // will not open.
+    private static MeasurementLog ReadMeasurementLog(SqliteConnection cn)
+    {
+        var points = ReadAll(
+            cn,
+            "SELECT id, name, location, zone FROM measuring_points ORDER BY ordinal;",
+            r => Guid.TryParse(Str(r, 0), out var id)
+                ? new MeasuringPoint(id, r.GetString(1), Str(r, 2), (MeasurementZone)r.GetInt32(3))
+                : null)
+            .OfType<MeasuringPoint>()
+            .ToList();
+
+        var devices = ReadAll(
+            cn,
+            "SELECT id, kind, name, number, vehicle, last_check FROM measuring_devices ORDER BY ordinal;",
+            r => Guid.TryParse(Str(r, 0), out var id)
+                ? new MeasuringDevice(id, (DeviceKind)r.GetInt32(1), r.GetString(2), Str(r, 3), Str(r, 4), Str(r, 5))
+                : null)
+            .OfType<MeasuringDevice>()
+            .ToList();
+
+        var channels = ReadAll(
+            cn,
+            "SELECT id, name, unit, direction, elevated, dangerous, lethal, plausible_up_to, device_id, is_active, note FROM measurement_channels ORDER BY ordinal;",
+            r => Guid.TryParse(Str(r, 0), out var id)
+                ? new MeasurementChannel(
+                    id,
+                    new Domain.CoMeasurement.GasDefinition(
+                        r.GetString(1),
+                        r.GetString(2),
+                        (Domain.CoMeasurement.GasDirection)r.GetInt32(3),
+                        GasDefinitionJson.FromText(Str(r, 4)),
+                        GasDefinitionJson.FromText(Str(r, 5)),
+                        GasDefinitionJson.FromText(Str(r, 6)),
+                        GasDefinitionJson.FromText(Str(r, 7))),
+                    NullableGuid(r, 8),
+                    r.GetInt32(9) != 0,
+                    Str(r, 10))
+                : null)
+            .OfType<MeasurementChannel>()
+            .ToList();
+
+        var correctionsByMeasurement = ReadAll(
+            cn,
+            "SELECT measurement_id, channel_id, previous_low, previous_high, value_low, value_high, reason, corrected_by, corrected_at FROM measurement_corrections ORDER BY measurement_id, ordinal;",
+            r => Guid.TryParse(Str(r, 0), out var measurementId)
+                && Guid.TryParse(Str(r, 1), out var channelId)
+                && TryStoredValue(Str(r, 2), Str(r, 3), out var previous)
+                && TryStoredValue(Str(r, 4), Str(r, 5), out var value)
+                ? new StoredCorrection(
+                    measurementId,
+                    new MeasurementCorrection(channelId, previous, value, r.GetString(6), r.GetString(7), ParseDate(r.GetString(8))))
+                : null)
+            .OfType<StoredCorrection>()
+            .GroupBy(x => x.MeasurementId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Correction).ToList());
+
+        var measurements = ReadAll(
+            cn,
+            "SELECT id, measured_at, order_ref, point_id, team, protection, mode, odour, deposits, note, measured_values, status, assessment_status, assessed_by, assessment_text, assessed_at, recorded_at, recorded_by FROM measurements ORDER BY ordinal;",
+            r =>
+            {
+                if (!Guid.TryParse(Str(r, 0), out var id) || !Guid.TryParse(Str(r, 3), out var pointId))
+                {
+                    return null;
+                }
+
+                // An assessment needs its status and its time; its author is checked by
+                // MeasurementAssessment.Sanitized on the way into the Einsatz.
+                var assessment = NullableInt(r, 12) is { } assessedStatus && Str(r, 15) is { } assessedAt
+                    ? new MeasurementAssessment((MeasurementStatus)assessedStatus, Str(r, 13) ?? string.Empty, Str(r, 14), ParseDate(assessedAt))
+                    : null;
+                return new Measurement(
+                    id,
+                    ParseDate(r.GetString(1)),
+                    Str(r, 2),
+                    pointId,
+                    Str(r, 4),
+                    (ProtectiveEquipment)r.GetInt32(5),
+                    (MeasurementMode)r.GetInt32(6),
+                    r.GetInt32(7) != 0,
+                    r.GetInt32(8) != 0,
+                    Str(r, 9),
+                    ReadMeasuredValues(r.GetString(10)),
+                    (MeasurementStatus)r.GetInt32(11),
+                    assessment,
+                    correctionsByMeasurement.TryGetValue(id, out var corrections) ? corrections : [],
+                    ParseDate(r.GetString(16)),
+                    r.GetString(17));
+            })
+            .OfType<Measurement>()
+            .ToList();
+
+        var weather = ReadAll(
+            cn,
+            "SELECT id, observed_at, wind, wind_speed_kmh, temperature_celsius, clouds, precipitation, source FROM weather_observations ORDER BY ordinal;",
+            r => Guid.TryParse(Str(r, 0), out var id)
+                ? new WeatherObservation(
+                    id,
+                    ParseDate(r.GetString(1)),
+                    (WindDirection)r.GetInt32(2),
+                    GasDefinitionJson.FromText(Str(r, 3)),
+                    GasDefinitionJson.FromText(Str(r, 4)),
+                    (CloudCover)r.GetInt32(5),
+                    (Precipitation)r.GetInt32(6),
+                    Str(r, 7))
+                : null)
+            .OfType<WeatherObservation>()
+            .ToList();
+
+        return new MeasurementLog(points, devices, channels, measurements, weather);
+    }
+
+    // measurements.measured_values: Messgröße id -> [low, high] as invariant decimal text, so a
+    // range ("Ex 8–14 %UEG") keeps both ends and a single reading is [v, v].
+    private static string WriteMeasuredValues(IReadOnlyDictionary<Guid, MeasuredValue> values) =>
+        System.Text.Json.JsonSerializer.Serialize(values.ToDictionary(
+            kv => kv.Key.ToString(),
+            kv => new[] { GasDefinitionJson.ToText(kv.Value.Low), GasDefinitionJson.ToText(kv.Value.High) }));
+
+    // The reverse. An entry whose key, shape or numbers do not read is dropped rather than failing
+    // the whole file, the way GasValues treats co_dwellings.gas_values.
+    private static Dictionary<Guid, MeasuredValue> ReadMeasuredValues(string json)
+    {
+        var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?[]?>>(json) ?? [];
+        var values = new Dictionary<Guid, MeasuredValue>();
+        foreach (var (key, ends) in raw)
+        {
+            if (Guid.TryParse(key, out var channelId)
+                && ends is [var low, var high]
+                && StoredValue(low, high) is { } value)
+            {
+                values[channelId] = value;
+            }
+        }
+
+        return values;
+    }
+
+    // A value kept as two invariant-text ends; null when either is missing or cannot be a reading.
+    private static MeasuredValue? StoredValue(string? low, string? high) =>
+        GasDefinitionJson.FromText(low) is { } l
+        && GasDefinitionJson.FromText(high) is { } h
+        && MeasuredValue.TryCreate(l, h, out var value)
+            ? value
+            : null;
+
+    // A correction's value: both ends absent is no value (one added afterwards, or taken out); a
+    // value that is there but does not read fails, so the correction is dropped whole rather than
+    // turned into one that took the value out.
+    private static bool TryStoredValue(string? low, string? high, out MeasuredValue? value)
+    {
+        value = StoredValue(low, high);
+        return value is not null || (low is null && high is null);
     }
 
     private static DateTimeOffset ParseDate(string s) =>
@@ -1278,4 +1585,7 @@ public sealed class IncidentRepository
             }
         }
     }
+
+    // One measurement_corrections row with the Messung it belongs to, before grouping.
+    private sealed record StoredCorrection(Guid MeasurementId, MeasurementCorrection Correction);
 }

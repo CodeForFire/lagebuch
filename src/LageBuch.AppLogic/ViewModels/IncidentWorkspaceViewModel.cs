@@ -474,6 +474,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public CoMessprotokollViewModel CoMessprotokoll { get; private set; } = null!;
 
+    /// <summary>The ABC/Gefahrstoff Messprotokoll (#930), the MESSPROTOKOLL tab of the MESSUNG entry.</summary>
+    public MeasurementLogViewModel MeasurementLog { get; private set; } = null!;
+
+    /// <summary>The MESSUNG rail entry, which shows <see cref="CoMessprotokoll"/> and <see cref="MeasurementLog"/> as tabs.</summary>
+    public MeasurementTabsViewModel MeasurementTabs { get; private set; } = null!;
+
     /// <summary>
     /// The left rail, in order: the built-in modules Stammdaten leaves visible, interleaved with
     /// this Einsatz's Checklisten. Mutated in place on rebuild — replacing the collection would
@@ -555,7 +561,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [EtbTabs, Tasks, LeadershipTabs, InvolvedParties, IssuedItems, Scba, CoMessprotokoll, Files, Links, Contacts];
+        object?[] modules = [EtbTabs, Tasks, LeadershipTabs, InvolvedParties, IssuedItems, Scba, MeasurementTabs, Files, Links, Contacts];
         return modules.OfType<INarrowAware>();
     }
 
@@ -1058,6 +1064,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Scba?.Dispose();
         Files?.Dispose();
         CoMessprotokoll?.Dispose();
+        MeasurementLog?.Dispose();
         if (Tasks is not null)
         {
             // Same reason as Atemschutz above (#460).
@@ -1087,6 +1094,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         // The same goes for the tab the ETB had open.
         var reopenEtbTab = EtbTabs is { } etbTabs ? etbTabs.SelectedTabIndex : EtbTabsViewModel.JournalTab;
+
+        // The same goes for the tab the MESSUNG entry had open.
+        var reopenMeasurementTab = MeasurementTabs is { } measurementTabs ? measurementTabs.SelectedTabIndex : MeasurementTabsViewModel.GebaeudeTab;
 
         // The same goes for the tab Führung had open.
         var reopenTab = LeadershipTabs is { } tabs ? tabs.SelectedTabIndex : LeadershipTabsViewModel.OrganisationTab;
@@ -1156,6 +1166,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs, _masterData.Vehicles);
 
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged, _masterData.Premises, _masterData.Gases);
+        MeasurementLog = new MeasurementLogViewModel(_session, _clock, OnChanged, _masterData.Gases, RequestConfirm);
+        MeasurementTabs = new MeasurementTabsViewModel(CoMessprotokoll, MeasurementLog, reopenMeasurementTab);
 
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged, OfferUndo);
         Tasks.RevealRequested += OnTasksRevealRequested;
@@ -1201,6 +1213,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(LeadershipTabs));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
+        OnPropertyChanged(nameof(MeasurementLog));
+        OnPropertyChanged(nameof(MeasurementTabs));
         OnPropertyChanged(nameof(Files));
         OnPropertyChanged(nameof(Links));
         OnPropertyChanged(nameof(Contacts));
@@ -1261,7 +1275,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.InvolvedParties] = InvolvedParties,
             [NavModules.IssuedItems] = IssuedItems,
             [NavModules.Scba] = Scba,
-            [NavModules.Co] = CoMessprotokoll,
+            [NavModules.Co] = MeasurementTabs,
             [NavModules.Files] = Files,
             [NavModules.Links] = Links,
             [NavModules.Contacts] = Contacts,
