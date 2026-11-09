@@ -330,7 +330,8 @@ public sealed class DemoFlowRenderTests : IDisposable
             TimeSpan.FromSeconds(10)));
         vm.Lagekarte.Map.ChangeViewCommand.Execute(new MapViewChange(FictionalRegionPack.Musterstrasse1, 17));
         Dispatcher.UIThread.RunJobs();
-        Assert.NotNull(vm.Lagekarte.WaterPoints);
+        Assert.Null(vm.Lagekarte.WaterPointsError);
+        Assert.Equal(5, vm.Lagekarte.WaterPoints?.Count);
         Capture(window, "lagekarte.png");
 
         // 7) Atemschutz: Trupp 1 started at t0 and past its 30 minutes (Rückzugsalarm), Trupp 2
