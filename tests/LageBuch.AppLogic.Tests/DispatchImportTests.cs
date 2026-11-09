@@ -103,6 +103,46 @@ public class DispatchImportTests
         Assert.Same(full, found);
     }
 
+    // A place name is entered for the abbreviated vehicles; one kept under its full Funkrufname
+    // must still be found.
+    [Theory]
+    [InlineData("Florian Musterstadt 2/40/1")]
+    [InlineData("2/40/1")]
+    public void A_vehicle_under_its_full_funkrufname_still_matches_once_a_place_name_is_entered(string requested)
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+
+        Assert.Same(full, DispatchImport.Match(requested, [full, Nachbar], [Mst]));
+    }
+
+    // An exact name still beats a vehicle the name only ends in.
+    [Fact]
+    public void The_full_funkrufname_exactly_beats_an_abbreviated_one_it_ends_in()
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+
+        Assert.Same(full, DispatchImport.Match("Florian Musterstadt 2/40/1", [full, MstHlf], [Mst]));
+    }
+
+    // The written name is one vehicle, the abbreviated name another: a wrong tick is worse
+    // than none.
+    [Fact]
+    public void The_written_and_the_abbreviated_name_naming_two_vehicles_is_ambiguous()
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+        var abbreviated = new Vehicle("Wache 2", "Florian MST 2/40/1", 9);
+
+        Assert.Null(DispatchImport.Match("Florian Musterstadt 2/40/1", [full, abbreviated, MstHlf], [Mst]));
+    }
+
+    [Fact]
+    public void The_written_and_the_abbreviated_name_ending_two_vehicles_is_ambiguous()
+    {
+        var full = new Vehicle("Wache 2", "Musterstadt 2/40/1", 9);
+
+        Assert.Null(DispatchImport.Match("Florian Musterstadt 2/40/1", [full, MstHlf], [Mst]));
+    }
+
     // Stammdaten from an import or a sync peer are hostile input. Each entry rewriting the output
     // of the one before doubled the name per entry: forty chained entries are 2^40 words. One
     // pass over the alarm's own words applies the first entry only.
