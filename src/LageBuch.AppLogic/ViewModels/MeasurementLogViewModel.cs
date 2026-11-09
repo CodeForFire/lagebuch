@@ -105,7 +105,11 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
     public bool ShowComposerButton => CanEdit && !IsComposerOpen && !IsAssessmentOpen && !IsCorrectionOpen;
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
-    private void OpenComposer() => IsComposerOpen = true;
+    private void OpenComposer()
+    {
+        RefreshNewTime();
+        IsComposerOpen = true;
+    }
 
     [RelayCommand]
     private void CloseComposer()
@@ -263,6 +267,42 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
     [ObservableProperty]
     private string _newTime;
 
+    // Whether the Lagebuchführer typed the Uhrzeit. One left alone keeps following the clock, so a
+    // form open for an hour does not record a Messung at the time it was opened.
+    private bool _newTimeTyped;
+    private bool _weatherTimeTyped;
+    private bool _settingDefaultTime;
+
+    partial void OnNewTimeChanged(string value) => _newTimeTyped |= !_settingDefaultTime;
+
+    partial void OnWeatherTimeChanged(string value) => _weatherTimeTyped |= !_settingDefaultTime;
+
+    private void RefreshNewTime(bool evenIfTyped = false)
+    {
+        if (_newTimeTyped && !evenIfTyped)
+        {
+            return;
+        }
+
+        _settingDefaultTime = true;
+        NewTime = MeasurementInput.TimeText(_clock.Now);
+        _settingDefaultTime = false;
+        _newTimeTyped = false;
+    }
+
+    private void RefreshWeatherTime(bool evenIfTyped = false)
+    {
+        if (_weatherTimeTyped && !evenIfTyped)
+        {
+            return;
+        }
+
+        _settingDefaultTime = true;
+        WeatherTime = MeasurementInput.TimeText(_clock.Now);
+        _settingDefaultTime = false;
+        _weatherTimeTyped = false;
+    }
+
     /// <summary>The Messauftrag, "MA 05".</summary>
     [ObservableProperty]
     private string? _newOrder;
@@ -329,6 +369,7 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
             input.Error = null;
         }
 
+        RefreshNewTime();
         if (!MeasurementInput.TryParseTime(NewTime, _clock.Now, out var measuredAt))
         {
             EntryError = "Uhrzeit als SS:MM eingeben, z. B. 14:05";
@@ -374,8 +415,15 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
         {
             EntryError = Run(() => _session.AddMeasuringPoint(pointName, null, MeasurementZone.Unknown, _gases));
             point = FindPoint(pointName);
-            if (EntryError is not null || point is null)
+            if (EntryError is not null)
             {
+                return;
+            }
+
+            // On a joined device the new Messpunkt arrives with the host's next snapshot.
+            if (point is null)
+            {
+                EntryError = "Messpunkt wird angelegt – warten, bis er erscheint, und Messung erneut speichern.";
                 return;
             }
         }
@@ -410,7 +458,7 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
         NewOdour = false;
         NewDeposits = false;
         NewNote = null;
-        NewTime = MeasurementInput.TimeText(_clock.Now);
+        RefreshNewTime(evenIfTyped: true);
         IsComposerOpen = false;
     }
 
@@ -666,6 +714,7 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
             return;
         }
 
+        RefreshWeatherTime();
         if (!MeasurementInput.TryParseTime(WeatherTime, _clock.Now, out var observedAt))
         {
             WeatherError = "Uhrzeit als SS:MM eingeben, z. B. 14:05";
@@ -692,7 +741,7 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
         {
             WeatherSpeed = null;
             WeatherTemperature = null;
-            WeatherTime = MeasurementInput.TimeText(_clock.Now);
+            RefreshWeatherTime(evenIfTyped: true);
         }
     }
 

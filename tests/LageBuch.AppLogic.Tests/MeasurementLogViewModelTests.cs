@@ -704,6 +704,69 @@ public sealed class MeasurementLogViewModelTests
     }
 
     [Fact]
+    public void An_untouched_uhrzeit_follows_the_clock_and_a_typed_one_is_kept()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock: clock);
+        var vm = NewVm(session, clock);
+        vm.NewPointName = "Wohnung";
+        Input(vm, "CO").Text = "12";
+
+        clock.Now = T0.AddMinutes(40);
+        vm.OpenComposerCommand.Execute(null);
+        Assert.Equal("15:10", vm.NewTime);
+        clock.Now = T0.AddMinutes(45);
+        vm.RecordMeasurementCommand.Execute(null);
+
+        Assert.Null(vm.EntryError);
+        Assert.Equal(T0.AddMinutes(45), Assert.Single(session.Incident.Measurements).MeasuredAt);
+
+        vm.OpenComposerCommand.Execute(null);
+        vm.NewTime = "15:00";
+        Input(vm, "CO").Text = "14";
+        clock.Now = T0.AddMinutes(60);
+        vm.CloseComposerCommand.Execute(null);
+        vm.OpenComposerCommand.Execute(null);
+        vm.RecordMeasurementCommand.Execute(null);
+
+        Assert.Null(vm.EntryError);
+        Assert.Equal(T0.AddMinutes(30), session.Incident.Measurements[1].MeasuredAt);
+    }
+
+    [Fact]
+    public void An_untouched_wetter_uhrzeit_follows_the_clock()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock: clock);
+        var vm = NewVm(session, clock);
+
+        clock.Now = T0.AddMinutes(40);
+        vm.AddWeatherCommand.Execute(null);
+
+        Assert.Null(vm.WeatherError);
+        Assert.Equal(T0.AddMinutes(40), Assert.Single(session.Incident.WeatherObservations).ObservedAt);
+    }
+
+    [Fact]
+    public void On_a_joined_device_a_messpunkt_still_on_its_way_says_so_and_keeps_the_values()
+    {
+        var local = NewSession();
+        Incident? beforeTheSnapshot = null;
+        var joined = new SnapshotRoundTrippingSession(local, incident => beforeTheSnapshot ??= incident);
+        using var vm = new MeasurementLogViewModel(joined, new FixedClock(T0), () => { }, Stammdaten);
+        vm.OpenComposerCommand.Execute(null);
+        vm.NewPointName = "Kellerabgang";
+        Input(vm, "CO").Text = "38";
+
+        vm.RecordMeasurementCommand.Execute(null);
+
+        Assert.Equal("Messpunkt wird angelegt – warten, bis er erscheint, und Messung erneut speichern.", vm.EntryError);
+        Assert.Empty(joined.Incident.Measurements);
+        Assert.Equal("38", Input(vm, "CO").Text);
+        Assert.True(vm.IsComposerOpen);
+    }
+
+    [Fact]
     public void Weather_is_recorded_newest_first_from_the_handwindmesser_by_default()
     {
         var clock = new FixedClock(T0);
