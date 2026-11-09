@@ -939,4 +939,492 @@ public sealed class MeasurementLogViewModelTests
 
         Assert.Empty(vm.Points);
     }
+
+    [Fact]
+    public void A_negative_number_that_is_not_one_is_refused()
+    {
+        Assert.False(MeasurementInput.TryParseOptionalNumber("-zwölf", out var value));
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public void A_time_exactly_twelve_hours_ahead_is_still_today()
+    {
+        var morning = new DateTimeOffset(2026, 11, 8, 11, 0, 0, TimeSpan.FromHours(1));
+
+        Assert.True(MeasurementInput.TryParseTime("23:00", morning, out var at));
+
+        Assert.Equal(new DateTimeOffset(2026, 11, 8, 23, 0, 0, morning.Offset), at);
+    }
+
+    [Fact]
+    public void Without_stammdaten_messgase_the_form_offers_co_alone()
+    {
+        using var vm = new MeasurementLogViewModel(NewSession(), new FixedClock(T0), () => { });
+
+        Assert.Equal(["CO (ppm)"], vm.ValueInputs.Select(i => i.Label));
+        Assert.Contains("Messgase aus den Stammdaten dazu: CO.", vm.SeedHint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_empty_list_says_whether_nothing_was_measured_at_all_or_only_not_here()
+    {
+        using var vm = NewVm(NewSession());
+        Assert.False(vm.HasRows);
+        Assert.Equal("Noch keine Messung.", vm.EmptyText);
+        Assert.False(vm.HasWeather);
+
+        Record(vm, "Kellerabgang", "14:05", co: "38");
+        Assert.True(vm.HasRows);
+        Assert.Null(vm.EmptyText);
+
+        vm.PointName = "Hofeinfahrt";
+        vm.SavePointCommand.Execute(null);
+        vm.SelectedPointFilter = vm.PointFilterOptions.Single(o => o.Label == "Hofeinfahrt");
+
+        Assert.False(vm.HasRows);
+        Assert.Equal("Noch keine Messung an diesem Messpunkt.", vm.EmptyText);
+    }
+
+    [Fact]
+    public void Each_page_answers_for_itself_alone()
+    {
+        using var vm = NewVm(NewSession());
+
+        vm.SelectPageCommand.Execute(MeasurementLogPage.Geraete);
+
+        Assert.True(vm.IsGeraetePage);
+        Assert.False(vm.IsMessreihePage);
+        Assert.False(vm.IsMesspunkteWetterPage);
+        Assert.False(vm.IsMessgroessenPage);
+        Assert.Equal("GERÄT HINZUFÜGEN", vm.DeviceSubmitLabel);
+        Assert.Null(vm.NoChannelsHint);
+    }
+
+    [Fact]
+    public void A_change_from_the_session_announces_every_list_it_rebuilt()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        session.AddMeasuringPoint("Hofeinfahrt", null, MeasurementZone.Danger, Stammdaten);
+
+        Assert.Contains(nameof(MeasurementLogViewModel.PointFilterOptions), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.Columns), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.PointNameOptions), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.OrderOptions), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.TeamOptions), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.IsNewPoint), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.HasWeather), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.GasChoices), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.SeedHint), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.IsChannelCapReached), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.DeviceChoices), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.HasRows), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.EmptyText), raised);
+        Assert.Contains(nameof(MeasurementLogViewModel.NoChannelsHint), raised);
+    }
+
+    [Fact]
+    public void A_refresh_replaces_the_lists_instead_of_adding_to_them()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        vm.PointName = "Hofeinfahrt";
+        vm.SavePointCommand.Execute(null);
+        vm.NewDeviceName = "X-am 5000";
+        vm.SaveDeviceCommand.Execute(null);
+
+        session.AddWeatherObservation(T0, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null);
+
+        Assert.Single(vm.Points);
+        Assert.Single(vm.Devices);
+        Assert.Single(vm.Weather);
+        Assert.Equal(2, vm.Channels.Count);
+    }
+
+    [Fact]
+    public void A_closed_einsatz_turns_every_form_away_without_an_error()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = NewSession(store, clock);
+        using var seedVm = NewVm(seed, clock);
+        seedVm.PointName = "Hofeinfahrt";
+        seedVm.SavePointCommand.Execute(null);
+        seed.Close();
+        using var vm = NewVm(LocalIncidentSession.OpenReadOnly(store, clock, "/x.lagebuch"), clock);
+
+        vm.RecordMeasurementCommand.Execute(null);
+        vm.PointName = "Kellerabgang";
+        vm.SavePointCommand.Execute(null);
+        vm.WeatherTime = "gleich";
+        vm.AddWeatherCommand.Execute(null);
+        vm.AddGasChoiceCommand.Execute(null);
+        vm.AddCustomChannelCommand.Execute(null);
+        vm.SaveDeviceCommand.Execute(null);
+
+        Assert.Null(vm.EntryError);
+        Assert.Null(vm.PointError);
+        Assert.Null(vm.WeatherError);
+        Assert.Null(vm.ChannelError);
+        Assert.Null(vm.DeviceError);
+        Assert.Equal("Kellerabgang", vm.PointName);
+    }
+
+    [Fact]
+    public void A_wetter_uhrzeit_that_is_not_one_is_explained()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        vm.WeatherTime = "gleich";
+
+        vm.AddWeatherCommand.Execute(null);
+
+        Assert.Equal("Uhrzeit als SS:MM eingeben, z. B. 14:05", vm.WeatherError);
+        Assert.Empty(session.Incident.WeatherObservations);
+    }
+
+    [Fact]
+    public void Two_wetter_readings_at_the_same_minute_show_the_later_entered_first()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+
+        session.AddWeatherObservation(T0, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null);
+        session.AddWeatherObservation(T0, WindDirection.N, null, null, CloudCover.Clear, Precipitation.None, null);
+
+        Assert.Equal(["N", "W"], vm.Weather.Select(w => w.WindText));
+    }
+
+    [Fact]
+    public void Two_messungen_at_the_same_minute_show_the_later_entered_first()
+    {
+        using var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:05", co: "38");
+        Record(vm, "Kellerabgang", "14:05", co: "40");
+
+        Assert.Equal(["40", "38"], vm.Rows.Select(r => r.Cells[0].Text));
+    }
+
+    [Fact]
+    public void Every_bad_value_is_marked_but_the_message_names_the_first()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        vm.NewPointName = "Kellerabgang";
+        Input(vm, "CO").Text = "viel";
+        Input(vm, "Ex").Text = "wenig";
+
+        vm.RecordMeasurementCommand.Execute(null);
+
+        Assert.Equal($"CO: {MeasurementLogViewModel.ValueFormatError}", vm.EntryError);
+        Assert.True(Input(vm, "Ex").HasError);
+
+        Input(vm, "CO").Text = "38";
+        Input(vm, "Ex").Text = null;
+        vm.RecordMeasurementCommand.Execute(null);
+
+        Assert.Null(vm.EntryError);
+        Assert.All(vm.ValueInputs, i => Assert.Null(i.Error));
+        Assert.Single(session.Incident.Measurements);
+    }
+
+    [Fact]
+    public void A_saved_messung_clears_the_niederschlag_too()
+    {
+        using var vm = NewVm(NewSession());
+        vm.NewDeposits = true;
+
+        Record(vm, "Kellerabgang", "14:05");
+
+        Assert.Equal("Ruß/Niederschlag", vm.Rows[0].ObservationText);
+        Assert.False(vm.NewDeposits);
+        Assert.False(vm.NewOdour);
+    }
+
+    [Fact]
+    public void A_second_assessment_opens_with_what_the_first_one_said()
+    {
+        using var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:05", co: "140");
+        vm.Rows[0].AssessCommand.Execute(null);
+        vm.AssessmentStatus = MeasurementStatus.Outlier;
+        vm.AssessmentBy = "Dr. Beispiel";
+        vm.ConfirmAssessmentCommand.Execute(null);
+        Assert.True(vm.Rows[0].HasAssessment);
+        Assert.False(vm.Rows[0].IsConfirmed);
+
+        vm.Rows[0].AssessCommand.Execute(null);
+
+        Assert.Equal(MeasurementStatus.Outlier, vm.AssessmentStatus);
+        Assert.Equal("Dr. Beispiel", vm.AssessmentBy);
+
+        vm.AssessmentStatus = MeasurementStatus.Confirmed;
+        vm.ConfirmAssessmentCommand.Execute(null);
+        Assert.True(vm.Rows[0].IsConfirmed);
+    }
+
+    [Fact]
+    public void A_messung_without_assessment_has_none()
+    {
+        using var vm = NewVm(NewSession());
+        vm.NewOrder = "MA 04";
+        Record(vm, "Kellerabgang", "14:05", co: "38");
+
+        Assert.False(vm.Rows[0].HasAssessment);
+        Assert.False(vm.Rows[0].IsConfirmed);
+        Assert.Equal("14:05 · MA 04 · Kellerabgang #1", vm.Rows[0].Heading);
+        Assert.Equal("1 Messung", vm.Points[0].CountText);
+    }
+
+    [Fact]
+    public void A_messgroesse_without_a_unit_is_named_alone()
+    {
+        var session = NewSession();
+        var gases = new[] { Co, new GasDefinition("Rauch", string.Empty, GasDirection.Rising, null, null, null, null) };
+        session.AddMeasuringPoint("Hofeinfahrt", null, MeasurementZone.Danger, [Co]);
+        using var vm = new MeasurementLogViewModel(session, new FixedClock(T0), () => { }, gases);
+        Assert.Equal(["Rauch"], vm.GasChoices.Select(g => g.Label));
+
+        vm.SelectedGasChoice = vm.GasChoices[0];
+        vm.AddGasChoiceCommand.Execute(null);
+        Assert.Equal(["CO (ppm)", "Rauch"], vm.ValueInputs.Select(i => i.Label));
+        vm.NewPointName = "Hofeinfahrt";
+        vm.ValueInputs[1].Text = "3";
+        vm.RecordMeasurementCommand.Execute(null);
+
+        vm.Rows[0].Cells[1].CorrectCommand.Execute(null);
+        Assert.Equal("Rauch · bisher: 3", vm.CorrectionHeading);
+        vm.Tiles[1].ShowTrendCommand.Execute(null);
+        Assert.Equal("VERLAUF · Rauch", vm.SelectedTrend?.Heading);
+        vm.Tiles[0].ShowTrendCommand.Execute(null);
+        Assert.Equal("VERLAUF · CO (ppm)", vm.SelectedTrend?.Heading);
+    }
+
+    [Fact]
+    public void A_chosen_messgas_that_arrives_from_elsewhere_is_no_longer_chosen()
+    {
+        var session = NewSession();
+        session.AddMeasuringPoint("Hofeinfahrt", null, MeasurementZone.Danger, [Co]);
+        using var vm = NewVm(session);
+        vm.SelectedGasChoice = vm.GasChoices.Single(g => g.Definition.Name == "Ex");
+
+        session.AddMeasurementChannel(Ex, null, null);
+
+        Assert.Null(vm.SelectedGasChoice);
+    }
+
+    [Fact]
+    public void The_chosen_geraet_stays_chosen_across_a_refresh_and_falls_back_once_it_is_gone()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        vm.NewDeviceName = "X-am 5000";
+        vm.SaveDeviceCommand.Execute(null);
+        vm.NewDeviceName = "Pac 8000";
+        vm.SaveDeviceCommand.Execute(null);
+        vm.NewChannelDevice = vm.DeviceChoices[2];
+
+        session.AddWeatherObservation(T0, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null);
+        Assert.Equal("Pac 8000 · Mehrgasmessgerät", vm.NewChannelDevice?.Label);
+
+        session.RemoveMeasuringDevice(vm.Devices[1].Id);
+        Assert.Equal("ohne Gerät", vm.NewChannelDevice?.Label);
+    }
+
+    [Fact]
+    public void Removing_the_geraet_being_edited_clears_the_form_and_another_one_leaves_it()
+    {
+        using var vm = NewVm(NewSession());
+        vm.NewDeviceName = "X-am 5000";
+        vm.SaveDeviceCommand.Execute(null);
+        vm.NewDeviceName = "Pac 8000";
+        vm.SaveDeviceCommand.Execute(null);
+
+        vm.Devices[0].EditCommand.Execute(null);
+        vm.Devices[1].RemoveCommand.Execute(null);
+        Assert.True(vm.IsEditingDevice);
+        Assert.Equal("X-am 5000", vm.NewDeviceName);
+
+        vm.Devices[0].RemoveCommand.Execute(null);
+        Assert.False(vm.IsEditingDevice);
+        Assert.Null(vm.NewDeviceName);
+    }
+
+    [Fact]
+    public void A_closed_verlauf_stays_closed_when_its_messgroesse_comes_back()
+    {
+        using var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:05", co: "38", ex: "2");
+        vm.Tiles[1].ShowTrendCommand.Execute(null);
+        Assert.Equal("Ex", vm.SelectedTrend?.Name);
+
+        vm.Channels[1].IsActive = false;
+        Assert.Null(vm.SelectedTrend);
+        vm.Channels[1].IsActive = true;
+
+        Assert.Null(vm.SelectedTrend);
+        Assert.All(vm.Tiles, t => Assert.False(t.IsTrendShown));
+    }
+
+    [Fact]
+    public void A_corrected_value_still_counts_as_a_reading_of_its_messgroesse()
+    {
+        using var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:05", co: "140", ex: "2");
+        vm.Rows[0].Cells[0].CorrectCommand.Execute(null);
+        vm.CorrectionValue = "14";
+        vm.CorrectionReason = "Ablesefehler";
+        vm.ConfirmCorrectionCommand.Execute(null);
+
+        Assert.True(vm.Channels[0].HasReadings);
+        Assert.False(vm.Channels[0].RemoveCommand.CanExecute(null));
+        Assert.False(vm.Rows[0].Cells[1].IsCorrected);
+        Assert.Null(vm.Rows[0].Cells[1].CorrectionText);
+    }
+
+    [Fact]
+    public void A_messgroesse_without_readings_gives_no_reason_against_removing_it()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        vm.PointName = "Hofeinfahrt";
+        vm.SavePointCommand.Execute(null);
+
+        Assert.Null(vm.Channels[0].RemoveHint);
+    }
+
+    [Fact]
+    public void The_values_typed_before_the_first_messpunkt_follow_their_messgase_into_the_messgroessen()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        Input(vm, "CO").Text = "38";
+        Input(vm, "Ex").Text = "12";
+
+        session.AddMeasuringPoint("Hofeinfahrt", null, MeasurementZone.Danger, Stammdaten);
+
+        Assert.All(vm.ValueInputs, i => Assert.NotNull(i.ChannelId));
+        Assert.Equal("38", Input(vm, "CO").Text);
+        Assert.Equal("12", Input(vm, "Ex").Text);
+
+        session.AddMeasurementChannel(new GasDefinition("H2S", "ppm", GasDirection.Rising, null, null, null, null), null, null);
+
+        Assert.Equal("38", Input(vm, "CO").Text);
+        Assert.Equal("12", Input(vm, "Ex").Text);
+        Assert.Null(Input(vm, "H2S").Text);
+    }
+
+    [Fact]
+    public void An_unrelated_change_keeps_the_very_inputs_and_their_errors()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        vm.NewPointName = "Kellerabgang";
+        Input(vm, "CO").Text = "viel";
+        vm.RecordMeasurementCommand.Execute(null);
+        var co = Input(vm, "CO");
+
+        session.AddWeatherObservation(T0, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null);
+
+        Assert.Same(co, Input(vm, "CO"));
+        Assert.True(co.HasError);
+    }
+
+    [Theory]
+    [InlineData("ABCDEFGHIJKL", null, null)]
+    [InlineData("ABCDEFGHIJKLM", null, "Messgröße: höchstens 12 Zeichen")]
+    [InlineData("Gas", "ABCDEFGHIJ", null)]
+    [InlineData("Gas", "ABCDEFGHIJK", "Einheit: höchstens 10 Zeichen")]
+    public void A_free_messgroesse_name_and_unit_may_be_as_long_as_the_stammdaten_allow(string name, string? unit, string? expected) =>
+        Assert.Equal(expected, MeasurementLogViewModel.ValidateChannel(new GasDefinition(name, unit ?? string.Empty, GasDirection.Rising, null, null, null, null)));
+
+    [Fact]
+    public void One_threshold_out_of_range_is_enough_to_refuse_a_free_messgroesse() =>
+        Assert.StartsWith(
+            "Schwellen: 0 bis ",
+            MeasurementLogViewModel.ValidateChannel(new GasDefinition("Gas", "ppm", GasDirection.Rising, 10m, 200_000m, null, null)),
+            StringComparison.Ordinal);
+
+    [Fact]
+    public void A_refused_free_messgroesse_keeps_what_was_typed()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        for (var i = 1; i <= MeasurementChannel.MaxCount - 2; i++)
+        {
+            vm.NewChannelName = $"G{i}";
+            vm.AddCustomChannelCommand.Execute(null);
+        }
+
+        vm.NewChannelName = "G99";
+        vm.AddCustomChannelCommand.Execute(null);
+
+        Assert.Equal(MeasurementLogViewModel.ChannelCapMessage, vm.ChannelError);
+        Assert.Equal("G99", vm.NewChannelName);
+    }
+
+    [Fact]
+    public void A_free_messgroesse_the_domain_refuses_keeps_what_was_typed()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        vm.NewChannelName = "O2";
+        vm.NewChannelElevated = 17m;
+        vm.NewChannelDevice = new DeviceChoice(Guid.NewGuid(), "entferntes Gerät");
+
+        vm.AddCustomChannelCommand.Execute(null);
+
+        Assert.NotNull(vm.ChannelError);
+        Assert.Equal("O2", vm.NewChannelName);
+        Assert.Equal(17m, vm.NewChannelElevated);
+        Assert.DoesNotContain(session.Incident.MeasurementChannels, c => c.Name == "O2");
+    }
+
+    [Fact]
+    public void A_renamed_messpunkt_keeps_the_filter_on_it_without_touching_the_form()
+    {
+        var session = NewSession();
+        using var vm = NewVm(session);
+        Record(vm, "Kellerabgang", "14:05", co: "38");
+        vm.SelectedPointFilter = vm.PointFilterOptions[1];
+        vm.NewPointName = "Hofeinfahrt";
+        var point = session.Incident.MeasuringPoints[0];
+
+        session.UpdateMeasuringPoint(point.Id, "Kellertreppe", null, point.Zone);
+
+        Assert.Equal("Kellertreppe", vm.SelectedPointFilter?.Label);
+        Assert.Equal("Hofeinfahrt", vm.NewPointName);
+
+        // Picking a Messpunkt afterwards is the Lagebuchführer's choice again, so the form follows.
+        vm.SelectedPointFilter = vm.PointFilterOptions[0];
+        vm.SelectedPointFilter = vm.PointFilterOptions[1];
+        Assert.Equal("Kellertreppe", vm.NewPointName);
+    }
+
+    [Fact]
+    public void A_tile_and_a_cell_name_the_dangerous_and_the_lethal_band()
+    {
+        using var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:05", co: "100");
+
+        Assert.True(vm.Tiles[0].HasValue);
+        Assert.True(vm.Tiles[0].IsDangerous);
+        Assert.False(vm.Tiles[0].IsLethal);
+        Assert.False(vm.Tiles[1].HasValue);
+        Assert.True(vm.Rows[0].Cells[0].HasValue);
+        Assert.True(vm.Rows[0].Cells[0].IsDangerous);
+        Assert.False(vm.Rows[0].Cells[0].IsLethal);
+        Assert.False(vm.Rows[0].Cells[1].HasValue);
+
+        Record(vm, "Kellerabgang", "14:10", co: "250");
+
+        Assert.True(vm.Tiles[0].IsLethal);
+        Assert.False(vm.Tiles[0].IsDangerous);
+        Assert.True(vm.Rows[0].Cells[0].IsLethal);
+        Assert.False(vm.Rows[0].Cells[0].IsDangerous);
+    }
 }

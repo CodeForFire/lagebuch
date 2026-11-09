@@ -1,7 +1,9 @@
+using LageBuch.Documents.Sections;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Time;
+using UglyToad.PdfPig;
 
 namespace LageBuch.Documents.Tests;
 
@@ -106,6 +108,162 @@ public class MeasurementLogSectionTests
     {
         Assert.True(IncidentPdfSections.All.HasFlag(IncidentPdfSections.Messprotokoll));
     }
+
+    [Fact]
+    public void Every_table_row_starts_with_all_its_cells_on_one_line()
+    {
+        // A missing column definition would push a row's last cells onto the next line.
+        var lines = PdfText.LinesOf(IncidentWithLog(), Started, IncidentPdfSections.Messprotokoll);
+
+        Assert.Contains("Messgröße Richtung Schwellen Messgerät Bemerkung", lines);
+        Assert.Contains("Art Bezeichnung Nr. / Charge Fahrzeug Prüfung", lines);
+        Assert.Contains("Kellerabgang Industriestraße 7 Gefahrenbereich 2", lines);
+        Assert.Contains("CO (ppm) steigend Erhöht ≥ 20 · Gefährlich ≥ 60 · X-am 5000 (Nr. —", lines);
+        Assert.Contains("Mehrgasmessgerät X-am 5000 ARAA-0042 GW-G Anzeigetest 08:00", lines);
+        Assert.Contains("08.11.2026 MA 04 Kellerabgang Messtrupp 1 CO 38 ppm (Erhöht) · Ex 8–14 bestätigt", lines);
+        Assert.Contains("08.11.2026 SW 12 km/h -2,5 °C klar kein Niederschlag Handwindmesser", lines);
+    }
+
+    [Fact]
+    public void Any_part_of_the_log_is_enough_to_print_the_section()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var channelOnly = Incident.Start(clock, op, "ABC");
+        channelOnly.AddMeasurementChannel(clock, op, Ex, deviceId: null, note: null);
+        var deviceOnly = Incident.Start(clock, op, "ABC");
+        deviceOnly.AddMeasuringDevice(DeviceKind.Pid, "PID", null, null, null);
+        var weatherOnly = Incident.Start(clock, op, "ABC");
+        weatherOnly.AddWeatherObservation(clock, op, Started, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null);
+
+        Assert.True(MeasurementLogSection.HasContent(channelOnly));
+        Assert.True(MeasurementLogSection.HasContent(deviceOnly));
+        Assert.True(MeasurementLogSection.HasContent(weatherOnly));
+        Assert.False(MeasurementLogSection.HasContent(Incident.Start(clock, op, "ABC")));
+    }
+
+    [Fact]
+    public void Only_the_parts_the_log_holds_get_a_heading()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var weatherOnly = Incident.Start(clock, op, "ABC");
+        weatherOnly.AddWeatherObservation(clock, op, Started, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null);
+        var pointOnly = Incident.Start(clock, op, "ABC");
+        pointOnly.AddMeasuringPoint(clock, op, "Hofeinfahrt", null, MeasurementZone.Cordon);
+
+        var weatherText = PdfText.Of(weatherOnly, Started, IncidentPdfSections.Messprotokoll);
+        var pointText = PdfText.Of(pointOnly, Started, IncidentPdfSections.Messprotokoll);
+
+        PdfText.AssertInOrder(weatherText, "Messprotokoll", "Messreihe", "— keine Messung —", "Wetter", "W — — klar kein Niederschlag —");
+        foreach (var absent in new[] { "Messpunkte", "Messgrößen", "Messgeräte", "Bewertungen" })
+        {
+            Assert.DoesNotContain(absent, weatherText, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("Messgeräte", pointText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Wetter", pointText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_messgroesse_without_unit_or_device_number_and_a_deactivated_one_are_printed_as_such()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "ABC");
+        var device = incident.AddMeasuringDevice(DeviceKind.Ph, "Indikatorpapier", null, null, null);
+        var ph = incident.AddMeasurementChannel(clock, op, new GasDefinition("pH", string.Empty, GasDirection.Rising, null, null, null, null), device.Id, note: "Pfütze", seedGases: [Ex]);
+        incident.UpdateMeasurementChannel(incident.MeasurementChannels[0].Id, deviceId: null, isActive: false, note: null);
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Messprotokoll);
+
+        Assert.Contains("Ex (%UEG) steigend Erhöht ≥ 10 · Gefährlich ≥ 20 · — —", lines);
+        Assert.Contains("pH steigend ohne Schwellen Indikatorpapier Pfütze", lines);
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Messprotokoll);
+        PdfText.AssertInOrder(text, "Ex (%UEG) deaktiviert steigend", "pH steigend");
+        Assert.Equal(1, PdfText.Count(text, "deaktiviert"));
+        Assert.True(ph.IsActive);
+    }
+
+    [Fact]
+    public void A_messung_without_values_says_so_and_lists_what_was_seen_and_an_implausible_value_is_flagged()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "ABC");
+        var point = incident.AddMeasuringPoint(clock, op, "Hofeinfahrt", null, MeasurementZone.Cordon);
+        var co = incident.MeasurementChannels[0];
+        incident.RecordMeasurement(
+            clock, op, Started.AddMinutes(1), null, point.Id, null, ProtectiveEquipment.None, MeasurementMode.FromVehicle, odour: false, deposits: true, note: null, new Dictionary<Guid, MeasuredValue>());
+        incident.RecordMeasurement(
+            clock, op, Started.AddMinutes(2), null, point.Id, null, ProtectiveEquipment.None, MeasurementMode.FromVehicle, odour: false, deposits: false, note: null, new Dictionary<Guid, MeasuredValue> { [co.Id] = MeasuredValue.Single(2500m) });
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Messprotokoll);
+
+        PdfText.AssertInOrder(text, "Hofeinfahrt #1", "kein Messwert", "Ruß / Niederschlag erkennbar", "Hofeinfahrt #2", "CO 2500 ppm (Lebensgefährlich)", "(unplausibel?)");
+        Assert.DoesNotContain("Geruch", text, StringComparison.Ordinal);
+        Assert.Equal(1, PdfText.Count(text, "kein Messwert"));
+    }
+
+    [Fact]
+    public void A_bewertung_without_a_reason_has_no_dash()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "ABC");
+        var point = incident.AddMeasuringPoint(clock, op, "Hofeinfahrt", null, MeasurementZone.Cordon);
+        var measurement = incident.RecordMeasurement(
+            clock, op, Started.AddMinutes(1), null, point.Id, null, ProtectiveEquipment.None, MeasurementMode.Remote, odour: true, deposits: false, note: null, new Dictionary<Guid, MeasuredValue>());
+        incident.AssessMeasurement(clock, op, measurement.Id, MeasurementStatus.Confirmed, "Fachberater ABC", text: null);
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Messprotokoll);
+
+        Assert.Contains("• 14:01 Hofeinfahrt #1: bestätigt (Fachberater ABC, 08.11.2026 14:00)", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Weather_is_printed_in_time_order_whatever_order_it_was_entered_in()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "ABC");
+        incident.AddWeatherObservation(clock, op, Started.AddMinutes(30), WindDirection.N, null, null, CloudCover.Overcast, Precipitation.Rain, "DWD");
+        incident.AddWeatherObservation(clock, op, Started, WindDirection.S, null, null, CloudCover.Clear, Precipitation.None, "Handwindmesser");
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Messprotokoll);
+
+        PdfText.AssertInOrder(text, "Handwindmesser", "DWD");
+    }
+
+    [Fact]
+    public void An_ausreisser_is_greyed_out_and_a_value_in_a_band_carries_its_colour()
+    {
+        var pdf = IncidentPdf.Generate(IncidentWithLog(), Started, sections: IncidentPdfSections.Messprotokoll);
+
+        var grey = TextInColour(pdf, 0x75, 0x75, 0x75);
+        var elevated = TextInColour(pdf, 0xFF, 0xB2, 0x3E);
+
+        Assert.Contains("CO14ppm", grey, StringComparison.Ordinal);
+        Assert.Contains("Ausreißer", grey, StringComparison.Ordinal);
+        Assert.DoesNotContain("bestätigt", grey, StringComparison.Ordinal);
+        Assert.DoesNotContain("CO38", grey, StringComparison.Ordinal);
+        Assert.Contains("CO38ppm(Erhöht)", elevated, StringComparison.Ordinal);
+        Assert.Contains("Ex8–14%UEG(Erhöht)", elevated, StringComparison.Ordinal);
+    }
+
+    // Every visible letter drawn in the colour, in drawing order and without spaces.
+    private static string TextInColour(byte[] pdf, int red, int green, int blue)
+    {
+        using var document = PdfDocument.Open(pdf);
+        var letters = document.GetPages()
+            .SelectMany(page => page.Letters)
+            .Where(letter => !string.IsNullOrWhiteSpace(letter.Value) && IsColour(letter.Color.ToRGBValues(), red, green, blue))
+            .Select(letter => letter.Value);
+        return string.Concat(letters);
+    }
+
+    private static bool IsColour((double R, double G, double B) rgb, int red, int green, int blue) =>
+        Math.Abs(rgb.R - (red / 255.0)) < 0.01 && Math.Abs(rgb.G - (green / 255.0)) < 0.01 && Math.Abs(rgb.B - (blue / 255.0)) < 0.01;
 
     private static Incident IncidentWithLog()
     {

@@ -528,11 +528,15 @@ public class IncidentWorkspaceViewModelTests
         vm.MeasurementTabs.SelectedTabIndex = MeasurementTabsViewModel.MessprotokollTab;
         var before = vm.MeasurementTabs;
         var log = vm.MeasurementLog;
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
         // Closing goes read-only, which rebuilds every rail entry.
         vm.CloseIncidentCommand.Execute(null);
         vm.PendingConfirm!.ConfirmCommand.Execute(null);
 
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.MeasurementLog), raised);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.MeasurementTabs), raised);
         Assert.NotSame(before, vm.MeasurementTabs);
         Assert.NotSame(log, vm.MeasurementLog);
         Assert.True(vm.MeasurementLog.IsReadOnly);

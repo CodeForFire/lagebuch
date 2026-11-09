@@ -1,3 +1,4 @@
+using System.Globalization;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Measurements;
 
@@ -121,6 +122,118 @@ public class MeasurementRulesTests
         Assert.Equal(2, MeasurementRules.RunningNumber(log, sameTime));
         Assert.Equal(3, MeasurementRules.RunningNumber(log, late));
         Assert.Equal(1, MeasurementRules.RunningNumber(log, elsewhere));
+    }
+
+    [Fact]
+    public void RunningNumber_refuses_a_messung_the_log_does_not_hold()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+        var recorded = MeasurementFixture.Record(incident, clock, op, point.Id, T0, (incident.MeasurementChannels[0].Id, 1m));
+        var stranger = recorded with { Id = Guid.NewGuid() };
+
+        var refused = Assert.Throws<ArgumentException>(() => MeasurementRules.RunningNumber(incident.MeasurementLog, stranger));
+
+        Assert.StartsWith($"Messung {stranger.Id} ist nicht im Messprotokoll.", refused.Message, StringComparison.Ordinal);
+        Assert.Equal("measurement", refused.ParamName);
+    }
+
+    [Fact]
+    public void An_out_of_range_end_names_the_limit_in_german()
+    {
+        var low = Assert.Throws<ArgumentOutOfRangeException>(() => new MeasuredValue(-1m, 3m));
+        var high = Assert.Throws<ArgumentOutOfRangeException>(() => new MeasuredValue(3m, GasDefinition.MaxValue + 1));
+
+        Assert.StartsWith("Messwert liegt außerhalb von 0 bis 100000.", low.Message, StringComparison.Ordinal);
+        Assert.Equal("low", low.ParamName);
+        Assert.StartsWith("Messwert liegt außerhalb von 0 bis 100000.", high.Message, StringComparison.Ordinal);
+        Assert.Equal("high", high.ParamName);
+    }
+
+    [Fact]
+    public void A_value_deconstructs_into_its_low_and_high_end()
+    {
+        var (low, high) = new MeasuredValue(14m, 8m);
+
+        Assert.Equal(8m, low);
+        Assert.Equal(14m, high);
+    }
+
+    [Theory]
+    [InlineData("0", "0")]
+    [InlineData("300", "300")]
+    [InlineData("12.34", "12.3")]
+    [InlineData("12.35", "12.4")]
+    public void A_wind_speed_from_0_to_300_is_kept_rounded_to_a_tenth(string value, string expected) =>
+        Assert.Equal(decimal.Parse(expected, CultureInfo.InvariantCulture), WeatherObservation.NormalizeWindSpeed(decimal.Parse(value, CultureInfo.InvariantCulture)));
+
+    [Theory]
+    [InlineData("-0.1")]
+    [InlineData("300.1")]
+    public void A_wind_speed_outside_0_to_300_is_dropped(string value) =>
+        Assert.Null(WeatherObservation.NormalizeWindSpeed(decimal.Parse(value, CultureInfo.InvariantCulture)));
+
+    [Theory]
+    [InlineData("-60", "-60")]
+    [InlineData("60", "60")]
+    [InlineData("-2.45", "-2.5")]
+    public void A_temperature_from_minus_60_to_60_is_kept_rounded_to_a_tenth(string value, string expected) =>
+        Assert.Equal(decimal.Parse(expected, CultureInfo.InvariantCulture), WeatherObservation.NormalizeTemperature(decimal.Parse(value, CultureInfo.InvariantCulture)));
+
+    [Theory]
+    [InlineData("-60.1")]
+    [InlineData("60.1")]
+    public void A_temperature_outside_minus_60_to_60_is_dropped(string value) =>
+        Assert.Null(WeatherObservation.NormalizeTemperature(decimal.Parse(value, CultureInfo.InvariantCulture)));
+
+    [Fact]
+    public void A_sanitized_weather_observation_keeps_known_values_and_reads_unknown_ones_as_their_default()
+    {
+        var known = new WeatherObservation(Guid.NewGuid(), T0, WindDirection.NW, 12.34m, -2.45m, CloudCover.Overcast, Precipitation.Fog, " DWD ");
+        var unknown = known with { Clouds = (CloudCover)42, Precipitation = (Precipitation)42 };
+
+        Assert.Equal(known with { WindSpeedKmh = 12.3m, TemperatureCelsius = -2.5m, Source = "DWD" }, known.Sanitized());
+        Assert.Equal(CloudCover.Clear, unknown.Sanitized().Clouds);
+        Assert.Equal(Precipitation.None, unknown.Sanitized().Precipitation);
+    }
+
+    [Fact]
+    public void A_sanitized_device_keeps_its_kind_and_reads_an_unknown_one_as_sonstiges()
+    {
+        var device = new MeasuringDevice(Guid.NewGuid(), DeviceKind.Pid, " PID ", " 7 ", null, " ");
+
+        Assert.Equal(device with { Name = "PID", Number = "7", Check = null }, device.Sanitized());
+        Assert.Equal(DeviceKind.Other, (device with { Kind = (DeviceKind)42 }).Sanitized()?.Kind);
+        Assert.Null((device with { Name = " " }).Sanitized());
+    }
+
+    [Fact]
+    public void A_sanitized_assessment_keeps_its_status_and_reads_an_unknown_one_as_unbestaetigt()
+    {
+        var assessment = new MeasurementAssessment(MeasurementStatus.Outlier, " Muster ", " Sensor ", T0);
+
+        Assert.Equal(new MeasurementAssessment(MeasurementStatus.Outlier, "Muster", "Sensor", T0), assessment.Sanitized());
+        Assert.Equal(MeasurementStatus.Unconfirmed, (assessment with { Status = (MeasurementStatus)42 }).Sanitized()?.Status);
+        Assert.Null((assessment with { By = " " }).Sanitized());
+    }
+
+    [Fact]
+    public void A_sanitized_messung_keeps_known_protection_and_mode_and_reads_unknown_ones_as_their_default()
+    {
+        var values = new Dictionary<Guid, MeasuredValue>();
+        var measurement = new Measurement(
+            Guid.NewGuid(), T0, null, Guid.NewGuid(), null, ProtectiveEquipment.Form3, MeasurementMode.Stationary, true, false, null, values, MeasurementStatus.Unconfirmed, null, [], T0, " Muster ");
+        var unknown = measurement with { Protection = (ProtectiveEquipment)42, Mode = (MeasurementMode)42, RecordedBy = " " };
+
+        var kept = measurement.Sanitized(new HashSet<Guid>());
+        var defaulted = unknown.Sanitized(new HashSet<Guid>());
+
+        Assert.Equal(ProtectiveEquipment.Form3, kept.Protection);
+        Assert.Equal(MeasurementMode.Stationary, kept.Mode);
+        Assert.Equal("Muster", kept.RecordedBy);
+        Assert.Equal(ProtectiveEquipment.None, defaulted.Protection);
+        Assert.Equal(MeasurementMode.Remote, defaulted.Mode);
+        Assert.Equal(string.Empty, defaulted.RecordedBy);
     }
 
     private static MeasurementChannel Channel(GasDefinition definition) =>

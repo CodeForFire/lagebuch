@@ -476,6 +476,311 @@ public class MeasurementLogAggregateTests
         Assert.Equal(MeasurementLog.Empty.Points, incident.MeasurementLog.Points);
     }
 
+    [Fact]
+    public void A_full_log_refuses_one_more_entry_of_each_kind_and_says_how_many_it_keeps()
+    {
+        var t = MeasurementFixture.Start;
+        var co = new MeasurementChannel(Guid.NewGuid(), GasDefinition.DefaultCo, null, true, null);
+        var points = Enumerable.Range(0, MeasuringPoint.MaxCount)
+            .Select(i => new MeasuringPoint(Guid.NewGuid(), $"MP {i}", null, MeasurementZone.Danger))
+            .ToList();
+        var devices = Enumerable.Range(0, MeasuringDevice.MaxCount)
+            .Select(i => new MeasuringDevice(Guid.NewGuid(), DeviceKind.MultiGas, $"Gerät {i}", null, null, null))
+            .ToList();
+        var measurements = Enumerable.Range(0, Measurement.MaxCount)
+            .Select(_ => Messung(points[0].Id, t, new() { [co.Id] = MeasuredValue.Single(1m) }))
+            .ToList();
+        var weather = Enumerable.Range(0, WeatherObservation.MaxCount)
+            .Select(_ => new WeatherObservation(Guid.NewGuid(), t, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null))
+            .ToList();
+        var incident = RehydrateWith(new MeasurementLog(points, devices, [co], measurements, weather));
+        var clock = new FixedClock(t);
+        var op = new SessionOperator("Muster");
+
+        var point = Assert.Throws<InvalidOperationException>(() => incident.AddMeasuringPoint(clock, op, "MP X", null, MeasurementZone.Danger, null));
+        var device = Assert.Throws<InvalidOperationException>(() => incident.AddMeasuringDevice(DeviceKind.Pid, "PID", null, null, null));
+        var measurement = Assert.Throws<InvalidOperationException>(() => MeasurementFixture.Record(incident, clock, op, points[0].Id, t, (co.Id, 2m)));
+        var observation = Assert.Throws<InvalidOperationException>(
+            () => incident.AddWeatherObservation(clock, op, t, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null));
+
+        Assert.Equal("Höchstens 50 Messpunkte.", point.Message);
+        Assert.Equal("Höchstens 20 Messgeräte.", device.Message);
+        Assert.Equal("Höchstens 2000 Messungen.", measurement.Message);
+        Assert.Equal("Höchstens 500 Wetterbeobachtungen.", observation.Message);
+        Assert.Equal(MeasuringPoint.MaxCount, incident.MeasuringPoints.Count);
+        Assert.Equal(MeasuringDevice.MaxCount, incident.MeasuringDevices.Count);
+        Assert.Equal(Measurement.MaxCount, incident.Measurements.Count);
+        Assert.Equal(WeatherObservation.MaxCount, incident.WeatherObservations.Count);
+        Assert.Empty(incident.Journal);
+    }
+
+    [Fact]
+    public void A_messung_takes_no_correction_past_its_cap()
+    {
+        var t = MeasurementFixture.Start;
+        var point = new MeasuringPoint(Guid.NewGuid(), "MP 1", null, MeasurementZone.Danger);
+        var co = new MeasurementChannel(Guid.NewGuid(), GasDefinition.DefaultCo, null, true, null);
+        var corrections = Enumerable.Range(0, Measurement.MaxCorrectionCount)
+            .Select(i => new MeasurementCorrection(co.Id, MeasuredValue.Single(i), MeasuredValue.Single(i + 1), "Ablesefehler", "Muster", t))
+            .ToList();
+        var full = Messung(point.Id, t, new() { [co.Id] = MeasuredValue.Single(50m) }) with { Corrections = corrections };
+        var incident = RehydrateWith(new MeasurementLog([point], [], [co], [full], []));
+
+        var refused = Assert.Throws<InvalidOperationException>(
+            () => incident.CorrectMeasurementValue(new FixedClock(t), new SessionOperator("Muster"), full.Id, co.Id, MeasuredValue.Single(5m), "Komma"));
+
+        Assert.Equal("Höchstens 50 Korrekturen je Messung.", refused.Message);
+        Assert.Equal(MeasuredValue.Single(50m), incident.Measurements[0].Values[co.Id]);
+    }
+
+    [Fact]
+    public void A_first_channel_named_like_a_seeded_gas_is_refused_and_seeds_nothing()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+
+        var taken = Assert.Throws<InvalidOperationException>(() => incident.AddMeasurementChannel(clock, op, O2, null, null, [H2S, O2]));
+
+        Assert.Equal("Messgröße O₂ gibt es schon.", taken.Message);
+        Assert.Empty(incident.MeasurementChannels);
+    }
+
+    [Fact]
+    public void A_full_set_of_channels_says_how_many_it_keeps()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+        for (var i = 1; i < MeasurementChannel.MaxCount; i++)
+        {
+            incident.AddMeasurementChannel(clock, op, H2S with { Name = $"G{i}" }, null, null, null);
+        }
+
+        var full = Assert.Throws<InvalidOperationException>(() => incident.AddMeasurementChannel(clock, op, Ex, null, null, null));
+
+        Assert.Equal("Höchstens 10 Messgrößen.", full.Message);
+    }
+
+    [Fact]
+    public void A_new_channel_is_active_and_one_without_unit_is_written_without_brackets()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var ph = new GasDefinition("pH", string.Empty, GasDirection.Rising, null, null, null, null);
+
+        var added = incident.AddMeasurementChannel(clock, op, ph, null, null, [O2]);
+
+        Assert.True(added.IsActive);
+        Assert.Equal("Messgröße angelegt: pH", incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void A_channel_needs_a_named_gas_and_a_known_device()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var channel = incident.AddMeasurementChannel(clock, op, H2S, null, null, [O2]);
+        var nameless = H2S with { Name = "  " };
+
+        var added = Assert.Throws<ArgumentException>(() => incident.AddMeasurementChannel(clock, op, nameless, null, null, null));
+        var updated = Assert.Throws<ArgumentException>(() => incident.UpdateMeasurementChannel(channel.Id, null, true, null, nameless));
+
+        Assert.StartsWith("Messgröße darf nicht leer sein.", added.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Messgröße darf nicht leer sein.", updated.Message, StringComparison.Ordinal);
+        Assert.Throws<KeyNotFoundException>(() => incident.UpdateMeasurementChannel(channel.Id, Guid.NewGuid(), true, null));
+        Assert.Null(incident.MeasurementChannels.Single(c => c.Id == channel.Id).DeviceId);
+    }
+
+    [Fact]
+    public void A_channel_cannot_be_renamed_to_a_name_another_one_has()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, [GasDefinition.DefaultCo, O2]);
+        var o2 = incident.MeasurementChannels[1];
+
+        var refused = Assert.Throws<InvalidOperationException>(() => incident.UpdateMeasurementChannel(o2.Id, null, true, null, O2 with { Name = "co" }));
+        var renamed = incident.UpdateMeasurementChannel(o2.Id, null, true, null, O2 with { Name = "o2" });
+
+        Assert.Equal("Messgröße co gibt es schon.", refused.Message);
+        Assert.Equal("o2", renamed.Name);
+    }
+
+    [Fact]
+    public void Changing_the_gas_of_a_channel_with_readings_says_why_it_is_refused()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+        var co = incident.MeasurementChannels[0];
+        MeasurementFixture.Record(incident, clock, op, point.Id, clock.Now, (co.Id, 5m));
+
+        var refused = Assert.Throws<InvalidOperationException>(() => incident.UpdateMeasurementChannel(co.Id, null, true, null, GasDefinition.LegacyCo));
+
+        Assert.Equal("Messgröße hat Messwerte – Gas, Einheit und Bänder bleiben.", refused.Message);
+    }
+
+    [Fact]
+    public void Recording_refuses_an_unknown_protection_or_mode_and_names_what_is_missing()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+        var values = new Dictionary<Guid, MeasuredValue> { [incident.MeasurementChannels[0].Id] = MeasuredValue.Single(1m) };
+
+        var protection = Assert.Throws<ArgumentOutOfRangeException>(() => incident.RecordMeasurement(
+            clock, op, clock.Now, null, point.Id, null, (ProtectiveEquipment)42, MeasurementMode.Remote, false, false, null, values));
+        var mode = Assert.Throws<ArgumentOutOfRangeException>(() => incident.RecordMeasurement(
+            clock, op, clock.Now, null, point.Id, null, ProtectiveEquipment.None, (MeasurementMode)42, false, false, null, values));
+        var unknown = Assert.Throws<ArgumentException>(() => MeasurementFixture.Record(incident, clock, op, point.Id, clock.Now, (Guid.NewGuid(), 1m)));
+        var empty = Assert.Throws<ArgumentException>(() => MeasurementFixture.Record(incident, clock, op, point.Id, clock.Now));
+
+        Assert.Equal("protection", protection.ParamName);
+        Assert.Equal("mode", mode.ParamName);
+        Assert.StartsWith("Messwert für eine unbekannte oder deaktivierte Messgröße.", unknown.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Eine Messung braucht einen Messwert, Geruch, Niederschlag oder eine Bemerkung.", empty.Message, StringComparison.Ordinal);
+        Assert.Empty(incident.Measurements);
+    }
+
+    [Fact]
+    public void A_deposit_without_a_smell_is_written_as_such()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+
+        incident.RecordMeasurement(
+            clock, op, clock.Now, null, point.Id, null, ProtectiveEquipment.FilterForm1, MeasurementMode.FromVehicle, odour: false, deposits: true, note: null, new Dictionary<Guid, MeasuredValue>());
+
+        Assert.Equal("Messung MP 1 #1 (Filter + Form 1, aus dem Fahrzeug) – Ruß/Niederschlag sichtbar", incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void Assessing_refuses_an_unknown_status_and_a_nameless_judge_and_writes_no_dash_without_a_reason()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+        var measurement = MeasurementFixture.Record(incident, clock, op, point.Id, clock.Now, (incident.MeasurementChannels[0].Id, 5m));
+
+        var status = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AssessMeasurement(clock, op, measurement.Id, (MeasurementStatus)42, "Muster", null));
+        Assert.Same(measurement, incident.Measurements[0]);
+        var nameless = Assert.Throws<ArgumentException>(() => incident.AssessMeasurement(clock, op, measurement.Id, MeasurementStatus.Outlier, " ", null));
+        incident.AssessMeasurement(clock, op, measurement.Id, MeasurementStatus.Outlier, "Muster", "  ");
+
+        Assert.Equal("status", status.ParamName);
+        Assert.StartsWith("Bewertet von darf nicht leer sein.", nameless.Message, StringComparison.Ordinal);
+        Assert.Equal("by", nameless.ParamName);
+        Assert.Equal("Messung MP 1 #1 bewertet: Ausreißer (Muster)", incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void A_refused_correction_says_why()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+        var co = incident.MeasurementChannels[0];
+        var measurement = MeasurementFixture.Record(incident, clock, op, point.Id, clock.Now, (co.Id, 140m));
+
+        var reasonless = Assert.Throws<ArgumentException>(() => incident.CorrectMeasurementValue(clock, op, measurement.Id, co.Id, MeasuredValue.Single(14m), " "));
+        var unchanged = Assert.Throws<ArgumentException>(() => incident.CorrectMeasurementValue(clock, op, measurement.Id, co.Id, MeasuredValue.Single(140m), "Ablesefehler"));
+
+        Assert.StartsWith("Grund darf nicht leer sein.", reasonless.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Der Messwert ist unverändert.", unchanged.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_value_can_be_added_afterwards_only_for_an_active_channel_but_corrected_on_a_deactivated_one()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, [GasDefinition.DefaultCo, O2, Ex]);
+        var (co, o2, ex) = (incident.MeasurementChannels[0], incident.MeasurementChannels[1], incident.MeasurementChannels[2]);
+        var measurement = MeasurementFixture.Record(incident, clock, op, point.Id, clock.Now, (co.Id, 140m));
+
+        incident.CorrectMeasurementValue(clock, op, measurement.Id, o2.Id, MeasuredValue.Single(20.9m), "vergessen");
+        Assert.Equal("Messwert korrigiert: MP 1 #1: O₂ 20,9 Vol-% nachgetragen (Grund: vergessen)", incident.Journal[^1].Text);
+
+        incident.UpdateMeasurementChannel(co.Id, null, isActive: false, note: null);
+        incident.UpdateMeasurementChannel(ex.Id, null, isActive: false, note: null);
+        var corrected = incident.CorrectMeasurementValue(clock, op, measurement.Id, co.Id, MeasuredValue.Single(14m), "Ablesefehler");
+        var refused = Assert.Throws<ArgumentException>(() => incident.CorrectMeasurementValue(clock, op, measurement.Id, ex.Id, MeasuredValue.Single(5m), "vergessen"));
+
+        Assert.Equal(MeasuredValue.Single(14m), corrected.Values[co.Id]);
+        Assert.StartsWith("Messgröße ist deaktiviert.", refused.Message, StringComparison.Ordinal);
+        Assert.Equal("channelId", refused.ParamName);
+        Assert.False(incident.Measurements[0].Values.ContainsKey(ex.Id));
+    }
+
+    [Fact]
+    public void A_weather_observation_refuses_unknown_values_and_names_the_range()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+
+        var wind = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AddWeatherObservation(clock, op, clock.Now, (WindDirection)42, null, null, CloudCover.Clear, Precipitation.None, null));
+        var clouds = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.W, null, null, (CloudCover)42, Precipitation.None, null));
+        var rain = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.W, null, null, CloudCover.Clear, (Precipitation)42, null));
+        var speed = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.W, 301m, null, CloudCover.Clear, Precipitation.None, null));
+        var temperature = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.W, null, 61m, CloudCover.Clear, Precipitation.None, null));
+
+        Assert.Equal("wind", wind.ParamName);
+        Assert.Equal("clouds", clouds.ParamName);
+        Assert.Equal("precipitation", rain.ParamName);
+        Assert.StartsWith("Windgeschwindigkeit liegt außerhalb von 0 bis 300 km/h.", speed.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Temperatur liegt außerhalb von −60 bis 60 °C.", temperature.Message, StringComparison.Ordinal);
+        Assert.Empty(incident.WeatherObservations);
+    }
+
+    [Fact]
+    public void Calm_and_variable_wind_are_written_without_a_direction()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+
+        var calm = incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.Calm, null, null, CloudCover.MoreThanHalf, Precipitation.Fog, null);
+        Assert.Equal("Wetter: Windstille, mehr als 50 % bedeckt, Nebel", incident.Journal[^1].Text);
+        Assert.Same(calm, Assert.Single(incident.WeatherObservations));
+
+        incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.Variable, 3m, null, CloudCover.UpToHalf, Precipitation.Rain, null);
+        Assert.Equal("Wetter: Wind umlaufend, 3 km/h, bis 50 % bedeckt, Regen", incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void A_point_or_device_needs_a_known_zone_or_kind_and_a_name()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+
+        var zone = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AddMeasuringPoint(clock, op, "MP 1", null, (MeasurementZone)42, null));
+        var point = Assert.Throws<ArgumentException>(() => incident.AddMeasuringPoint(clock, op, " ", null, MeasurementZone.Danger, null));
+        var kind = Assert.Throws<ArgumentOutOfRangeException>(() => incident.AddMeasuringDevice((DeviceKind)42, "PID", null, null, null));
+        var device = Assert.Throws<ArgumentException>(() => incident.AddMeasuringDevice(DeviceKind.Pid, " ", null, null, null));
+
+        Assert.Equal("zone", zone.ParamName);
+        Assert.StartsWith("Messpunkt darf nicht leer sein.", point.Message, StringComparison.Ordinal);
+        Assert.Equal("kind", kind.ParamName);
+        Assert.StartsWith("Messgerät darf nicht leer sein.", device.Message, StringComparison.Ordinal);
+        Assert.Empty(incident.MeasuringPoints);
+        Assert.Empty(incident.MeasuringDevices);
+    }
+
+    [Fact]
+    public void An_unknown_id_is_named_in_the_error()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+        var id = Guid.NewGuid();
+
+        var point = Assert.Throws<KeyNotFoundException>(() => incident.UpdateMeasuringPoint(clock, op, id, "X", null, MeasurementZone.Danger));
+        var device = Assert.Throws<KeyNotFoundException>(() => incident.RemoveMeasuringDevice(id));
+        var channel = Assert.Throws<KeyNotFoundException>(() => incident.RemoveMeasurementChannel(id));
+        var measurement = Assert.Throws<KeyNotFoundException>(() => incident.AssessMeasurement(clock, op, id, MeasurementStatus.Confirmed, "Muster", null));
+
+        Assert.Equal($"Messpunkt {id} nicht gefunden.", point.Message);
+        Assert.Equal($"Messgerät {id} nicht gefunden.", device.Message);
+        Assert.Equal($"Messgröße {id} nicht gefunden.", channel.Message);
+        Assert.Equal($"Messung {id} nicht gefunden.", measurement.Message);
+    }
+
+    [Fact]
+    public void Moving_a_point_to_another_zone_without_renaming_writes_the_name_once()
+    {
+        var (incident, clock, op) = MeasurementFixture.NewIncident();
+        var point = incident.AddMeasuringPoint(clock, op, "MP 1", null, MeasurementZone.Danger, null);
+
+        incident.UpdateMeasuringPoint(clock, op, point.Id, "MP 1", null, MeasurementZone.Outside);
+
+        Assert.Equal("Messpunkt geändert: MP 1 (außerhalb)", incident.Journal[^1].Text);
+    }
+
     private static Measurement Messung(Guid pointId, DateTimeOffset at, Dictionary<Guid, MeasuredValue> values) =>
         new(Guid.NewGuid(), at, null, pointId, null, ProtectiveEquipment.None, MeasurementMode.Remote, false, false, null, values, MeasurementStatus.Unconfirmed, null, [], at, "Muster");
 
