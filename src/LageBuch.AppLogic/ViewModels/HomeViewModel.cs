@@ -10,6 +10,7 @@ using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.Services.Weather;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
+using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
@@ -71,7 +72,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // The report the crash notice is about, or null after a normal start.
     private readonly string? _crashReportPath;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null, string? lastCrashReport = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null, IWeatherSource? weather = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null, string? lastCrashReport = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null, IWeatherSource? weather = null, DispatchInboxViewModel? dispatch = null)
     {
         _mapPacks = mapPacks;
         _mapNightMode = mapNightMode;
@@ -109,6 +110,9 @@ public sealed partial class HomeViewModel : ObservableObject
         _lastConnectionStore = lastConnection;
         _lastConnection = lastConnection?.GetLast();
 
+        // Alarm import is desktop-only: none wired (Android, most tests) and the Home screen shows none of it.
+        Dispatch = dispatch;
+
         // The rows go up unmarked and already in their final order, so the first frame never waits on
         // a file; the lock markers are filled in afterwards without the list reshuffling (#291).
         var rows = SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed: false))).ToArray();
@@ -117,6 +121,9 @@ public sealed partial class HomeViewModel : ObservableObject
     }
 
     public ObservableCollection<RecentFileItem> RecentFiles { get; }
+
+    /// <summary>The alarm folder and the alarm it offers, or null where alarm import is not wired.</summary>
+    public DispatchInboxViewModel? Dispatch { get; }
 
     // Only closed files are posted back: an open or unreadable one already shows no marker.
     private void ProbeRecentFileStates(IReadOnlyList<RecentFileItem> rows) =>
@@ -312,8 +319,10 @@ public sealed partial class HomeViewModel : ObservableObject
         // Date + time, e.g. "20260819-2217.lagebuch". Neither the Einsatznummer (#69) nor the
         // Stichwort is known at creation -- both are entered later through the workspace's
         // Einsatzdaten dialog -- so nothing but the timestamp is available to name the file.
+        // An alarm brings both, and names the file after its time and Stichwort.
+        var dispatch = request.Dispatch;
         var timestamp = _clock.Now.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
-        var suggestedName = $"{timestamp}{IncidentFileExtension.Current}";
+        var suggestedName = dispatch?.SuggestedFileName(_clock.Now) ?? $"{timestamp}{IncidentFileExtension.Current}";
         var path = await _dialogs.PickSaveAsync(suggestedName, _lastSaveFolder?.GetLastFolder());
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -336,7 +345,14 @@ public sealed partial class HomeViewModel : ObservableObject
                 t.Id,
                 t.Title,
                 t.Items.Select(i => (i.Text, i.IsMandatory)).ToList())).ToList(),
-            incidentNumber: null);
+            incidentNumber: dispatch is null ? null : new IncidentNumber(dispatch.Alarm.IncidentNumber),
+            keyword: dispatch?.Alarm.Keyword);
+        if (dispatch is not null)
+        {
+            dispatch.ApplyTo(session, md.Streets);
+            Dispatch?.MarkTaken(dispatch.Alarm);
+        }
+
         OpenWorkspace(session, path, md);
     }
 

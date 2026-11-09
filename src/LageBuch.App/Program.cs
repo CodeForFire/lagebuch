@@ -4,6 +4,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using LageBuch.App.Services;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Dispatch;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.Services.Weather;
 using LageBuch.AppLogic.ViewModels;
@@ -108,7 +109,8 @@ internal static class Program
             alarmMute: new AlarmMute(AppPaths.AlarmMuteJsonPath),
             mapPacks: new RegionPackLibrary(http, AppPaths.RegionPacksDir),
             mapNightMode: new MapNightMode(AppPaths.MapNightJsonPath),
-            weather: new BrightSkyClient(http));
+            weather: new BrightSkyClient(http),
+            dispatchInbox: new JsonDispatchInboxStore(AppPaths.DispatchInboxJsonPath));
         OpenLaunchedFile(mainViewModel);
         return mainViewModel;
     }

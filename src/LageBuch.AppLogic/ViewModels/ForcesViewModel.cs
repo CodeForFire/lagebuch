@@ -665,19 +665,14 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
 
         NewCallSign = value.CallSign;
 
-        // The catalogue's spelling when it knows the type, the Stammdaten's text when it does not;
-        // options first, so that text already has an entry to select.
-        var vehicleType = Domain.VehicleTypes.Find(value.VehicleType)?.Code ?? Domain.VehicleTypes.FromStored(value.VehicleType);
-        NewVehicleTypeOptions = VehicleTypeChoices.For(vehicleType);
-        NewVehicleType = VehicleTypeChoices.Of(vehicleType);
+        // Options first, so a type the catalogue lacks already has an entry to select.
+        var preset = VehiclePreset.Of(value);
+        NewVehicleTypeOptions = VehicleTypeChoices.For(preset.VehicleType);
+        NewVehicleType = VehicleTypeChoices.Of(preset.VehicleType);
 
-        // Sitzplätze-Vorbelegung: 9 Sitze ergeben 1 Führungskraft + 8 Mannschaft (#76).
-        // The Zugführer occupies one of the vehicle's seats, so it comes out of the same pool
-        // instead of being added on top (#260).
-        NewZugfuehrerCount = value.HasZugfuehrer ? 1 : 0;
-        int remainingSeats = Math.Max(value.Seats - (NewZugfuehrerCount ?? 0), 0);
-        NewOfficerCount = Math.Min(1, remainingSeats);
-        NewMannschaftCount = Math.Max(remainingSeats - 1, 0);
+        NewZugfuehrerCount = preset.Zugfuehrer;
+        NewOfficerCount = preset.Officers;
+        NewMannschaftCount = preset.Mannschaft;
         NewScbaCount = 0;
     }
 

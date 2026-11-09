@@ -68,6 +68,54 @@
                      Text="Dokumentation für den Einsatz. Lege einen neuen Einsatz an, öffne ein bestehendes Lagebuch oder verbinde dich wieder mit einem Einsatz auf einem anderen Gerät." />
         </StackPanel>
 
+        <!-- The alarm the Leitstelle sent, found in this PC's alarm folder: taken up into a new
+             incident with its Einsatznummer, address, Einsatzort and the ticked Einsatzmittel, or
+             answered without one. Desktop only: Android wires no alarm folder, and Dispatch is null. -->
+        <Panel x:Name="DispatchOfferPanel" IsVisible="{Binding Dispatch.Offer, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
+          <Border x:Name="DispatchOfferBanner" DataContext="{Binding Dispatch}" x:DataType="vm:DispatchInboxViewModel"
+                  Background="{StaticResource SignalWashBrush}"
+                  BorderBrush="{StaticResource SignalBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="18,16">
+            <StackPanel Spacing="10">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="ALARM EMPFANGEN" Classes="overline" Foreground="{StaticResource SignalBrush}"
+                           VerticalAlignment="Center" />
+                <Border x:Name="DispatchProbeTag" IsVisible="{Binding Offer.IsTest, FallbackValue=False}"
+                        BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusSm}" Padding="6,1">
+                  <TextBlock Text="PROBEALARM" Classes="overline" Foreground="{StaticResource AmberBrush}" />
+                </Border>
+              </StackPanel>
+              <TextBlock x:Name="DispatchOfferTitle" Text="{Binding Offer.Title}"
+                         FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"
+                         Foreground="{StaticResource TextPrimaryBrush}" />
+              <TextBlock x:Name="DispatchOfferSummary" Text="{Binding Offer.Summary}"
+                         Classes="secondary" TextWrapping="Wrap" />
+              <TextBlock Text="EINSATZMITTEL ÜBERNEHMEN" Classes="overline" Margin="0,4,0,0"
+                         IsVisible="{Binding Offer.HasUnits, FallbackValue=False}" />
+              <ItemsControl x:Name="DispatchUnitList" ItemsSource="{Binding Offer.Units}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:DispatchUnitChoice">
+                    <CheckBox IsChecked="{Binding IsSelected}" AutomationProperties.Name="{Binding Name}">
+                      <StackPanel Spacing="1">
+                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                        <TextBlock Classes="rowMeta" Text="{Binding Detail}" />
+                      </StackPanel>
+                    </CheckBox>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                <Button x:Name="AcceptDispatchButton" Classes="signal" Content="EINSATZ ANLEGEN"
+                        Command="{Binding AcceptCommand}" />
+                <Button x:Name="DismissDispatchButton" Classes="ghost" Content="VERWERFEN"
+                        ToolTip.Tip="Keinen Einsatz anlegen; dieser Alarm wird nicht mehr angeboten"
+                        Command="{Binding DismissCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </Panel>
+
         <!-- The start after a crash (#300): what happened and where the report is. Selectable, so the
              path can be copied into a bug report; same shape as the open-failure banner below. On
              Android the path is out of reach, so TEILEN hands the report on instead (#636). -->
@@ -279,6 +327,46 @@
             </StackPanel>
           </StackPanel>
         </Border>
+
+        <!-- Where this PC finds alarm mails (FF-Agent), set once per machine; not Stammdaten,
+             which travel to other devices. Desktop only, like the offer above. -->
+        <Panel x:Name="DispatchFolderPanel" IsVisible="{Binding Dispatch, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Border x:Name="DispatchFolderCard" DataContext="{Binding Dispatch}" x:DataType="vm:DispatchInboxViewModel"
+                  Background="{StaticResource SurfaceBrush}"
+                  BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusLg}" Padding="22,20"
+                  BoxShadow="{StaticResource PanelShadow}">
+            <StackPanel Spacing="12">
+              <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0" Text="ALARMIERUNG" Classes="overline" VerticalAlignment="Center" />
+                <Border Grid.Column="1" Height="1" Background="{StaticResource HairlineBrush}"
+                        VerticalAlignment="Center" Margin="14,0,0,0" />
+              </Grid>
+              <TextBlock x:Name="DispatchFolderText" Classes="secondary" TextWrapping="Wrap"
+                         IsVisible="{Binding HasFolder}"
+                         Text="{Binding Folder, StringFormat='Alarm-Mails aus {0}'}" />
+              <TextBlock x:Name="DispatchFolderHint" Classes="secondary" TextWrapping="Wrap"
+                         IsVisible="{Binding !HasFolder}"
+                         Text="Alarm-Mails aus einem Ordner übernehmen: Lagebuch bietet dann jede neue Alarmierung als Einsatz an." />
+              <TextBlock x:Name="DispatchError" TextWrapping="Wrap"
+                         Foreground="{StaticResource AmberBrush}"
+                         Text="{Binding Error}"
+                         IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <!-- Wraps: three buttons do not fit side by side at phone width. -->
+              <WrapPanel x:Name="DispatchFolderActions" ItemSpacing="8" LineSpacing="8">
+                <Button x:Name="PickDispatchFolderButton" Content="ORDNER WÄHLEN"
+                        Command="{Binding PickFolderCommand}" />
+                <Button x:Name="OpenAlarmFileButton" Classes="ghost" Content="ALARM-DATEI ÖFFNEN"
+                        ToolTip.Tip="Eine gespeicherte Alarm-Mail als Einsatz anbieten, auch wenn sie älter als 2 Stunden ist"
+                        Command="{Binding OpenAlarmFileCommand}" />
+                <Button x:Name="ClearDispatchFolderButton" Classes="ghost" Content="AUSSCHALTEN"
+                        ToolTip.Tip="Keine Alarm-Mails mehr übernehmen"
+                        IsVisible="{Binding HasFolder}"
+                        Command="{Binding ClearFolderCommand}" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+        </Panel>
       </StackPanel>
     </ScrollViewer>
   </Grid>

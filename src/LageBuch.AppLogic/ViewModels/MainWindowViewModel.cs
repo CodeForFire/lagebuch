@@ -11,6 +11,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         None,
         New,
+
+        // A new incident taken up from the alarm the Home screen offers.
+        NewFromDispatch,
         Join,
     }
 
@@ -22,6 +25,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly AlarmMute? _alarmMute;
     private readonly IUiDispatcher? _uiDispatcher;
     private PendingAction _pending = PendingAction.None;
+
+    // The alarm offer EINSATZ ANLEGEN accepted, until its operator prompt is answered.
+    private DispatchOfferViewModel? _pendingOffer;
 
     // Set by CancelJoin() and consumed by ConfirmOperatorAsync (#196): a cancelled join leaves
     // HomeViewModel.JoinError null exactly like a successful one, so "JoinError is null" alone can't
@@ -40,6 +46,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _uiDispatcher = uiDispatcher;
         _home.WorkspaceOpened = ShowWorkspace;
         _home.ReconnectRequested = () => RequestJoinDeviceCommand.Execute(null);
+        if (_home.Dispatch is { } dispatch)
+        {
+            dispatch.CreateRequested = RequestNewIncidentFromDispatch;
+            dispatch.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(DispatchInboxViewModel.Offer))
+                {
+                    OnPropertyChanged(nameof(DispatchNotice));
+                }
+            };
+        }
+
         _currentView = home;
     }
 
@@ -58,7 +76,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIncidentOpen))]
+    [NotifyPropertyChangedFor(nameof(DispatchNotice))]
     private object? _currentView;
+
+    /// <summary>
+    /// A quiet line while an Einsatz is on screen and an alarm has come in: it never takes the
+    /// screen from the incident being documented. The offer itself waits on the Home screen.
+    /// </summary>
+    public string? DispatchNotice => IsIncidentOpen && _home.Dispatch?.Offer is { } offer
+        ? $"Neuer Alarm: {offer.Title} – auf der Startseite anlegen"
+        : null;
 
     /// <summary>
     /// Whether an Einsatz is on screen. The Android head keeps the display awake while it is: the
@@ -166,6 +193,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         },
         askEvenIfReadOnly: true);
 
+    // EINSATZ ANLEGEN on the Home screen's alarm: the same operator prompt as a new incident. The
+    // offer is kept as it was accepted, since a scan meanwhile may drop or replace it; its ticks are
+    // read only once the Lagebuchführer is confirmed, so the ones set meanwhile count.
+    private void RequestNewIncidentFromDispatch()
+    {
+        _pending = PendingAction.NewFromDispatch;
+        _pendingOffer = _home.Dispatch?.Offer;
+        PendingPrompt = new OperatorPromptViewModel(callSignOptions: _home.CallSignOptions, personnel: _home.Personnel);
+    }
+
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
     [RelayCommand]
     private Task RequestOpenFile() => NavigateAwayAsync(() => _home.OpenFileCommand.Execute(null));
@@ -254,11 +291,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        if (action == PendingAction.New)
+        if (action is PendingAction.New or PendingAction.NewFromDispatch)
         {
             PendingPrompt = null;
             _pending = PendingAction.None;
-            _home.NewIncidentCommand.Execute(new NewIncidentRequest(op));
+            var dispatch = _pendingOffer?.ToImport(); // set only by EINSATZ ANLEGEN
+            _pendingOffer = null;
+            _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, dispatch));
             return;
         }
 
@@ -309,6 +348,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         PendingPrompt = null;
         _pending = PendingAction.None;
+        _pendingOffer = null;
         CurrentView = _home;
 
         // A join dialog closed after its host was reached: release that connection (#459).
