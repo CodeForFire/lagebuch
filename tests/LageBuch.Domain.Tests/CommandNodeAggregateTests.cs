@@ -811,4 +811,20 @@ public class CommandNodeAggregateTests
         incident.UpdateCommandNode(clock, op, node.Id, "Nordost", null, null, null, null, null);
         Assert.Equal("Nordost", Assert.Single(incident.Roles).Section);
     }
+
+    [Fact]
+    public void The_Einsatzleitungs_Fuehrungsfahrzeug_is_logged_when_set_or_swapped_and_not_when_kept_or_cleared()
+    {
+        var (incident, clock, op) = NewIncident();
+        var before = incident.Journal.Count;
+
+        incident.UpdateLeadershipPost(clock, op, null, null, null, null, "FFB 1/12/1");
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", null, null, null, "FFB 1/12/1");
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", null, null, null, "FFB 1/11/1");
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", null, null, null, null);
+
+        Assert.Equal(
+            new[] { "Führungsfahrzeug Einsatzleitung: FFB 1/12/1", "Führungsfahrzeug Einsatzleitung: FFB 1/11/1" },
+            incident.Journal.Skip(before).Select(e => e.Text).ToArray());
+    }
 }
