@@ -303,6 +303,60 @@ public sealed class MeasurementLogViewModelTests
         Assert.Equal("Hofeinfahrt · 14:10", vm.Tiles[0].Footer);
     }
 
+    // The Verlauf of the mockup: per Messpunkt its values in time order, the Ausreißer kept but
+    // marked, so the chart can leave it off the line.
+    [Fact]
+    public void A_tile_carries_its_verlauf_per_messpunkt_in_time_order()
+    {
+        var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:10", co: "8–14");
+        Record(vm, "Kellerabgang", "14:05", co: "38");
+        Record(vm, "Hofeinfahrt", "14:07", co: "5", ex: "2");
+        vm.Rows.Single(r => r.TimeText == "14:07").AssessCommand.Execute(null);
+        vm.AssessmentStatus = MeasurementStatus.Outlier;
+        vm.AssessmentText = "Gerät nicht genullt";
+        vm.ConfirmAssessmentCommand.Execute(null);
+
+        var co = vm.Tiles[0].Trend;
+        Assert.Equal("CO", co.Name);
+        Assert.Equal("ppm", co.Unit);
+        Assert.Equal((Co.Elevated, Co.Dangerous, Co.Lethal), (co.Elevated, co.Dangerous, co.Lethal));
+        Assert.Equal(["Kellerabgang", "Hofeinfahrt"], co.Series.Select(s => s.PointName));
+        Assert.Equal([(38m, 38m, CoSeverity.Elevated), (8m, 14m, CoSeverity.Normal)], co.Series[0].Points.Select(p => (p.Low, p.High, p.Severity)));
+        Assert.Equal(["14:05", "14:10"], co.Series[0].Points.Select(p => Formatting.TimeOfDay(p.At)));
+        Assert.True(Assert.Single(co.Series[1].Points).IsOutlier);
+
+        // Ex was measured only at the Hofeinfahrt.
+        Assert.Equal("Hofeinfahrt", Assert.Single(vm.Tiles[1].Trend.Series).PointName);
+    }
+
+    [Fact]
+    public void A_tile_opens_its_verlauf_follows_the_filter_and_closes_again()
+    {
+        var vm = NewVm(NewSession());
+        Record(vm, "Kellerabgang", "14:05", co: "38");
+        Record(vm, "Hofeinfahrt", "14:10", co: "5");
+        Assert.Null(vm.SelectedTrend);
+
+        vm.Tiles[0].ShowTrendCommand.Execute(null);
+        Assert.Equal("CO", vm.SelectedTrend?.Name);
+        Assert.True(vm.Tiles[0].IsTrendShown);
+        Assert.Equal(2, vm.SelectedTrend!.Series.Count);
+
+        vm.SelectedPointFilter = vm.PointFilterOptions.Single(o => o.Label == "Hofeinfahrt");
+        Assert.Equal("Hofeinfahrt", Assert.Single(vm.SelectedTrend!.Series).PointName);
+        Assert.True(vm.Tiles[0].IsTrendShown);
+
+        vm.Tiles[0].ShowTrendCommand.Execute(null);
+        Assert.Null(vm.SelectedTrend);
+        Assert.False(vm.Tiles[0].IsTrendShown);
+
+        vm.Tiles[1].ShowTrendCommand.Execute(null);
+        Assert.Equal("Ex", vm.SelectedTrend?.Name);
+        vm.CloseTrendCommand.Execute(null);
+        Assert.Null(vm.SelectedTrend);
+    }
+
     [Fact]
     public void The_filter_keeps_its_point_across_a_refresh_without_touching_the_form()
     {

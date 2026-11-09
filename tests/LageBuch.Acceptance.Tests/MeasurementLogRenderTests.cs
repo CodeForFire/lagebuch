@@ -3,8 +3,10 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using LageBuch.App.Shared.Controls;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -198,6 +200,7 @@ public class MeasurementLogRenderTests
         Assert.False(Named<Border>(view, "MeasurementCardPanel").IsEffectivelyVisible);
         Assert.False(Named<Border>(view, "InputDock").IsEffectivelyVisible);
         Assert.True(Named<Button>(view, "OpenComposerButton").IsEffectivelyVisible);
+        Assert.Equal(HorizontalAlignment.Left, Named<Button>(view, "OpenComposerButton").HorizontalAlignment);
         Capture(window, "messprotokoll-messreihe.png");
 
         OpenComposer(view);
@@ -206,6 +209,34 @@ public class MeasurementLogRenderTests
         Assert.True(Named<Button>(view, "CloseComposerButton").IsEffectivelyVisible);
         Assert.False(Named<Button>(view, "OpenComposerButton").IsEffectivelyVisible);
         Capture(window, "messprotokoll-neue-messung.png");
+    }
+
+    // The mockup's Verlauf: every tile draws its values small, and a tap opens them large, one
+    // line per Messpunkt with the bands dashed across.
+    [AvaloniaFact]
+    public void A_tile_shows_its_verlauf_small_and_a_tap_opens_it_large()
+    {
+        var (window, vm) = ShowWorkspace();
+        var view = OpenLog(window);
+        var coTile = Named<ItemsControl>(view, "TileList").GetRealizedContainers().First();
+
+        var spark = Named<MeasurementTrendChart>(coTile, "TileSpark");
+        Assert.True(spark.IsEffectivelyVisible);
+        Assert.Equal(3, spark.Trend?.Series.Count);
+        Assert.False(Named<Border>(view, "TrendPanel").IsEffectivelyVisible);
+
+        Named<Button>(coTile, "TileButton").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Named<Border>(view, "TrendPanel").IsEffectivelyVisible);
+        Assert.Equal("VERLAUF · CO (ppm)", Named<TextBlock>(view, "TrendHeading").Text);
+        Assert.Same(vm.MeasurementLog.SelectedTrend, Named<MeasurementTrendChart>(view, "TrendChart").Trend);
+        Assert.True(Named<MeasurementTrendChart>(view, "TrendChart").Bounds.Height >= 150);
+        Capture(window, "messprotokoll-verlauf.png");
+
+        Named<Button>(view, "CloseTrendButton").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(Named<Border>(view, "TrendPanel").IsEffectivelyVisible);
     }
 
     // The four-row form, docked open for good, took every pixel below the Messpunkt chips on a
@@ -394,6 +425,7 @@ public class MeasurementLogRenderTests
         Assert.Equal(6, Named<ItemsControl>(view, "MeasurementCards").ItemCount);
         Assert.False(Named<Border>(view, "InputDock").IsEffectivelyVisible);
         Assert.True(Named<Button>(view, "OpenComposerButton").IsEffectivelyVisible);
+        Assert.Equal(HorizontalAlignment.Stretch, Named<Button>(view, "OpenComposerButton").HorizontalAlignment);
         AssertWithinPhone(window, Named<Border>(view, "MeasurementCardPanel"));
         Capture(window, "messprotokoll-messreihe-phone.png");
     }

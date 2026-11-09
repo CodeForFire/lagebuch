@@ -114,6 +114,29 @@
       <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
     </Style>
 
+    <!-- A tile is a button: a tap opens its Verlauf. The Border inside keeps the tile's look, so
+         the button itself draws nothing. The open tile is raised a step rather than outlined, since
+         its edge already carries the band. -->
+    <Style Selector="Button.tile-button">
+      <Setter Property="Height" Value="NaN" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.tile-button:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tile-button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <!-- Not over a lethal tile: its red wash says more than the step up would. -->
+    <Style Selector="Button.tile-button:pointerover Border.tile:not(.lethal)">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+    </Style>
+    <Style Selector="Border.tile.shown:not(.lethal)">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+    </Style>
+
     <!-- A value in the Messreihe is a button: a tap opens its correction. It keeps the look of a
          cell, and a closed Einsatz keeps it legible rather than greyed out like a disabled button. -->
     <Style Selector="Button.cell">
@@ -242,6 +265,10 @@
       <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
     </Style>
     <!-- The form gets what is left above the bottom bar and scrolls inside it. -->
+    <!-- A style, not a local value: a local HorizontalAlignment would beat the narrow one below. -->
+    <Style Selector="Button#OpenComposerButton">
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow Button#OpenComposerButton">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
@@ -332,39 +359,77 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MeasurementTile">
-              <Border x:Name="Tile" Classes="tile" HorizontalAlignment="Stretch"
-                      Classes.elevated="{Binding IsElevated}"
-                      Classes.dangerous="{Binding IsDangerous}"
-                      Classes.lethal="{Binding IsLethal}">
-                <StackPanel Spacing="1">
-                  <Grid ColumnDefinitions="Auto,*">
-                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
-                    <TextBlock Grid.Column="1" Text="{Binding DeviceName}" FontSize="10" Margin="8,0,0,0"
-                               HorizontalAlignment="Right" VerticalAlignment="Center"
+              <Button x:Name="TileButton" Classes="tile-button"
+                      Command="{Binding ShowTrendCommand}"
+                      AutomationProperties.Name="{Binding Name, StringFormat='Verlauf {0}'}"
+                      ToolTip.Tip="Verlauf zeigen">
+                <Border x:Name="Tile" Classes="tile" HorizontalAlignment="Stretch"
+                        Classes.elevated="{Binding IsElevated}"
+                        Classes.dangerous="{Binding IsDangerous}"
+                        Classes.lethal="{Binding IsLethal}"
+                        Classes.shown="{Binding IsTrendShown}">
+                  <StackPanel Spacing="1">
+                    <Grid ColumnDefinitions="Auto,*">
+                      <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                      <TextBlock Grid.Column="1" Text="{Binding DeviceName}" FontSize="10" Margin="8,0,0,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis"
+                                 Foreground="{StaticResource TextSecondaryBrush}" />
+                    </Grid>
+                    <TextBlock x:Name="TileValue" Classes="mono coValue" FontSize="22" FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis"
+                               Classes.elevated="{Binding IsElevated}"
+                               Classes.dangerous="{Binding IsDangerous}"
+                               Classes.lethal="{Binding IsLethal}"
+                               Text="{Binding ValueText}" />
+                    <TextBlock x:Name="TileSeverity" Classes="coValue" FontSize="12" FontWeight="SemiBold"
+                               Classes.elevated="{Binding IsElevated}"
+                               Classes.dangerous="{Binding IsDangerous}"
+                               Classes.lethal="{Binding IsLethal}"
+                               Text="{Binding SeverityText}"
+                               IsVisible="{Binding SeverityText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock Classes="implausible" FontSize="11" Text="⚠ Ungewöhnlich hoher Wert – prüfen"
+                               TextWrapping="Wrap" IsVisible="{Binding IsImplausible}" />
+                    <ctrl:MeasurementTrendChart x:Name="TileSpark" IsCompact="True" Height="18" Margin="0,2,0,0"
+                                                Trend="{Binding Trend}" />
+                    <TextBlock Text="{Binding Footer}" FontSize="11" TextTrimming="CharacterEllipsis"
                                Foreground="{StaticResource TextSecondaryBrush}" />
-                  </Grid>
-                  <TextBlock x:Name="TileValue" Classes="mono coValue" FontSize="22" FontWeight="SemiBold"
-                             TextTrimming="CharacterEllipsis"
-                             Classes.elevated="{Binding IsElevated}"
-                             Classes.dangerous="{Binding IsDangerous}"
-                             Classes.lethal="{Binding IsLethal}"
-                             Text="{Binding ValueText}" />
-                  <TextBlock x:Name="TileSeverity" Classes="coValue" FontSize="12" FontWeight="SemiBold"
-                             Classes.elevated="{Binding IsElevated}"
-                             Classes.dangerous="{Binding IsDangerous}"
-                             Classes.lethal="{Binding IsLethal}"
-                             Text="{Binding SeverityText}"
-                             IsVisible="{Binding SeverityText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  <TextBlock Classes="implausible" FontSize="11" Text="⚠ Ungewöhnlich hoher Wert – prüfen"
-                             TextWrapping="Wrap" IsVisible="{Binding IsImplausible}" />
-                  <TextBlock Text="{Binding Footer}" FontSize="11" TextTrimming="CharacterEllipsis"
-                             Foreground="{StaticResource TextSecondaryBrush}" />
-                </StackPanel>
-              </Border>
+                  </StackPanel>
+                </Border>
+              </Button>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- The open tile's Verlauf, as in the mockup: one line per Messpunkt the filter covers.
+             The outer Panel gives way to a phone's open form, as the tiles do. -->
+        <Panel DockPanel.Dock="Top">
+          <Panel.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.Or}">
+              <Binding Path="!IsNarrow" />
+              <Binding Path="!IsComposerOpen" />
+            </MultiBinding>
+          </Panel.IsVisible>
+          <Border x:Name="TrendPanel" Classes="dock" Margin="0,0,0,12" Padding="14,10"
+                  IsVisible="{Binding SelectedTrend, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <DockPanel>
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                <TextBlock x:Name="TrendHeading" Grid.Column="0" Classes="overline" VerticalAlignment="Center"
+                           Text="{Binding SelectedTrend.Heading, FallbackValue={x:Null}}" />
+                <Button Grid.Column="1" x:Name="CloseTrendButton" Classes="ghost"
+                        AutomationProperties.Name="Verlauf schließen"
+                        ToolTip.Tip="Verlauf schließen"
+                        Command="{Binding CloseTrendCommand}">
+                  <PathIcon Width="13" Height="13"
+                            Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+                </Button>
+              </Grid>
+              <ctrl:MeasurementTrendChart x:Name="TrendChart" Height="200"
+                                          Foreground="{StaticResource TextSecondaryBrush}"
+                                          Trend="{Binding SelectedTrend}" />
+            </DockPanel>
+          </Border>
+        </Panel>
 
         <!-- Which Messpunkt the tiles and the list show. -->
         <ListBox x:Name="PointFilter" DockPanel.Dock="Top" Classes="chips" Margin="0,0,0,12"
@@ -390,7 +455,7 @@
              the Ausgabeliste. On every width: a four-row form always open left the Messreihe no
              room at all on a laptop. The narrow style stretches it across the phone. -->
         <Button x:Name="OpenComposerButton" DockPanel.Dock="Bottom" Classes="signal"
-                Margin="0,12,0,0" HorizontalAlignment="Left"
+                Margin="0,12,0,0"
                 Height="{StaticResource ControlHeightTouch}"
                 Content="+ MESSUNG ERFASSEN"
                 IsVisible="{Binding ShowComposerButton}"

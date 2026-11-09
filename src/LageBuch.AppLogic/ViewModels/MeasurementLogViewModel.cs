@@ -229,6 +229,26 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
         }
     }
 
+    // The Messgröße whose Verlauf is open, kept by id so it survives the rebuild of the tiles.
+    private Guid? _trendChannelId;
+
+    /// <summary>The Verlauf open below the tiles, or null while every tile is closed.</summary>
+    [ObservableProperty]
+    private MeasurementTrend? _selectedTrend;
+
+    private void ToggleTrend(Guid channelId)
+    {
+        _trendChannelId = _trendChannelId == channelId ? null : channelId;
+        BuildMessreihe(_session.Incident.MeasurementLog);
+    }
+
+    [RelayCommand]
+    private void CloseTrend()
+    {
+        _trendChannelId = null;
+        BuildMessreihe(_session.Incident.MeasurementLog);
+    }
+
     /// <summary>The Messungen at the filtered Messpunkt, newest first.</summary>
     public ObservableCollection<MeasurementRow> Rows { get; } = new();
 
@@ -1100,19 +1120,27 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
                 g => g.Key,
                 g => g.OrderBy(l => MeasurementRules.SeverityOf(channelsById[l.ChannelId], l.Value)).ThenBy(l => l.MeasuredAt).Last());
         var devicesById = log.Devices.ToDictionary(d => d.Id);
+        var filteredPoints = log.Points.Where(p => pointId is null || p.Id == pointId).ToList();
         Tiles.Clear();
+        MeasurementTrend? shownTrend = null;
         foreach (var channel in log.Channels.Where(c => c.IsActive))
         {
             var device = channel.DeviceId is { } d && devicesById.TryGetValue(d, out var found) ? found.Name : null;
-            if (latest.TryGetValue(channel.Id, out var value))
+            var trend = MeasurementTrend.Of(channel, filteredPoints, log.Measurements);
+            var isShown = channel.Id == _trendChannelId;
+            if (isShown)
             {
-                Tiles.Add(new MeasurementTile(channel, device, value.Value, pointsById[value.PointId].Name, value.MeasuredAt));
+                shownTrend = trend;
             }
-            else
-            {
-                Tiles.Add(new MeasurementTile(channel, device, null, null, null));
-            }
+
+            Tiles.Add(latest.TryGetValue(channel.Id, out var value)
+                ? new MeasurementTile(channel, device, value.Value, pointsById[value.PointId].Name, value.MeasuredAt, trend, isShown, ToggleTrend)
+                : new MeasurementTile(channel, device, null, null, null, trend, isShown, ToggleTrend));
         }
+
+        // A Messgröße switched inactive or removed elsewhere takes its open Verlauf with it.
+        _trendChannelId = shownTrend is null ? null : _trendChannelId;
+        SelectedTrend = shownTrend;
 
         // The running number counts a Messpunkt's Messungen in time order, as MeasurementRules does.
         var numbers = new Dictionary<Guid, int>();

@@ -8,14 +8,28 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// One Messgröße's tile above the Messreihe: its latest value that is not an Ausreißer, at the
-/// Messpunkt the filter names or at any of them, coloured by its band.
+/// Messpunkt the filter names or the worst of them, coloured by its band, with its Verlauf drawn
+/// small. Opening the tile shows that Verlauf large.
 /// </summary>
 public sealed class MeasurementTile
 {
-    public MeasurementTile(MeasurementChannel channel, string? deviceName, MeasuredValue? value, string? pointName, DateTimeOffset? at)
+    public MeasurementTile(
+        MeasurementChannel channel,
+        string? deviceName,
+        MeasuredValue? value,
+        string? pointName,
+        DateTimeOffset? at,
+        MeasurementTrend trend,
+        bool isTrendShown,
+        Action<Guid> onShowTrend)
     {
         ArgumentNullException.ThrowIfNull(channel);
+        ArgumentNullException.ThrowIfNull(trend);
+        ArgumentNullException.ThrowIfNull(onShowTrend);
         ChannelId = channel.Id;
+        Trend = trend;
+        IsTrendShown = isTrendShown;
+        ShowTrendCommand = new RelayCommand(() => onShowTrend(channel.Id));
         Name = channel.Name;
         Unit = channel.Unit;
         DeviceName = deviceName;
@@ -57,6 +71,15 @@ public sealed class MeasurementTile
 
     /// <summary>"Kellerabgang · 14:05", or "keine Messung".</summary>
     public string Footer { get; }
+
+    /// <summary>The Verlauf at the Messpunkte the filter covers.</summary>
+    public MeasurementTrend Trend { get; }
+
+    /// <summary>Whether this tile's Verlauf is the one open below the tiles.</summary>
+    public bool IsTrendShown { get; }
+
+    /// <summary>Opens this tile's Verlauf, or closes it when it is already open.</summary>
+    public IRelayCommand ShowTrendCommand { get; }
 }
 
 /// <summary>One Messgröße's value in one row of the Messreihe. KORRIGIEREN opens the correction.</summary>
