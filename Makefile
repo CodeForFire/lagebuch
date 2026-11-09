@@ -63,9 +63,12 @@ PUBLISH_FLAGS := -c Release --self-contained true -p:PublishSingleFile=true \
 # DOTNET_ROOT in the environment wins.
 export DOTNET_ROOT ?= $(patsubst %/,%,$(dir $(realpath $(shell command -v $(DOTNET)))))
 
-TEST_FILTER := $(if $(FILTER),--filter $(FILTER),)
-# FILTER on its own fails in assemblies that match nothing, so narrow with
-# PROJECT=tests/LageBuch.Domain.Tests when filtering.
+TEST_FILTER := $(if $(FILTER),--filter "$(FILTER)",)
+# FILTER is quoted, so `|` and `&` reach dotnet test instead of the shell.
+# A FILTER that matches nothing runs no tests and currently still exits 0, so
+# narrow with PROJECT=tests/LageBuch.Domain.Tests and check for "Passed!".
+# The xunit adapters have no Name property, so Name~ matches nothing; use
+# FullyQualifiedName~ for a class or a method (docs/testing.md).
 TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .DEFAULT_GOAL := help
@@ -94,7 +97,7 @@ build: ## Build everything except the Android head
 build-all: ## Build the full solution incl. Android (needs JDK <= 21)
 	$(DOTNET) build $(SLN) -c $(CONFIG)
 
-test: ## Run tests (PROJECT=path and/or FILTER=Name~Foo to narrow)
+test: ## Run tests (PROJECT=path and/or FILTER=FullyQualifiedName~Foo to narrow)
 	$(DOTNET) test $(TEST_TARGET) -c $(CONFIG) $(TEST_FILTER)
 
 test-all: ## Run tests over the full solution (needs JDK <= 21)
