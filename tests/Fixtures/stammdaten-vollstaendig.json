@@ -225,6 +225,12 @@
       "vehicleType": null
     }
   ],
+  "dispatchPlaceNames": [
+    {
+      "name": "Musterstadt",
+      "abbreviation": "MST"
+    }
+  ],
   "talkGroups": [
     {
       "name": "FW_MUSTER",

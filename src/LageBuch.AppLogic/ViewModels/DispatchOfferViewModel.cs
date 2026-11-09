@@ -11,13 +11,14 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed class DispatchOfferViewModel
 {
-    public DispatchOfferViewModel(DispatchAlarm alarm, IReadOnlyList<Vehicle> vehicles)
+    /// <summary>The alarm, its Einsatzmittel matched against the vehicles and place names of <paramref name="masterData"/>.</summary>
+    public DispatchOfferViewModel(DispatchAlarm alarm, MasterDataSet masterData)
     {
         ArgumentNullException.ThrowIfNull(alarm);
-        ArgumentNullException.ThrowIfNull(vehicles);
+        ArgumentNullException.ThrowIfNull(masterData);
         Alarm = alarm;
         Units = alarm.RequestedUnits
-            .Select(name => new DispatchUnitChoice(name, DispatchImport.Match(name, vehicles)))
+            .Select(name => new DispatchUnitChoice(name, DispatchImport.Match(name, masterData.Vehicles, masterData.DispatchPlaceNames)))
             .ToList();
     }
 

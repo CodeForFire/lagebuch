@@ -84,6 +84,43 @@ public class MasterDataJsonTests
         Assert.Empty(set.Streets);
         Assert.Empty(set.Links);
         Assert.Empty(set.Personnel);
+        Assert.Empty(set.DispatchPlaceNames);
+    }
+
+    [Fact]
+    public void Parse_reads_the_place_names_of_the_alarm_trimmed()
+    {
+        var set = Parse("""{ "dispatchPlaceNames": [{ "name": " Fürstenfeldbruck ", "abbreviation": " FFB " }] }""");
+
+        Assert.Equal(new DispatchPlaceName("Fürstenfeldbruck", "FFB"), Assert.Single(set.DispatchPlaceNames));
+    }
+
+    // A hand-edited file is hostile input: the fields are required and capped.
+    [Theory]
+    [InlineData("""{ "dispatchPlaceNames": [{ "abbreviation": "FFB" }] }""")]
+    [InlineData("""{ "dispatchPlaceNames": [{ "name": "Fürstenfeldbruck" }] }""")]
+    [InlineData("""{ "dispatchPlaceNames": [{ "name": null, "abbreviation": "FFB" }] }""")]
+    [InlineData("""{ "dispatchPlaceNames": [{ "name": "Fürstenfeldbruck", "abbreviation": null }] }""")]
+    public void Parse_refuses_a_place_name_without_both_fields(string json)
+    {
+        Assert.ThrowsAny<Exception>(() => Parse(json));
+    }
+
+    [Fact]
+    public void Parse_refuses_a_place_name_over_the_cap()
+    {
+        var json = $$"""{ "dispatchPlaceNames": [{ "name": "{{new string('x', DispatchPlaceName.MaxLength + 1)}}", "abbreviation": "X" }] }""";
+
+        Assert.Throws<JsonException>(() => Parse(json));
+    }
+
+    [Fact]
+    public void A_place_name_at_the_cap_is_read()
+    {
+        var name = new string('x', DispatchPlaceName.MaxLength);
+        var json = $$"""{ "dispatchPlaceNames": [{ "name": "X", "abbreviation": "{{name}}" }] }""";
+
+        Assert.Equal(name, Assert.Single(Parse(json).DispatchPlaceNames).Abbreviation);
     }
 
     [Fact]
@@ -743,6 +780,7 @@ public class MasterDataJsonTests
         Assert.False((MasterDataSet.Empty with { Devices = new[] { new Device("AED", 1) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Districts = new[] { "Puch" } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Streets = new[] { new Street("Hauptstraße") } }).IsEmpty);
+        Assert.False((MasterDataSet.Empty with { DispatchPlaceNames = new[] { new DispatchPlaceName("Fürstenfeldbruck", "FFB") } }).IsEmpty);
     }
 
     [Fact]

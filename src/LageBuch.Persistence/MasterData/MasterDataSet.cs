@@ -43,6 +43,11 @@ public sealed record MasterDataSet(
     // Vehicles per Wache with their seat count (#76).
     IReadOnlyList<Vehicle> Vehicles,
 
+    // How the Leitstelle's alarm spells a place that the Funkrufnamen above abbreviate:
+    // "Florian Fürstenfeldbruck 2/40/1" in the alarm mail is "FFB 2/40/1" here. Read only to match
+    // an alarmed Einsatzmittel to its vehicle; nothing of it enters an incident.
+    IReadOnlyList<DispatchPlaceName> DispatchPlaceNames,
+
     // Textbausteine: phrases called up by typing ::kürzel, each offered in the areas it is ticked
     // for. Inserting one copies its text into the entry (#337); nothing points back here.
     IReadOnlyList<TextSnippet> TextSnippets,
@@ -86,6 +91,7 @@ public sealed record MasterDataSet(
         Array.Empty<TruppType>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
+        Array.Empty<DispatchPlaceName>(),
         Array.Empty<TextSnippet>(),
         Array.Empty<Premises>(),
         Array.Empty<Device>(),
@@ -113,6 +119,7 @@ public sealed record MasterDataSet(
         && TruppTypes.Count == 0
         && Personnel.Count == 0
         && Vehicles.Count == 0
+        && DispatchPlaceNames.Count == 0
         && TextSnippets.Count == 0
         && Premises.Count == 0
         && Devices.Count == 0
@@ -154,6 +161,17 @@ public sealed record MasterDataSet(
 [SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 [SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 public sealed record Link(string Name, string Url, string Group = "");
+
+/// <summary>
+/// A place as the Leitstelle's alarm names it (<see cref="Name"/>, "Fürstenfeldbruck") and as the
+/// Funkrufnamen in these Stammdaten abbreviate it (<see cref="Abbreviation"/>, "FFB"), so an alarmed
+/// "Florian Fürstenfeldbruck 2/40/1" finds the vehicle "FFB 2/40/1".
+/// </summary>
+public sealed record DispatchPlaceName(string Name, string Abbreviation)
+{
+    /// <summary>Longest place name or short form accepted; a place name is a few words.</summary>
+    public const int MaxLength = 100;
+}
 
 /// <summary>
 /// A Textbaustein: a phrase called up by typing <c>::</c> and its <see cref="Shortcut"/> in a text
@@ -870,6 +888,8 @@ public static class AnonymizedExampleData
     public const string LinkName = "Wetterdienst";
     public const string LinkUrl = "https://dwd.de";
     public const string LinkGroup = "Gefahrgut";
+    public const string DispatchPlaceName = "Musterstadt";
+    public const string DispatchPlaceAbbreviation = "MST";
     public const string Whereabouts = "bei Nachbarin Frau Meier";
     public const string RescueCallSign = "Rotkreuz Musterstadt 71/1";
 
@@ -901,6 +921,8 @@ public static class AnonymizedExampleData
     public const string LinkNamePlaceholder = "z. B. " + LinkName;
     public const string LinkUrlPlaceholder = "z. B. " + LinkUrl;
     public const string LinkGroupPlaceholder = "z. B. " + LinkGroup;
+    public const string DispatchPlaceNamePlaceholder = "z. B. " + DispatchPlaceName;
+    public const string DispatchPlaceAbbreviationPlaceholder = "z. B. " + DispatchPlaceAbbreviation;
 
     // A field that is genuinely optional reuses this idiom rather than inventing a second
     // convention for the same idea.
@@ -1095,6 +1117,32 @@ public static class MasterDataJson
         return result;
     }
 
+    // Hostile input like the Funkgruppen: both fields are required and capped.
+    private static IReadOnlyList<DispatchPlaceName> ParseDispatchPlaceNames(JsonElement root)
+    {
+        if (!root.TryGetProperty("dispatchPlaceNames", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<DispatchPlaceName>();
+        }
+
+        var result = new List<DispatchPlaceName>();
+        foreach (var x in arr.EnumerateArray())
+        {
+            var name = RequiredName(x, "Ortsname in der Alarmierung").Trim();
+            var shortForm = x.GetProperty("abbreviation").GetString()
+                ?? throw new JsonException("Ortsname in der Alarmierung: \"abbreviation\" darf nicht null sein.");
+            shortForm = shortForm.Trim();
+            if (name.Length > DispatchPlaceName.MaxLength || shortForm.Length > DispatchPlaceName.MaxLength)
+            {
+                throw new JsonException($"Ortsname in der Alarmierung: höchstens {DispatchPlaceName.MaxLength} Zeichen.");
+            }
+
+            result.Add(new DispatchPlaceName(name, shortForm));
+        }
+
+        return result;
+    }
+
     private static string? OptionalString(JsonElement e, string key) =>
         e.TryGetProperty(key, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
 
@@ -1139,6 +1187,7 @@ public static class MasterDataJson
             ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
+            ParseDispatchPlaceNames(root),
             ParseTextSnippets(root),
             ParsePremises(root),
             ParseDevices(root),
@@ -1556,6 +1605,7 @@ public static class MasterDataJson
             navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url, group = l.Group }),
             vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone, email = v.Email, vehicleType = v.VehicleType }),
+            dispatchPlaceNames = set.DispatchPlaceNames.Select(d => new { name = d.Name, abbreviation = d.Abbreviation }),
             talkGroups = set.TalkGroups.Select(t => new
             {
                 name = t.Name,

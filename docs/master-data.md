@@ -156,6 +156,19 @@ slot means none. The editor shows the slot in the **Führungs-Organisation** col
 calls `fuehrungsassistent` "Führungsunterstützung", the name the FÜHRUNG board uses; the
 key itself is unchanged.
 
+## Ortsnamen in der Alarmierung
+
+`dispatchPlaceNames` tells the alarm import ([alarmierung-ff-agent.md](alarmierung-ff-agent.md))
+how the Leitstelle spells a place that the vehicles' Funkrufnamen abbreviate. Each entry has a
+`name`, the place as the alarm writes it (`"Fürstenfeldbruck"`), and an `abbreviation`, the
+place as the Funkrufnamen write it (`"FFB"`). Both are required and at most 100 characters.
+
+With that entry an alarmed `Florian Fürstenfeldbruck 2/40/1` finds the vehicle `FFB 2/40/1`. The
+place is replaced as whole words, in any case, and the longest place name is tried first. A
+Funkrufname the alarm already ends with, such as `Maisach 40/1`, needs no entry. The editor shows
+the list in an **Alarmierung** section. The list is used only for matching; nothing of it enters
+an Einsatz.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the

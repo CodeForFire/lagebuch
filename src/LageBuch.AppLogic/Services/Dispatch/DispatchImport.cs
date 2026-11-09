@@ -21,14 +21,19 @@ public sealed record DispatchImport(DispatchAlarm Alarm, IReadOnlyList<DispatchU
     /// other after a space, so "2/40/1" and "Florian Musterstadt 2/40/1" find each other. Null
     /// when nothing matches, or when the name is only a suffix of more than one vehicle -- a wrong
     /// tick is worse than none.
+    /// <para>
+    /// A place the Funkrufnamen abbreviate is first written the Stammdaten way, as whole words,
+    /// longest place first: with "Musterstadt" → "MST", "Florian Musterstadt 2/40/1" finds
+    /// "MST 2/40/1". The numbers alone never decide; many an Ort has a 40/1.
+    /// </para>
     /// </summary>
-    public static Vehicle? Match(string requested, IEnumerable<Vehicle> vehicles)
+    public static Vehicle? Match(string requested, IEnumerable<Vehicle> vehicles, IReadOnlyList<DispatchPlaceName>? placeNames = null)
     {
         ArgumentNullException.ThrowIfNull(requested);
         ArgumentNullException.ThrowIfNull(vehicles);
 
         // A blank name would equal a vehicle with a blank Funkrufname, and nothing else.
-        var name = Normalize(requested);
+        var name = Abbreviate(Normalize(requested), placeNames ?? []);
         if (name.Length == 0)
         {
             return null;
@@ -149,6 +154,28 @@ public sealed record DispatchImport(DispatchAlarm Alarm, IReadOnlyList<DispatchU
 
     private static string Normalize(string? value) =>
         string.Join(' ', (value ?? string.Empty).Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+
+    // Every whole-word occurrence of a place name, in any case, becomes its short form. Longest
+    // first, so "Musterstadt Nord" is not first cut down to "MST Nord".
+    private static string Abbreviate(string name, IReadOnlyList<DispatchPlaceName> placeNames)
+    {
+        var padded = $" {name} ";
+        foreach (var place in placeNames
+            .Select(p => (Name: Normalize(p.Name), Abbreviation: Normalize(p.Abbreviation)))
+            .Where(p => p.Name.Length > 0 && p.Abbreviation.Length > 0)
+            .OrderByDescending(p => p.Name.Length))
+        {
+            var from = $" {place.Name} ";
+            var at = padded.IndexOf(from, StringComparison.OrdinalIgnoreCase);
+            while (at >= 0)
+            {
+                padded = string.Concat(padded.AsSpan(0, at), $" {place.Abbreviation} ", padded.AsSpan(at + from.Length));
+                at = padded.IndexOf(from, at + place.Abbreviation.Length + 1, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        return padded.Trim();
+    }
 
     private static bool EndsWithWord(string longer, string shorter) =>
         longer.EndsWith(" " + shorter, StringComparison.OrdinalIgnoreCase);

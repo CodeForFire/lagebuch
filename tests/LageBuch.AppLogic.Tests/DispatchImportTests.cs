@@ -42,6 +42,56 @@ public class DispatchImportTests
         Assert.Null(DispatchImport.Match(requested, [Hlf, Dlk]));
     }
 
+    // The Leitstelle writes the place out, the Funkrufnamen abbreviate it.
+    private static readonly Vehicle MstHlf = new("MST Wache 2", "MST 2/40/1", 9, VehicleType: "HLF 20");
+    private static readonly Vehicle Nachbar = new("Beispielried", "Beispielried 43/2", 9);
+    private static readonly DispatchPlaceName Mst = new("Musterstadt", "MST");
+
+    [Theory]
+    [InlineData("Florian Musterstadt 2/40/1")]
+    [InlineData("florian MUSTERSTADT 2/40/1")]
+    public void A_place_name_turns_the_alarmed_name_into_the_abbreviated_funkrufname(string requested)
+    {
+        Assert.Same(MstHlf, DispatchImport.Match(requested, [MstHlf, Nachbar], [Mst]));
+    }
+
+    [Fact]
+    public void Without_the_place_name_the_abbreviated_vehicle_is_not_found()
+    {
+        Assert.Null(DispatchImport.Match("Florian Musterstadt 2/40/1", [MstHlf, Nachbar]));
+    }
+
+    // Only a whole word is a place: "Musterstadtwald" is another Ort.
+    [Fact]
+    public void A_place_name_inside_a_longer_word_is_left_alone()
+    {
+        Assert.Null(DispatchImport.Match("Florian Musterstadtwald 2/40/1", [MstHlf], [Mst]));
+    }
+
+    // "Musterstadt Nord" is its own Feuerwehr, and must not become "MST Nord".
+    [Fact]
+    public void The_longest_place_name_wins()
+    {
+        var nord = new Vehicle("Nord", "MSN 40/1", 9);
+
+        var found = DispatchImport.Match("Florian Musterstadt Nord 40/1", [MstHlf, nord], [Mst, new DispatchPlaceName("Musterstadt Nord", "MSN")]);
+
+        Assert.Same(nord, found);
+    }
+
+    // The numbers alone never decide: Beispielried 43/2 is not Olching's 43/2.
+    [Fact]
+    public void Another_ort_with_the_same_number_still_finds_nothing()
+    {
+        Assert.Null(DispatchImport.Match("Florian Andersdorf 43/2", [MstHlf, Nachbar], [Mst]));
+    }
+
+    [Fact]
+    public void A_nachbarwehr_still_matches_by_its_own_name()
+    {
+        Assert.Same(Nachbar, DispatchImport.Match("Florian Beispielried 43/2", [MstHlf, Nachbar], [Mst]));
+    }
+
     [Fact]
     public void A_short_name_that_ends_two_vehicles_matches_neither()
     {

@@ -175,7 +175,7 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
         // The same alarm again keeps the offer on screen as it is, ticks and all.
         if (!_offerIsHandPicked && scan.Newest?.Key != Offer?.Alarm.Key)
         {
-            Offer = scan.Newest is { } alarm ? new DispatchOfferViewModel(alarm, _masterData.Get().Vehicles) : null;
+            Offer = scan.Newest is { } alarm ? new DispatchOfferViewModel(alarm, _masterData.Get()) : null;
         }
     }
 
@@ -232,7 +232,7 @@ public sealed partial class DispatchInboxViewModel : ObservableObject, IDisposab
         }
 
         Error = null;
-        Offer = new DispatchOfferViewModel(alarm, _masterData.Get().Vehicles);
+        Offer = new DispatchOfferViewModel(alarm, _masterData.Get());
         _offerIsHandPicked = true;
     }
 
