@@ -23,12 +23,16 @@ frames=(
   "home.png|Einsatz anlegen oder öffnen"
   "einsatzdaten.png|Stichwort, Einsatznummer, Adresse"
   "etb.png|Einsatztagebuch: jede Meldung mit Zeitstempel"
+  "lagemeldung.png|Lagemeldung an die ILS, mit Buchstabier-Helfer"
+  "fuehrung.png|Führungsorganisation wie auf dem A3-Bogen"
+  "lagekarte.png|Lagekarte offline, mit taktischen Zeichen und Hydranten"
   "kraefte.png|Kräfte und Stärke im Blick"
   "kontakte.png|Kontakte: die Mannschaft mit Funkrufname"
   "atemschutz.png|Atemschutzüberwachung mit Sprachansage"
   "aufgaben.png|Aufgaben mit Fälligkeit"
-  "co-messung.png|CO-Messprotokoll Wohnung für Wohnung"
+  "co-messung.png|Gasmessprotokoll Wohnung für Wohnung"
   "beteiligte.png|Beteiligte: die Menschen des Einsatzes"
+  "ausgabe.png|Ausgabeliste: wer welches Gerät hat"
   "pdf-export.png|PDF-Bericht mit einem Klick"
 )
 

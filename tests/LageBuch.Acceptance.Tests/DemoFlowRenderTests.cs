@@ -5,10 +5,12 @@ using Avalonia.Threading;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
@@ -22,12 +24,22 @@ namespace LageBuch.Acceptance.Tests;
 // It doubles as an end-to-end smoke test of the workspace: every module is populated through the
 // session API and must render the state it was given, and both overlay dialogs must open and
 // close from the workspace commands.
-public class DemoFlowRenderTests
+public sealed class DemoFlowRenderTests : IDisposable
 {
     private const string Elw = "Florian Musterstadt 11/1";
     private const string Lf = "Florian Musterstadt 40/1";
     private const string Lf2 = "Florian Musterstadt 41/1";
     private const string Dlk = "Florian Musterstadt 30/1";
+    private const string Musterdorf = "Florian Musterdorf 42/1";
+
+    private readonly string _dir = Directory.CreateTempSubdirectory("lagebuch-demo-").FullName;
+    private readonly HttpClient _http = new();
+
+    public void Dispose()
+    {
+        _http.Dispose();
+        Directory.Delete(_dir, recursive: true);
+    }
 
     private sealed class DemoRecent : IRecentFilesStore
     {
@@ -117,6 +129,19 @@ public class DemoFlowRenderTests
     private static void SelectTab(Window window, string header) =>
         WorkspaceRenderHelper.SelectTab(window, header);
 
+    private static void SelectModuleTab(Window window, string railHeader, string tabHeader) =>
+        WorkspaceRenderHelper.SelectModuleTab(window, railHeader, tabHeader);
+
+    private static Guid AddNode(
+        LocalIncidentSession session, CommandNodeKind kind, string name, string? auftrag, Funkgruppen? funkgruppen = null)
+    {
+        session.AddCommandNode(kind, name, auftrag: auftrag, funkgruppen: funkgruppen);
+        return session.Incident.CommandNodes[^1].Id;
+    }
+
+    private static Guid Unit(LocalIncidentSession session, string callSign) =>
+        session.Incident.Forces.Single(f => f.CallSign == callSign).Id;
+
     [AvaloniaFact]
     public void Home_screen_lists_recent_incidents()
     {
@@ -168,8 +193,13 @@ public class DemoFlowRenderTests
                 t.Id, t.Title, t.Items.Select(i => (i.Text, i.IsMandatory)).ToList())).ToList(),
             new IncidentNumber("B 1.2 260622 0042"),
             keyword: "B 3 – Zimmerbrand");
-        session.SetAddress("Hauptstraße 12", "Musterstadt");
+        session.SetAddress("Hauptstraße", null, "12", "12345", "Musterstadt");
         var ticker = new ManualTicker();
+
+        // The made-up Kartenpaket the Lagekarte tests use, so the Lagekarte frame shows a map
+        // without any real OSM data in it.
+        var regions = Path.Join(_dir, "regions");
+        FictionalRegionPack.Install(regions);
         var vm = new IncidentWorkspaceViewModel(
             session,
             clock,
@@ -177,7 +207,8 @@ public class DemoFlowRenderTests
             md,
             new FakeDialogs(),
             new NoopAlarmService(),
-            new NoopIncidentHostController());
+            new NoopIncidentHostController(),
+            mapPacks: new RegionPackLibrary(_http, regions));
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = RenderWidth, Height = RenderHeight };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -204,18 +235,18 @@ public class DemoFlowRenderTests
         // 3) ETB: the first minutes of the incident.
         session.AddJournalEntry(EtbDirection.Incoming, "Alarmierung B 3 Zimmerbrand, Hauptstraße 12, Rauch aus dem 2. OG, Personen vermutlich noch im Gebäude", "ILS", Elw);
         clock.Now = clock.Now.AddMinutes(4);
-        session.AssignRole("EL", "Mustermann, Max", callSign: Elw, from: clock.Now, phone: AnonymizedExampleData.PhoneNumber);
+        session.AssignRole("EL", "Mustermann, Max", callSign: Elw, from: clock.Now, phone: AnonymizedExampleData.PhoneNumber, slot: RoleSlot.Leiter);
         session.AssignRole("AS-Überwachung", "Wagner, Tobias", from: clock.Now);
         clock.Now = clock.Now.AddMinutes(2);
-        session.AddForceUnit("FF Musterstadt", 9, Lf, "Im Einsatz", "Innenangriff", scbaCount: 4, officerCount: 1);
-        session.AddForceUnit("FF Musterstadt", 9, Lf2, "Im Einsatz", "Wasserversorgung", scbaCount: 2, officerCount: 1);
-        session.AddForceUnit("FF Musterstadt", 3, Dlk, "Im Einsatz", "Menschenrettung über DLK", scbaCount: 1, officerCount: 1);
+        session.AddForceUnit("FF Musterstadt", 9, Lf, "Im Einsatz", "Innenangriff", scbaCount: 4, officerCount: 1, vehicleType: "HLF");
+        session.AddForceUnit("FF Musterstadt", 9, Lf2, "Im Einsatz", "Wasserversorgung", scbaCount: 2, officerCount: 1, vehicleType: "LF");
+        session.AddForceUnit("FF Musterstadt", 3, Dlk, "Im Einsatz", "Menschenrettung über DLK", scbaCount: 1, officerCount: 1, vehicleType: "DLK");
         session.AddJournalEntry(EtbDirection.Outgoing, "Lagemeldung: Zimmerbrand im 2. OG, Menschenrettung über DLK eingeleitet, Innenangriff mit 1 Trupp", Elw, "ILS");
         clock.Now = clock.Now.AddMinutes(3);
         session.AddJournalEntry(EtbDirection.Incoming, "Person aus dem 2. OG über DLK gerettet, Übergabe an RD", Dlk, Elw);
         session.AddJournalEntry(EtbDirection.Outgoing, "Nachforderung: 1 LF zur Ablösung, RD zur Absicherung", Elw, "ILS");
         clock.Now = clock.Now.AddMinutes(2);
-        session.AddForceUnit("FF Musterdorf", 9, "Florian Musterdorf 42/1", "Auf Anfahrt", null, scbaCount: 4, officerCount: 1);
+        session.AddForceUnit("FF Musterdorf", 9, Musterdorf, "Auf Anfahrt", null, scbaCount: 4, officerCount: 1, vehicleType: "LF");
         session.AddJournalEntry(EtbDirection.Incoming, "Florian Musterdorf 42/1 alarmiert, ETA 8 Minuten", "ILS", Elw);
         ticker.Pulse();
 
@@ -223,7 +254,52 @@ public class DemoFlowRenderTests
         Assert.True(vm.Etb.Entries.Count(e => e.DirectionValue != EtbDirection.System) >= 5);
         Capture(window, "etb.png");
 
-        // 4) Kräfte: four units, one still on its way.
+        // 3b) Lagemeldung: the next report to the ILS, drafted from the Einsatz, beside the
+        //     Buchstabier-Helfer. Back to the journal afterwards, so the PDF frame shows the ETB.
+        session.AddSituationReport(
+            Elw,
+            "Hauptstraße 12",
+            "Zimmerbrand 2. OG, eine Person über DLK gerettet und an den RD übergeben",
+            "Innenangriff mit 1 Trupp unter PA, Wasserversorgung aufgebaut",
+            "FF Musterstadt, FF Musterdorf auf Anfahrt",
+            "1 RTW zur Absicherung");
+        SelectModuleTab(window, "ETB", "LAGEMELDUNG");
+        vm.SituationReports.SelectedReport = vm.SituationReports.Reports.Single();
+        vm.SituationReports.Helper.Input = "Hauptstraße";
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(session.Incident.SituationReports);
+        Capture(window, "lagemeldung.png");
+        SelectModuleTab(window, "ETB", "EINSATZTAGEBUCH");
+
+        // 4) Führung → Organisation: the Führungsorganisation as the A3 sheet draws it, with the
+        //    Einsatzleitung, two Abschnitte, a Bereitstellung, the Rettungsdienst and the units.
+        session.UpdateLeadershipPost(
+            "Hauptstraße 10", Elw, null, new Funkgruppen(["FW_MUSTER 1000"], ["301_F"]), Elw);
+        session.SetDispatchChannel("TMO FW_MUSTER");
+        var innen = AddNode(
+            session,
+            CommandNodeKind.Abschnitt,
+            "Abschnitt 1 Innenangriff",
+            "Brandbekämpfung 2. OG, Menschenrettung",
+            new Funkgruppen(["FW_MUSTER 1000"], ["301_F"]));
+        var wasser = AddNode(
+            session,
+            CommandNodeKind.Abschnitt,
+            "Abschnitt 2 Wasserversorgung",
+            "Wasserversorgung vom Hydranten Hauptstraße",
+            new Funkgruppen(["FW_MUSTER 1000"], null));
+        var bereitstellung = AddNode(session, CommandNodeKind.Bereitstellung, "Bereitstellung Marktplatz", "Nachrückende Kräfte sammeln");
+        AddNode(session, CommandNodeKind.Partner, "Rettungsdienst", null, new Funkgruppen(["RD_MUSTER 1001"], null));
+        session.MoveForceUnit(Unit(session, Lf), innen);
+        session.MoveForceUnit(Unit(session, Dlk), innen);
+        session.MoveForceUnit(Unit(session, Lf2), wasser);
+        session.MoveForceUnit(Unit(session, Musterdorf), bereitstellung);
+        session.AssignRole("EAL", "Schmidt, Anna", callSign: Lf, from: clock.Now, nodeId: innen, slot: RoleSlot.Leiter);
+        session.AssignRole("EAL", "Becker, Jonas", callSign: Lf2, from: clock.Now, nodeId: wasser, slot: RoleSlot.Leiter);
+        SelectTab(window, "ORGANISATION");
+        Capture(window, "fuehrung.png");
+
+        // 4b) Kräfte: four units, one still on its way, each in its Abschnitt.
         SelectTab(window, "KRÄFTE");
         Assert.Equal(4, vm.Forces.Forces.Count);
         Capture(window, "kraefte.png");
@@ -235,8 +311,28 @@ public class DemoFlowRenderTests
 
         // 6) Funktionen.
         SelectTab(window, "FUNKTIONEN");
-        Assert.Equal(2, vm.Roles.Roles.Count);
+        Assert.Equal(4, vm.Roles.Roles.Count);
         Capture(window, "funktionen.png");
+
+        // 6b) Lagekarte: the Einsatzstelle on the made-up Kartenpaket's Marktplatz, the units as
+        //     taktische Zeichen around it, and the hydrants close by.
+        session.SetIncidentLocation(FictionalRegionPack.Musterstrasse1);
+        session.PlaceForceUnit(Unit(session, Lf), new GeoPoint(48.1789, 11.2549));
+        session.PlaceForceUnit(Unit(session, Dlk), new GeoPoint(48.1781, 11.2549));
+        session.PlaceForceUnit(Unit(session, Lf2), new GeoPoint(48.1778, 11.2531));
+        SelectTab(window, "LAGEKARTE");
+        Assert.True(SpinWait.SpinUntil(
+            () =>
+            {
+                Dispatcher.UIThread.RunJobs();
+                return vm.Lagekarte.WaterPoints is not null || vm.Lagekarte.WaterPointsError is not null;
+            },
+            TimeSpan.FromSeconds(10)));
+        vm.Lagekarte.Map.ChangeViewCommand.Execute(new MapViewChange(FictionalRegionPack.Musterstrasse1, 17));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Null(vm.Lagekarte.WaterPointsError);
+        Assert.Equal(5, vm.Lagekarte.WaterPoints?.Count);
+        Capture(window, "lagekarte.png");
 
         // 7) Atemschutz: Trupp 1 started at t0 and past its 30 minutes (Rückzugsalarm), Trupp 2
         //    started 20 minutes later and still counting down, Trupp 3 waiting. Driven through the
@@ -319,9 +415,19 @@ public class DemoFlowRenderTests
         session.AddInvolvedParty("Musterfrau, Maria", "01 71 / 8 76 54 32", "Bewohnerin 2. OG, über DLK gerettet, Übergabe an RD");
         session.AddInvolvedParty("Mustermann, Otto", "01 71 / 9 87 65 43", "Nachbar, hat die Feuerwehr alarmiert");
         session.AddInvolvedParty("POK Beispiel", null, "Polizei vor Ort, Streife 12/3");
+        session.SetInvolvedPartyWhereabouts(session.Incident.InvolvedParties[0].Id, "RTW Rotkreuz Musterstadt 71/1");
         SelectTab(window, "BETEILIGTE");
         Assert.Equal(3, session.Incident.InvolvedParties.Count);
         Capture(window, "beteiligte.png");
+
+        // 10b) Ausgabe: what was handed out at the Einsatzstelle, and to whom; one Gerät is back.
+        session.IssueItem("Mobilteil 1", "POK Beispiel", null, "Polizei, Streife 12/3", null);
+        session.IssueItem("Weste Presse", "Mustermann, Paul", "01 71 / 2 34 56 78", "Musterstädter Tagblatt", null);
+        session.IssueItem("Fernglas", "Schmidt, Anna", null, "EAL Abschnitt 1", "Dachbeobachtung");
+        session.ReturnIssuedItem(session.Incident.IssuedItems[2].Id);
+        SelectTab(window, "AUSGABE");
+        Assert.Equal(3, session.Incident.IssuedItems.Count);
+        Capture(window, "ausgabe.png");
 
         // 11) PDF export: the section picker that precedes the report.
         SelectTab(window, "ETB");
