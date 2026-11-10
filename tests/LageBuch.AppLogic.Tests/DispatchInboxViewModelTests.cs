@@ -75,6 +75,22 @@ public sealed class DispatchInboxViewModelTests : IDisposable
     }
 
     [Fact]
+    public void A_vehicle_the_funkrufnamen_abbreviate_starts_ticked_through_its_place_name()
+    {
+        Drop();
+        var masterData = new VehicleMasterData
+        {
+            Vehicles = [new Vehicle("MST Wache 2", "MST 2/40/1", 9)],
+            PlaceNames = [new DispatchPlaceName("Musterstadt", "MST")],
+        };
+
+        var inbox = new DispatchInboxViewModel(_store, masterData, new FakeDialogs(), new FixedClock(Now), _ticker, zone: Cet);
+
+        Assert.Equal([false, false, true], inbox.Offer?.Units.Select(u => u.IsSelected));
+        Assert.Equal("MST 2/40/1", inbox.Offer?.Units[2].Vehicle?.CallSign);
+    }
+
+    [Fact]
     public void The_import_carries_the_units_as_ticked_right_now()
     {
         Drop();
@@ -577,7 +593,11 @@ public sealed class DispatchInboxViewModelTests : IDisposable
 
     private sealed class VehicleMasterData : IMasterDataProvider
     {
-        public MasterDataSet Get() => MasterDataSet.Empty with { Vehicles = [Hlf] };
+        public IReadOnlyList<Vehicle> Vehicles { get; init; } = [Hlf];
+
+        public IReadOnlyList<DispatchPlaceName> PlaceNames { get; init; } = [];
+
+        public MasterDataSet Get() => MasterDataSet.Empty with { Vehicles = Vehicles, DispatchPlaceNames = PlaceNames };
 
         public void Save(MasterDataSet set)
         {

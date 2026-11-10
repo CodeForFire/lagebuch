@@ -193,7 +193,7 @@ public class MasterDataEditorViewModelTests
         Assert.Equal(
             new[]
             {
-                "Einstellungen", "Navigation", "Einheiten-Status",
+                "Einstellungen", "Navigation", "Alarmierung", "Einheiten-Status",
                 "Fahrzeuge", "Funkgruppen", "Geräte", "Links", "Messgase", "Objekte", "Ortsteile", "Personal", "Rollen", "Stichwörter",
                 "Straßen", "Textbausteine", "Trupp-Typen",
             },

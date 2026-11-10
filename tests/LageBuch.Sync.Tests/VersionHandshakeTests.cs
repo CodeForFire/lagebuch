@@ -375,7 +375,16 @@ public class VersionHandshakeTests
     {
         // 40 lets a client send setDispatchChannel and setLagefuehrung (#926), which a host at 39
         // does not know: a 39 and a 40 must not connect.
-        Assert.Equal(40, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 40, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 40, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_alarm_place_names_raise_the_protocol_but_not_the_floor()
+    {
+        // 41 adds dispatchPlaceNames to /masterdata. A peer at 40 drops the key and only loses the
+        // pre-ticked Einsatzmittel of an alarm, so a 40 and a 41 still connect.
+        Assert.Equal(41, SyncProtocol.ProtocolVersion);
         Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
     }
 }

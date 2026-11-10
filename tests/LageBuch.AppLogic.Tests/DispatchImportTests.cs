@@ -42,6 +42,129 @@ public class DispatchImportTests
         Assert.Null(DispatchImport.Match(requested, [Hlf, Dlk]));
     }
 
+    // The Leitstelle writes the place out, the Funkrufnamen abbreviate it.
+    private static readonly Vehicle MstHlf = new("MST Wache 2", "MST 2/40/1", 9, VehicleType: "HLF 20");
+    private static readonly Vehicle Nachbar = new("Beispielried", "Beispielried 43/2", 9);
+    private static readonly DispatchPlaceName Mst = new("Musterstadt", "MST");
+
+    [Theory]
+    [InlineData("Florian Musterstadt 2/40/1")]
+    [InlineData("florian MUSTERSTADT 2/40/1")]
+    public void A_place_name_turns_the_alarmed_name_into_the_abbreviated_funkrufname(string requested)
+    {
+        Assert.Same(MstHlf, DispatchImport.Match(requested, [MstHlf, Nachbar], [Mst]));
+    }
+
+    [Fact]
+    public void Without_the_place_name_the_abbreviated_vehicle_is_not_found()
+    {
+        Assert.Null(DispatchImport.Match("Florian Musterstadt 2/40/1", [MstHlf, Nachbar]));
+    }
+
+    // Only a whole word is a place: "Musterstadtwald" is another Ort.
+    [Fact]
+    public void A_place_name_inside_a_longer_word_is_left_alone()
+    {
+        Assert.Null(DispatchImport.Match("Florian Musterstadtwald 2/40/1", [MstHlf], [Mst]));
+    }
+
+    // "Musterstadt Nord" is its own Feuerwehr, and must not become "MST Nord".
+    [Fact]
+    public void The_longest_place_name_wins()
+    {
+        var nord = new Vehicle("Nord", "MSN 40/1", 9);
+
+        var found = DispatchImport.Match("Florian Musterstadt Nord 40/1", [MstHlf, nord], [Mst, new DispatchPlaceName("Musterstadt Nord", "MSN")]);
+
+        Assert.Same(nord, found);
+    }
+
+    // The numbers alone never decide: Beispielried 43/2 is not Olching's 43/2.
+    [Fact]
+    public void Another_ort_with_the_same_number_still_finds_nothing()
+    {
+        Assert.Null(DispatchImport.Match("Florian Andersdorf 43/2", [MstHlf, Nachbar], [Mst]));
+    }
+
+    [Fact]
+    public void A_place_at_the_start_of_the_name_is_abbreviated_too()
+    {
+        Assert.Same(MstHlf, DispatchImport.Match("Musterstadt 2/40/1", [MstHlf], [Mst]));
+    }
+
+    // A blank entry would match at every word (or wipe the place out); it is passed over.
+    [Fact]
+    public void A_place_name_entry_with_a_blank_field_is_ignored()
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+
+        var found = DispatchImport.Match("Florian Musterstadt 2/40/1", [full], [new DispatchPlaceName(" ", "MST"), new DispatchPlaceName("Musterstadt", " ")]);
+
+        Assert.Same(full, found);
+    }
+
+    // A place name is entered for the abbreviated vehicles; one kept under its full Funkrufname
+    // must still be found.
+    [Theory]
+    [InlineData("Florian Musterstadt 2/40/1")]
+    [InlineData("2/40/1")]
+    public void A_vehicle_under_its_full_funkrufname_still_matches_once_a_place_name_is_entered(string requested)
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+
+        Assert.Same(full, DispatchImport.Match(requested, [full, Nachbar], [Mst]));
+    }
+
+    // An exact name still beats a vehicle the name only ends in.
+    [Fact]
+    public void The_full_funkrufname_exactly_beats_an_abbreviated_one_it_ends_in()
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+
+        Assert.Same(full, DispatchImport.Match("Florian Musterstadt 2/40/1", [full, MstHlf], [Mst]));
+    }
+
+    // The written name is one vehicle, the abbreviated name another: a wrong tick is worse
+    // than none.
+    [Fact]
+    public void The_written_and_the_abbreviated_name_naming_two_vehicles_is_ambiguous()
+    {
+        var full = new Vehicle("Wache 2", "Florian Musterstadt 2/40/1", 9);
+        var abbreviated = new Vehicle("Wache 2", "Florian MST 2/40/1", 9);
+
+        Assert.Null(DispatchImport.Match("Florian Musterstadt 2/40/1", [full, abbreviated, MstHlf], [Mst]));
+    }
+
+    [Fact]
+    public void The_written_and_the_abbreviated_name_ending_two_vehicles_is_ambiguous()
+    {
+        var full = new Vehicle("Wache 2", "Musterstadt 2/40/1", 9);
+
+        Assert.Null(DispatchImport.Match("Florian Musterstadt 2/40/1", [full, MstHlf], [Mst]));
+    }
+
+    // Stammdaten from an import or a sync peer are hostile input. Each entry rewriting the output
+    // of the one before doubled the name per entry: forty chained entries are 2^40 words. One
+    // pass over the alarm's own words applies the first entry only.
+    [Fact]
+    public void Chained_place_names_are_applied_once_and_never_to_their_own_output()
+    {
+        var chain = Enumerable.Range(0, 40).Select(i => new DispatchPlaceName($"P{i}", $"P{i + 1} P{i + 1}")).ToList();
+        var once = new Vehicle("Wache", "P1 P1 40/1", 9);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var found = DispatchImport.Match("Florian P0 40/1", [once], chain);
+
+        Assert.Same(once, found);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(1), $"took {watch.Elapsed}");
+    }
+
+    [Fact]
+    public void A_nachbarwehr_still_matches_by_its_own_name()
+    {
+        Assert.Same(Nachbar, DispatchImport.Match("Florian Beispielried 43/2", [MstHlf, Nachbar], [Mst]));
+    }
+
     [Fact]
     public void A_short_name_that_ends_two_vehicles_matches_neither()
     {

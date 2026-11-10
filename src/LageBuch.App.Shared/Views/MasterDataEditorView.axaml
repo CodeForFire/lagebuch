@@ -857,6 +857,47 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Alarmierung: how the alarm mail spells a place the Funkrufnamen abbreviate. Two
+                   columns and a remove button; the order means nothing, so rows do not move. -->
+              <DataTemplate x:DataType="vm:DispatchPlaceNamesSection">
+                <DockPanel Classes="add-below">
+                  <TextBlock x:Name="DispatchPlaceNamesHint" DockPanel.Dock="Top" Classes="secondary" FontSize="12"
+                             TextWrapping="Wrap" Margin="0,0,0,10"
+                             Text="Schreibt die Leitstelle einen Ort aus, den die Funkrufnamen abkürzen, findet die Alarm-Mail ihre Fahrzeuge hiermit: „Florian Musterstadt 2/40/1“ wird zu „MST 2/40/1“." />
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="ORT IN DER ALARMIERUNG" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="KÜRZEL IM FUNKRUFNAMEN" Classes="overline" FontSize="10" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DispatchPlaceNameRow">
+                          <Grid ColumnDefinitions="*,*,32" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.DispatchPlaceNamePlaceholder}"
+                                     MaxLength="{x:Static md:DispatchPlaceName.MaxLength}"
+                                     Text="{Binding Name}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.DispatchPlaceAbbreviationPlaceholder}"
+                                     MaxLength="{x:Static md:DispatchPlaceName.MaxLength}"
+                                     Text="{Binding Abbreviation}" Margin="0,0,6,0" />
+                            <!-- ReflectionBinding: see the Links rows. -->
+                            <Button Grid.Column="2" Classes="icon-btn" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Vehicles editor (#76): Wache + Funkrufname + Fahrzeugtyp + Fahrzeugtelefon + E-Mail + Sitzplätze. -->
               <DataTemplate x:DataType="vm:VehiclesSection">
                 <DockPanel Classes="add-below">

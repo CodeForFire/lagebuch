@@ -105,6 +105,20 @@ public sealed class MasterDataStore
                 });
         }
 
+        Run(cn, tx, "DELETE FROM md_dispatch_place_names;", _ => { });
+        foreach (var d in set.DispatchPlaceNames)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_dispatch_place_names (name, abbreviation) VALUES ($n,$a);",
+                p =>
+                {
+                    p("$n", d.Name);
+                    p("$a", d.Abbreviation);
+                });
+        }
+
         Run(cn, tx, "DELETE FROM md_trupp_types;", _ => { });
         foreach (var t in set.TruppTypes)
         {
@@ -364,6 +378,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL DEFAULT '', place TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
+            CREATE TABLE IF NOT EXISTS md_dispatch_place_names (name TEXT NOT NULL, abbreviation TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT, vehicle_type TEXT);
             CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT, is_favorite INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS md_gases (name TEXT NOT NULL, unit TEXT NOT NULL DEFAULT '', direction INTEGER NOT NULL DEFAULT 0, elevated TEXT, dangerous TEXT, lethal TEXT, plausible_up_to TEXT);
@@ -695,6 +710,7 @@ public sealed class MasterDataStore
             ReadTruppTypes(cn),
             ReadPersonnel(cn),
             ReadVehicles(cn),
+            ReadDispatchPlaceNames(cn),
             ReadTextSnippets(cn),
             ReadPremises(cn),
             ReadDevices(cn),
@@ -849,6 +865,20 @@ public sealed class MasterDataStore
         while (r.Read())
         {
             list.Add(new Link(r.GetString(0), r.GetString(1), r.GetString(2)));
+        }
+
+        return list;
+    }
+
+    private static List<DispatchPlaceName> ReadDispatchPlaceNames(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT name, abbreviation FROM md_dispatch_place_names ORDER BY rowid;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<DispatchPlaceName>();
+        while (r.Read())
+        {
+            list.Add(new DispatchPlaceName(r.GetString(0), r.GetString(1)));
         }
 
         return list;

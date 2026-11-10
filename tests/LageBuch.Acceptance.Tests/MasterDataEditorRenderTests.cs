@@ -31,6 +31,7 @@ public class MasterDataEditorRenderTests
                 new Role("ZF"),
                 new Role("GF"),
             },
+            DispatchPlaceNames = new[] { new DispatchPlaceName("Musterstadt", "MST") },
             TalkGroups = new[]
             {
                 new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle", IsFavorite: true),
@@ -119,8 +120,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 13 data categories, and this fixture's 2.
-        Assert.Equal(16, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 15 data categories, and this fixture's 2.
+        Assert.Equal(17, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -714,6 +715,37 @@ public class MasterDataEditorRenderTests
         Assert.Equal(RoleUniqueness.UniquePerSection, section.Rows[0].Uniqueness);
     }
 
+    // The alarm's place names: the place as the Leitstelle writes it and the Funkrufnamen's short form.
+    [AvaloniaFact]
+    public void Alarmierung_section_renders_place_and_abbreviation_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = (DispatchPlaceNamesSection)vm.Sections.Single(s => s.Title == "Alarmierung");
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "DispatchPlaceNamesHint").IsEffectivelyVisible);
+        var boxes = view.GetVisualDescendants().OfType<TextBox>().Where(t => t.Text is "Musterstadt" or "MST").ToList();
+        Assert.Equal(2, boxes.Count);
+
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+            using var frame = window.CaptureRenderedFrame()!;
+            frame.SavePng(Path.Join(dir, "master-data-editor-alarmierung.png"));
+        }
+
+        boxes.Single(t => t.Text == "MST").Text = "MSTD";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("MSTD", section.ToValues().Single().Abbreviation);
+        Assert.True(vm.IsDirty);
+    }
+
     [AvaloniaFact]
     public void Links_section_renders_name_and_url_per_row()
     {
@@ -1019,7 +1051,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(16, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(17, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -1079,7 +1111,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(16, rows.Length);
+        Assert.Equal(17, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";
@@ -1100,7 +1132,7 @@ public class MasterDataEditorRenderTests
         var view = new MasterDataEditorView { DataContext = vm };
 
         // Tall enough for every category and this fixture's two Checklisten; grows with the rail.
-        var window = new Window { Content = view, Width = 1080, Height = 1250 };
+        var window = new Window { Content = view, Width = 1080, Height = 1310 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 

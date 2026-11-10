@@ -46,6 +46,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private PremisesSection _premises = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
+    private DispatchPlaceNamesSection _dispatchPlaceNames = null!;
     private StreetsSection _streets = null!;
     private TalkGroupsSection _talkGroups = null!;
     private GasesSection _gases = null!;
@@ -280,6 +281,10 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged, RequestConfirm),
             _talkGroups = new TalkGroupsSection("Funkgruppen", set.TalkGroups, MarkDirty, RequestConfirm),
 
+            // How the alarm mail spells a place the Funkrufnamen abbreviate, so its Einsatzmittel
+            // find their vehicles.
+            _dispatchPlaceNames = new DispatchPlaceNamesSection("Alarmierung", set.DispatchPlaceNames, MarkDirty, RequestConfirm),
+
             // The gases the Gasmessung records (#410), copied into an Einsatz by its first Haus.
             _gases = new GasesSection("Messgase", set.Gases, OnGasesChanged, RequestConfirm),
         };
@@ -420,6 +425,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
+        DispatchPlaceNames = _dispatchPlaceNames.ToValues(),
         TalkGroups = _talkGroups.ToValues(),
         Gases = _gases.ToValues(),
         Settings = _settings.ToSettings(),

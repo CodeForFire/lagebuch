@@ -15,6 +15,9 @@ Einsatz schon ausgefüllt:
   alarmierten Einsatzmitteln.
 - **Kräfte:** die angehakten Einsatzmittel. Vorangehakt sind alle, deren Funkrufname einem Fahrzeug
   aus den Stammdaten entspricht; sie übernehmen Wache, Fahrzeugtyp und Sitzplätze von dort.
+  Kürzen die Funkrufnamen den Ort ab („FFB 2/40/1“ statt „Florian Fürstenfeldbruck 2/40/1“), in
+  den Stammdaten unter **Alarmierung** den Ort und sein Kürzel eintragen: `Fürstenfeldbruck` →
+  `FFB`. Ein Eintrag genügt für alle Fahrzeuge dieses Orts.
 
 **VERWERFEN** legt keinen Einsatz an. Dieser Alarm wird danach nicht mehr angeboten.
 

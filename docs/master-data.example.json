@@ -101,6 +101,9 @@
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true, "phone": "01 71 / 2 34 56 78", "email": "kdow@ff-musterstadt.example", "vehicleType": "KdoW" },
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false, "vehicleType": "LF" }
   ],
+  "dispatchPlaceNames": [
+    { "name": "Musterstadt", "abbreviation": "MST" }
+  ],
   "talkGroups": [
     { "name": "FW_MUSTER", "number": "1000", "kind": "tmo", "note": "Einsatzstelle", "favorite": true },
     { "name": "RD_MUSTER", "number": "1001", "kind": "tmo", "note": null, "favorite": false },

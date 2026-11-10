@@ -1,0 +1,1 @@
+Alarmierung: a new Stammdaten section lists the places the Funkrufnamen abbreviate ("Fürstenfeldbruck" → "FFB"), so an alarmed "Florian Fürstenfeldbruck 2/40/1" now finds and pre-ticks the vehicle "FFB 2/40/1".

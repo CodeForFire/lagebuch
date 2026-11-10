@@ -233,8 +233,13 @@ public static class SyncProtocol
     /// floor rises to 40. The snapshot carries an optional <c>dispatchChannel</c> and
     /// <c>lagefuehrungNodeId</c>.
     /// </para>
+    /// <para>
+    /// 41: the Stammdaten carry <c>dispatchPlaceNames</c>, the place names the alarm import matches
+    /// Funkrufnamen through. A peer at 40 drops the key and reads none, which only costs it the
+    /// pre-ticked Einsatzmittel of an alarm, so the floor stays at 40.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 40;
+    public const int ProtocolVersion = 41;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
