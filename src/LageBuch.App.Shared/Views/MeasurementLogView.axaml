@@ -1068,7 +1068,7 @@
                     </ComboBox>
                   </HeaderedContentControl>
                   <HeaderedContentControl Classes="field suggest" Header="QUELLE">
-                    <AutoCompleteBox x:Name="WeatherSourceBox" Classes="w-m" Text="{Binding WeatherSource}"
+                    <AutoCompleteBox x:Name="WeatherSourceBox" Classes="w-l" Text="{Binding WeatherSource}"
                                      ItemsSource="{x:Static vm:MeasurementLogViewModel.WeatherSourceSuggestions}"
                                      FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                      MaxLength="{x:Static vm:MeasurementLogViewModel.MaxSourceLength}"
@@ -1077,8 +1077,16 @@
                 </WrapPanel>
                 <TextBlock x:Name="WeatherErrorText" Classes="field-error" TextWrapping="Wrap" Text="{Binding WeatherError}"
                            IsVisible="{Binding WeatherError, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                <Button x:Name="AddWeatherButton" Classes="signal dock-action" Content="WETTER ERFASSEN"
-                        HorizontalAlignment="Left" Command="{Binding AddWeatherCommand}" />
+                <TextBlock x:Name="DwdNoteText" TextWrapping="Wrap" Text="{Binding DwdNote}"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           IsVisible="{Binding DwdNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <WrapPanel ItemSpacing="8" LineSpacing="8">
+                  <Button x:Name="AddWeatherButton" Classes="signal dock-action" Content="WETTER ERFASSEN"
+                          Command="{Binding AddWeatherCommand}" />
+                  <Button x:Name="LoadDwdWeatherButton" Classes="dock-action" Content="DWD-WETTER LADEN"
+                          Command="{Binding LoadDwdWeatherCommand}" IsVisible="{Binding IsDwdAvailable}"
+                          ToolTip.Tip="Werte der nächsten DWD-Station am Einsatzort ins Formular übernehmen" />
+                </WrapPanel>
               </StackPanel>
             </Border>
             <TextBlock x:Name="WeatherEmptyText" Text="Noch keine Wetterbeobachtung."

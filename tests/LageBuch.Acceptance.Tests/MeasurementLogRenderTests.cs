@@ -10,10 +10,12 @@ using LageBuch.App.Shared.Controls;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
+using LageBuch.AppLogic.Services.Weather;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Measurements;
+using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -111,9 +113,14 @@ public class MeasurementLogRenderTests
     }
 
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace(
-        double width = 1920, double height = 1032, bool seeded = true, bool closed = false)
+        double width = 1920, double height = 1032, bool seeded = true, bool closed = false, IWeatherSource? weather = null)
     {
         var session = NewSession(seeded, closed);
+        if (weather is not null)
+        {
+            session.SetIncidentLocation(new GeoPoint(48.1785, 11.2555));
+        }
+
         var vm = new IncidentWorkspaceViewModel(
             session,
             new FixedClock(),
@@ -121,7 +128,8 @@ public class MeasurementLogRenderTests
             WorkspaceRenderHelper.MasterData() with { Gases = Gases },
             new FakeDialogs(),
             new NoopAlarmService(),
-            new NoopIncidentHostController());
+            new NoopIncidentHostController(),
+            weather: weather);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = height };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -381,6 +389,48 @@ public class MeasurementLogRenderTests
         Assert.Contains("chipon", Named<Button>(view, "MesspunkteWetterPageButton").Classes);
         Assert.DoesNotContain("chipon", Named<Button>(view, "MessreihePageButton").Classes);
         Capture(window, "messprotokoll-messpunkte-wetter.png");
+    }
+
+    private sealed class CannedWeather(WeatherReading reading) : IWeatherSource
+    {
+        public Task<WeatherReading> LoadAsync(GeoPoint at, CancellationToken cancellationToken = default) => Task.FromResult(reading);
+    }
+
+    [AvaloniaFact]
+    public void Dwd_wetter_laden_fills_the_wetter_form_and_names_the_station()
+    {
+        var reading = new WeatherReading(
+            At(8, 50), "Maisach-Galgen", 4576, 250, 16.6, 27.4, 15.2, "dry", 0, [])
+        {
+            CloudCoverPercent = 37.5,
+        };
+        var (window, vm) = ShowWorkspace(weather: new CannedWeather(reading));
+        var view = OpenLog(window);
+        ShowPage(vm.MeasurementLog, MeasurementLogPage.MesspunkteWetter);
+
+        var button = Named<Button>(view, "LoadDwdWeatherButton");
+        Assert.True(button.IsEffectivelyVisible);
+        button.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("08:50", Named<TextBox>(view, "WeatherTimeBox").Text);
+        Assert.Equal("16,6", Named<TextBox>(view, "WeatherSpeedBox").Text);
+        Assert.Equal("15,2", Named<TextBox>(view, "WeatherTemperatureBox").Text);
+        Assert.Equal("DWD Maisach-Galgen (4,6 km)", Named<AutoCompleteBox>(view, "WeatherSourceBox").Text);
+        var note = Named<TextBlock>(view, "DwdNoteText");
+        Assert.True(note.IsEffectivelyVisible);
+        Assert.StartsWith("DWD-Station Maisach-Galgen (4,6 km) · Stand 08:50", note.Text, StringComparison.Ordinal);
+        Capture(window, "messprotokoll-dwd-wetter.png");
+    }
+
+    [AvaloniaFact]
+    public void Without_a_weather_source_the_wetter_form_has_no_dwd_button()
+    {
+        var (window, vm) = ShowWorkspace();
+        var view = OpenLog(window);
+        ShowPage(vm.MeasurementLog, MeasurementLogPage.MesspunkteWetter);
+
+        Assert.False(Named<Button>(view, "LoadDwdWeatherButton").IsEffectivelyVisible);
     }
 
     [AvaloniaFact]

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services.Weather;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Measurements;
@@ -36,6 +37,7 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
     private readonly Action _onChanged;
     private readonly IReadOnlyList<GasDefinition>? _gases;
     private readonly Action<string, string, Action> _requestConfirm;
+    private readonly IWeatherSource? _dwd;
 
     // Set while Refresh moves the filter, which must not overwrite the form's Messpunkt.
     private bool _refreshingFilter;
@@ -52,12 +54,14 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
     /// Asks the host to confirm a removal before running it, as <see cref="IssuedItemsViewModel"/>
     /// does. Defaults to running it immediately.
     /// </param>
+    /// <param name="weather">Where the DWD weather for the Einsatzort comes from, as on the Lagekarte; null offers none.</param>
     public MeasurementLogViewModel(
         IIncidentSession session,
         IClock clock,
         Action onChanged,
         IReadOnlyList<GasDefinition>? gases = null,
-        Action<string, string, Action>? requestConfirm = null)
+        Action<string, string, Action>? requestConfirm = null,
+        IWeatherSource? weather = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clock);
@@ -67,6 +71,7 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
         _onChanged = onChanged;
         _gases = gases;
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
+        _dwd = weather;
         IsReadOnly = session.IsReadOnly;
         _newTime = MeasurementInput.TimeText(clock.Now);
         _weatherTime = _newTime;
@@ -741,8 +746,81 @@ public sealed partial class MeasurementLogViewModel : ObservableObject, INarrowA
         {
             WeatherSpeed = null;
             WeatherTemperature = null;
+            DwdNote = null;
             RefreshWeatherTime(evenIfTyped: true);
         }
+    }
+
+    /// <summary>Whether this device can fetch the DWD weather, which the Lagekarte uses too.</summary>
+    public bool IsDwdAvailable => _dwd is not null && CanEdit;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoadDwdWeatherCommand))]
+    private bool _isLoadingDwd;
+
+    /// <summary>
+    /// Which DWD station filled the form and when it measured, with any DWD warning in force;
+    /// null until the form is filled, and again once the observation is saved.
+    /// </summary>
+    [ObservableProperty]
+    private string? _dwdNote;
+
+    private bool CanLoadDwd => IsDwdAvailable && !IsLoadingDwd;
+
+    /// <summary>
+    /// Fills the Wetter form from the DWD station nearest the Einsatzort. Nothing is saved: the
+    /// Lagebuchführer checks the values against what is felt on site and saves them as any other
+    /// observation. Asked only on this press, because the request tells the weather service
+    /// roughly where the Einsatz is.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanLoadDwd))]
+    private async Task LoadDwdWeatherAsync()
+    {
+        if (_dwd is null || IsReadOnly)
+        {
+            return;
+        }
+
+        if (_session.Incident.Location is not { } at)
+        {
+            WeatherError = "Für DWD-Wetter erst den Einsatzort setzen (EINSATZDATEN).";
+            return;
+        }
+
+        IsLoadingDwd = true;
+        WeatherError = null;
+        DwdNote = null;
+        try
+        {
+            Fill(await _dwd.LoadAsync(at));
+        }
+        catch (WeatherException e)
+        {
+            WeatherError = e.Message;
+        }
+        finally
+        {
+            IsLoadingDwd = false;
+        }
+    }
+
+    private void Fill(WeatherReading reading)
+    {
+        var offset = _clock.Now.Offset;
+
+        // Set as if typed: the time is the station's, and must not follow the clock from here on.
+        WeatherTime = MeasurementInput.TimeText(reading.MeasuredAt.ToOffset(offset));
+        WeatherWind = MeasurementWeather.Wind(reading) ?? WeatherWind;
+        WeatherSpeed = MeasurementWeather.Number(reading.WindSpeedKmh);
+        WeatherTemperature = MeasurementWeather.Number(reading.TemperatureCelsius);
+        WeatherClouds = MeasurementWeather.Clouds(reading) ?? WeatherClouds;
+        WeatherPrecipitation = MeasurementWeather.Precipitation(reading);
+        WeatherSource = MeasurementWeather.Source(reading);
+
+        var note = WeatherText.Source(reading, offset) + " · prüfen, dann WETTER ERFASSEN.";
+        DwdNote = reading.Alerts.Count == 0
+            ? note
+            : note + "\n" + string.Join("\n", reading.Alerts.Select(a => WeatherText.Alert(a, offset)));
     }
 
     public ObservableCollection<MeasurementChannelRow> Channels { get; } = new();

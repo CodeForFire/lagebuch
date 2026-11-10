@@ -1166,7 +1166,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs, _masterData.Vehicles);
 
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged, _masterData.Premises, _masterData.Gases);
-        MeasurementLog = new MeasurementLogViewModel(_session, _clock, OnChanged, _masterData.Gases, RequestConfirm);
+        MeasurementLog = new MeasurementLogViewModel(_session, _clock, OnChanged, _masterData.Gases, RequestConfirm, _weather);
         MeasurementTabs = new MeasurementTabsViewModel(CoMessprotokoll, MeasurementLog, reopenMeasurementTab);
 
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged, OfferUndo);
