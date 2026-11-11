@@ -91,7 +91,101 @@ public class GasesSectionTests
         var conflicts = section.Conflicts();
 
         Assert.Contains("Messgas ohne Namen: Zeile 3", conflicts);
-        Assert.Contains("Doppelte Messgase: CO", conflicts);
+        Assert.Contains("Messgas CO ist doppelt eingetragen", conflicts);
+    }
+
+    [Fact]
+    public void Several_names_used_twice_are_named_together()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S, GasDefinition.DefaultCo, H2S);
+
+        Assert.Equal("Messgase CO, H2S sind doppelt eingetragen", Assert.Single(section.Conflicts()));
+    }
+
+    // Feedback from v0.10.0-beta.1: the only word about a duplicate was a badge at the far left of
+    // the header, so SPEICHERN looked greyed out for no reason. The rows say which, the section why.
+    [Fact]
+    public void Rows_named_twice_are_marked_and_the_others_are_not()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S, GasDefinition.DefaultCo with { Name = "co " });
+
+        Assert.Equal(new[] { true, false, true }, section.Rows.Select(r => r.HasConflict));
+    }
+
+    [Fact]
+    public void A_nameless_row_and_a_row_out_of_order_are_marked()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S with { Lethal = 1m }, GasDefinition.DefaultCo with { Name = " " }, H2S with { Name = "HCN" });
+
+        Assert.Equal(new[] { false, true, true, false }, section.Rows.Select(r => r.HasConflict));
+    }
+
+    [Fact]
+    public void The_section_says_what_to_fix_and_that_saving_waits_for_it()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S);
+        Assert.Null(section.ConflictMessage);
+
+        section.Rows[1].Name = "CO";
+
+        Assert.Equal("Messgas CO ist doppelt eingetragen\nSpeichern erst nach Korrektur möglich", section.ConflictMessage);
+        Assert.True(section.Rows[1].HasConflict);
+    }
+
+    [Fact]
+    public void Fixing_a_conflict_clears_the_marks_and_the_message()
+    {
+        var section = Section(GasDefinition.DefaultCo, GasDefinition.DefaultCo);
+        Assert.NotNull(section.ConflictMessage);
+
+        section.Rows[1].Name = "H2S";
+
+        Assert.Null(section.ConflictMessage);
+        Assert.All(section.Rows, r => Assert.False(r.HasConflict));
+    }
+
+    [Fact]
+    public void Removing_the_second_of_a_pair_clears_the_mark_on_the_first()
+    {
+        var section = Section(GasDefinition.DefaultCo, GasDefinition.DefaultCo, H2S);
+
+        section.RemoveCommand.Execute(section.Rows[1]);
+
+        Assert.False(section.Rows[0].HasConflict);
+        Assert.Null(section.ConflictMessage);
+    }
+
+    [Fact]
+    public void Marking_a_row_is_not_an_edit()
+    {
+        var changes = 0;
+        var section = new GasesSection("Messgase", [GasDefinition.DefaultCo, H2S], () => changes++);
+
+        section.Rows[1].Name = "CO";
+
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void A_save_blocked_by_a_conflict_says_why()
+    {
+        var provider = new Provider(MasterDataSet.Empty with { Gases = [GasDefinition.DefaultCo, H2S] });
+        var vm = new MasterDataEditorViewModel(provider, new FakeDialogs(), new NoFiles());
+        var gases = vm.Sections.OfType<GasesSection>().Single();
+        Assert.Equal("Keine Änderungen zu speichern", vm.SaveBlockedReason);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        gases.Rows[1].Name = "co";
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.Equal("Erst korrigieren:\nMessgas CO ist doppelt eingetragen", vm.SaveBlockedReason);
+        Assert.Contains(nameof(MasterDataEditorViewModel.SaveBlockedReason), raised);
+
+        gases.Rows[1].Name = "H2S";
+
+        Assert.True(vm.SaveCommand.CanExecute(null));
+        Assert.Null(vm.SaveBlockedReason);
     }
 
     [Fact]

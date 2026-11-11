@@ -949,6 +949,26 @@ public class MasterDataEditorViewModelTests
         Assert.Contains("Mustermann, Max", vm.PersonnelConflicts, StringComparison.Ordinal);
     }
 
+    // A greyed-out SPEICHERN names every reason in its tooltip, whichever category holds it.
+    [Fact]
+    public void A_blocked_save_names_the_vehicle_and_the_person_conflict_alike()
+    {
+        var vm = Vm(new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Vehicles = [new Vehicle("FFB Wache 1", "FFB 1/40/1", 9)],
+            Personnel = [new Person("Mustermann", "Max", "ZF", null, null, true, "max.mustermann@ff-musterstadt.example")],
+        }));
+
+        Vehicles(vm).AddCommand.Execute(null);
+        Vehicles(vm).Rows[1].Wache = "FFB Wache 1";
+        Vehicles(vm).Rows[1].CallSign = "FFB 1/40/1";
+        Personnel(vm).Rows[0].Email = "max@@ff-musterstadt.example";
+
+        Assert.NotNull(vm.VehicleConflicts);
+        Assert.NotNull(vm.PersonnelConflicts);
+        Assert.Equal($"Erst korrigieren:\n{vm.VehicleConflicts}\n{vm.PersonnelConflicts}", vm.SaveBlockedReason);
+    }
+
     // The message sits in a narrow strip; the name finds the row, the address does not.
     [Fact]
     public void The_message_names_the_person_rather_than_the_address()

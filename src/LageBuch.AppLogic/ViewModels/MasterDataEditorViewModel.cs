@@ -157,6 +157,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     [NotifyCanExecuteChangedFor(nameof(DiscardCommand))]
     private bool _isDirty;
 
@@ -180,6 +181,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     private string? _vehicleConflicts;
 
     /// <summary>
@@ -191,6 +193,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     private string? _personnelConflicts;
 
     /// <summary>
@@ -200,6 +203,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     private string? _gasConflicts;
 
     public bool HasVehicleConflicts => VehicleConflicts is not null;
@@ -207,6 +211,24 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     public bool HasPersonnelConflicts => PersonnelConflicts is not null;
 
     public bool HasGasConflicts => GasConflicts is not null;
+
+    /// <summary>
+    /// Why SPEICHERN is greyed out, for its tooltip, or <see langword="null"/> when it is not.
+    /// Feedback from v0.10.0-beta.1: a disabled button with no reason reads as a broken one.
+    /// </summary>
+    public string? SaveBlockedReason
+    {
+        get
+        {
+            if (!IsDirty)
+            {
+                return "Keine Änderungen zu speichern";
+            }
+
+            var conflicts = new[] { VehicleConflicts, PersonnelConflicts, GasConflicts }.OfType<string>().ToList();
+            return conflicts.Count == 0 ? null : string.Join("\n", conflicts.Prepend("Erst korrigieren:"));
+        }
+    }
 
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
