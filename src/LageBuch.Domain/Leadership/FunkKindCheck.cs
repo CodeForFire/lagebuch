@@ -2,14 +2,15 @@ namespace LageBuch.Domain.Leadership;
 
 /// <summary>One kind of a <see cref="FunkCheckResult"/>.</summary>
 /// <param name="IsChecked">
-/// False while either side has no Funkgruppe of this kind: not entered yet is not a mismatch.
+/// False while neither side has a Funkgruppe of this kind: nothing entered yet is not a mismatch.
+/// One side without any is checked, and a mismatch: it cannot reach the other on this kind.
 /// </param>
 /// <param name="Shared">The node's own Funkgruppen of this kind the level above has too, as the node writes them.</param>
 public sealed record FunkKindCheck(bool IsChecked, IReadOnlyList<string> Shared)
 {
     public static FunkKindCheck NotChecked { get; } = new(false, []);
 
-    /// <summary>Both sides have Funkgruppen of this kind and none in common.</summary>
+    /// <summary>The kind is checked and the two sides have none of it in common.</summary>
     public bool IsMismatch => IsChecked && Shared.Count == 0;
 
     /// <summary>

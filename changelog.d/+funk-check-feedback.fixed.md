@@ -1,0 +1,1 @@
+The Führung board's Funk-Check now flags a TMO or DMO Funkgruppe entered on only one side as not shared, and marks the Einsatzleitung Feuerwehr's own Funkgruppen against the partner Einsatzleitungen, naming any partner it shares none with.
