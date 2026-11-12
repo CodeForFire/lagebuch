@@ -144,7 +144,9 @@ public class LeadershipViewModelRefreshTests
         Assert.Same(card, vm.Sections[0]);
         Assert.Equal("Abschnitt 1 Nordost", card.Name);
         Assert.Equal("Riegelstellung", card.Auftrag);
-        Assert.Equal([new FunkgruppeLine("302_F", null)], card.DmoLines);
+
+        // The Einsatzleitung has no DMO Funkgruppe, so the Abschnitt's one is shared with nobody.
+        Assert.Equal([new FunkgruppeLine("302_F", false)], card.DmoLines);
         Assert.Same(unit, card.Units[0]);
         Assert.Equal("Abschnitt 1 Nordost", unit.NodeLabel);
     }
@@ -338,6 +340,94 @@ public class LeadershipViewModelRefreshTests
         Assert.Equal("Keine gemeinsame TMO-Funkgruppe mit Abschnitt Nord", BoardNodeCard.FunkHintOf(Result(none, shared)));
         Assert.Equal("Keine gemeinsame DMO-Funkgruppe mit Abschnitt Nord", BoardNodeCard.FunkHintOf(Result(FunkKindCheck.NotChecked, none)));
         Assert.Equal("Keine gemeinsame TMO- und DMO-Funkgruppe mit Abschnitt Nord", BoardNodeCard.FunkHintOf(Result(none, none)));
+    }
+
+    [Fact]
+    public void A_partner_on_another_tmo_with_no_dmo_on_either_side_shows_the_tmo_hint_on_both_cards()
+    {
+        // The v0.10.0-beta.1 report, literally: EL Fw on TMO A, EL RD on TMO B, no DMO anywhere.
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW_A"], null));
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        session.UpdateCommandNode(rd, "Rettungsdienst", null, null, null, null, null, new Funkgruppen(["RD_B"], null));
+        using var vm = NewVm(session);
+        var partner = Assert.Single(vm.Partners);
+
+        Assert.Equal("Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung", partner.FunkHint);
+        Assert.Equal([new FunkgruppeLine("RD_B", false)], partner.TmoLines);
+        Assert.Equal("Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung Rettungsdienst", vm.El.FunkHint);
+        Assert.Equal([new FunkgruppeLine("FW_A", false)], vm.El.TmoLines);
+    }
+
+    [Fact]
+    public void A_dmo_only_the_partner_has_is_named_on_both_cards()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], null));
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        session.UpdateCommandNode(rd, "Rettungsdienst", null, null, null, null, null, new Funkgruppen(["FW 1000"], ["305_F"]));
+        using var vm = NewVm(session);
+        var partner = Assert.Single(vm.Partners);
+
+        Assert.Equal("Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung", partner.FunkHint);
+        Assert.Equal([new FunkgruppeLine("305_F", false)], partner.DmoLines);
+        Assert.Equal("Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung Rettungsdienst", vm.El.FunkHint);
+    }
+
+    [Fact]
+    public void The_einsatzleitung_marks_a_tmo_its_partner_shares_and_follows_the_partner_away()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], null));
+        var rd = AddNode(session, CommandNodeKind.Partner, "Rettungsdienst");
+        session.UpdateCommandNode(rd, "Rettungsdienst", null, null, null, null, null, new Funkgruppen(["fw 1000"], null));
+        using var vm = NewVm(session);
+
+        Assert.Equal([new FunkgruppeLine("FW 1000", true)], vm.El.TmoLines);
+        Assert.Equal([new FunkgruppeLine("fw 1000", true)], vm.Partners[0].TmoLines);
+        Assert.Null(vm.El.FunkHint);
+
+        session.DissolveCommandNode(rd);
+
+        Assert.Equal([new FunkgruppeLine("FW 1000", null)], vm.El.TmoLines);
+        Assert.Null(vm.El.FunkHint);
+    }
+
+    [Fact]
+    public void The_einsatzleitung_is_not_marked_against_its_abschnitte()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, null, null, new Funkgruppen(["FW 1000"], ["301_F"]));
+        var nord = AddNode(session, CommandNodeKind.Abschnitt, "Nord");
+        session.UpdateCommandNode(nord, "Nord", null, null, null, null, null, new Funkgruppen(["FW 2000"], null));
+        using var vm = NewVm(session);
+
+        Assert.Equal([new FunkgruppeLine("FW 1000", null)], vm.El.TmoLines);
+        Assert.Equal([new FunkgruppeLine("301_F", null)], vm.El.DmoLines);
+        Assert.Null(vm.El.FunkHint);
+        Assert.Equal("Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung", vm.Sections[0].FunkHint);
+    }
+
+    [Fact]
+    public void The_einsatzleitungs_funk_hint_names_the_partners_of_each_kind()
+    {
+        static EinsatzleitungFunkCheck Check(string[] tmo, string[] dmo) =>
+            new(FunkKindCheck.NotChecked, FunkKindCheck.NotChecked, tmo, dmo);
+
+        Assert.Null(ElCard.FunkHintOf(null));
+        Assert.Null(ElCard.FunkHintOf(Check([], [])));
+        Assert.Equal(
+            "Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung Rettungsdienst",
+            ElCard.FunkHintOf(Check(["Rettungsdienst"], ["Rettungsdienst"])));
+        Assert.Equal(
+            "Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung Rettungsdienst und Polizei",
+            ElCard.FunkHintOf(Check(["Rettungsdienst", "Polizei"], [])));
+        Assert.Equal(
+            "Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung THW, Rettungsdienst und Polizei",
+            ElCard.FunkHintOf(Check([], ["THW", "Rettungsdienst", "Polizei"])));
+        Assert.Equal(
+            "Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung Polizei\nKeine gemeinsame DMO-Funkgruppe mit Einsatzleitung Rettungsdienst",
+            ElCard.FunkHintOf(Check(["Polizei"], ["Rettungsdienst"])));
     }
 
     [Fact]

@@ -85,11 +85,21 @@ public sealed partial class ElCard : ObservableObject
 
     public ObservableCollection<BoardPersonRow> Assistants { get; } = [];
 
-    /// <summary>The TMO Funkgruppen one per line, unmarked: the Einsatzleitung is the level the others are checked against.</summary>
+    /// <summary>
+    /// The TMO Funkgruppen one per line, marked against the live partner Einsatzleitungen: shared when
+    /// any partner has it. The Abschnitte are checked against this card, not it against them.
+    /// </summary>
     public IReadOnlyList<FunkgruppeLine> TmoLines { get; private set; } = [];
 
     /// <summary>The DMO Funkgruppen one per line, as <see cref="TmoLines"/>.</summary>
     public IReadOnlyList<FunkgruppeLine> DmoLines { get; private set; } = [];
+
+    /// <summary>
+    /// Which kind of Funkgruppe the Einsatzleitung shares none of with which partner, e.g. „Keine
+    /// gemeinsame TMO-Funkgruppe mit Einsatzleitung Rettungsdienst"; null when there is none to give.
+    /// </summary>
+    [ObservableProperty]
+    private string? _funkHint;
 
     /// <summary>
     /// Further Leiter and Melder at the Einsatzleitung beyond the posts (an EAL typed on FUNKTIONEN
@@ -100,8 +110,43 @@ public sealed partial class ElCard : ObservableObject
     /// <summary>Funkgruppen of one kind as the card shows them, one per line; null when there are none.</summary>
     internal static string? Lines(IReadOnlyList<string> groups) => groups.Count == 0 ? null : string.Join('\n', groups);
 
-    /// <summary>Takes the Einsatzleitung row of the reporting line and the incident's post.</summary>
-    public void Update(ReportingEntry entry, LeadershipPost post)
+    /// <summary>
+    /// The hint for the Einsatzleitung's <see cref="FunkCheck.OfEinsatzleitung"/>: one line per kind
+    /// naming the partners it shares none with, both kinds on one line when they miss the same
+    /// partners; null when nothing is missing.
+    /// </summary>
+    internal static string? FunkHintOf(EinsatzleitungFunkCheck? check)
+    {
+        if (check is null)
+        {
+            return null;
+        }
+
+        var tmo = check.TmoMismatchWith;
+        var dmo = check.DmoMismatchWith;
+        if (tmo.SequenceEqual(dmo, StringComparer.Ordinal))
+        {
+            return tmo.Count == 0 ? null : BoardNodeCard.FunkHintText(true, true, PartnerLabel(tmo));
+        }
+
+        string?[] lines =
+        [
+            tmo.Count == 0 ? null : BoardNodeCard.FunkHintText(true, false, PartnerLabel(tmo)),
+            dmo.Count == 0 ? null : BoardNodeCard.FunkHintText(false, true, PartnerLabel(dmo)),
+        ];
+        return string.Join('\n', lines.OfType<string>());
+    }
+
+    // "Einsatzleitung Rettungsdienst", "Einsatzleitung Rettungsdienst und Polizei", "... A, B und C".
+    private static string PartnerLabel(IReadOnlyList<string> names) =>
+        $"{CommandNodeKindLabels.Of(CommandNodeKind.Partner)} "
+        + (names.Count == 1 ? names[0] : $"{string.Join(", ", names.Take(names.Count - 1))} und {names[^1]}");
+
+    /// <summary>
+    /// Takes the Einsatzleitung row of the reporting line and the incident's post, its Funkgruppen
+    /// marked by <paramref name="funkCheck"/>; null leaves them unmarked.
+    /// </summary>
+    public void Update(ReportingEntry entry, LeadershipPost post, EinsatzleitungFunkCheck? funkCheck = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(post);
@@ -112,17 +157,19 @@ public sealed partial class ElCard : ObservableObject
         Telefon = post.Telefon;
         Tmo = Lines(post.Funkgruppen.Tmo);
         Dmo = Lines(post.Funkgruppen.Dmo);
-        if (FunkgruppeLine.Changed(TmoLines, FunkgruppeLine.Of(post.Funkgruppen.Tmo, null)) is { } tmo)
+        if (FunkgruppeLine.Changed(TmoLines, FunkgruppeLine.Of(post.Funkgruppen.Tmo, funkCheck?.Tmo)) is { } tmo)
         {
             TmoLines = tmo;
             OnPropertyChanged(nameof(TmoLines));
         }
 
-        if (FunkgruppeLine.Changed(DmoLines, FunkgruppeLine.Of(post.Funkgruppen.Dmo, null)) is { } dmo)
+        if (FunkgruppeLine.Changed(DmoLines, FunkgruppeLine.Of(post.Funkgruppen.Dmo, funkCheck?.Dmo)) is { } dmo)
         {
             DmoLines = dmo;
             OnPropertyChanged(nameof(DmoLines));
         }
+
+        FunkHint = FunkHintOf(funkCheck);
 
         Leiter = BoardPersonRow.Follow(Leiter, entry.Leiter);
         Melder = BoardPersonRow.Follow(Melder, entry.Melder);

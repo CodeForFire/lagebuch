@@ -201,7 +201,7 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
         if (line.FirstOrDefault(e => e.Kind == ReportingEntryKind.Einsatzleitung) is { } el)
         {
-            El.Update(el, incident.LeadershipPost);
+            El.Update(el, incident.LeadershipPost, FunkCheck.OfEinsatzleitung(incident));
         }
 
         var children = NodeEntries(line, e => e.Depth == 2);

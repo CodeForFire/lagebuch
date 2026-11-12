@@ -152,7 +152,9 @@ public class LeadershipViewModelTests
         Assert.Empty(staging.Units);
         Assert.Empty(staging.Children);
         Assert.False(staging.HasTmo);
-        Assert.Null(staging.FunkHint);
+
+        // A node with no Funkgruppe at all, under an Einsatzleitung that has both kinds, reaches it on neither.
+        Assert.Equal("Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung", staging.FunkHint);
 
         var card = vm.Sections[1];
         Assert.Equal("Abschnitt", card.KindLabel);
@@ -199,7 +201,10 @@ public class LeadershipViewModelTests
         Assert.Equal("Rettungsdienst", partner.Name);
         Assert.Equal([new FunkgruppeLine("RD_FFB 3000", false)], partner.TmoLines);
         Assert.False(partner.HasDmo);
-        Assert.Equal("Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung", partner.FunkHint);
+
+        // No DMO on the partner's side, while the Einsatzleitung has one, is a DMO mismatch too.
+        Assert.Equal("Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung", partner.FunkHint);
+        Assert.Equal("Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung Rettungsdienst", vm.El.FunkHint);
         Assert.Equal("Einsatzleitung", partner.KindLabel);
         Assert.Equal("Sabine Schmid", partner.Leiter?.PersonName);
 
