@@ -238,8 +238,13 @@ public static class SyncProtocol
     /// Funkrufnamen through. A peer at 40 drops the key and reads none, which only costs it the
     /// pre-ticked Einsatzmittel of an alarm, so the floor stays at 40.
     /// </para>
+    /// <para>
+    /// 42: the Stammdaten carry <c>vehicleTypeCodes</c>, the Fahrzeugkennungen a vehicle's empty
+    /// Fahrzeugtyp is filled from. A peer at 41 drops the key and reads none, which only leaves its
+    /// new vehicles to be typed by hand, so the floor stays at 40.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 41;
+    public const int ProtocolVersion = 42;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

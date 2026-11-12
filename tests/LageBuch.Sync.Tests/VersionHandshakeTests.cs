@@ -384,7 +384,16 @@ public class VersionHandshakeTests
     {
         // 41 adds dispatchPlaceNames to /masterdata. A peer at 40 drops the key and only loses the
         // pre-ticked Einsatzmittel of an alarm, so a 40 and a 41 still connect.
-        Assert.Equal(41, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 41, int.MaxValue);
+        Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
+    }
+
+    [Fact]
+    public void The_fahrzeugkennungen_raise_the_protocol_but_not_the_floor()
+    {
+        // 42 adds vehicleTypeCodes to /masterdata. A peer at 41 drops the key and only types its
+        // new vehicles by hand, so a 41 and a 42 still connect.
+        Assert.Equal(42, SyncProtocol.ProtocolVersion);
         Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
     }
 }
