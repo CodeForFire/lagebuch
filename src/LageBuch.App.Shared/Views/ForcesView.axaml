@@ -183,6 +183,16 @@
               <ComboBox x:Name="VehicleBox"
                         ItemsSource="{Binding VehicleOptions}"
                         SelectedItem="{Binding SelectedVehicle}">
+                <!-- A plain StackPanel, not the default VirtualizingStackPanel: that one measures
+                     only the rows on screen, so the open list took the width of whichever
+                     Funkrufnamen were showing and jumped when a long one scrolled in. The
+                     Stammdaten hold tens to a few hundred vehicles, few enough to realize them
+                     all, as the Stammdaten editor's lists do. -->
+                <ComboBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel />
+                  </ItemsPanelTemplate>
+                </ComboBox.ItemsPanel>
                 <ComboBox.ItemTemplate>
                   <DataTemplate x:DataType="md:Vehicle">
                     <StackPanel Orientation="Horizontal" Spacing="6">
