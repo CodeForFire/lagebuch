@@ -93,8 +93,13 @@ public sealed record GasDefinition(
     private bool UpperAlarmInOrder =>
         Direction != GasDirection.Falling
         || UpperAlarm is not { } upper
-        || ((new[] { Elevated, Dangerous, Lethal }.Max() is not { } mildest || upper > mildest)
-            && (PlausibleUpTo is not { } plausible || upper <= plausible));
+        || (IsAboveMildestBand(upper) && IsWithinPlausibleRange(upper));
+
+    private bool IsAboveMildestBand(decimal upper) =>
+        new[] { Elevated, Dangerous, Lethal }.Max() is not { } mildest || upper > mildest;
+
+    private bool IsWithinPlausibleRange(decimal upper) =>
+        PlausibleUpTo is not { } plausible || upper <= plausible;
 
     /// <summary>
     /// The same gas with every rule that cannot be trusted from outside applied: name and unit
