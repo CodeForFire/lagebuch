@@ -384,7 +384,16 @@ public class VersionHandshakeTests
     {
         // 41 adds dispatchPlaceNames to /masterdata. A peer at 40 drops the key and only loses the
         // pre-ticked Einsatzmittel of an alarm, so a 40 and a 41 still connect.
-        Assert.Equal(41, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 41, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
+    }
+
+    [Fact]
+    public void The_upper_alarm_of_a_falling_gas_raises_the_protocol_but_not_the_floor()
+    {
+        // 42 adds an optional upperAlarm to every gas definition (#927). A peer at 41 drops it and
+        // only loses the enrichment colour of its O2, so a 41 and a 42 still connect.
+        Assert.Equal(42, SyncProtocol.ProtocolVersion);
         Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
     }
 }

@@ -10,6 +10,12 @@ namespace LageBuch.Domain.CoMeasurement;
 /// Every threshold is optional. A gas without any is recorded and shown in neutral: it never earns
 /// a colour nobody configured. <see cref="PlausibleUpTo"/> only ever produces a "check this" hint,
 /// never a rejection.
+/// <para>
+/// <see cref="UpperAlarm"/> ("Anreicherung ab", #927) is the one threshold that points the other
+/// way: a falling gas -- O₂ -- is also dangerous when it climbs, enrichment being a fire hazard.
+/// It means nothing on a rising gas and is dropped there. It assumes no particular instrument: a
+/// Gastec 31B tube reads O₂ up to 24 %, so 23 Vol-% is as much its limit as a multi-gas meter's.
+/// </para>
 /// </remarks>
 public sealed record GasDefinition(
     string Name,
@@ -18,7 +24,8 @@ public sealed record GasDefinition(
     decimal? Elevated,
     decimal? Dangerous,
     decimal? Lethal,
-    decimal? PlausibleUpTo)
+    decimal? PlausibleUpTo,
+    decimal? UpperAlarm = null)
 {
     /// <summary>The longest list a brigade can keep. Enforced in the editor, on import, and on an
     /// incident's copied list arriving from a file or a sync peer.</summary>
@@ -51,8 +58,12 @@ public sealed record GasDefinition(
 
     /// <summary>Whether the thresholds that are set climb in the gas's own direction:
     /// Erhöht &lt; Gefährlich &lt; Lebensgefährlich for a rising gas, the reverse for a falling
-    /// one. Missing thresholds are skipped, so 30 / — / 800 is in order.</summary>
-    public bool ThresholdsInOrder
+    /// one. Missing thresholds are skipped, so 30 / — / 800 is in order. A falling gas's
+    /// <see cref="UpperAlarm"/> must lie above its mildest band and not beyond
+    /// <see cref="PlausibleUpTo"/>; on a rising gas it is ignored, as everywhere else.</summary>
+    public bool ThresholdsInOrder => BandsInOrder && UpperAlarmInOrder;
+
+    private bool BandsInOrder
     {
         get
         {
@@ -76,11 +87,22 @@ public sealed record GasDefinition(
         }
     }
 
+    // The mildest falling band is the highest one set: Erhöht, else Gefährlich, else
+    // Lebensgefährlich. Max rather than the first one set keeps this check independent of
+    // BandsInOrder, so Sanitized can judge the two apart.
+    private bool UpperAlarmInOrder =>
+        Direction != GasDirection.Falling
+        || UpperAlarm is not { } upper
+        || ((new[] { Elevated, Dangerous, Lethal }.Max() is not { } mildest || upper > mildest)
+            && (PlausibleUpTo is not { } plausible || upper <= plausible));
+
     /// <summary>
     /// The same gas with every rule that cannot be trusted from outside applied: name and unit
     /// trimmed and cut to their caps, an unknown direction read as rising, a negative or oversized
     /// number dropped, and thresholds that are out of order dropped altogether, so the gas falls
-    /// back to neutral rather than showing a colour it has not earned. Returns null for a gas
+    /// back to neutral rather than showing a colour it has not earned. An <see cref="UpperAlarm"/>
+    /// is kept only on a falling gas and only where it still fits the bands that are left; it is
+    /// dropped on its own, so the falling bands keep working. Returns null for a gas
     /// without a name. Used on everything an incident file or a sync peer hands over; the
     /// Stammdaten import rejects out-of-order thresholds outright instead.
     /// </summary>
@@ -92,15 +114,22 @@ public sealed record GasDefinition(
             return null;
         }
 
+        var direction = Enum.IsDefined(Direction) ? Direction : GasDirection.Rising;
         var sanitized = new GasDefinition(
             name,
             Cut(Unit, MaxUnitLength),
-            Enum.IsDefined(Direction) ? Direction : GasDirection.Rising,
+            direction,
             InRange(Elevated),
             InRange(Dangerous),
             InRange(Lethal),
-            InRange(PlausibleUpTo));
-        return sanitized.ThresholdsInOrder ? sanitized : sanitized with { Elevated = null, Dangerous = null, Lethal = null };
+            InRange(PlausibleUpTo),
+            direction == GasDirection.Falling ? InRange(UpperAlarm) : null);
+        if (!sanitized.BandsInOrder)
+        {
+            sanitized = sanitized with { Elevated = null, Dangerous = null, Lethal = null };
+        }
+
+        return sanitized.UpperAlarmInOrder ? sanitized : sanitized with { UpperAlarm = null };
     }
 
     /// <summary>Caps a list at <see cref="MaxCount"/> after sanitising each entry and dropping

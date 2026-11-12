@@ -128,7 +128,7 @@
     { "name": "CO2", "unit": "Vol-%", "direction": "steigend", "elevated": 0.5, "dangerous": 4, "lethal": 8, "plausibleUpTo": 20 },
     { "name": "H2S", "unit": "ppm", "direction": "steigend", "elevated": 5, "dangerous": 10, "lethal": 100, "plausibleUpTo": 500 },
     { "name": "CH4", "unit": "%UEG", "direction": "steigend", "elevated": 10, "dangerous": 20, "lethal": 40, "plausibleUpTo": 100 },
-    { "name": "O2", "unit": "Vol-%", "direction": "fallend", "elevated": 19, "dangerous": 17, "lethal": 10, "plausibleUpTo": 25 }
+    { "name": "O2", "unit": "Vol-%", "direction": "fallend", "elevated": 19, "dangerous": 17, "lethal": 10, "plausibleUpTo": 25, "upperAlarm": 23 }
   ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,
