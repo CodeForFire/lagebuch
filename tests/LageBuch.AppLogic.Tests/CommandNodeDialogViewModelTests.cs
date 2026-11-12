@@ -415,6 +415,10 @@ public class CommandNodeDialogViewModelTests
         vm.Fuehrungsfahrzeug = "Florian Emmering 12/1";
 
         Assert.Equal("Florian Emmering 12/1", vm.Rufname);
+        vm.SaveCommand.Execute(null);
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal(("Florian Emmering 12/1", "Florian Emmering 12/1"), (post.Fuehrungsfahrzeug, post.Rufname));
     }
 
     [Fact]

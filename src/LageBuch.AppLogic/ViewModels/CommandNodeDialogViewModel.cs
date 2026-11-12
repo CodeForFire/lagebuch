@@ -576,8 +576,10 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                     var live = Seen(string.Empty, null, post.Standort, post.Rufname, post.Telefon, post.Funkgruppen, post.Fuehrungsfahrzeug);
                     var save = Merge(typed, live);
 
-                    // A Rufname only filled in from the Fahrzeug yields to one a peer saved meanwhile.
-                    if (_rufnameFollowsFahrzeug && live.Rufname is not null)
+                    // A Rufname only filled in from the Fahrzeug yields to one a peer saved meanwhile,
+                    // never to the one the dialog opened with: clearing that is what started the following.
+                    if (_rufnameFollowsFahrzeug && live.Rufname is not null
+                        && !string.Equals(live.Rufname, _seeded.Rufname, StringComparison.Ordinal))
                     {
                         save = save with { Rufname = live.Rufname };
                     }
