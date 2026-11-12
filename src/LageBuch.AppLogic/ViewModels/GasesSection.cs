@@ -75,7 +75,7 @@ public sealed partial class GasesSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row, row.Name, AllBlank(row.Name, row.Unit) && row.Elevated is null && row.Dangerous is null && row.Lethal is null && row.PlausibleUpTo is null, () =>
+        RemoveAfterConfirm(row, row.Name, AllBlank(row.Name, row.Unit) && row.Elevated is null && row.Dangerous is null && row.Lethal is null && row.PlausibleUpTo is null && row.UpperAlarm is null, () =>
         {
             if (Rows.Remove(row))
             {
