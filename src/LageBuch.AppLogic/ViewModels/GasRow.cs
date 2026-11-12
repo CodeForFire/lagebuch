@@ -49,6 +49,11 @@ public sealed partial class GasRow : ObservableObject
     [ObservableProperty]
     private decimal? _plausibleUpTo;
 
+    /// <summary>Whether this row is one of those <see cref="GasesSection.Conflicts"/> names, so
+    /// the view can mark it. Set by the section; not an edit of its own.</summary>
+    [ObservableProperty]
+    private bool _hasConflict;
+
     /// <summary>The row as it would be saved: name and unit trimmed, nothing else touched.</summary>
     public GasDefinition ToDefinition() =>
         new((Name ?? string.Empty).Trim(), (Unit ?? string.Empty).Trim(), Direction, Elevated, Dangerous, Lethal, PlausibleUpTo);

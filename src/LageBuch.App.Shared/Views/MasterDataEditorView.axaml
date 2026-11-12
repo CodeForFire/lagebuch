@@ -73,6 +73,10 @@
       <Setter Property="Grid.Row" Value="0" />
       <Setter Property="Grid.Column" Value="1" />
     </Style>
+    <!-- A Messgas row GasesSection names as a conflict: the name is what makes it one. -->
+    <Style Selector="Grid.pick-row.invalid > TextBox.row-name">
+      <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+    </Style>
     <Style Selector="Grid.pick-row > :is(Control).row-note">
       <Setter Property="Grid.Row" Value="0" />
       <Setter Property="Grid.Column" Value="2" />
@@ -221,7 +225,8 @@
           <Button x:Name="ImportButton" Content="IMPORTIEREN" Command="{Binding ImportCommand}" />
           <Button x:Name="ExportButton" Content="EXPORTIEREN" Command="{Binding ExportCommand}" />
           <Button x:Name="DiscardButton" Content="VERWERFEN" Command="{Binding DiscardCommand}" />
-          <Button x:Name="SaveButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveCommand}" />
+          <Button x:Name="SaveButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveCommand}"
+                  ToolTip.Tip="{Binding SaveBlockedReason}" ToolTip.ShowOnDisabled="True" />
         </WrapPanel>
       </Grid>
 
@@ -1221,6 +1226,11 @@
                   <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}"
                           ToolTip.Tip="Höchstens acht Messgase" />
+                  <!-- Feedback from v0.10.0-beta.1: the header badge alone went unseen, and SPEICHERN
+                       looked greyed out for no reason. Said here, beside the rows it is about. -->
+                  <TextBlock DockPanel.Dock="Bottom" x:Name="GasSectionConflicts" Classes="field-error"
+                             TextWrapping="Wrap" Margin="0,8,0,0" Text="{Binding ConflictMessage}"
+                             IsVisible="{Binding ConflictMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   <!-- #791 review: crews know their meter's A1 / A2 / A3, not the band names. -->
                   <TextBlock x:Name="GasBandsHint" DockPanel.Dock="Top" Classes="secondary" FontSize="12"
                              TextWrapping="Wrap" Margin="0,0,0,8"
@@ -1242,17 +1252,27 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:GasRow">
-                          <Grid Classes="pick-row" ColumnDefinitions="*,Auto,32" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,6">
+                          <Grid x:Name="GasRowGrid" Classes="pick-row" Classes.invalid="{Binding HasConflict}"
+                                ColumnDefinitions="*,Auto,32" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,6">
                             <Border Grid.Row="2" Grid.ColumnSpan="3" Classes="row-rule" />
-                            <TextBox Grid.Column="0" Classes="row-name" Margin="0,0,6,0" Text="{Binding Name}"
+                            <TextBox x:Name="GasNameInput" Grid.Column="0" Classes="row-name" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="CO" MaxLength="{x:Static vm:GasRow.MaxNameLength}"
                                      AutomationProperties.Name="Name des Messgases" />
                             <WrapPanel Classes="row-extras">
                               <StackPanel Width="96">
                                 <TextBlock Classes="overline narrow-label" FontSize="10" Text="EINHEIT" />
-                                <AutoCompleteBox Margin="0,0,6,0" Text="{Binding Unit}" ItemsSource="{Binding UnitSuggestions}"
-                                                 MaxLength="{x:Static vm:GasRow.MaxUnitLength}"
-                                                 AutomationProperties.Name="Einheit des Messgases" />
+                                <!-- A dropdown like the Fahrzeugtyp's, still free text: FilterMode None
+                                     lists every unit, not just the one the row already holds. -->
+                                <Grid Margin="0,0,6,0">
+                                  <AutoCompleteBox x:Name="GasUnitInput" Text="{Binding Unit}" ItemsSource="{Binding UnitSuggestions}"
+                                                   FilterMode="None" MinimumPrefixLength="0" Padding="11,7,22,7"
+                                                   MaxLength="{x:Static vm:GasRow.MaxUnitLength}"
+                                                   AutomationProperties.Name="Einheit des Messgases" />
+                                  <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            Margin="0,0,9,0" IsHitTestVisible="False"
+                                            Foreground="{StaticResource TextMutedBrush}"
+                                            Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                                </Grid>
                               </StackPanel>
                               <StackPanel Width="124">
                                 <TextBlock Classes="overline narrow-label" FontSize="10" Text="RICHTUNG" />

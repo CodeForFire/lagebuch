@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -153,5 +155,68 @@ public class GasmessungRenderTests
             .Select(t => t.Text)
             .ToList();
         Assert.Equal(new[] { "CO", "CO2", "H2S", "CH4", "O2" }, names);
+    }
+
+    // Feedback from v0.10.0-beta.1: a second O2 greyed SPEICHERN out, and the only word about it
+    // was a badge at the far left of the header. Now the section says it, the two rows are marked
+    // and the disabled button names the reason.
+    [AvaloniaFact]
+    public void A_gas_entered_twice_is_named_in_the_section_and_on_its_rows()
+    {
+        var vm = new MasterDataEditorViewModel(new Provider(), new FakeDialogs(), new NoFiles());
+        var section = Assert.IsType<GasesSection>(vm.Sections.Single(s => s.Title == "Messgase"));
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1280, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var message = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "GasSectionConflicts");
+        Assert.False(message.IsVisible);
+
+        section.Rows[1].Name = "O2";
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "stammdaten-messgase-doppelt.png");
+
+        Assert.True(message.IsEffectivelyVisible);
+        Assert.Equal("Messgas O2 ist doppelt eingetragen\nSpeichern erst nach Korrektur möglich", message.Text);
+        var marked = view.GetVisualDescendants().OfType<Grid>()
+            .Where(g => g.Name == "GasRowGrid")
+            .Select(g => g.Classes.Contains("invalid"))
+            .ToList();
+        Assert.Equal(new[] { false, true, false, false, true }, marked);
+        var error = view.FindResource("ErrorBrush");
+        var names = view.GetVisualDescendants().OfType<TextBox>().Where(t => t.Name == "GasNameInput").ToList();
+        Assert.Same(error, names[1].BorderBrush);
+        Assert.NotSame(error, names[0].BorderBrush);
+
+        var save = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SaveButton");
+        Assert.False(save.IsEffectivelyEnabled);
+        Assert.Equal("Erst korrigieren:\nMessgas O2 ist doppelt eingetragen", ToolTip.GetTip(save));
+        Assert.True(ToolTip.GetShowOnDisabled(save));
+    }
+
+    // Feedback from v0.10.0-beta.1: the unit field looked like a plain box, though it knows ppm and
+    // Vol-%. Opened on a row that already says Vol-%, it lists every unit, not just that one.
+    [AvaloniaFact]
+    public void The_unit_field_lists_every_unit_whatever_it_already_holds()
+    {
+        var vm = new MasterDataEditorViewModel(new Provider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Messgase");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1280, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var unit = view.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "GasUnitInput").ElementAt(1);
+        Assert.Equal("Vol-%", unit.Text);
+        unit.Focus();
+        unit.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var popup = unit.GetVisualDescendants().OfType<Popup>().Single(p => p.Name == "PART_Popup");
+        var list = popup.GetLogicalDescendants().OfType<SelectingItemsControl>().Single();
+        Assert.True(unit.IsDropDownOpen);
+        Assert.Equal(GasDefinition.UnitSuggestions, list.Items.Cast<string>());
     }
 }
