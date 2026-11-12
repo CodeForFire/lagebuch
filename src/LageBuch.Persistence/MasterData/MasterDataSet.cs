@@ -43,6 +43,11 @@ public sealed record MasterDataSet(
     // Vehicles per Wache with their seat count (#76).
     IReadOnlyList<Vehicle> Vehicles,
 
+    // Fahrzeugkennungen: the middle number of a Funkrufname and the Fahrzeugtyp it stands for,
+    // "12" for the MZF in "FFB 1/12/1". Fills a vehicle's empty type where one is entered or
+    // recorded; the type is copied as text (#337), nothing points back here.
+    IReadOnlyList<VehicleTypeCode> VehicleTypeCodes,
+
     // How the Leitstelle's alarm spells a place that the Funkrufnamen above abbreviate:
     // "Florian Fürstenfeldbruck 2/40/1" in the alarm mail is "FFB 2/40/1" here. Read only to match
     // an alarmed Einsatzmittel to its vehicle; nothing of it enters an incident.
@@ -91,6 +96,7 @@ public sealed record MasterDataSet(
         Array.Empty<TruppType>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
+        Array.Empty<VehicleTypeCode>(),
         Array.Empty<DispatchPlaceName>(),
         Array.Empty<TextSnippet>(),
         Array.Empty<Premises>(),
@@ -119,6 +125,7 @@ public sealed record MasterDataSet(
         && TruppTypes.Count == 0
         && Personnel.Count == 0
         && Vehicles.Count == 0
+        && VehicleTypeCodes.Count == 0
         && DispatchPlaceNames.Count == 0
         && TextSnippets.Count == 0
         && Premises.Count == 0
@@ -161,6 +168,35 @@ public sealed record MasterDataSet(
 [SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 [SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 public sealed record Link(string Name, string Url, string Group = "");
+
+/// <summary>
+/// A Fahrzeugkennung (<see cref="Kennung"/>, the <c>12</c> in <c>FFB 1/12/1</c>) and the
+/// Fahrzeugtyp it stands for (<see cref="VehicleType"/>, <c>MZF</c>), so a vehicle takes its type
+/// from its Funkrufname instead of being picked one by one.
+/// </summary>
+public sealed record VehicleTypeCode(string Kennung, string VehicleType)
+{
+    /// <summary>Longest Kennung or Fahrzeugtyp accepted: the cap a Fahrzeugtyp has everywhere.</summary>
+    public const int MaxLength = VehicleTypes.MaxLength;
+
+    /// <summary>
+    /// The Fahrzeugtyp the Kennung of <paramref name="callSign"/> stands for, spelled as the
+    /// catalogue does when it knows it ("mzf" gives "MZF"). The first entry with a type wins.
+    /// Null when the name has no Kennung (see <see cref="CallSignKennung.Of"/>) or none is listed.
+    /// </summary>
+    public static string? TypeFor(string? callSign, IEnumerable<VehicleTypeCode> codes)
+    {
+        ArgumentNullException.ThrowIfNull(codes);
+        if (CallSignKennung.Of(callSign) is not { } kennung)
+        {
+            return null;
+        }
+
+        var type = codes.FirstOrDefault(c =>
+            string.Equals(c.Kennung.Trim(), kennung, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(c.VehicleType))?.VehicleType;
+        return VehicleTypes.Find(type)?.Code ?? VehicleTypes.FromStored(type);
+    }
+}
 
 /// <summary>
 /// A place as the Leitstelle's alarm names it (<see cref="Name"/>, "Fürstenfeldbruck") and as the
@@ -890,6 +926,8 @@ public static class AnonymizedExampleData
     public const string LinkGroup = "Gefahrgut";
     public const string DispatchPlaceName = "Musterstadt";
     public const string DispatchPlaceAbbreviation = "MST";
+    public const string VehicleKennung = "12";
+    public const string VehicleKennungType = "MZF";
     public const string Whereabouts = "bei Nachbarin Frau Meier";
     public const string RescueCallSign = "Rotkreuz Musterstadt 71/1";
 
@@ -923,6 +961,8 @@ public static class AnonymizedExampleData
     public const string LinkGroupPlaceholder = "z. B. " + LinkGroup;
     public const string DispatchPlaceNamePlaceholder = "z. B. " + DispatchPlaceName;
     public const string DispatchPlaceAbbreviationPlaceholder = "z. B. " + DispatchPlaceAbbreviation;
+    public const string VehicleKennungPlaceholder = "z. B. " + VehicleKennung;
+    public const string VehicleKennungTypePlaceholder = "z. B. " + VehicleKennungType;
 
     // A field that is genuinely optional reuses this idiom rather than inventing a second
     // convention for the same idea.
@@ -1143,6 +1183,34 @@ public static class MasterDataJson
         return result;
     }
 
+    // Hostile input like the place names: both fields are required and capped.
+    private static IReadOnlyList<VehicleTypeCode> ParseVehicleTypeCodes(JsonElement root)
+    {
+        if (!root.TryGetProperty("vehicleTypeCodes", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<VehicleTypeCode>();
+        }
+
+        var result = new List<VehicleTypeCode>();
+        foreach (var x in arr.EnumerateArray())
+        {
+            var kennung = x.GetProperty("kennung").GetString()
+                ?? throw new JsonException("Fahrzeugkennung: \"kennung\" darf nicht null sein.");
+            var type = x.GetProperty("vehicleType").GetString()
+                ?? throw new JsonException("Fahrzeugkennung: \"vehicleType\" darf nicht null sein.");
+            kennung = kennung.Trim();
+            type = type.Trim();
+            if (kennung.Length > VehicleTypeCode.MaxLength || type.Length > VehicleTypeCode.MaxLength)
+            {
+                throw new JsonException($"Fahrzeugkennung: höchstens {VehicleTypeCode.MaxLength} Zeichen.");
+            }
+
+            result.Add(new VehicleTypeCode(kennung, type));
+        }
+
+        return result;
+    }
+
     private static string? OptionalString(JsonElement e, string key) =>
         e.TryGetProperty(key, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
 
@@ -1187,6 +1255,7 @@ public static class MasterDataJson
             ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
+            ParseVehicleTypeCodes(root),
             ParseDispatchPlaceNames(root),
             ParseTextSnippets(root),
             ParsePremises(root),
@@ -1605,6 +1674,7 @@ public static class MasterDataJson
             navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url, group = l.Group }),
             vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone, email = v.Email, vehicleType = v.VehicleType }),
+            vehicleTypeCodes = set.VehicleTypeCodes.Select(c => new { kennung = c.Kennung, vehicleType = c.VehicleType }),
             dispatchPlaceNames = set.DispatchPlaceNames.Select(d => new { name = d.Name, abbreviation = d.Abbreviation }),
             talkGroups = set.TalkGroups.Select(t => new
             {

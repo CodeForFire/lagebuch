@@ -169,6 +169,20 @@ Funkrufname the alarm already ends with, such as `Maisach 40/1`, needs no entry.
 the list in an **Alarmierung** section. The list is used only for matching; nothing of it enters
 an Einsatz.
 
+## Fahrzeugkennungen
+
+`vehicleTypeCodes` maps the Fahrzeugkennung, the middle number of a Funkrufname such as
+`FFB 1/12/1` or `Florian Emmering 1/12/1`, to the Fahrzeugtyp it stands for:
+`{ "kennung": "12", "vehicleType": "MZF" }`. Both fields are required and at most 16
+characters, the cap a Fahrzeugtyp has everywhere. A Funkrufname that does not end in three numbers
+split by slashes (`Florian Musterdorf 40/1`) has no Kennung and is left alone.
+
+A vehicle whose Fahrzeugtyp is empty takes it from this list: in the editor as its Funkrufname is
+typed, in the Kräfte form when it is picked, and in the alarm import, which also types a unit the
+Stammdaten do not know. A Fahrzeugtyp already chosen is never replaced. For a Kennung listed twice
+the first entry wins. The editor shows the list in a **Fahrzeugkennungen** section. Only the type's
+text enters an Einsatz, never a reference to the list.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the

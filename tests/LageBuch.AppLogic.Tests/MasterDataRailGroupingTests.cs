@@ -87,7 +87,7 @@ public class MasterDataRailGroupingTests
             new[]
             {
                 "Einstellungen", "Navigation", "Alarmierung", "Einheiten-Status",
-                "Fahrzeuge", "Funkgruppen", "Geräte", "Links", "Messgase", "Objekte", "Ortsteile", "Personal", "Rollen", "Stichwörter",
+                "Fahrzeuge", "Fahrzeugkennungen", "Funkgruppen", "Geräte", "Links", "Messgase", "Objekte", "Ortsteile", "Personal", "Rollen", "Stichwörter",
                 "Straßen", "Textbausteine", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
@@ -108,7 +108,7 @@ public class MasterDataRailGroupingTests
         var vm = Vm();
 
         Assert.Empty(vm.Checklists);
-        Assert.Equal(17, vm.Sections.Count);
+        Assert.Equal(18, vm.Sections.Count);
     }
 
     // The rail is two ListBoxes over one SelectedSection. Avalonia's SelectedItem is a two-way

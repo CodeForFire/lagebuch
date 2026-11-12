@@ -395,6 +395,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
     private readonly Action _onChanged;
     private readonly Action<string, string, Action> _requestConfirm;
     private readonly IReadOnlyList<Vehicle> _masterVehicles;
+    private readonly IReadOnlyList<VehicleTypeCode> _vehicleTypeCodes;
 
     /// <summary>
     /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action before
@@ -417,6 +418,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         _onChanged = onChanged;
         _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         _masterVehicles = masterData.Vehicles;
+        _vehicleTypeCodes = masterData.VehicleTypeCodes;
         IsReadOnly = session.IsReadOnly;
         StatusOptions = masterData.UnitStatus;
         Forces = new ObservableCollection<ForceRow>(ByCallSign(session.Incident.Forces).Select(ToRow));
@@ -621,7 +623,8 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
     /// Fahrzeuge aller Wachen (#215): picking one derives Feuerwehr, so there is no need to type
     /// it first. Ein bereits aufgenommenes Fahrzeug wird nicht noch einmal angeboten (#76
     /// follow-up) — sein Funkrufname ist vergeben, bis seine Zeile entfernt wird. DistinctBy
-    /// schützt zusätzlich vor Duplikaten in Altdaten.
+    /// schützt zusätzlich vor Duplikaten in Altdaten. Sorted by Wache, then Funkrufname, numbers
+    /// by value, so "FFB 2/44/1" comes before "FFB 10/44/1"; the Stammdaten keep their own order.
     /// </summary>
     [ObservableProperty]
     private IReadOnlyList<Vehicle> _vehicleOptions = Array.Empty<Vehicle>();
@@ -635,6 +638,8 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         VehicleOptions = _masterVehicles
             .DistinctBy(v => v.CallSign, StringComparer.OrdinalIgnoreCase)
             .Where(v => !taken.Contains(v.CallSign.Trim()))
+            .OrderBy(v => v.Wache.Trim(), CallSignOrder)
+            .ThenBy(v => v.CallSign.Trim(), CallSignOrder)
             .ToArray();
     }
 
@@ -666,7 +671,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         NewCallSign = value.CallSign;
 
         // Options first, so a type the catalogue lacks already has an entry to select.
-        var preset = VehiclePreset.Of(value);
+        var preset = VehiclePreset.Of(value, _vehicleTypeCodes);
         NewVehicleTypeOptions = VehicleTypeChoices.For(preset.VehicleType);
         NewVehicleType = VehicleTypeChoices.Of(preset.VehicleType);
 

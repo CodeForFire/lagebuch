@@ -196,13 +196,13 @@ public class TacticalSignTests
     public void The_catalogue_names_the_feuerwehr_and_rettungsdienst_vehicles_in_their_usual_order()
     {
         Assert.Equal(
-            ["LF", "HLF", "TLF", "TSF", "DLK", "RW", "ELW 1", "ELW 2", "KdoW", "MTW", "GW-A", "GW-G", "GW-L", "SW", "WLF", "RTW", "NEF", "KTW"],
+            ["LF", "HLF", "TLF", "TSF", "DLK", "RW", "ELW 1", "ELW 2", "KdoW", "MTW", "MZF", "GW-A", "GW-G", "GW-L", "SW", "WLF", "RTW", "NEF", "KTW"],
             VehicleTypes.All.Select(t => t.Code));
         Assert.Equal(
             [
                 "Löschgruppenfahrzeug", "Hilfeleistungslöschgruppenfahrzeug", "Tanklöschfahrzeug", "Tragkraftspritzenfahrzeug",
                 "Drehleiter mit Korb", "Rüstwagen", "Einsatzleitwagen 1", "Einsatzleitwagen 2", "Kommandowagen",
-                "Mannschaftstransportwagen", "Gerätewagen Atemschutz", "Gerätewagen Gefahrgut", "Gerätewagen Logistik",
+                "Mannschaftstransportwagen", "Mehrzweckfahrzeug", "Gerätewagen Atemschutz", "Gerätewagen Gefahrgut", "Gerätewagen Logistik",
                 "Schlauchwagen", "Wechselladerfahrzeug", "Rettungswagen", "Notarzteinsatzfahrzeug", "Krankentransportwagen",
             ],
             VehicleTypes.All.Select(t => t.Name));

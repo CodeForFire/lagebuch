@@ -32,6 +32,7 @@ public class MasterDataEditorRenderTests
                 new Role("GF"),
             },
             DispatchPlaceNames = new[] { new DispatchPlaceName("Musterstadt", "MST") },
+            VehicleTypeCodes = new[] { new VehicleTypeCode("10", "KdoW"), new VehicleTypeCode("11", "ELW 1"), new VehicleTypeCode("12", "MZF") },
             TalkGroups = new[]
             {
                 new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle", IsFavorite: true),
@@ -120,8 +121,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 15 data categories, and this fixture's 2.
-        Assert.Equal(17, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 16 data categories, and this fixture's 2.
+        Assert.Equal(18, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -715,6 +716,48 @@ public class MasterDataEditorRenderTests
         Assert.Equal(RoleUniqueness.UniquePerSection, section.Rows[0].Uniqueness);
     }
 
+    // The Fahrzeugkennungen: the middle number of a Funkrufname and the Fahrzeugtyp it stands for.
+    // The type is picked from the same sorted catalogue a Fahrzeug row offers.
+    [AvaloniaFact]
+    public void Fahrzeugkennungen_section_renders_kennung_and_a_sorted_type_picker_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = (VehicleTypeCodesSection)vm.Sections.Single(s => s.Title == "Fahrzeugkennungen");
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "VehicleTypeCodesHint").IsEffectivelyVisible);
+        var kennungen = view.GetVisualDescendants().OfType<TextBox>().Where(t => t.Name == "KennungBox").ToList();
+        Assert.Equal(["10", "11", "12"], kennungen.Select(t => t.Text));
+        var types = view.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "VehicleTypeCodeTypeBox").ToList();
+        Assert.Equal(["KdoW", "ELW 1", "MZF"], types.Select(b => b.Text));
+
+        kennungen[0].Text = "13";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("13", section.ToValues()[0].Kennung);
+        Assert.True(vm.IsDirty);
+
+        // A new row's type box offers the whole catalogue, alphabetically, the MZF among it.
+        section.AddCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        var box = view.GetVisualDescendants().OfType<AutoCompleteBox>().Last(b => b.Name == "VehicleTypeCodeTypeBox");
+        box.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.ArrowDown);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(box.IsDropDownOpen);
+        var popup = box.GetVisualDescendants().OfType<Popup>().Single();
+        Assert.NotNull(popup.Child);
+        var offered = popup.Child.GetVisualDescendants().OfType<ListBoxItem>().Select(i => i.Content as string).ToList();
+        Assert.Equal(["DLK", "ELW 1", "ELW 2"], offered.Take(3));
+        Assert.Contains("MZF", Assert.IsAssignableFrom<IEnumerable<string>>(box.ItemsSource));
+    }
+
     // The alarm's place names: the place as the Leitstelle writes it and the Funkrufnamen's short form.
     [AvaloniaFact]
     public void Alarmierung_section_renders_place_and_abbreviation_per_row()
@@ -1051,7 +1094,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(17, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(18, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -1111,7 +1154,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(17, rows.Length);
+        Assert.Equal(18, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";
@@ -1132,7 +1175,7 @@ public class MasterDataEditorRenderTests
         var view = new MasterDataEditorView { DataContext = vm };
 
         // Tall enough for every category and this fixture's two Checklisten; grows with the rail.
-        var window = new Window { Content = view, Width = 1080, Height = 1310 };
+        var window = new Window { Content = view, Width = 1080, Height = 1370 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
