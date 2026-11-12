@@ -93,6 +93,27 @@ public class LeadershipBoardCommandTests
         Assert.False(vm.CanAssignFuehrungsfahrzeug(unit)); // already it
     }
 
+    // Feedback on v0.10.0-beta.1: FFB 1/12/1 dropped on an Einsatzleitung with no Rufname gives it
+    // that Rufname, and leaves the strip; it is the Einsatzleitung's now, its NodeId untouched.
+    [Fact]
+    public void Assigning_a_fuehrungsfahrzeug_fills_an_empty_rufname_and_takes_the_unit_off_the_unplaced_strip()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost("Feuerwehrhaus", null, null, Funkgruppen.Empty, null);
+        var unit = AddUnit(session, "FFB", "FFB 1/12/1");
+        AddUnit(session, "FF Emmering", "Florian Emmering 11/2");
+        using var vm = NewVm(session);
+        Assert.Equal(2, vm.UnplacedUnits.Count);
+
+        Assert.True(vm.AssignFuehrungsfahrzeug(unit));
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal(("FFB 1/12/1", "FFB 1/12/1", "Feuerwehrhaus"), (post.Fuehrungsfahrzeug, post.Rufname, post.Standort));
+        Assert.Equal("FFB 1/12/1", vm.El.Rufname);
+        Assert.Equal("Florian Emmering 11/2", Assert.Single(vm.UnplacedUnits).Title);
+        Assert.Null(session.Incident.Forces.Single(u => u.Id == unit).NodeId);
+    }
+
     [Fact]
     public void A_unit_without_a_funkrufname_an_unknown_unit_or_a_read_only_einsatz_assigns_no_fuehrungsfahrzeug()
     {
