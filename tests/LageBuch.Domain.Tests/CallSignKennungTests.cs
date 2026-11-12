@@ -16,6 +16,7 @@ public class CallSignKennungTests
 
     [Theory]
     [InlineData("  FFB 1/12/1  ")]
+    [InlineData(" 1/12/1")]
     [InlineData("FFB 1 / 12 / 1")]
     [InlineData("FFB  1/ 12 /1")]
     [InlineData("FFB\t1/12/1")]
