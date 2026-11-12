@@ -442,8 +442,9 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
 
     /// <summary>
     /// Makes the unit's Funkrufname the Einsatzleitung's Führungsfahrzeug, as the post dialog (#829)
-    /// does: the post's other fields are kept, and the unit keeps its place and status. False when
-    /// <see cref="CanAssignFuehrungsfahrzeug"/> says no or the session refuses.
+    /// does: an empty Rufname takes the Funkrufname too, the post's other fields are kept, and the
+    /// unit keeps its place and status. False when <see cref="CanAssignFuehrungsfahrzeug"/> says no
+    /// or the session refuses.
     /// </summary>
     public bool AssignFuehrungsfahrzeug(Guid unitId)
     {
@@ -456,16 +457,20 @@ public sealed partial class LeadershipViewModel : ObservableObject, INarrowAware
         var callSign = _incident.Forces.First(u => u.Id == unitId).CallSign;
         var post = _incident.LeadershipPost;
         var previous = post.Fuehrungsfahrzeug;
-        if (!Run(() => _session.UpdateLeadershipPost(post.Standort, post.Rufname, post.Telefon, post.Funkgruppen, callSign)))
+        var fillsRufname = post.Rufname is null;
+        var rufname = fillsRufname ? callSign : post.Rufname;
+        if (!Run(() => _session.UpdateLeadershipPost(post.Standort, rufname, post.Telefon, post.Funkgruppen, callSign)))
         {
             return false;
         }
 
-        // The post as it stands by then: only the Fahrzeug goes back, an edit made meanwhile stays.
+        // The post as it stands by then: the Fahrzeug goes back, and the Rufname with it while it is
+        // still the one the drop filled in; an edit made meanwhile stays.
         _offerUndo($"„{callSign}“ ist Führungsfahrzeug der Einsatzleitung.", () => Run(() =>
         {
             var now = _session.Incident.LeadershipPost;
-            _session.UpdateLeadershipPost(now.Standort, now.Rufname, now.Telefon, now.Funkgruppen, previous);
+            var keptRufname = fillsRufname && string.Equals(now.Rufname, callSign, StringComparison.Ordinal) ? null : now.Rufname;
+            _session.UpdateLeadershipPost(now.Standort, keptRufname, now.Telefon, now.Funkgruppen, previous);
         }));
         return true;
     }

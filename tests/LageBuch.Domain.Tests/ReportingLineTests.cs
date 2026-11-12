@@ -286,6 +286,30 @@ public class ReportingLineTests
         Assert.Equal(["Null", "Missing", "Dissolved", "Partner"], unplaced.Select(u => u.Brigade).ToArray());
     }
 
+    // Feedback on v0.10.0-beta.1: the Einsatzleitung's Führungsfahrzeug is placed there, so it leaves
+    // the strip; one in an Abschnitt keeps standing there (#888), and a namesake check needs a name.
+    [Fact]
+    public void The_einsatzleitungs_fuehrungsfahrzeug_counts_as_placed_and_its_node_id_stays_untouched()
+    {
+        var incident = NewIncident();
+        var nord = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1 Nord");
+        var elw = incident.AddForceUnit(Clock, Op, "FFB", 3, callSign: "FFB 1/12/1");
+        incident.AddForceUnit(Clock, Op, "FF Emmering", 6, callSign: "Florian Emmering 11/2");
+        incident.AddForceUnit(Clock, Op, "FF Aich", 6);
+        Assert.Equal(3, ReportingLine.UnplacedUnits(incident).Count);
+
+        incident.UpdateLeadershipPost(Clock, Op, null, null, null, null, "FFB 1/12/1");
+
+        Assert.Equal(
+            ["FF Emmering", "FF Aich"],
+            ReportingLine.UnplacedUnits(incident).Select(u => u.Brigade).ToArray());
+        Assert.Null(incident.Forces.Single(u => u.Id == elw.Id).NodeId);
+
+        incident.MoveForceUnit(Clock, Op, elw.Id, nord.Id);
+        Assert.Equal(elw.Id, Assert.Single(ReportingLine.Of(incident).Single(e => e.Node?.Id == nord.Id).Units).Id);
+        Assert.Equal(2, ReportingLine.UnplacedUnits(incident).Count);
+    }
+
     [Fact]
     public void A_live_Unterabschnitt_under_a_dissolved_Abschnitt_stands_alone_with_its_unit_and_Leiter()
     {

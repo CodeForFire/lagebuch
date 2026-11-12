@@ -378,6 +378,91 @@ public class CommandNodeDialogViewModelTests
         Assert.Null(session.Incident.LeadershipPost.Fuehrungsfahrzeug);
     }
 
+    // Feedback on v0.10.0-beta.1: the Einsatzleitung is called by its Führungsfahrzeug until someone
+    // says otherwise, so an empty RUFNAME takes the Fahrzeug, in the catalogue's spelling.
+    [Fact]
+    public void An_empty_post_rufname_follows_the_fuehrungsfahrzeug_until_a_rufname_is_typed()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, WithVehicles());
+
+        vm.Fuehrungsfahrzeug = " florian EMMERING 12/1 ";
+        Assert.Equal("Florian Emmering 12/1", vm.Rufname);
+        vm.Fuehrungsfahrzeug = "  ";
+        Assert.Null(vm.Rufname);
+        vm.Fuehrungsfahrzeug = "FFB 1/12/1";
+        Assert.Equal("FFB 1/12/1", vm.Rufname);
+
+        vm.Rufname = "Florian Emmering 1";
+        vm.Fuehrungsfahrzeug = "Florian Emmering 12/1";
+        Assert.Equal("Florian Emmering 1", vm.Rufname);
+        vm.SaveCommand.Execute(null);
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal(("Florian Emmering 12/1", "Florian Emmering 1"), (post.Fuehrungsfahrzeug, post.Rufname));
+    }
+
+    [Fact]
+    public void A_rufname_cleared_in_the_post_dialog_follows_the_fuehrungsfahrzeug_again()
+    {
+        var session = NewSession();
+        session.UpdateLeadershipPost(null, "Florian Emmering 1", null, null, null);
+        var vm = CommandNodeDialogViewModel.ForPost(session, WithVehicles());
+
+        vm.Fuehrungsfahrzeug = "FFB 1/12/1";
+        Assert.Equal("Florian Emmering 1", vm.Rufname);
+        vm.Rufname = " ";
+        vm.Fuehrungsfahrzeug = "Florian Emmering 12/1";
+
+        Assert.Equal("Florian Emmering 12/1", vm.Rufname);
+        vm.SaveCommand.Execute(null);
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal(("Florian Emmering 12/1", "Florian Emmering 12/1"), (post.Fuehrungsfahrzeug, post.Rufname));
+    }
+
+    [Fact]
+    public void A_rufname_filled_from_the_fuehrungsfahrzeug_yields_to_one_a_peer_saved_meanwhile()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, WithVehicles());
+        vm.Fuehrungsfahrzeug = "FFB 1/12/1";
+
+        session.UpdateLeadershipPost(null, "Florian Emmering 1", null, null, null);
+        vm.SaveCommand.Execute(null);
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal(("FFB 1/12/1", "Florian Emmering 1"), (post.Fuehrungsfahrzeug, post.Rufname));
+    }
+
+    [Fact]
+    public void A_rufname_typed_in_the_post_dialog_wins_over_one_a_peer_saved_meanwhile()
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForPost(session, WithVehicles());
+        vm.Rufname = "Florian Emmering 1";
+
+        session.UpdateLeadershipPost(null, "Florian Emmering 2", null, null, null);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Florian Emmering 1", session.Incident.LeadershipPost.Rufname);
+    }
+
+    [Theory]
+    [InlineData(CommandNodeKind.Abschnitt)]
+    [InlineData(CommandNodeKind.Partner)]
+    public void A_node_dialog_leaves_the_rufname_alone_when_a_fuehrungsfahrzeug_is_picked(CommandNodeKind kind)
+    {
+        var session = NewSession();
+        var vm = CommandNodeDialogViewModel.ForCreate(session, WithVehicles(), kind, null, "Nord");
+
+        vm.Rufname = "x";
+        vm.Rufname = null;
+        vm.Fuehrungsfahrzeug = "Florian Emmering 12/1";
+
+        Assert.Null(vm.Rufname);
+    }
+
     [Fact]
     public void Saving_another_post_field_keeps_a_peers_fuehrungsfahrzeug()
     {
