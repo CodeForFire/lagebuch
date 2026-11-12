@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -447,5 +449,85 @@ public class ForcesTabRenderTests
             $"DuplicateHint (y={hint.Bounds.Y}) should render below the fields row (button bottom={addButton.Bounds.Bottom}), not beside it");
 
         Capture(window, "forces-duplicate-blocked.png");
+    }
+
+    // Feedback on v0.10.0-beta.1: the Fahrzeug dropdown changed its width while scrolling. A
+    // virtualizing panel measures only the rows on screen, so the popup took the width of
+    // whichever Funkrufnamen were showing and jumped when a long one scrolled in.
+    [AvaloniaFact]
+    public void The_vehicle_dropdown_keeps_its_width_while_scrolling_past_long_names()
+    {
+        var shortNames = Enumerable.Range(1, 30).Select(i => new Vehicle($"FFB Wache {i}", $"FFB {i}/44/1", 9));
+        Vehicle[] longNames =
+        [
+            new("FF Musterhausen-Oberndorf", "Florian Musterhausen-Oberndorf 40/1", 9),
+            new("FF Musterhausen-Oberndorf", "Florian Musterhausen-Oberndorf 11/1", 6),
+        ];
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        using var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            MasterData() with { Vehicles = [.. shortNames, .. longNames] },
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
+        var view = new ForcesView { DataContext = vm.Forces };
+        var window = new Window { Content = view, Width = 1920, Height = 1032 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var box = view.GetControl<ComboBox>("VehicleBox");
+        box.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        var popup = box.GetVisualDescendants().OfType<Popup>().Single();
+        var list = popup.Child;
+        Assert.NotNull(list);
+        var scroller = list.GetVisualDescendants().OfType<ScrollViewer>().First();
+        Assert.True(scroller.Extent.Height > scroller.Viewport.Height, "the list should be long enough to scroll");
+        var top = list.Bounds.Width;
+        CaptureWithPopup(window, popup, "forces-vehicle-dropdown-top.png");
+
+        scroller.Offset = new Vector(0, scroller.Extent.Height);
+        Dispatcher.UIThread.RunJobs();
+        var bottom = list.Bounds.Width;
+        CaptureWithPopup(window, popup, "forces-vehicle-dropdown-bottom.png");
+
+        Assert.True(Math.Abs(bottom - top) <= 1.0, $"the dropdown was {top}px wide at the top and {bottom}px at the bottom");
+    }
+
+    // A popup renders in its own PopupRoot, so the window's frame lacks it; draw it on top.
+    // Only with RENDER_OUT set, as in IssuedItemsTabRenderTests.
+    private static void CaptureWithPopup(Window window, Popup popup, string name)
+    {
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
+        if (string.IsNullOrWhiteSpace(dir))
+        {
+            return;
+        }
+
+        var popupRoot = TopLevel.GetTopLevel(popup.Child);
+        Assert.NotNull(popupRoot);
+        Dispatcher.UIThread.RunJobs();
+        using var windowFrame = window.CaptureRenderedFrame();
+        using var popupFrame = popupRoot.CaptureRenderedFrame();
+        Assert.NotNull(windowFrame);
+        Assert.NotNull(popupFrame);
+        var offset = popupRoot.PointToScreen(default) - window.PointToScreen(default);
+        using var composite = new RenderTargetBitmap(windowFrame.PixelSize);
+        using (var context = composite.CreateDrawingContext())
+        {
+            context.DrawImage(windowFrame, new Rect(windowFrame.Size));
+            context.DrawImage(popupFrame, new Rect(new Point(offset.X, offset.Y), popupFrame.Size));
+        }
+
+        Directory.CreateDirectory(dir);
+        composite.Save(Path.Join(dir, name), PngBitmapEncoderOptions.Default);
     }
 }
