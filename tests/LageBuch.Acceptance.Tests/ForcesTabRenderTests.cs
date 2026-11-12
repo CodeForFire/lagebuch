@@ -470,7 +470,7 @@ public class ForcesTabRenderTests
             "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(
+        using var vm = new IncidentWorkspaceViewModel(
             session,
             new FixedClock(),
             new NoopTicker(),
