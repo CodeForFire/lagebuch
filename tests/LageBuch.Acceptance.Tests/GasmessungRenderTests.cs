@@ -242,7 +242,7 @@ public class GasmessungRenderTests
 
         // A rising row keeps the slot, so its fields stay under the same headers as the O2 row's.
         var units = view.GetVisualDescendants().OfType<AutoCompleteBox>().Where(b => b.Name == "GasUnitInput").ToList();
-        var x = units.Select(u => u.TranslatePoint(new Point(0, 0), view)!.Value.X).ToList();
+        var x = units.Select(u => Assert.NotNull(u.TranslatePoint(new Point(0, 0), view)).X).ToList();
         Assert.True(Math.Abs(x[0] - x[1]) < 1, $"EINHEIT starts at x={x[0]:0} on CO and x={x[1]:0} on O2");
 
         section.Rows[0].Direction = GasDirection.Falling;
@@ -268,7 +268,7 @@ public class GasmessungRenderTests
 
         var input = view.GetVisualDescendants().OfType<NumericUpDown>().Where(n => n.Name == "GasUpperAlarmInput").ElementAt(1);
         Assert.True(input.IsEffectivelyVisible);
-        var right = input.TranslatePoint(new Point(input.Bounds.Width, 0), window)!.Value.X;
+        var right = Assert.NotNull(input.TranslatePoint(new Point(input.Bounds.Width, 0), window)).X;
         Assert.True(right <= 412, $"Anreicherung ab ends at x={right:0}");
     }
 
@@ -285,8 +285,10 @@ public class GasmessungRenderTests
         co.ConfirmAddBuildingCommand.Execute(null);
         var cell = co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0];
         cell.OpenEditorCommand.Execute(null);
-        co.Editor!.GasInputs[0].Value = 5;
-        co.Editor.GasInputs[1].Value = 24;
+        var editor = co.Editor;
+        Assert.NotNull(editor);
+        editor.GasInputs[0].Value = 5;
+        editor.GasInputs[1].Value = 24;
         co.ConfirmEditorCommand.Execute(null);
         var view = new IncidentWorkspaceView { DataContext = vm };
         var window = new Window { Content = view, Width = 1280, Height = 800 };
