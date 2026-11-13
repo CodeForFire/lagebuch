@@ -96,7 +96,9 @@ dropped, and a list holds at most 500 Objekte.
 ## Messgase
 
 `gases` is the list **Messgase**: the gases a crew reads off its multi-gas meter
-in the **Gasmessung**, at most eight, in the order every Einsatz shows them.
+in the **Messung**, at most eight, in the order every Einsatz shows them. Both
+tabs use it: **GEBÄUDE** (the Gasmessprotokoll by Haus, Geschoss and Wohnung) and
+**MESSPROTOKOLL** (Messpunkte, Messreihe, Wetter and Geräte, not tied to a building).
 
 | Field | JSON | Meaning |
 |---|---|---|
@@ -134,9 +136,14 @@ cut at eight, an overlong name or unit is cut, and a second gas of the same name
 (ignoring case) is dropped. The editor names the same problems and does not save
 until they are fixed.
 
-The list is **copied** into an Einsatz when the Gasmessung opens its first Haus.
+The list is **copied** into an Einsatz when the GEBÄUDE tab opens its first Haus.
 From then on the Einsatz keeps its own copy: editing the Messgase later changes
 no Einsatzdatei, and a joined device shows the host's list.
+
+The MESSPROTOKOLL tab takes its own copy, as its Messgrößen, when it records its
+first Messpunkt or Messgröße. The two copies are independent: a Messgröße added, deactivated
+or tied to a Messgerät in the Messprotokoll does not change the Gasmessprotokoll,
+and the Messprotokoll can hold up to ten Messgrößen.
 
 ## Funkgruppen and the Führungstafel slot of a Funktion
 

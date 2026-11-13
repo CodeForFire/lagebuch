@@ -160,7 +160,7 @@ public class ConfigurableRailRenderTests
         Assert.Equal(
             new[]
             {
-                "ETB", "AUFGABEN", "FÜHRUNG", "BETEILIGTE", "ATEMSCHUTZ", "GASMESSUNG",
+                "ETB", "AUFGABEN", "FÜHRUNG", "BETEILIGTE", "ATEMSCHUTZ", "MESSUNG",
                 "DATEIEN", "LINKS", "KONTAKTE", "AUSGABE",
             },
             WorkspaceRenderHelper.RailHeaders(window));

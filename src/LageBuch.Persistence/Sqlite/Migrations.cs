@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 44;
+    public const int CurrentVersion = 45;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -303,6 +303,11 @@ public static class Migrations
         if (version < 44)
         {
             ApplyV44(cn, tx);
+        }
+
+        if (version < 45)
+        {
+            ApplyV45(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1347,6 +1352,94 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "lagefuehrung_node_id", "TEXT");
 
         // Stryker restore all
+    }
+
+    // The Messprotokoll (#930): Messpunkte, Messgeräte, Messgrößen, Messungen with their
+    // corrections, and Wetterbeobachtungen, each in its own table and in its own order. A Messgröße
+    // carries its gas by value, the columns co_gases has; a Messung keeps its values as a JSON map
+    // of Messgröße id to [low, high] in invariant text, the way co_dwellings.gas_values does, and
+    // its assessment in columns of its own. Only new tables: an older file has no Messprotokoll,
+    // which is what it had.
+    private static void ApplyV45(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql45 = """
+            CREATE TABLE IF NOT EXISTS measuring_points (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                location TEXT,
+                zone INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS measuring_devices (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                kind INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL,
+                number TEXT,
+                vehicle TEXT,
+                last_check TEXT
+            );
+            CREATE TABLE IF NOT EXISTS measurement_channels (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                unit TEXT NOT NULL DEFAULT '',
+                direction INTEGER NOT NULL DEFAULT 0,
+                elevated TEXT,
+                dangerous TEXT,
+                lethal TEXT,
+                plausible_up_to TEXT,
+                device_id TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                note TEXT
+            );
+            CREATE TABLE IF NOT EXISTS measurements (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                measured_at TEXT NOT NULL,
+                order_ref TEXT,
+                point_id TEXT NOT NULL,
+                team TEXT,
+                protection INTEGER NOT NULL DEFAULT 0,
+                mode INTEGER NOT NULL DEFAULT 0,
+                odour INTEGER NOT NULL DEFAULT 0,
+                deposits INTEGER NOT NULL DEFAULT 0,
+                note TEXT,
+                measured_values TEXT NOT NULL DEFAULT '{}',
+                status INTEGER NOT NULL DEFAULT 0,
+                assessment_status INTEGER,
+                assessed_by TEXT,
+                assessment_text TEXT,
+                assessed_at TEXT,
+                recorded_at TEXT NOT NULL,
+                recorded_by TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS measurement_corrections (
+                id TEXT PRIMARY KEY,
+                measurement_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                channel_id TEXT NOT NULL,
+                previous_low TEXT,
+                previous_high TEXT,
+                value_low TEXT,
+                value_high TEXT,
+                reason TEXT NOT NULL,
+                corrected_by TEXT NOT NULL,
+                corrected_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS weather_observations (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                observed_at TEXT NOT NULL,
+                wind INTEGER NOT NULL DEFAULT 8,
+                wind_speed_kmh TEXT,
+                temperature_celsius TEXT,
+                clouds INTEGER NOT NULL DEFAULT 0,
+                precipitation INTEGER NOT NULL DEFAULT 0,
+                source TEXT
+            );
+            """;
+        Exec(cn, tx, sql45);
     }
 
     [SuppressMessage(

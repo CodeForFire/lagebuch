@@ -130,7 +130,7 @@ Alle Beispieldaten sind frei erfunden.
    eine Wohnung schon dreimal gemessen wurde. Über **WEITER BEARBEITEN** könnt ihr selbst eingreifen.
 4. **Ausprobieren** – einen ETB-Eintrag schreiben, im Tab **ATEMSCHUTZ** einen
    Trupp bereitstellen, einen Sicherheitstrupp zuordnen und starten, eine
-   Aufgabe mit Timer anlegen, in der **GASMESSUNG** eine Wohnung markieren oder
+   Aufgabe mit Timer anlegen, in der **MESSUNG** eine Wohnung markieren oder
    einen weiteren Messwert eintragen.
 5. **PDF EXPORTIEREN** – der fertige Einsatzbericht liegt nach ein paar
    Sekunden auf der Platte.

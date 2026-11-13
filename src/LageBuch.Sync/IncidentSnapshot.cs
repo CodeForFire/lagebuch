@@ -3,6 +3,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
@@ -96,7 +97,10 @@ public sealed record IncidentSnapshot(
     // A snapshot without them reads as no channel and the Feuerwehr in the lead; an id naming no
     // live partner reads as the Feuerwehr too.
     string? DispatchChannel = null,
-    Guid? LagefuehrungNodeId = null);
+    Guid? LagefuehrungNodeId = null,
+
+    // Protocol 41 (#930): the Messprotokoll. Null reads as an empty one.
+    MeasurementLogDto? MeasurementLog = null);
 
 public sealed record MapOverlayDto(
     Guid Id,
@@ -313,3 +317,66 @@ public sealed record GasDefinitionDto(
 
 /// <summary>One of the Einsatz's own gases on the wire; mirrors <see cref="IncidentGas"/>.</summary>
 public sealed record IncidentGasDto(Guid Id, GasDefinitionDto Definition);
+
+/// <summary>The Messprotokoll on the wire (#930); mirrors <see cref="MeasurementLog"/>. Every list
+/// may be missing, and everything in it is hostile: <see cref="MeasurementLog.Sanitized"/> runs on
+/// the way in, through <see cref="Incident.Rehydrate"/>.</summary>
+public sealed record MeasurementLogDto(
+    IReadOnlyList<MeasuringPointDto>? Points,
+    IReadOnlyList<MeasuringDeviceDto>? Devices,
+    IReadOnlyList<MeasurementChannelDto>? Channels,
+    IReadOnlyList<MeasurementDto>? Measurements,
+    IReadOnlyList<WeatherObservationDto>? Weather);
+
+public sealed record MeasuringPointDto(Guid Id, string? Name, string? Location, MeasurementZone Zone);
+
+public sealed record MeasuringDeviceDto(Guid Id, DeviceKind Kind, string? Name, string? Number, string? Vehicle, string? Check);
+
+public sealed record MeasurementChannelDto(Guid Id, GasDefinitionDto? Definition, Guid? DeviceId, bool IsActive, string? Note);
+
+public sealed record MeasurementDto(
+    Guid Id,
+    DateTimeOffset MeasuredAt,
+    string? Order,
+    Guid PointId,
+    string? Team,
+    ProtectiveEquipment Protection,
+    MeasurementMode Mode,
+    bool Odour,
+    bool Deposits,
+    string? Note,
+    IReadOnlyList<MeasurementValueDto>? Values,
+    MeasurementStatus Status,
+    MeasurementAssessmentDto? Assessment,
+    IReadOnlyList<MeasurementCorrectionDto>? Corrections,
+    DateTimeOffset RecordedAt,
+    string? RecordedBy);
+
+/// <summary>A reading on the wire: one number has <see cref="Low"/> equal to <see cref="High"/>.
+/// Checked with <see cref="MeasuredValue.TryCreate"/> on arrival.</summary>
+public sealed record MeasuredValueDto(decimal Low, decimal High)
+{
+    public static MeasuredValueDto From(MeasuredValue value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new(value.Low, value.High);
+    }
+}
+
+/// <summary>One Messgröße's reading in a Messung, keyed by the Einsatz's own Messgröße id.</summary>
+public sealed record MeasurementValueDto(Guid ChannelId, decimal Low, decimal High);
+
+public sealed record MeasurementAssessmentDto(MeasurementStatus Status, string? By, string? Text, DateTimeOffset At);
+
+public sealed record MeasurementCorrectionDto(
+    Guid ChannelId, MeasuredValueDto? Previous, MeasuredValueDto? Value, string? Reason, string? By, DateTimeOffset At);
+
+public sealed record WeatherObservationDto(
+    Guid Id,
+    DateTimeOffset ObservedAt,
+    WindDirection Wind,
+    decimal? WindSpeedKmh,
+    decimal? TemperatureCelsius,
+    CloudCover Clouds,
+    Precipitation Precipitation,
+    string? Source);

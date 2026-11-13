@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
@@ -88,6 +89,18 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(ReturnIssuedItemCommand), "returnIssuedItem")]
 [JsonDerivedType(typeof(UndoIssuedItemReturnCommand), "undoIssuedItemReturn")]
 [JsonDerivedType(typeof(RemoveIssuedItemCommand), "removeIssuedItem")]
+[JsonDerivedType(typeof(AddMeasuringPointCommand), "addMeasuringPoint")]
+[JsonDerivedType(typeof(UpdateMeasuringPointCommand), "updateMeasuringPoint")]
+[JsonDerivedType(typeof(AddMeasuringDeviceCommand), "addMeasuringDevice")]
+[JsonDerivedType(typeof(UpdateMeasuringDeviceCommand), "updateMeasuringDevice")]
+[JsonDerivedType(typeof(RemoveMeasuringDeviceCommand), "removeMeasuringDevice")]
+[JsonDerivedType(typeof(AddMeasurementChannelCommand), "addMeasurementChannel")]
+[JsonDerivedType(typeof(UpdateMeasurementChannelCommand), "updateMeasurementChannel")]
+[JsonDerivedType(typeof(RemoveMeasurementChannelCommand), "removeMeasurementChannel")]
+[JsonDerivedType(typeof(RecordMeasurementCommand), "recordMeasurement")]
+[JsonDerivedType(typeof(AssessMeasurementCommand), "assessMeasurement")]
+[JsonDerivedType(typeof(CorrectMeasurementValueCommand), "correctMeasurementValue")]
+[JsonDerivedType(typeof(AddWeatherObservationCommand), "addWeatherObservation")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -431,3 +444,71 @@ public sealed record SetApartmentCountCommand(
 // mean "drop the ones on the right". Attributed like SetApartmentCount: it writes an ETB line.
 public sealed record RemoveDwellingsCommand(
     OperatorDto Operator, Guid BuildingId, int FloorOrdinal, IReadOnlyList<int> ApartmentNumbers) : SyncCommand;
+
+// Protocol 41: the Messprotokoll (#930). Every command that writes an ETB line or stamps an author
+// carries the operator; a Messgerät, and a Messgröße's Gerät, note or state, are silent equipment
+// edits like the Beteiligte and carry none. No recording time on the wire: the host stamps it with
+// its own clock. MeasuredAt and ObservedAt are what the Messtrupp reports, so they travel. The
+// domain caps and checks every field, so an oversized or impossible value from a peer is refused
+// on the host. Gases are the sender's Stammdaten Messgase, which the host copies only while the
+// Einsatz has no Messgröße yet, as AddCoBuildingCommand's do for the Gasmessprotokoll.
+public sealed record AddMeasuringPointCommand(
+    OperatorDto Operator,
+    string Name,
+    string? Location,
+    MeasurementZone Zone,
+    IReadOnlyList<GasDefinitionDto>? Gases = null) : SyncCommand;
+
+public sealed record UpdateMeasuringPointCommand(
+    OperatorDto Operator, Guid PointId, string Name, string? Location, MeasurementZone Zone) : SyncCommand;
+
+public sealed record AddMeasuringDeviceCommand(
+    DeviceKind Kind, string Name, string? Number, string? Vehicle, string? Check) : SyncCommand;
+
+public sealed record UpdateMeasuringDeviceCommand(
+    Guid DeviceId, DeviceKind Kind, string Name, string? Number, string? Vehicle, string? Check) : SyncCommand;
+
+public sealed record RemoveMeasuringDeviceCommand(Guid DeviceId) : SyncCommand;
+
+public sealed record AddMeasurementChannelCommand(
+    OperatorDto Operator,
+    GasDefinitionDto Definition,
+    Guid? DeviceId,
+    string? Note,
+    IReadOnlyList<GasDefinitionDto>? Gases = null) : SyncCommand;
+
+// A null Definition keeps the Messgröße's gas; the host refuses a new one once it has readings.
+public sealed record UpdateMeasurementChannelCommand(
+    Guid ChannelId, Guid? DeviceId, bool IsActive, string? Note, GasDefinitionDto? Definition = null) : SyncCommand;
+
+public sealed record RemoveMeasurementChannelCommand(Guid ChannelId) : SyncCommand;
+
+public sealed record RecordMeasurementCommand(
+    OperatorDto Operator,
+    DateTimeOffset MeasuredAt,
+    string? Order,
+    Guid PointId,
+    string? Team,
+    ProtectiveEquipment Protection,
+    MeasurementMode Mode,
+    bool Odour,
+    bool Deposits,
+    string? Note,
+    IReadOnlyList<MeasurementValueDto> Values) : SyncCommand;
+
+public sealed record AssessMeasurementCommand(
+    OperatorDto Operator, Guid MeasurementId, MeasurementStatus Status, string By, string? Text) : SyncCommand;
+
+// A null Value takes the Messgröße's value out of the Messung.
+public sealed record CorrectMeasurementValueCommand(
+    OperatorDto Operator, Guid MeasurementId, Guid ChannelId, MeasuredValueDto? Value, string Reason) : SyncCommand;
+
+public sealed record AddWeatherObservationCommand(
+    OperatorDto Operator,
+    DateTimeOffset ObservedAt,
+    WindDirection Wind,
+    decimal? WindSpeedKmh,
+    decimal? TemperatureCelsius,
+    CloudCover Clouds,
+    Precipitation Precipitation,
+    string? Source) : SyncCommand;

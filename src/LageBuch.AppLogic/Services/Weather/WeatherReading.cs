@@ -25,7 +25,11 @@ public sealed record WeatherReading(
     double? TemperatureCelsius,
     string? Condition,
     double? PrecipitationMm,
-    IReadOnlyList<WeatherAlert> Alerts);
+    IReadOnlyList<WeatherAlert> Alerts)
+{
+    /// <summary>How much of the sky is covered, 0 up to 100 %; null when the station does not say.</summary>
+    public double? CloudCoverPercent { get; init; }
+}
 
 /// <summary>A DWD warning (Unwetterwarnung) for the point, in the German wording DWD issues.</summary>
 /// <param name="Event">The kind of warning, e.g. "STURMBÖEN".</param>

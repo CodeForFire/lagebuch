@@ -3,6 +3,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync.Tests;
@@ -1289,5 +1290,155 @@ public class CommandApplierTests
 
         Assert.Equal(before, incident.CommandNodes);
         Assert.Equal(entries, incident.Journal.Count);
+    }
+
+    // --- #930: the Messprotokoll ---
+    private static readonly OperatorDto Messtrupp = new("Huber", "Florian Musterstadt 40/1");
+    private static readonly GasDefinitionDto CoGas = GasDefinitionDto.From(GasDefinition.DefaultCo);
+    private static readonly GasDefinitionDto ExGas = new("Ex", "%UEG", GasDirection.Rising, 10m, 20m, null, 100m);
+
+    private static (Incident Incident, Guid Point) WithMeasuringPoint(FixedClock clock)
+    {
+        var incident = NewIncident(clock);
+        ApplyOverWire(new AddMeasuringPointCommand(Messtrupp, "Kellerabgang", "Hauptstraße 12", MeasurementZone.Danger, [CoGas, ExGas]), incident, clock);
+        return (incident, incident.MeasuringPoints[0].Id);
+    }
+
+    private static RecordMeasurementCommand Messung(Guid point, params MeasurementValueDto[] values) =>
+        new(
+            Messtrupp,
+            new DateTimeOffset(2026, 8, 12, 8, 55, 0, TimeSpan.FromHours(2)),
+            "MA 04",
+            point,
+            "Angriffstrupp",
+            ProtectiveEquipment.ScbaForm1,
+            MeasurementMode.Remote,
+            Odour: false,
+            Deposits: false,
+            Note: null,
+            values);
+
+    [Fact]
+    public void The_first_Messpunkt_from_a_peer_seeds_the_Messgroessen_it_carries()
+    {
+        var clock = new FixedClock();
+
+        var (incident, _) = WithMeasuringPoint(clock);
+
+        Assert.Equal(new[] { "CO", "Ex" }, incident.MeasurementChannels.Select(c => c.Name));
+        Assert.Equal(MeasurementZone.Danger, Assert.Single(incident.MeasuringPoints).Zone);
+        Assert.Contains(incident.Journal, e => e.Text.StartsWith("Messpunkt angelegt: Kellerabgang", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_Messung_from_a_peer_keeps_its_time_and_range_and_the_host_stamps_the_recording()
+    {
+        var clock = new FixedClock();
+        var (incident, point) = WithMeasuringPoint(clock);
+        var ex = incident.MeasurementChannels[1].Id;
+
+        ApplyOverWire(Messung(point, new MeasurementValueDto(ex, 14m, 8m)), incident, clock);
+
+        var measurement = Assert.Single(incident.Measurements);
+        Assert.Equal(new MeasuredValue(8m, 14m), measurement.Values[ex]);
+        Assert.Equal(new DateTimeOffset(2026, 8, 12, 8, 55, 0, TimeSpan.FromHours(2)), measurement.MeasuredAt);
+        Assert.Equal(clock.Now, measurement.RecordedAt);
+        Assert.Equal("Huber (Florian Musterstadt 40/1)", measurement.RecordedBy);
+    }
+
+    [Fact]
+    public void Assessment_correction_and_weather_from_a_peer_land_on_the_host()
+    {
+        var clock = new FixedClock();
+        var (incident, point) = WithMeasuringPoint(clock);
+        var co = incident.MeasurementChannels[0].Id;
+        ApplyOverWire(Messung(point, new MeasurementValueDto(co, 140m, 140m)), incident, clock);
+        var id = incident.Measurements[0].Id;
+
+        ApplyOverWire(new CorrectMeasurementValueCommand(Messtrupp, id, co, new MeasuredValueDto(14m, 14m), "Ablesefehler"), incident, clock);
+        ApplyOverWire(new AssessMeasurementCommand(Messtrupp, id, MeasurementStatus.Confirmed, "Fachberater", "plausibel"), incident, clock);
+        ApplyOverWire(new AddWeatherObservationCommand(Messtrupp, clock.Now, WindDirection.W, 12m, 14m, CloudCover.Clear, Precipitation.None, "Handwindmesser"), incident, clock);
+
+        var measurement = Assert.Single(incident.Measurements);
+        Assert.Equal(MeasuredValue.Single(14m), measurement.Values[co]);
+        Assert.Equal(MeasuredValue.Single(140m), Assert.Single(measurement.Corrections).Previous);
+        Assert.Equal(MeasurementStatus.Confirmed, measurement.Status);
+        Assert.Equal("Fachberater", measurement.Assessment?.By);
+        Assert.Equal(12m, Assert.Single(incident.WeatherObservations).WindSpeedKmh);
+    }
+
+    [Fact]
+    public void Geraete_and_Messgroessen_from_a_peer_are_added_linked_changed_and_removed()
+    {
+        var clock = new FixedClock();
+        var (incident, _) = WithMeasuringPoint(clock);
+
+        ApplyOverWire(new AddMeasuringDeviceCommand(DeviceKind.MultiGas, "X-am 8000", "ARAA-0001", "GW-Mess", null), incident, clock);
+        var device = Assert.Single(incident.MeasuringDevices).Id;
+        ApplyOverWire(new UpdateMeasuringDeviceCommand(device, DeviceKind.MultiGas, "X-am 8000", "ARAA-0001", "GW-Mess", "Begasung 01.11."), incident, clock);
+        ApplyOverWire(new AddMeasurementChannelCommand(Messtrupp, new GasDefinitionDto("H2S", "ppm", GasDirection.Rising, 5m, 10m, 100m, 500m), device, "neu"), incident, clock);
+        var h2s = incident.MeasurementChannels[2].Id;
+        ApplyOverWire(new UpdateMeasurementChannelCommand(h2s, device, false, "Sensor defekt"), incident, clock);
+        Assert.False(incident.MeasurementChannels[2].IsActive);
+        Assert.Equal("Begasung 01.11.", incident.MeasuringDevices[0].Check);
+
+        ApplyOverWire(new RemoveMeasuringDeviceCommand(device), incident, clock);
+        Assert.Null(incident.MeasurementChannels[2].DeviceId);
+        ApplyOverWire(new RemoveMeasurementChannelCommand(h2s), incident, clock);
+        Assert.Equal(2, incident.MeasurementChannels.Count);
+        Assert.Empty(incident.MeasuringDevices);
+    }
+
+    [Fact]
+    public void A_Messpunkt_correction_from_a_peer_is_applied()
+    {
+        var clock = new FixedClock();
+        var (incident, point) = WithMeasuringPoint(clock);
+
+        ApplyOverWire(new UpdateMeasuringPointCommand(Messtrupp, point, "Kellerabgang Nord", null, MeasurementZone.Transition), incident, clock);
+
+        Assert.Equal(new MeasuringPoint(point, "Kellerabgang Nord", null, MeasurementZone.Transition), Assert.Single(incident.MeasuringPoints));
+    }
+
+    // Everything a peer sends is hostile: a reading that cannot be one, a Messgröße named twice, more
+    // values than the Messprotokoll has Messgrößen, or a Messgröße without a gas is refused as a bad
+    // command, and refused without changing anything.
+    [Theory]
+    [InlineData("negative")]
+    [InlineData("oversized")]
+    [InlineData("twice")]
+    [InlineData("tooMany")]
+    public void A_malformed_Messung_from_a_peer_is_refused(string shape)
+    {
+        var clock = new FixedClock();
+        var (incident, point) = WithMeasuringPoint(clock);
+        var co = incident.MeasurementChannels[0].Id;
+        MeasurementValueDto[] values = shape switch
+        {
+            "negative" => [new(co, -1m, 5m)],
+            "oversized" => [new(co, 1m, GasDefinition.MaxValue + 1)],
+            "twice" => [new(co, 1m, 1m), new(co, 2m, 2m)],
+            _ => Enumerable.Range(0, MeasurementChannel.MaxCount + 1).Select(_ => new MeasurementValueDto(Guid.NewGuid(), 1m, 1m)).ToArray(),
+        };
+
+        Assert.ThrowsAny<ArgumentException>(() => ApplyOverWire(Messung(point, values), incident, clock));
+        Assert.Empty(incident.Measurements);
+    }
+
+    [Fact]
+    public void A_Messgroesse_without_a_gas_or_a_correction_that_is_no_reading_is_refused()
+    {
+        var clock = new FixedClock();
+        var (incident, point) = WithMeasuringPoint(clock);
+        var co = incident.MeasurementChannels[0].Id;
+        ApplyOverWire(Messung(point, new MeasurementValueDto(co, 38m, 38m)), incident, clock);
+        var json = SyncJson.Serialize<SyncCommand>(new AddMeasurementChannelCommand(Messtrupp, ExGas, null, null));
+
+        Assert.ThrowsAny<ArgumentException>(() => CommandApplier.Apply(
+            SyncJson.Deserialize<SyncCommand>(json.Replace("\"definition\":{", "\"definition\":null,\"x\":{", StringComparison.Ordinal)), incident, clock));
+        Assert.ThrowsAny<ArgumentException>(() => ApplyOverWire(
+            new CorrectMeasurementValueCommand(Messtrupp, incident.Measurements[0].Id, co, new MeasuredValueDto(-3m, -3m), "Ablesefehler"), incident, clock));
+        Assert.Equal(2, incident.MeasurementChannels.Count);
+        Assert.Empty(incident.Measurements[0].Corrections);
     }
 }

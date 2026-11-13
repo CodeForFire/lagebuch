@@ -383,8 +383,17 @@ public class VersionHandshakeTests
     public void The_alarm_place_names_raise_the_protocol_but_not_the_floor()
     {
         // 41 adds dispatchPlaceNames to /masterdata. A peer at 40 drops the key and only loses the
-        // pre-ticked Einsatzmittel of an alarm, so a 40 and a 41 still connect.
-        Assert.Equal(41, SyncProtocol.ProtocolVersion);
-        Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
+        // pre-ticked Einsatzmittel of an alarm, so 41 by itself kept the floor at 40.
+        Assert.InRange(SyncProtocol.ProtocolVersion, 41, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 40, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_Messprotokoll_raises_the_protocol_and_the_floor_to_forty_two()
+    {
+        // 42 lets a client send the Messprotokoll's commands (#930), which a host at 41 does not
+        // know: a 41 and a 42 must not connect.
+        Assert.Equal(42, SyncProtocol.ProtocolVersion);
+        Assert.Equal(42, SyncProtocol.MinimumProtocolVersion);
     }
 }

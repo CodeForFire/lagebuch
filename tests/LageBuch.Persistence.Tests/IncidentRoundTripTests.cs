@@ -1,7 +1,9 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -12,6 +14,8 @@ namespace LageBuch.Persistence.Tests;
 
 public class IncidentRoundTripTests : IDisposable
 {
+    private static readonly IReadOnlyDictionary<Guid, MeasuredValue> NoValues = new Dictionary<Guid, MeasuredValue>();
+
     private readonly string _path = Path.Join(Path.GetTempPath(), $"rt-{Guid.NewGuid():N}.lagebuch");
 
     private sealed class Clock : IClock
@@ -1139,6 +1143,160 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(RoleSlot.None, role.Slot);
         Assert.Empty(loaded.CommandNodes);
         Assert.Equal(LeadershipPost.Empty, loaded.LeadershipPost);
+    }
+
+    // #930: the whole Messprotokoll -- Messpunkte, a Gerät and the Messgröße it is linked to, an
+    // inactive Messgröße, a Messung with a range, a correction and an assessment, and the Wetter.
+    [Fact]
+    public void A_full_Messprotokoll_round_trips()
+    {
+        var clock = new Clock();
+        var incident = IncidentWithMeasurementLog(clock);
+        IncidentRepository.Save(_path, incident);
+
+        var loaded = IncidentRepository.Load(_path);
+
+        var expected = incident.MeasurementLog;
+        var actual = loaded.MeasurementLog;
+        Assert.Equal(expected.Points, actual.Points);
+        Assert.Equal(expected.Devices, actual.Devices);
+        Assert.Equal(expected.Channels, actual.Channels);
+        Assert.Equal(expected.Weather, actual.Weather);
+        Assert.Equal(expected.Measurements.Count, actual.Measurements.Count);
+        for (var i = 0; i < expected.Measurements.Count; i++)
+        {
+            var want = expected.Measurements[i];
+            var got = actual.Measurements[i];
+            Assert.Equal(WithoutCollections(want), WithoutCollections(got));
+            Assert.Equal(want.Values.OrderBy(v => v.Key), got.Values.OrderBy(v => v.Key));
+            Assert.Equal(want.Corrections, got.Corrections);
+        }
+
+        var measurement = actual.Measurements[0];
+        Assert.Equal(new MeasuredValue(8m, 14m), measurement.Values[actual.Channels[1].Id]);
+        Assert.Equal(MeasurementStatus.Confirmed, measurement.Status);
+        Assert.Equal(MeasuredValue.Single(140m), Assert.Single(measurement.Corrections).Previous);
+        Assert.False(actual.Channels[3].IsActive);
+        Assert.Equal(actual.Devices[0].Id, actual.Channels[0].DeviceId);
+    }
+
+    [Fact]
+    public void A_file_from_before_the_Messprotokoll_loads_with_an_empty_one()
+    {
+        var clock = new Clock();
+        IncidentRepository.Save(_path, Incident.Start(clock, new SessionOperator("Muster"), "Brand"));
+        ExecRaw("""
+            DROP TABLE measuring_points; DROP TABLE measuring_devices; DROP TABLE measurement_channels;
+            DROP TABLE measurements; DROP TABLE measurement_corrections; DROP TABLE weather_observations;
+            UPDATE schema_version SET version = 43;
+            """);
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(MeasurementLog.Empty.Points, loaded.MeasurementLog.Points);
+        Assert.Empty(loaded.MeasurementLog.Measurements);
+    }
+
+    // A file is hostile: a value that is no reading, an id that does not read, or a Messung at a
+    // Messpunkt that is not there costs that entry, never the Einsatz.
+    [Fact]
+    public void A_hostile_files_Messprotokoll_loses_what_does_not_read_not_the_Einsatz()
+    {
+        var clock = new Clock();
+        var incident = IncidentWithMeasurementLog(clock);
+        IncidentRepository.Save(_path, incident);
+        var co = incident.MeasurementChannels[0].Id;
+        var ex = incident.MeasurementChannels[1].Id;
+
+        ExecRaw($$"""
+            UPDATE measurements SET measured_values = '{"{{co}}":["-5","3"],"{{ex}}":["8","14"],"kein-guid":["1","1"],"{{Guid.NewGuid()}}":["1"]}';
+            UPDATE measurement_corrections SET value_low = 'viel';
+            INSERT INTO measurements (id, ordinal, measured_at, point_id, recorded_at) VALUES ('{{Guid.NewGuid()}}', 1, '2026-06-22T09:00:00+02:00', '{{Guid.NewGuid()}}', '2026-06-22T09:00:00+02:00');
+            INSERT INTO measuring_points (id, ordinal, name) VALUES ('kaputt', 9, 'Ohne Id');
+            UPDATE weather_observations SET wind_speed_kmh = '999', wind = 42;
+            """);
+        var loaded = IncidentRepository.Load(_path).MeasurementLog;
+
+        var measurement = Assert.Single(loaded.Measurements);
+        Assert.Equal(new MeasuredValue(8m, 14m), Assert.Single(measurement.Values).Value);
+        Assert.Empty(measurement.Corrections);
+        Assert.Equal(2, loaded.Points.Count);
+        var weather = Assert.Single(loaded.Weather);
+        Assert.Null(weather.WindSpeedKmh);
+        Assert.Equal(WindDirection.Variable, weather.Wind);
+    }
+
+    // measured_values that are no JSON, or JSON of another shape, cost that Messung its values,
+    // never the Einsatz.
+    [Theory]
+    [InlineData("kein json")]
+    [InlineData("[1]")]
+    [InlineData("{\"x\":{\"a\":1}}")]
+    public void A_hostile_files_measured_values_that_do_not_read_cost_only_the_values(string json)
+    {
+        var clock = new Clock();
+        IncidentRepository.Save(_path, IncidentWithMeasurementLog(clock));
+        ExecRaw($"UPDATE measurements SET measured_values = '{json}';");
+
+        var measurement = Assert.Single(IncidentRepository.Load(_path).MeasurementLog.Measurements);
+
+        Assert.Empty(measurement.Values);
+    }
+
+    // Record equality compares the collections by reference, so both sides get the same empty ones
+    // and the collections are compared on their own.
+    private static Measurement WithoutCollections(Measurement m) =>
+        m with { Values = NoValues, Corrections = Array.Empty<MeasurementCorrection>() };
+
+    private static Incident IncidentWithMeasurementLog(Clock clock)
+    {
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "ABC 1");
+        var keller = incident.AddMeasuringPoint(
+            clock,
+            op,
+            "Kellerabgang",
+            "Hauptstr. 12, Rückseite",
+            MeasurementZone.Danger,
+            [
+                GasDefinition.DefaultCo,
+                new GasDefinition("Ex", "%UEG", GasDirection.Rising, 10m, 20m, null, 100m),
+                new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m),
+            ]);
+        incident.AddMeasuringPoint(clock, op, "MP 2 Windrichtung 200 m", null, MeasurementZone.Cordon);
+        var device = incident.AddMeasuringDevice(DeviceKind.MultiGas, "X-am 8000", "ARAA-0001", "GW-Mess", "Begasung 01.11.");
+        var co = incident.MeasurementChannels[0];
+        var ex = incident.MeasurementChannels[1];
+        var o2 = incident.MeasurementChannels[2];
+        incident.UpdateMeasurementChannel(co.Id, device.Id, isActive: true, note: "Sensor getauscht");
+        var h2s = incident.AddMeasurementChannel(clock, op, new GasDefinition("H2S", "ppm", GasDirection.Rising, 5m, 10m, 100m, 500m), null, null);
+        incident.UpdateMeasurementChannel(h2s.Id, null, isActive: false, note: "Sensor defekt");
+
+        clock.Now = clock.Now.AddMinutes(10);
+        var measurement = incident.RecordMeasurement(
+            clock,
+            op,
+            clock.Now.AddMinutes(-2),
+            "MA 04",
+            keller.Id,
+            "Florian Musterstadt 40/1 · Angriffstrupp",
+            ProtectiveEquipment.ScbaForm1,
+            MeasurementMode.Remote,
+            odour: true,
+            deposits: false,
+            "stechender Geruch",
+            new Dictionary<Guid, MeasuredValue>
+            {
+                [co.Id] = MeasuredValue.Single(140m),
+                [ex.Id] = new MeasuredValue(8m, 14m),
+                [o2.Id] = MeasuredValue.Single(20.1m),
+            });
+        clock.Now = clock.Now.AddMinutes(1);
+        incident.CorrectMeasurementValue(clock, op, measurement.Id, co.Id, MeasuredValue.Single(14m), "Ablesefehler");
+        clock.Now = clock.Now.AddMinutes(1);
+        incident.AssessMeasurement(clock, op, measurement.Id, MeasurementStatus.Confirmed, "Fachberater Chemie", "plausibel");
+        incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.W, 12m, 14.5m, CloudCover.UpToHalf, Precipitation.None, "Handwindmesser");
+        return incident;
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

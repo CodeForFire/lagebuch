@@ -52,7 +52,7 @@ public class CoMessprotokollEditorSurvivesRefreshTests
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         session.AddCoBuilding("Mehrfamilienhaus B", 2, 2);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
 
         var co = vm.CoMessprotokoll;
         var buildingId = co.SelectedBuilding!.Id;
