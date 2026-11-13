@@ -1712,6 +1712,7 @@ public static class MasterDataJson
                 dangerous = g.Dangerous,
                 lethal = g.Lethal,
                 plausibleUpTo = g.PlausibleUpTo,
+                upperAlarm = g.UpperAlarm,
             }),
             premises = set.Premises.Select(p => new
             {

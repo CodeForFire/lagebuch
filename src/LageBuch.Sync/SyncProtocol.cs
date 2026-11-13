@@ -239,12 +239,18 @@ public static class SyncProtocol
     /// pre-ticked Einsatzmittel of an alarm, so the floor stays at 40.
     /// </para>
     /// <para>
-    /// 42: the Stammdaten carry <c>vehicleTypeCodes</c>, the Fahrzeugkennungen a vehicle's empty
-    /// Fahrzeugtyp is filled from. A peer at 41 drops the key and reads none, which only leaves its
+    /// 42: a falling gas may carry <c>upperAlarm</c>, its enrichment limit (#927), in the snapshot's
+    /// gas list, in <c>addCoBuilding</c>'s Messgase and in <c>/masterdata</c>. The field is optional
+    /// on every one of them: a peer at 41 drops it and reads that O₂ without an enrichment limit,
+    /// so the floor stays at 40.
+    /// </para>
+    /// <para>
+    /// 43: the Stammdaten carry <c>vehicleTypeCodes</c>, the Fahrzeugkennungen a vehicle's empty
+    /// Fahrzeugtyp is filled from. A peer at 42 drops the key and reads none, which only leaves its
     /// new vehicles to be typed by hand, so the floor stays at 40.
     /// </para>
     /// </summary>
-    public const int ProtocolVersion = 42;
+    public const int ProtocolVersion = 43;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

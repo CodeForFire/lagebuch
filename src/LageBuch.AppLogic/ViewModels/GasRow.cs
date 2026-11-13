@@ -4,7 +4,8 @@ using LageBuch.Domain.CoMeasurement;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>One editable Messgas (#410): name, unit, direction and up to three bands, plus the
-/// value beyond which a reading is probably a typo.</summary>
+/// value beyond which a reading is probably a typo and, on a falling gas, the enrichment limit
+/// (#927).</summary>
 public sealed partial class GasRow : ObservableObject
 {
     private readonly Action _onChanged;
@@ -20,6 +21,7 @@ public sealed partial class GasRow : ObservableObject
         _dangerous = gas.Dangerous;
         _lethal = gas.Lethal;
         _plausibleUpTo = gas.PlausibleUpTo;
+        _upperAlarm = gas.UpperAlarm;
     }
 
     /// <summary>steigend and fallend with their labels, built once by <see cref="GasesSection.DirectionChoices"/>.</summary>
@@ -39,6 +41,7 @@ public sealed partial class GasRow : ObservableObject
     [ObservableProperty]
     private string _unit;
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFalling))]
     private GasDirection _direction;
     [ObservableProperty]
     private decimal? _elevated;
@@ -49,6 +52,14 @@ public sealed partial class GasRow : ObservableObject
     [ObservableProperty]
     private decimal? _plausibleUpTo;
 
+    /// <summary>„Anreicherung ab“: kept while the row is rising, so switching the direction back
+    /// and forth loses nothing, but saved only on a falling gas (<see cref="GasDefinition.Sanitized"/>).</summary>
+    [ObservableProperty]
+    private decimal? _upperAlarm;
+
+    /// <summary>Whether the row offers „Anreicherung ab“ at all: it means nothing on a rising gas.</summary>
+    public bool IsFalling => Direction == GasDirection.Falling;
+
     /// <summary>Whether this row is one of those <see cref="GasesSection.Conflicts"/> names, so
     /// the view can mark it. Set by the section; not an edit of its own.</summary>
     [ObservableProperty]
@@ -56,7 +67,7 @@ public sealed partial class GasRow : ObservableObject
 
     /// <summary>The row as it would be saved: name and unit trimmed, nothing else touched.</summary>
     public GasDefinition ToDefinition() =>
-        new((Name ?? string.Empty).Trim(), (Unit ?? string.Empty).Trim(), Direction, Elevated, Dangerous, Lethal, PlausibleUpTo);
+        new((Name ?? string.Empty).Trim(), (Unit ?? string.Empty).Trim(), Direction, Elevated, Dangerous, Lethal, PlausibleUpTo, UpperAlarm);
 
     partial void OnNameChanged(string value) => _onChanged();
 
@@ -71,6 +82,8 @@ public sealed partial class GasRow : ObservableObject
     partial void OnLethalChanged(decimal? value) => _onChanged();
 
     partial void OnPlausibleUpToChanged(decimal? value) => _onChanged();
+
+    partial void OnUpperAlarmChanged(decimal? value) => _onChanged();
 }
 
 /// <summary>A <see cref="GasDirection"/> paired with its label for the picker.</summary>

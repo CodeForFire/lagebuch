@@ -1267,7 +1267,8 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Messgase editor (#410): NAME / EINHEIT / RICHTUNG / three bands / PLAUSIBEL BIS. The
+              <!-- Messgase editor (#410): NAME / EINHEIT / RICHTUNG / three bands / PLAUSIBEL BIS /
+                   ANREICHERUNG AB (falling gases only, #927). The
                    Rollen layout: the fields wrap under the name on a phone. Thresholds are decimals
                    (20,9 Vol-%), so they take NumericUpDown.decimal; an empty one is "no band". -->
               <DataTemplate x:DataType="vm:GasesSection">
@@ -1283,7 +1284,7 @@
                   <!-- #791 review: crews know their meter's A1 / A2 / A3, not the band names. -->
                   <TextBlock x:Name="GasBandsHint" DockPanel.Dock="Top" Classes="secondary" FontSize="12"
                              TextWrapping="Wrap" Margin="0,0,0,8"
-                             Text="Erhöht ≈ A1, Gefährlich ≈ A2, Lebensgefährlich ≈ A3 des Messgeräts: Rückzug. Bänder an die eigenen Geräte anpassen." />
+                             Text="Erhöht ≈ A1, Gefährlich ≈ A2, Lebensgefährlich ≈ A3 des Messgeräts: Rückzug. Bänder an die eigenen Geräte anpassen. Anreicherung ab nur bei fallend, z. B. O₂ ab 23 Vol-%: gefährlich." />
                   <Grid DockPanel.Dock="Top" Classes="pick-header" ColumnDefinitions="*,Auto,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="GAS" Classes="overline" FontSize="10" />
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -1295,6 +1296,9 @@
                       <TextBlock Width="92" Text="LEBENSGEF." Classes="overline" FontSize="10" ToolTip.Tip="Lebensgefährlich ab" />
                       <TextBlock Width="92" Text="PLAUSIBEL BIS" Classes="overline" FontSize="10"
                                  ToolTip.Tip="Darüber fragt die Gasmessung nach einem Tippfehler" />
+                      <!-- PLAUSIBEL BIS runs past its 92px; the margin keeps the two apart. -->
+                      <TextBlock Width="116" Margin="6,0,0,0" Text="ANREICHERUNG AB" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Nur bei fallend: ab hier gefährlich, z. B. O₂-Anreicherung ab 23 Vol-%" />
                     </StackPanel>
                   </Grid>
                   <ScrollViewer>
@@ -1357,6 +1361,18 @@
                                 <NumericUpDown Classes="decimal" Margin="0,0,6,0" Minimum="0" Maximum="{x:Static vm:GasRow.MaxValue}"
                                                ClipValueToMinMax="True" Value="{Binding PlausibleUpTo}"
                                                AutomationProperties.Name="Plausibel bis" />
+                              </StackPanel>
+                              <!-- #927: O2 is dangerous rising too. Only a falling gas shows the
+                                   field. The slot keeps its width on a rising row: each row is its
+                                   own Grid, so a narrower Auto column would push its fields right. -->
+                              <StackPanel Width="122">
+                                <StackPanel IsVisible="{Binding IsFalling}">
+                                  <TextBlock Classes="overline narrow-label" FontSize="10" Text="ANREICHERUNG AB" />
+                                  <NumericUpDown x:Name="GasUpperAlarmInput" Classes="decimal" Margin="0,0,6,0" Minimum="0"
+                                                 Maximum="{x:Static vm:GasRow.MaxValue}"
+                                                 ClipValueToMinMax="True" Value="{Binding UpperAlarm}"
+                                                 AutomationProperties.Name="Anreicherung ab" />
+                                </StackPanel>
                               </StackPanel>
                             </WrapPanel>
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled

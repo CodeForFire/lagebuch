@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 44;
+    public const int CurrentVersion = 45;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -303,6 +303,11 @@ public static class Migrations
         if (version < 44)
         {
             ApplyV44(cn, tx);
+        }
+
+        if (version < 45)
+        {
+            ApplyV45(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1345,6 +1350,16 @@ public static class Migrations
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "dispatch_channel", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "lagefuehrung_node_id", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // A falling gas's enrichment limit, "Anreicherung ab" (#927). Additive and nullable: a gas
+    // from an older file has none, so its O2 reads exactly as it did.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV45(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_gases", "upper_alarm", "TEXT");
 
         // Stryker restore all
     }

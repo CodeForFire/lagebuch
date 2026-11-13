@@ -320,7 +320,8 @@
       "elevated": 30,
       "dangerous": 200,
       "lethal": 800,
-      "plausibleUpTo": 2000
+      "plausibleUpTo": 2000,
+      "upperAlarm": null
     },
     {
       "name": "O2",
@@ -329,7 +330,8 @@
       "elevated": 19.5,
       "dangerous": 17,
       "lethal": 10,
-      "plausibleUpTo": 25
+      "plausibleUpTo": 25,
+      "upperAlarm": 23.5
     }
   ],
   "premises": [

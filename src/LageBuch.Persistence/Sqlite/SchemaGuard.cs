@@ -84,6 +84,7 @@ internal static class SchemaGuard
         new("co_gases", "dangerous", "TEXT", false, null),
         new("co_gases", "lethal", "TEXT", false, null),
         new("co_gases", "plausible_up_to", "TEXT", false, null),
+        new("co_gases", "upper_alarm", "TEXT", false, null),
         new("co_readings", "value", "INTEGER", false, null),
         new("co_readings", "gas_id", "TEXT", false, null),
         new("co_readings", "measured_value", "TEXT", false, null),
