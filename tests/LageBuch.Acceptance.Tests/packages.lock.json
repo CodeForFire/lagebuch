@@ -434,7 +434,7 @@
         "dependencies": {
           "Avalonia": "[12.1.5, )",
           "Avalonia.Controls.DataGrid": "[12.1.2, )",
-          "Avalonia.Themes.Fluent": "[12.1.4, )",
+          "Avalonia.Themes.Fluent": "[12.1.5, )",
           "LageBuch.AppLogic": "[1.0.0, )"
         }
       },
@@ -498,11 +498,11 @@
       },
       "Avalonia.Themes.Fluent": {
         "type": "CentralTransitive",
-        "requested": "[12.1.4, )",
-        "resolved": "12.1.4",
-        "contentHash": "vx7P4as07WLQqA2mhMy4iBsqhkWEGwZI7g9Rd2DlJgz3uKS2tSvY6nZqHq3sWMFDBYBT65jkTsetPrgV8oprsQ==",
+        "requested": "[12.1.5, )",
+        "resolved": "12.1.5",
+        "contentHash": "FGjtJEpeVIbth+u4r507c9nbm1NQWLTvT3RC4e/yqDceRC4crAl37zVUloElA6rexDz69y0WvDfMLGX+t12yBQ==",
         "dependencies": {
-          "Avalonia": "12.1.4"
+          "Avalonia": "12.1.5"
         }
       },
       "CommunityToolkit.Mvvm": {
