@@ -27,6 +27,7 @@ public class GasesSectionTests
         ["dangerous"] = r => r.Dangerous = 10,
         ["lethal"] = r => r.Lethal = 100,
         ["plausible"] = r => r.PlausibleUpTo = 500,
+        ["upper"] = r => r.UpperAlarm = 23,
     };
 
     private static GasesSection Section(params GasDefinition[] gases) => new("Messgase", gases, () => { });
@@ -188,6 +189,61 @@ public class GasesSectionTests
         Assert.Null(vm.SaveBlockedReason);
     }
 
+    // #927: Anreicherung ab, the enrichment limit of a falling gas.
+    [Fact]
+    public void Only_a_falling_gas_offers_the_upper_alarm_and_the_row_follows_the_direction()
+    {
+        var section = Section(GasDefinition.DefaultCo);
+        var row = section.Rows[0];
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        Assert.False(row.IsFalling);
+
+        row.Direction = GasDirection.Falling;
+
+        Assert.True(row.IsFalling);
+        Assert.Contains(nameof(GasRow.IsFalling), raised);
+    }
+
+    [Fact]
+    public void The_upper_alarm_of_a_falling_gas_is_read_edited_and_saved()
+    {
+        var o2 = new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m, UpperAlarm: 23m);
+        var provider = new Provider(MasterDataSet.Empty with { Gases = [o2] });
+        var vm = new MasterDataEditorViewModel(provider, new FakeDialogs(), new NoFiles());
+        var row = vm.Sections.OfType<GasesSection>().Single().Rows[0];
+        Assert.Equal(23m, row.UpperAlarm);
+
+        row.UpperAlarm = 23.5m;
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(23.5m, Assert.Single(provider.Saved.Gases).UpperAlarm);
+    }
+
+    [Theory]
+    [InlineData("19")]
+    [InlineData("26")]
+    public void An_upper_alarm_at_the_mildest_band_or_beyond_plausibility_is_named_and_marked(string upper)
+    {
+        var section = Section(new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m));
+
+        section.Rows[0].UpperAlarm = decimal.Parse(upper, System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Equal("Schwellen nicht in Reihenfolge: O2", Assert.Single(section.Conflicts()));
+        Assert.True(section.Rows[0].HasConflict);
+    }
+
+    [Fact]
+    public void An_upper_alarm_left_on_a_gas_switched_to_rising_is_no_conflict_and_is_not_saved()
+    {
+        var section = Section(new GasDefinition("O2", "Vol-%", GasDirection.Falling, null, null, null, null, UpperAlarm: 23m));
+
+        section.Rows[0].Direction = GasDirection.Rising;
+
+        Assert.Empty(section.Conflicts());
+        Assert.Null(Assert.Single(section.ToValues()).UpperAlarm);
+    }
+
     [Fact]
     public void Values_come_back_trimmed_in_row_order()
     {
@@ -271,6 +327,7 @@ public class GasesSectionTests
     [InlineData("dangerous")]
     [InlineData("lethal")]
     [InlineData("plausible")]
+    [InlineData("upper")]
     public void A_row_added_with_any_field_filled_asks_before_it_goes(string field)
     {
         var asked = 0;

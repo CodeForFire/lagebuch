@@ -298,17 +298,25 @@ public sealed record CoReadingDto(DateTimeOffset MeasuredAt, Guid GasId, decimal
 /// <summary>A gas definition on the wire (#410): a Messgas from the Stammdaten in
 /// <see cref="AddCoBuildingCommand"/>, or the definition half of an <see cref="IncidentGasDto"/>.
 /// Hostile like everything a peer sends: <see cref="GasDefinition.Sanitized"/> runs on the way
-/// in.</summary>
+/// in. <see cref="UpperAlarm"/> (#927, protocol 42) is optional: a peer from before it sends
+/// none and drops the one it receives, so its O₂ simply has no enrichment limit.</summary>
 public sealed record GasDefinitionDto(
-    string Name, string Unit, GasDirection Direction, decimal? Elevated, decimal? Dangerous, decimal? Lethal, decimal? PlausibleUpTo)
+    string Name,
+    string Unit,
+    GasDirection Direction,
+    decimal? Elevated,
+    decimal? Dangerous,
+    decimal? Lethal,
+    decimal? PlausibleUpTo,
+    decimal? UpperAlarm = null)
 {
     public static GasDefinitionDto From(GasDefinition gas)
     {
         ArgumentNullException.ThrowIfNull(gas);
-        return new(gas.Name, gas.Unit, gas.Direction, gas.Elevated, gas.Dangerous, gas.Lethal, gas.PlausibleUpTo);
+        return new(gas.Name, gas.Unit, gas.Direction, gas.Elevated, gas.Dangerous, gas.Lethal, gas.PlausibleUpTo, gas.UpperAlarm);
     }
 
-    public GasDefinition ToDefinition() => new(Name, Unit, Direction, Elevated, Dangerous, Lethal, PlausibleUpTo);
+    public GasDefinition ToDefinition() => new(Name, Unit, Direction, Elevated, Dangerous, Lethal, PlausibleUpTo, UpperAlarm);
 }
 
 /// <summary>One of the Einsatz's own gases on the wire; mirrors <see cref="IncidentGas"/>.</summary>

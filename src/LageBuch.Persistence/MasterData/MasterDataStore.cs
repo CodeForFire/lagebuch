@@ -215,7 +215,7 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_gases (name, unit, direction, elevated, dangerous, lethal, plausible_up_to) VALUES ($n,$u,$d,$e,$g,$l,$p);",
+                "INSERT INTO md_gases (name, unit, direction, elevated, dangerous, lethal, plausible_up_to, upper_alarm) VALUES ($n,$u,$d,$e,$g,$l,$p,$a);",
                 p =>
                 {
                     p("$n", g.Name);
@@ -225,6 +225,7 @@ public sealed class MasterDataStore
                     p("$g", (object?)GasDefinitionJson.ToText(g.Dangerous) ?? DBNull.Value);
                     p("$l", (object?)GasDefinitionJson.ToText(g.Lethal) ?? DBNull.Value);
                     p("$p", (object?)GasDefinitionJson.ToText(g.PlausibleUpTo) ?? DBNull.Value);
+                    p("$a", (object?)GasDefinitionJson.ToText(g.UpperAlarm) ?? DBNull.Value);
                 });
         }
 
@@ -381,7 +382,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_dispatch_place_names (name TEXT NOT NULL, abbreviation TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT, vehicle_type TEXT);
             CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT, is_favorite INTEGER NOT NULL DEFAULT 0);
-            CREATE TABLE IF NOT EXISTS md_gases (name TEXT NOT NULL, unit TEXT NOT NULL DEFAULT '', direction INTEGER NOT NULL DEFAULT 0, elevated TEXT, dangerous TEXT, lethal TEXT, plausible_up_to TEXT);
+            CREATE TABLE IF NOT EXISTS md_gases (name TEXT NOT NULL, unit TEXT NOT NULL DEFAULT '', direction INTEGER NOT NULL DEFAULT 0, elevated TEXT, dangerous TEXT, lethal TEXT, plausible_up_to TEXT, upper_alarm TEXT);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -547,6 +548,9 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "dangerous", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "lethal", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "plausible_up_to", "TEXT");
+
+        // A falling gas's enrichment limit (#927). A store from before it reads none.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_gases", "upper_alarm", "TEXT");
 
         // Wachen and Funkrufnamen used to be lists of their own; they are derived from md_vehicles
         // (and md_personnel) now. Drop the stale tables a pre-change store still carries -- their
@@ -1037,7 +1041,7 @@ public sealed class MasterDataStore
     private static IReadOnlyList<GasDefinition> ReadGases(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT name, unit, direction, elevated, dangerous, lethal, plausible_up_to FROM md_gases;";
+        cmd.CommandText = "SELECT name, unit, direction, elevated, dangerous, lethal, plausible_up_to, upper_alarm FROM md_gases;";
         using var r = cmd.ExecuteReader();
         var list = new List<GasDefinition>();
         while (r.Read())
@@ -1049,7 +1053,8 @@ public sealed class MasterDataStore
                 GasDefinitionJson.FromText(Str(r, 3)),
                 GasDefinitionJson.FromText(Str(r, 4)),
                 GasDefinitionJson.FromText(Str(r, 5)),
-                GasDefinitionJson.FromText(Str(r, 6))));
+                GasDefinitionJson.FromText(Str(r, 6)),
+                GasDefinitionJson.FromText(Str(r, 7))));
         }
 
         var gases = GasDefinition.SanitizeList(list);

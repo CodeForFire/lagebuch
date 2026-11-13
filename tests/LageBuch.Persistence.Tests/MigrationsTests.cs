@@ -588,4 +588,35 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(0) && r.IsDBNull(2));
         Assert.Equal(("Florian EL", "Hof"), (r.GetString(1), r.GetString(3)));
     }
+
+    [Fact]
+    public void V44_database_upgrades_to_v45_and_its_gases_have_no_upper_alarm()
+    {
+        // A V44 file: today's schema minus co_gases.upper_alarm, with a falling O2.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE co_gases DROP COLUMN upper_alarm;
+                INSERT INTO co_gases (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to)
+                    VALUES ('g', 0, 'O2', 'Vol-%', 1, '19', '17', '10', '25');
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (44);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT upper_alarm, elevated, plausible_up_to FROM co_gases WHERE id = 'g';";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.True(r.IsDBNull(0));
+        Assert.Equal(("19", "25"), (r.GetString(1), r.GetString(2)));
+    }
 }

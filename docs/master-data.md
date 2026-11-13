@@ -96,7 +96,7 @@ dropped, and a list holds at most 500 Objekte.
 ## Messgase
 
 `gases` is the list **Messgase**: the gases a crew reads off its multi-gas meter
-in the **Gasmessung**, at most eight, in the order every Einsatz shows them.
+or detector tubes in the **Gasmessung**, at most eight, in the order every Einsatz shows them.
 
 | Field | JSON | Meaning |
 |---|---|---|
@@ -105,6 +105,17 @@ in the **Gasmessung**, at most eight, in the order every Einsatz shows them.
 | Richtung | `direction` | `"steigend"` (higher is worse) or `"fallend"` (lower is worse, for O₂); anything else reads as steigend |
 | Erhöht / Gefährlich / Lebensgefährlich | `elevated` / `dangerous` / `lethal` | the bands, each optional, ordered in the gas's direction |
 | Plausibel bis | `plausibleUpTo` | optional; a reading above it gets the "bitte auf Tippfehler prüfen" hint and is still recorded |
+| Anreicherung ab | `upperAlarm` | optional, fallend only; a reading at or above it counts as Gefährlich, e.g. O₂ enrichment from 23 Vol-% |
+
+A falling gas can be dangerous both ways: O₂ below 19 Vol-% is a lack of oxygen,
+O₂ from about 23 Vol-% an enrichment that feeds a fire. **Anreicherung ab** is the
+upper limit for that second case. A reading at or above it is coloured as
+Gefährlich and counts towards the worst gas of the Wohnung, like any band. It must
+lie above the gas's mildest band (Erhöht, or the next one set) and not above
+Plausibel bis. It assumes no particular instrument: a Gastec 31B tube reads O₂ from
+6 to 24 %, so 23 Vol-% is a limit a tube can show as well as a multi-gas meter. On
+a steigend gas the field means nothing; the editor hides it and the import drops
+it.
 
 Numbers may carry decimals (`20.9` in the file, `20,9` on screen). A gas without
 any band is recorded and shown without colour. A Stammdaten file without `gases`,
@@ -127,7 +138,7 @@ A2 is the Rückzug threshold, so set Lebensgefährlich to it and leave Gefährli
 empty: 20 / — / 200. Check the values against your own devices and Dienstanweisung
 before relying on them.
 
-The import rejects a file whose bands are out of order for their gas, because
+The import rejects a file whose bands, or Anreicherung ab, are out of order for their gas, because
 guessing which of them was meant would colour a Wohnung wrongly; a band that is
 not a number, negative or above 100 000 rejects it too. More than eight gases are
 cut at eight, an overlong name or unit is cut, and a second gas of the same name
