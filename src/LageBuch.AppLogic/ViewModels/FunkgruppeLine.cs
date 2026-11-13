@@ -7,8 +7,8 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 /// <param name="Text">The Funkgruppe as the node records it.</param>
 /// <param name="IsShared">
-/// Whether the level above has it too; null when the kind is not checked, because one side has no
-/// Funkgruppe of it yet, and the line then carries no mark.
+/// Whether the level above has it too; null when the kind is not checked, because neither side has
+/// a Funkgruppe of it yet or there is nothing to check against, and the line then carries no mark.
 /// </param>
 public sealed record FunkgruppeLine(string Text, bool? IsShared)
 {

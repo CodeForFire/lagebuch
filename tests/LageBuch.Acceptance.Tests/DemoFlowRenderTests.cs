@@ -174,7 +174,7 @@ public sealed class DemoFlowRenderTests : IDisposable
         Dispatcher.UIThread.RunJobs();
 
         // The two rail groups: the app's own categories, then the brigade's own Checklisten.
-        Assert.Equal(17, vm.Sections.Count);
+        Assert.Equal(18, vm.Sections.Count);
         Assert.Equal(2, vm.Checklists.Count);
         Capture(window, "stammdaten-editor.png");
     }

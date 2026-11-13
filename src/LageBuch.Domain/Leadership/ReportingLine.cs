@@ -48,14 +48,20 @@ public static class ReportingLine
         return entries;
     }
 
-    /// <summary>Units without a place: no node, or one that is missing, dissolved or a Partner.</summary>
+    /// <summary>
+    /// Units without a place: no node, or one that is missing, dissolved or a Partner. The
+    /// Einsatzleitung's Führungsfahrzeug is placed there, matched by its Funkrufname; its NodeId is
+    /// left alone (#888), so one an Abschnitt holds stays in that Abschnitt.
+    /// </summary>
     public static IReadOnlyList<ForceUnit> UnplacedUnits(Incident incident)
     {
         ArgumentNullException.ThrowIfNull(incident);
 
+        var fahrzeug = incident.LeadershipPost.Fuehrungsfahrzeug;
         return incident.Forces
             .Where(u => u.NodeId is not { } id
                 || incident.FindCommandNode(id) is not { IsLive: true, Kind: not CommandNodeKind.Partner })
+            .Where(u => fahrzeug is null || !string.Equals(u.CallSign, fahrzeug, StringComparison.Ordinal))
             .ToList();
     }
 

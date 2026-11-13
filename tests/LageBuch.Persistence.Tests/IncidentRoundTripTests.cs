@@ -1188,7 +1188,7 @@ public class IncidentRoundTripTests : IDisposable
         ExecRaw("""
             DROP TABLE measuring_points; DROP TABLE measuring_devices; DROP TABLE measurement_channels;
             DROP TABLE measurements; DROP TABLE measurement_corrections; DROP TABLE weather_observations;
-            UPDATE schema_version SET version = 43;
+            UPDATE schema_version SET version = 45;
             """);
 
         var loaded = IncidentRepository.Load(_path);

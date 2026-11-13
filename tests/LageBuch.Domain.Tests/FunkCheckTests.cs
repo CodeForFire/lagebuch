@@ -71,19 +71,100 @@ public class FunkCheckTests
     }
 
     [Fact]
-    public void A_kind_either_side_left_empty_is_not_checked()
+    public void A_kind_both_sides_left_empty_is_not_checked()
     {
         var (incident, clock, op) = NewIncident(new Funkgruppen(["FW 1000"], null));
         var nord = incident.AddCommandNode(
-            clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(null, ["305_F"]));
+            clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 1000"], null));
 
         var result = For(incident, nord);
 
-        Assert.False(result.Tmo.IsChecked);
         Assert.False(result.Dmo.IsChecked);
-        Assert.False(result.Tmo.IsMismatch);
         Assert.False(result.Dmo.IsMismatch);
         Assert.Null(result.Dmo.IsShared("305_F"));
+    }
+
+    [Fact]
+    public void A_kind_only_the_node_has_is_a_mismatch()
+    {
+        // v0.10.0-beta.1 feedback: a DMO Funkgruppe the Einsatzleitung has not entered is no
+        // shared one, so the node cannot reach it on DMO.
+        var (incident, clock, op) = NewIncident(new Funkgruppen(["FW 1000"], null));
+        var nord = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 1000"], ["305_F"]));
+
+        var result = For(incident, nord);
+
+        Assert.True(result.Dmo.IsChecked);
+        Assert.True(result.Dmo.IsMismatch);
+        Assert.False(result.Dmo.IsShared("305_F"));
+        Assert.False(result.Tmo.IsMismatch);
+    }
+
+    [Fact]
+    public void A_kind_only_the_level_above_has_is_a_mismatch()
+    {
+        var (incident, clock, op) = NewIncident(new Funkgruppen(["FW 1000"], ["301_F"]));
+        var nord = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 1000"], null));
+
+        var result = For(incident, nord);
+
+        Assert.True(result.Dmo.IsMismatch);
+        Assert.Empty(result.Dmo.Shared);
+    }
+
+    [Fact]
+    public void The_reported_partner_on_another_tmo_and_no_dmo_on_either_side_is_a_tmo_mismatch_only()
+    {
+        // The report from v0.10.0-beta.1, literally: EL Fw on TMO A, EL RD on TMO B, no DMO anywhere.
+        var (incident, clock, op) = NewIncident(new Funkgruppen(["FW_A"], null));
+        var rd = incident.AddCommandNode(
+            clock, op, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["RD_B"], null));
+
+        var result = For(incident, rd);
+        var el = FunkCheck.OfEinsatzleitung(incident);
+
+        Assert.True(result.Tmo.IsMismatch);
+        Assert.False(result.Dmo.IsChecked);
+        Assert.True(el.Tmo.IsMismatch);
+        Assert.False(el.Tmo.IsShared("FW_A"));
+        Assert.Equal(["Rettungsdienst"], el.TmoMismatchWith);
+        Assert.False(el.Dmo.IsChecked);
+        Assert.Empty(el.DmoMismatchWith);
+    }
+
+    [Fact]
+    public void An_einsatzleitung_funkgruppe_a_partner_shares_is_shared()
+    {
+        var (incident, clock, op) = NewIncident(new Funkgruppen(["FW 1000", "fw 2000"], ["301_F"]));
+        incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["FW 2000"], ["301_F"]));
+        incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Polizei", funkgruppen: new Funkgruppen(["POL 1"], ["301_F"]));
+
+        var el = FunkCheck.OfEinsatzleitung(incident);
+
+        Assert.Equal(["fw 2000"], el.Tmo.Shared);
+        Assert.True(el.Tmo.IsShared("fw 2000"));
+        Assert.Null(el.Tmo.IsShared("FW 1000"));
+        Assert.Equal(["Polizei"], el.TmoMismatchWith);
+        Assert.Equal(["301_F"], el.Dmo.Shared);
+        Assert.Empty(el.DmoMismatchWith);
+    }
+
+    [Fact]
+    public void The_einsatzleitung_is_checked_against_live_partners_only_not_abschnitte()
+    {
+        var (incident, clock, op) = NewIncident(new Funkgruppen(["FW 1000"], ["301_F"]));
+        incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord", funkgruppen: new Funkgruppen(["FW 2000"], ["305_F"]));
+        var rd = incident.AddCommandNode(clock, op, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["RD 1"], null));
+        incident.DissolveCommandNode(clock, op, rd.Id);
+
+        var el = FunkCheck.OfEinsatzleitung(incident);
+
+        Assert.False(el.Tmo.IsChecked);
+        Assert.False(el.Dmo.IsChecked);
+        Assert.Empty(el.TmoMismatchWith);
+        Assert.Empty(el.DmoMismatchWith);
     }
 
     [Fact]

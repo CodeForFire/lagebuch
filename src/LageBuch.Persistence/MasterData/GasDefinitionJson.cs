@@ -28,6 +28,8 @@ internal static class GasDefinitionJson
     /// cut at <see cref="GasDefinition.MaxCount"/>. A threshold that is not a number, or is out of
     /// range, fails the read; thresholds out of order reject the file outright with a German
     /// message, because guessing which of them the brigade meant would colour a Wohnung wrongly.
+    /// That includes a falling gas's <c>upperAlarm</c> (#927) at or below its mildest band or
+    /// beyond <c>plausibleUpTo</c>; on a rising gas it means nothing and is dropped instead.
     /// </summary>
     public static IReadOnlyList<GasDefinition> Parse(JsonElement root)
     {
@@ -51,7 +53,8 @@ internal static class GasDefinitionJson
                 Number(x, "elevated"),
                 Number(x, "dangerous"),
                 Number(x, "lethal"),
-                Number(x, "plausibleUpTo"));
+                Number(x, "plausibleUpTo"),
+                Number(x, "upperAlarm"));
             if (!gas.ThresholdsInOrder)
             {
                 throw new JsonException($"Messgas „{gas.Name.Trim()}“: Schwellen nicht in Reihenfolge.");

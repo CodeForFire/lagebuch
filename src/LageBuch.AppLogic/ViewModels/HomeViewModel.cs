@@ -349,7 +349,7 @@ public sealed partial class HomeViewModel : ObservableObject
             keyword: dispatch?.Alarm.Keyword);
         if (dispatch is not null)
         {
-            dispatch.ApplyTo(session, md.Streets);
+            dispatch.ApplyTo(session, md.Streets, md.VehicleTypeCodes);
             Dispatch?.MarkTaken(dispatch.Alarm);
         }
 

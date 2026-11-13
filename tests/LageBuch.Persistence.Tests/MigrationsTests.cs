@@ -590,9 +590,40 @@ public class MigrationsTests : IDisposable
     }
 
     [Fact]
-    public void V44_database_upgrades_to_v45_and_gains_the_messprotokoll_tables()
+    public void V44_database_upgrades_to_v45_and_its_gases_have_no_upper_alarm()
     {
-        // A V44 file: today's schema minus the Messprotokoll tables.
+        // A V44 file: today's schema minus co_gases.upper_alarm, with a falling O2.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE co_gases DROP COLUMN upper_alarm;
+                INSERT INTO co_gases (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to)
+                    VALUES ('g', 0, 'O2', 'Vol-%', 1, '19', '17', '10', '25');
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (44);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT upper_alarm, elevated, plausible_up_to FROM co_gases WHERE id = 'g';";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.True(r.IsDBNull(0));
+        Assert.Equal(("19", "25"), (r.GetString(1), r.GetString(2)));
+    }
+
+    [Fact]
+    public void V45_database_upgrades_to_v46_and_gains_the_messprotokoll_tables()
+    {
+        // A V45 file: today's schema minus the Messprotokoll tables.
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
         {
             Migrations.Migrate(cn);
@@ -600,7 +631,7 @@ public class MigrationsTests : IDisposable
             cmd.CommandText = """
                 DROP TABLE measuring_points; DROP TABLE measuring_devices; DROP TABLE measurement_channels;
                 DROP TABLE measurements; DROP TABLE measurement_corrections; DROP TABLE weather_observations;
-                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (44);
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (45);
                 """;
             cmd.ExecuteNonQuery();
         }

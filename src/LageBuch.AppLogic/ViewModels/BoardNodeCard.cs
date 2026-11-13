@@ -239,14 +239,23 @@ public sealed partial class BoardNodeCard : ObservableObject
             return null;
         }
 
-        var kinds = (check.Tmo.IsMismatch, check.Dmo.IsMismatch) switch
+        return FunkHintText(check.Tmo.IsMismatch, check.Dmo.IsMismatch, check.ParentLabel);
+    }
+
+    /// <summary>
+    /// „Keine gemeinsame TMO-Funkgruppe mit <paramref name="with"/>", naming the kinds that are a
+    /// mismatch; null when neither is.
+    /// </summary>
+    internal static string? FunkHintText(bool tmo, bool dmo, string with)
+    {
+        var kinds = (tmo, dmo) switch
         {
             (true, true) => "TMO- und DMO",
             (true, false) => "TMO",
             (false, true) => "DMO",
             _ => null,
         };
-        return kinds is null ? null : $"Keine gemeinsame {kinds}-Funkgruppe mit {check.ParentLabel}";
+        return kinds is null ? null : $"Keine gemeinsame {kinds}-Funkgruppe mit {with}";
     }
 
     /// <summary>

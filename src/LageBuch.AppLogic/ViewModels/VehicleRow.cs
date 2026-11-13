@@ -9,10 +9,13 @@ namespace LageBuch.AppLogic.ViewModels;
 /// Fahrzeugtyp of its taktisches Zeichen. Wache and Funkrufname carry suggestion lists from the
 /// master data for the view's AutoCompleteBox, the Fahrzeugtyp the codes of
 /// <see cref="VehicleTypes"/> -- free text stays valid, so they are suggestions, not a closed set.
+/// An empty Fahrzeugtyp fills in from the Fahrzeugkennungen as the Funkrufname is typed; a type
+/// already there is never replaced.
 /// </summary>
 public sealed partial class VehicleRow : ObservableObject
 {
     private readonly Action _onChanged;
+    private readonly Func<string, string?>? _typeForCallSign;
 
     public VehicleRow(
         string wache,
@@ -25,9 +28,11 @@ public sealed partial class VehicleRow : ObservableObject
         string? vehicleType,
         IReadOnlyList<string> wacheOptions,
         IReadOnlyList<string> callSignOptions,
-        Action onChanged)
+        Action onChanged,
+        Func<string, string?>? typeForCallSign = null)
     {
         _onChanged = onChanged;
+        _typeForCallSign = typeForCallSign;
         _wache = wache;
         _callSign = callSign;
         _seats = seats;
@@ -46,8 +51,8 @@ public sealed partial class VehicleRow : ObservableObject
     /// <summary>Suggestions: the Funkrufnamen of the vehicles and roster as loaded (derived, not a separate list).</summary>
     public IReadOnlyList<string> CallSignOptions { get; }
 
-    /// <summary>Suggestions: every Fahrzeugtyp the Lagekarte has a sign for.</summary>
-    public static IReadOnlyList<string> VehicleTypeOptions { get; } = VehicleTypes.All.Select(t => t.Code).ToList();
+    /// <summary>Suggestions: every Fahrzeugtyp the Lagekarte has a sign for, alphabetically.</summary>
+    public static IReadOnlyList<string> VehicleTypeOptions => VehicleTypeChoices.Catalogue;
 
     [ObservableProperty]
     private string _wache;
@@ -68,7 +73,14 @@ public sealed partial class VehicleRow : ObservableObject
 
     partial void OnWacheChanged(string value) => _onChanged();
 
-    partial void OnCallSignChanged(string value) => _onChanged();
+    partial void OnCallSignChanged(string value)
+    {
+        _onChanged();
+        if (string.IsNullOrWhiteSpace(VehicleType) && _typeForCallSign?.Invoke(value) is { } type)
+        {
+            VehicleType = type;
+        }
+    }
 
     partial void OnSeatsChanged(int value) => _onChanged();
 

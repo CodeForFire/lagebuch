@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 45;
+    public const int CurrentVersion = 46;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -308,6 +308,11 @@ public static class Migrations
         if (version < 45)
         {
             ApplyV45(cn, tx);
+        }
+
+        if (version < 46)
+        {
+            ApplyV46(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1354,15 +1359,25 @@ public static class Migrations
         // Stryker restore all
     }
 
+    // A falling gas's enrichment limit, "Anreicherung ab" (#927). Additive and nullable: a gas
+    // from an older file has none, so its O2 reads exactly as it did.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV45(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_gases", "upper_alarm", "TEXT");
+
+        // Stryker restore all
+    }
+
     // The Messprotokoll (#930): Messpunkte, Messgeräte, Messgrößen, Messungen with their
     // corrections, and Wetterbeobachtungen, each in its own table and in its own order. A Messgröße
     // carries its gas by value, the columns co_gases has; a Messung keeps its values as a JSON map
     // of Messgröße id to [low, high] in invariant text, the way co_dwellings.gas_values does, and
     // its assessment in columns of its own. Only new tables: an older file has no Messprotokoll,
     // which is what it had.
-    private static void ApplyV45(SqliteConnection cn, SqliteTransaction tx)
+    private static void ApplyV46(SqliteConnection cn, SqliteTransaction tx)
     {
-        const string sql45 = """
+        const string sql46 = """
             CREATE TABLE IF NOT EXISTS measuring_points (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -1439,7 +1454,7 @@ public static class Migrations
                 source TEXT
             );
             """;
-        Exec(cn, tx, sql45);
+        Exec(cn, tx, sql46);
     }
 
     [SuppressMessage(

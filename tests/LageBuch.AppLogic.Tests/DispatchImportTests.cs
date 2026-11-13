@@ -344,4 +344,50 @@ public class DispatchImportTests
     {
         Assert.Equal("HLF", ViewModels.VehiclePreset.Of(new Vehicle("Wache 2", "2/40/1", 9, VehicleType: " hlf ")).VehicleType);
     }
+
+    // The Fahrzeugkennungen: the middle number of a Funkrufname names its Fahrzeugtyp.
+    private static readonly VehicleTypeCode[] TypeCodes = [new("40", "HLF 20"), new("12", "MZF")];
+
+    [Fact]
+    public void An_unknown_unit_takes_its_type_from_the_kennung_in_its_funkrufname()
+    {
+        var session = Session();
+
+        new DispatchImport(Alarm(), [new DispatchUnit("Florian Musterstadt 2/12/1", null)]).ApplyTo(session, [], TypeCodes);
+
+        Assert.Equal("MZF", Assert.Single(session.Incident.Forces).VehicleType);
+    }
+
+    [Fact]
+    public void An_unknown_unit_whose_kennung_is_not_listed_comes_in_without_a_type()
+    {
+        var session = Session();
+
+        new DispatchImport(Alarm(), [new DispatchUnit("Florian Musterstadt 2/99/1", null)]).ApplyTo(session, [], TypeCodes);
+
+        Assert.Null(Assert.Single(session.Incident.Forces).VehicleType);
+    }
+
+    [Fact]
+    public void A_stammdaten_vehicle_without_a_type_takes_the_one_of_its_kennung()
+    {
+        var session = Session();
+        var untyped = Hlf with { VehicleType = null };
+
+        new DispatchImport(Alarm(), [new DispatchUnit("Florian Musterstadt 2/40/1", untyped)]).ApplyTo(session, [], TypeCodes);
+
+        Assert.Equal("HLF 20", Assert.Single(session.Incident.Forces).VehicleType);
+    }
+
+    // An explicitly chosen type is never overwritten: the Stammdaten say DLK, the Kennung says MZF.
+    [Fact]
+    public void A_stammdaten_vehicle_keeps_the_type_it_was_given()
+    {
+        var session = Session();
+        var dlk = new Vehicle("Wache 1", "Florian Musterstadt 1/12/1", 3, VehicleType: "DLK 23/12");
+
+        new DispatchImport(Alarm(), [new DispatchUnit(dlk.CallSign, dlk)]).ApplyTo(session, [], TypeCodes);
+
+        Assert.Equal("DLK 23/12", Assert.Single(session.Incident.Forces).VehicleType);
+    }
 }

@@ -544,16 +544,19 @@
             <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="field-value" Text="{Binding Rufname, TargetNullValue='—'}" />
             <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="TELEFON" />
             <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="field-value" Text="{Binding Telefon, TargetNullValue='—'}" />
-            <!-- One Funkgruppe per line (#828): up to three of each kind. -->
+            <!-- One Funkgruppe per line (#828): up to three of each kind, each marked against the
+                 partner Einsatzleitungen as a node's are against the level above. -->
             <TextBlock Grid.Row="4" Grid.Column="0" Classes="field-label" Text="TMO" VerticalAlignment="Top" />
             <SelectableTextBlock Grid.Row="4" Grid.Column="1" Classes="field-value" Text="—" IsVisible="{Binding !TmoLines.Count}" />
             <ItemsControl Grid.Row="4" Grid.Column="1" x:Name="ElTmo" Classes="funk-lines" ItemsSource="{Binding TmoLines}"
-                          ItemTemplate="{StaticResource FunkgruppeChipTemplate}" />
+                          ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
             <TextBlock Grid.Row="5" Grid.Column="0" Classes="field-label" Text="DMO" VerticalAlignment="Top" />
             <SelectableTextBlock Grid.Row="5" Grid.Column="1" Classes="field-value" Text="—" IsVisible="{Binding !DmoLines.Count}" />
             <ItemsControl Grid.Row="5" Grid.Column="1" x:Name="ElDmo" Classes="funk-lines" ItemsSource="{Binding DmoLines}"
-                          ItemTemplate="{StaticResource FunkgruppeChipTemplate}" />
+                          ItemTemplate="{StaticResource FunkgruppeLineTemplate}" />
           </Grid>
+          <TextBlock x:Name="ElFunkHint" Classes="board-hint" Text="{Binding FunkHint}"
+                     IsVisible="{Binding FunkHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
           <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
             <Button Classes="board-action" Content="ERREICHBARKEIT BEARBEITEN"

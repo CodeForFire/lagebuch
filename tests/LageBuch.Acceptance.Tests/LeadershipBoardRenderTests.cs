@@ -327,9 +327,10 @@ public class LeadershipBoardRenderTests
             .Select(AutomationProperties.GetName)
             .ToList();
 
-        // Nord: TMO shared, DMO not. Dach: DMO shared with Nord. Süd: both shared. RD: neither.
+        // Nord: TMO shared, DMO not. Dach: DMO shared with Nord. Süd: both shared. RD: neither, so
+        // the Einsatzleitung, which Polizei shares nothing with either, marks neither of its own.
         Assert.Equal(4, marks.Count(m => m == "gemeinsame Funkgruppe"));
-        Assert.Equal(3, marks.Count(m => m == "keine gemeinsame Funkgruppe"));
+        Assert.Equal(5, marks.Count(m => m == "keine gemeinsame Funkgruppe"));
     }
 
     // A Funkgruppe with its Kurzwahl reads as one line on a card, not "FW_FFB (KW:" over "2062)":
@@ -378,6 +379,59 @@ public class LeadershipBoardRenderTests
             west.GetVisualDescendants().OfType<TextBlock>(), t => t.Name == "NodeFunkHint" && t.IsEffectivelyVisible);
     }
 
+    // Each Funkgruppe line of one kind with the mark it shows, so a mark on the wrong line cannot pass.
+    private static List<(string? Text, string? Mark)> Marks(Visual root, string name) =>
+        root.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == name)
+            .GetVisualDescendants().OfType<Grid>()
+            .Select(line => (
+                line.GetVisualDescendants().OfType<SelectableTextBlock>().Single().Text,
+                line.GetVisualChildren().OfType<PathIcon>().Where(p => p.IsEffectivelyVisible).Select(AutomationProperties.GetName).SingleOrDefault()))
+            .ToList();
+
+    private static List<string?> FunkHints(Visual root, string name) =>
+        [.. root.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Name == name && t.IsEffectivelyVisible).Select(t => t.Text)];
+
+    // The v0.10.0-beta.1 report, literally: EL Fw on TMO A, EL RD on TMO B, no DMO on either side.
+    // Both cards say it, and both mark their TMO line.
+    [AvaloniaFact]
+    public void A_partner_on_another_tmo_without_any_dmo_is_flagged_on_both_einsatzleitungen()
+    {
+        var board = Show(filled: false, more: s =>
+        {
+            s.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", null, new Funkgruppen(["FW_EMMERING 1000"], null));
+            AddNode(s, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["RD_FFB 1001"], null));
+        });
+        Capture(board.Window, "fuehrung-funkcheck-partner-mismatch.png");
+        var rd = Card(board.View, "Rettungsdienst");
+
+        Assert.Equal(["Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung"], FunkHints(rd, "NodeFunkHint"));
+        Assert.Equal<(string?, string?)>([("RD_FFB 1001", "keine gemeinsame Funkgruppe")], Marks(rd, "NodeTmo"));
+        Assert.Equal(["Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung Rettungsdienst"], FunkHints(board.View, "ElFunkHint"));
+        Assert.Equal<(string?, string?)>([("FW_EMMERING 1000", "keine gemeinsame Funkgruppe")], Marks(board.View, "ElTmo"));
+    }
+
+    // A TMO the Einsatzleitung shares with one partner is checked on both cards; the partner it
+    // shares none with is named on the Einsatzleitung's card.
+    [AvaloniaFact]
+    public void A_tmo_shared_with_a_partner_is_checked_on_both_einsatzleitungen()
+    {
+        var board = Show(filled: false, more: s =>
+        {
+            s.UpdateLeadershipPost("Feuerwehrhaus Emmering", "Florian Emmering 1", null, new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
+            AddNode(s, CommandNodeKind.Partner, "Rettungsdienst", funkgruppen: new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]));
+            AddNode(s, CommandNodeKind.Partner, "Polizei", funkgruppen: new Funkgruppen(["POL_FFB 1"], ["307_F"]));
+        });
+        Capture(board.Window, "fuehrung-funkcheck-partner-shared.png");
+        var rd = Card(board.View, "Rettungsdienst");
+
+        Assert.Equal<(string?, string?)>([("FW_EMMERING 1000", "gemeinsame Funkgruppe")], Marks(rd, "NodeTmo"));
+        Assert.Equal<(string?, string?)>([("307_F", "gemeinsame Funkgruppe")], Marks(rd, "NodeDmo"));
+        Assert.Empty(FunkHints(rd, "NodeFunkHint"));
+        Assert.Equal<(string?, string?)>([("FW_EMMERING 1000", "gemeinsame Funkgruppe")], Marks(board.View, "ElTmo"));
+        Assert.Equal<(string?, string?)>([("307_F", "gemeinsame Funkgruppe")], Marks(board.View, "ElDmo"));
+        Assert.Equal(["Keine gemeinsame TMO-Funkgruppe mit Einsatzleitung Polizei"], FunkHints(board.View, "ElFunkHint"));
+    }
+
     [AvaloniaFact]
     public void The_board_draws_every_part_of_the_sheet()
     {
@@ -396,10 +450,21 @@ public class LeadershipBoardRenderTests
         Assert.Equal(
             ["FW_EMMERING 1000", "FW_EMMERING 1000", "RD_FFB 1001"],
             Lines(view, "NodeTmo").Order(StringComparer.Ordinal));
+
+        // Nord misses the DMO; the Bereitstellung, RD and Polizei both kinds; Dach has no TMO.
         Assert.Equal(
-            ["Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung", "Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung"],
+            [
+                "Keine gemeinsame DMO-Funkgruppe mit Einsatzleitung",
+                "Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung",
+                "Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung",
+                "Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung",
+                "Keine gemeinsame TMO-Funkgruppe mit Abschnitt Abschnitt 1 Nord",
+            ],
             view.GetVisualDescendants().OfType<TextBlock>()
                 .Where(t => t.Name == "NodeFunkHint" && t.IsEffectivelyVisible).Select(t => t.Text).Order(StringComparer.Ordinal));
+        Assert.Equal(
+            ["Keine gemeinsame TMO- und DMO-Funkgruppe mit Einsatzleitung Rettungsdienst und Polizei"],
+            FunkHints(view, "ElFunkHint"));
         Assert.False(Named<Grid>(view, "ElFurther").IsVisible);
 
         // On the desktop the reason AUFLÖSEN is off is the button's tooltip, not a line on the card.
@@ -836,7 +901,7 @@ public class LeadershipBoardRenderTests
         Assert.Equal("Florian Emmering 11/2", session.Incident.LeadershipPost.Fuehrungsfahrzeug);
         Assert.Equal("Florian Emmering 11/2", Named<TextBlock>(board.View, "ElFahrzeug").Text);
         Assert.Null(NodeOfUnit(session, unit));
-        Assert.Contains(board.Vm.UnplacedUnits, u => u.Id == unit);
+        Assert.DoesNotContain(board.Vm.UnplacedUnits, u => u.Id == unit);
         Assert.DoesNotContain("drop-target", el.Classes);
         Assert.True(string.IsNullOrEmpty(hint.Text));
         Capture(board.Window, "fuehrung-el-dropped.png");
@@ -847,6 +912,35 @@ public class LeadershipBoardRenderTests
         notice.UndoCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("Florian Emmering 12/1", Named<TextBlock>(board.View, "ElFahrzeug").Text);
+        Assert.Contains(board.Vm.UnplacedUnits, u => u.Id == unit);
+    }
+
+    // Feedback on v0.10.0-beta.1: FFB 1/12/1 dropped on an Einsatzleitung with no Rufname yet gives
+    // it that Rufname, and the strip no longer lists it as nicht zugeordnet.
+    [AvaloniaFact]
+    public void Dropping_a_unit_on_an_einsatzleitung_without_a_rufname_names_it_and_empties_the_strip()
+    {
+        var board = Show(more: s =>
+        {
+            s.UpdateLeadershipPost("Feuerwehrhaus Emmering", null, null, new Funkgruppen(["FW_EMMERING 1000"], ["307_F"]), null);
+            s.AddForceUnit("FFB", 3, "FFB 1/12/1", scbaCount: 0, officerCount: 1);
+            var spare = s.Incident.Forces.Single(u => u.CallSign == "Florian Emmering 11/2").Id;
+            s.MoveForceUnit(spare, s.Incident.CommandNodes.Single(n => n.Name == "Abschnitt 2 Süd").Id);
+        });
+        var session = board.Session!;
+        var unit = UnitId(board, "FFB 1/12/1");
+        var target = Named<TextBlock>(board.View, "ElFahrzeug");
+        using var transfer = Dragging(unit);
+        Capture(board.Window, "fuehrung-el-fahrzeug-before.png");
+
+        Over(transfer, target);
+        Drop(transfer, target);
+        Dispatcher.UIThread.RunJobs();
+        Capture(board.Window, "fuehrung-el-fahrzeug-after.png");
+
+        Assert.Equal(("FFB 1/12/1", "FFB 1/12/1"), (session.Incident.LeadershipPost.Fuehrungsfahrzeug, session.Incident.LeadershipPost.Rufname));
+        Assert.Empty(board.Vm.UnplacedUnits);
+        Assert.False(board.View.GetControl<Border>("UnplacedStrip").IsEffectivelyVisible);
     }
 
     // The board's refusal stands at its head; RÜCKGÄNGIG pressed with the board scrolled down still shows it.
@@ -881,7 +975,9 @@ public class LeadershipBoardRenderTests
         var el = board.View.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ElCard");
         var target = Named<TextBlock>(board.View, "ElFahrzeug");
 
-        using var same = Dragging(UnitId(board, "Florian Emmering 12/1"));
+        // The Führungsfahrzeug counts as placed at the Einsatzleitung, so the strip no longer lists it;
+        // a drag that started before a peer made it the Führungsfahrzeug still meets the refusal.
+        using var same = Dragging(session.Incident.Forces.Single(u => u.CallSign == "Florian Emmering 12/1").Id);
         Assert.Equal(DragDropEffects.None, Over(same, target).DragEffects);
         Assert.DoesNotContain("drop-target", el.Classes);
 

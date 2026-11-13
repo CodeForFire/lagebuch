@@ -27,6 +27,7 @@ public class GasesSectionTests
         ["dangerous"] = r => r.Dangerous = 10,
         ["lethal"] = r => r.Lethal = 100,
         ["plausible"] = r => r.PlausibleUpTo = 500,
+        ["upper"] = r => r.UpperAlarm = 23,
     };
 
     private static GasesSection Section(params GasDefinition[] gases) => new("Messgase", gases, () => { });
@@ -91,7 +92,156 @@ public class GasesSectionTests
         var conflicts = section.Conflicts();
 
         Assert.Contains("Messgas ohne Namen: Zeile 3", conflicts);
-        Assert.Contains("Doppelte Messgase: CO", conflicts);
+        Assert.Contains("Messgas CO ist doppelt eingetragen", conflicts);
+    }
+
+    [Fact]
+    public void Several_names_used_twice_are_named_together()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S, GasDefinition.DefaultCo, H2S);
+
+        Assert.Equal("Messgase CO, H2S sind doppelt eingetragen", Assert.Single(section.Conflicts()));
+    }
+
+    // Feedback from v0.10.0-beta.1: the only word about a duplicate was a badge at the far left of
+    // the header, so SPEICHERN looked greyed out for no reason. The rows say which, the section why.
+    [Fact]
+    public void Rows_named_twice_are_marked_and_the_others_are_not()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S, GasDefinition.DefaultCo with { Name = "co " });
+
+        Assert.Equal(new[] { true, false, true }, section.Rows.Select(r => r.HasConflict));
+    }
+
+    [Fact]
+    public void A_nameless_row_and_a_row_out_of_order_are_marked()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S with { Lethal = 1m }, GasDefinition.DefaultCo with { Name = " " }, H2S with { Name = "HCN" });
+
+        Assert.Equal(new[] { false, true, true, false }, section.Rows.Select(r => r.HasConflict));
+    }
+
+    [Fact]
+    public void The_section_says_what_to_fix_and_that_saving_waits_for_it()
+    {
+        var section = Section(GasDefinition.DefaultCo, H2S);
+        Assert.Null(section.ConflictMessage);
+
+        section.Rows[1].Name = "CO";
+
+        Assert.Equal("Messgas CO ist doppelt eingetragen\nSpeichern erst nach Korrektur möglich", section.ConflictMessage);
+        Assert.True(section.Rows[1].HasConflict);
+    }
+
+    [Fact]
+    public void Fixing_a_conflict_clears_the_marks_and_the_message()
+    {
+        var section = Section(GasDefinition.DefaultCo, GasDefinition.DefaultCo);
+        Assert.NotNull(section.ConflictMessage);
+
+        section.Rows[1].Name = "H2S";
+
+        Assert.Null(section.ConflictMessage);
+        Assert.All(section.Rows, r => Assert.False(r.HasConflict));
+    }
+
+    [Fact]
+    public void Removing_the_second_of_a_pair_clears_the_mark_on_the_first()
+    {
+        var section = Section(GasDefinition.DefaultCo, GasDefinition.DefaultCo, H2S);
+
+        section.RemoveCommand.Execute(section.Rows[1]);
+
+        Assert.False(section.Rows[0].HasConflict);
+        Assert.Null(section.ConflictMessage);
+    }
+
+    [Fact]
+    public void Marking_a_row_is_not_an_edit()
+    {
+        var changes = 0;
+        var section = new GasesSection("Messgase", [GasDefinition.DefaultCo, H2S], () => changes++);
+
+        section.Rows[1].Name = "CO";
+
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void A_save_blocked_by_a_conflict_says_why()
+    {
+        var provider = new Provider(MasterDataSet.Empty with { Gases = [GasDefinition.DefaultCo, H2S] });
+        var vm = new MasterDataEditorViewModel(provider, new FakeDialogs(), new NoFiles());
+        var gases = vm.Sections.OfType<GasesSection>().Single();
+        Assert.Equal("Keine Änderungen zu speichern", vm.SaveBlockedReason);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        gases.Rows[1].Name = "co";
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.Equal("Erst korrigieren:\nMessgas CO ist doppelt eingetragen", vm.SaveBlockedReason);
+        Assert.Contains(nameof(MasterDataEditorViewModel.SaveBlockedReason), raised);
+
+        gases.Rows[1].Name = "H2S";
+
+        Assert.True(vm.SaveCommand.CanExecute(null));
+        Assert.Null(vm.SaveBlockedReason);
+    }
+
+    // #927: Anreicherung ab, the enrichment limit of a falling gas.
+    [Fact]
+    public void Only_a_falling_gas_offers_the_upper_alarm_and_the_row_follows_the_direction()
+    {
+        var section = Section(GasDefinition.DefaultCo);
+        var row = section.Rows[0];
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        Assert.False(row.IsFalling);
+
+        row.Direction = GasDirection.Falling;
+
+        Assert.True(row.IsFalling);
+        Assert.Contains(nameof(GasRow.IsFalling), raised);
+    }
+
+    [Fact]
+    public void The_upper_alarm_of_a_falling_gas_is_read_edited_and_saved()
+    {
+        var o2 = new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m, UpperAlarm: 23m);
+        var provider = new Provider(MasterDataSet.Empty with { Gases = [o2] });
+        var vm = new MasterDataEditorViewModel(provider, new FakeDialogs(), new NoFiles());
+        var row = vm.Sections.OfType<GasesSection>().Single().Rows[0];
+        Assert.Equal(23m, row.UpperAlarm);
+
+        row.UpperAlarm = 23.5m;
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(23.5m, Assert.Single(provider.Saved.Gases).UpperAlarm);
+    }
+
+    [Theory]
+    [InlineData("19")]
+    [InlineData("26")]
+    public void An_upper_alarm_at_the_mildest_band_or_beyond_plausibility_is_named_and_marked(string upper)
+    {
+        var section = Section(new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m));
+
+        section.Rows[0].UpperAlarm = decimal.Parse(upper, System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Equal("Schwellen nicht in Reihenfolge: O2", Assert.Single(section.Conflicts()));
+        Assert.True(section.Rows[0].HasConflict);
+    }
+
+    [Fact]
+    public void An_upper_alarm_left_on_a_gas_switched_to_rising_is_no_conflict_and_is_not_saved()
+    {
+        var section = Section(new GasDefinition("O2", "Vol-%", GasDirection.Falling, null, null, null, null, UpperAlarm: 23m));
+
+        section.Rows[0].Direction = GasDirection.Rising;
+
+        Assert.Empty(section.Conflicts());
+        Assert.Null(Assert.Single(section.ToValues()).UpperAlarm);
     }
 
     [Fact]
@@ -177,6 +327,7 @@ public class GasesSectionTests
     [InlineData("dangerous")]
     [InlineData("lethal")]
     [InlineData("plausible")]
+    [InlineData("upper")]
     public void A_row_added_with_any_field_filled_asks_before_it_goes(string field)
     {
         var asked = 0;

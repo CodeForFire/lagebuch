@@ -46,6 +46,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private PremisesSection _premises = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
+    private VehicleTypeCodesSection _vehicleTypeCodes = null!;
     private DispatchPlaceNamesSection _dispatchPlaceNames = null!;
     private StreetsSection _streets = null!;
     private TalkGroupsSection _talkGroups = null!;
@@ -157,6 +158,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     [NotifyCanExecuteChangedFor(nameof(DiscardCommand))]
     private bool _isDirty;
 
@@ -180,6 +182,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     private string? _vehicleConflicts;
 
     /// <summary>
@@ -191,6 +194,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     private string? _personnelConflicts;
 
     /// <summary>
@@ -200,6 +204,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(SaveBlockedReason))]
     private string? _gasConflicts;
 
     public bool HasVehicleConflicts => VehicleConflicts is not null;
@@ -207,6 +212,24 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     public bool HasPersonnelConflicts => PersonnelConflicts is not null;
 
     public bool HasGasConflicts => GasConflicts is not null;
+
+    /// <summary>
+    /// Why SPEICHERN is greyed out, for its tooltip, or <see langword="null"/> when it is not.
+    /// Feedback from v0.10.0-beta.1: a disabled button with no reason reads as a broken one.
+    /// </summary>
+    public string? SaveBlockedReason
+    {
+        get
+        {
+            if (!IsDirty)
+            {
+                return "Keine Änderungen zu speichern";
+            }
+
+            var conflicts = new[] { VehicleConflicts, PersonnelConflicts, GasConflicts }.OfType<string>().ToList();
+            return conflicts.Count == 0 ? null : string.Join("\n", conflicts.Prepend("Erst korrigieren:"));
+        }
+    }
 
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
@@ -278,7 +301,17 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
             // rows (plus the roster), so the vehicle list is the single place to maintain them.
             // The derived lists still serve as typing suggestions for further rows.
-            _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged, RequestConfirm),
+            // A Funkrufname typed into a row with no type takes the one its Kennung stands for,
+            // read from the Fahrzeugkennungen as they stand in the editor, saved or not.
+            _vehicles = new VehiclesSection(
+                "Fahrzeuge",
+                set.Vehicles,
+                set.Brigades,
+                set.RadioCallSigns,
+                OnVehiclesChanged,
+                RequestConfirm,
+                callSign => VehicleTypeCode.TypeFor(callSign, _vehicleTypeCodes.ToValues())),
+            _vehicleTypeCodes = new VehicleTypeCodesSection("Fahrzeugkennungen", set.VehicleTypeCodes, MarkDirty, RequestConfirm),
             _talkGroups = new TalkGroupsSection("Funkgruppen", set.TalkGroups, MarkDirty, RequestConfirm),
 
             // How the alarm mail spells a place the Funkrufnamen abbreviate, so its Einsatzmittel
@@ -425,6 +458,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
+        VehicleTypeCodes = _vehicleTypeCodes.ToValues(),
         DispatchPlaceNames = _dispatchPlaceNames.ToValues(),
         TalkGroups = _talkGroups.ToValues(),
         Gases = _gases.ToValues(),

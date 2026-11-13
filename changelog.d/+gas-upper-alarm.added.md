@@ -1,0 +1,1 @@
+A falling Messgas such as O2 can now carry an optional „Anreicherung ab“ limit in the Stammdaten, so an enriched reading, e.g. from 23 Vol-%, counts as Gefährlich on the tile and in the PDF, whether it comes from a multi-gas meter or a detector tube (#927).

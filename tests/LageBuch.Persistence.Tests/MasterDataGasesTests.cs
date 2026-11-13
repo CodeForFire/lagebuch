@@ -138,6 +138,77 @@ public class MasterDataGasesTests : IDisposable
         Assert.Equal(gases, MasterDataStore.GetOrCreate(_path).Gases);
     }
 
+    // #927: the enrichment limit of a falling gas.
+    [Fact]
+    public void A_falling_gas_reads_its_upper_alarm_from_the_file()
+    {
+        var gas = Assert.Single(Parse("""{ "gases": [{ "name": "O2", "direction": "fallend", "elevated": 19, "plausibleUpTo": 25, "upperAlarm": 23 }] }""").Gases);
+
+        Assert.Equal(23m, gas.UpperAlarm);
+    }
+
+    [Fact]
+    public void An_upper_alarm_on_a_rising_gas_is_dropped_rather_than_rejected()
+    {
+        var gas = Assert.Single(Parse("""{ "gases": [{ "name": "CO", "elevated": 30, "upperAlarm": 5 }] }""").Gases);
+
+        Assert.Null(gas.UpperAlarm);
+        Assert.Equal(30m, gas.Elevated);
+    }
+
+    [Theory]
+    [InlineData("19")]
+    [InlineData("26")]
+    public void An_upper_alarm_out_of_order_rejects_the_file(string upper)
+    {
+        var ex = Assert.Throws<JsonException>(() => Parse(
+            $$"""{ "gases": [{ "name": "O2", "direction": "fallend", "elevated": 19, "plausibleUpTo": 25, "upperAlarm": {{upper}} }] }"""));
+
+        Assert.Contains("O2", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_hostile_upper_alarm_fails_only_with_an_exception_the_join_catches()
+    {
+        Assert.Throws<FormatException>(() => Parse("""{ "gases": [{ "name": "O2", "direction": "fallend", "upperAlarm": "23" }] }"""));
+        Assert.Throws<JsonException>(() => Parse("""{ "gases": [{ "name": "O2", "direction": "fallend", "upperAlarm": 1e9 }] }"""));
+    }
+
+    [Fact]
+    public void The_upper_alarm_round_trips_through_the_file_format_and_the_store()
+    {
+        var gases = new[]
+        {
+            new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m, UpperAlarm: 23.5m),
+            GasDefinition.DefaultCo,
+        };
+        var set = MasterDataSet.Empty with { Gases = gases };
+
+        Assert.Equal(gases, Parse(MasterDataJson.Serialize(set)).Gases);
+        Assert.Contains("\"upperAlarm\": 23.5", MasterDataJson.Serialize(set), StringComparison.Ordinal);
+        MasterDataStore.Save(_path, set);
+        Assert.Equal(gases, MasterDataStore.GetOrCreate(_path).Gases);
+    }
+
+    [Fact]
+    public void A_store_from_before_the_upper_alarm_gains_the_column_and_reads_none()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Gases = [new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, null, null, null, UpperAlarm: 23m)] });
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE md_gases DROP COLUMN upper_alarm;";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var gas = Assert.Single(MasterDataStore.GetOrCreate(_path).Gases);
+        Assert.Equal(("O2", 19m), (gas.Name, gas.Elevated));
+        Assert.Null(gas.UpperAlarm);
+    }
+
     [Fact]
     public void A_store_without_gases_reads_as_CO_alone()
     {

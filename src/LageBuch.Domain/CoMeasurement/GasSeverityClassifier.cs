@@ -7,8 +7,10 @@ namespace LageBuch.Domain.CoMeasurement;
 public static class GasSeverityClassifier
 {
     /// <summary>The band a reading falls in, read in the gas's own direction: a rising gas is
-    /// Erhöht from its threshold upwards, a falling gas from its threshold downwards. A gas with no
-    /// thresholds is always <see cref="CoSeverity.Normal"/>.</summary>
+    /// Erhöht from its threshold upwards, a falling gas from its threshold downwards. A falling gas
+    /// at or above its <see cref="GasDefinition.UpperAlarm"/> is <see cref="CoSeverity.Dangerous"/>
+    /// (#927): O₂ enrichment feeds a fire but does not kill by itself. A gas with no thresholds is
+    /// always <see cref="CoSeverity.Normal"/>.</summary>
     public static CoSeverity SeverityOf(GasDefinition gas, decimal? value)
     {
         ArgumentNullException.ThrowIfNull(gas);
@@ -23,6 +25,11 @@ public static class GasSeverityClassifier
         }
 
         if (Reached(gas.Direction, v, gas.Dangerous))
+        {
+            return CoSeverity.Dangerous;
+        }
+
+        if (gas.Direction == GasDirection.Falling && gas.UpperAlarm is { } upper && v >= upper)
         {
             return CoSeverity.Dangerous;
         }

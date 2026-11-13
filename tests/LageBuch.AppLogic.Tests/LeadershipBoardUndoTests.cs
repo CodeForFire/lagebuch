@@ -101,6 +101,40 @@ public class LeadershipBoardUndoTests
     }
 
     [Fact]
+    public void Undoing_a_fuehrungsfahrzeug_that_filled_the_rufname_empties_both_and_puts_the_unit_back_on_the_strip()
+    {
+        var session = NewSession();
+        var unit = AddUnit(session, "FFB", "FFB 1/12/1");
+        var offered = new List<(string Message, Action Undo)>();
+        using var vm = NewVmOffering(session, offered);
+        Assert.True(vm.AssignFuehrungsfahrzeug(unit));
+        Assert.Empty(vm.UnplacedUnits);
+
+        Assert.Single(offered).Undo();
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal((null, null), (post.Fuehrungsfahrzeug, post.Rufname));
+        Assert.Equal(unit, Assert.Single(vm.UnplacedUnits).Id);
+    }
+
+    [Fact]
+    public void Undoing_a_fuehrungsfahrzeug_keeps_a_rufname_typed_after_the_drop()
+    {
+        var session = NewSession();
+        var unit = AddUnit(session, "FFB", "FFB 1/12/1");
+        var offered = new List<(string Message, Action Undo)>();
+        using var vm = NewVmOffering(session, offered);
+        Assert.True(vm.AssignFuehrungsfahrzeug(unit));
+
+        // A peer names the Einsatzleitung after the EL himself in the seconds before RÜCKGÄNGIG.
+        session.UpdateLeadershipPost(null, "Florian Emmering 1", null, Funkgruppen.Empty, "FFB 1/12/1");
+        Assert.Single(offered).Undo();
+
+        var post = session.Incident.LeadershipPost;
+        Assert.Equal((null, "Florian Emmering 1"), (post.Fuehrungsfahrzeug, post.Rufname));
+    }
+
+    [Fact]
     public void A_move_that_keeps_the_status_does_not_name_it_and_its_undo_leaves_the_status_alone()
     {
         var session = NewSession();

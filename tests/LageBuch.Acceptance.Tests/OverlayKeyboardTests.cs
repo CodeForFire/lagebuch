@@ -81,7 +81,7 @@ public class OverlayKeyboardTests
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0];
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         vm.Forces.Forces[0].RemoveCommand.Execute(null);

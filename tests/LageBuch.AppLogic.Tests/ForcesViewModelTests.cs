@@ -91,7 +91,7 @@ public class ForcesViewModelTests
 
         // The dropdown fills Wache, Funkrufname and the seat-derived Stärke in one go, and locks
         // the two text fields -- so the "or" branch of the rule needs nothing of its own.
-        vm.SelectedVehicle = vm.VehicleOptions[0];
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
         vm.AddForceCommand.Execute(null);
 
         Assert.Single(vm.Forces);
@@ -292,16 +292,16 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
 
         // All Stammdaten vehicles, across every Wache (#215) -- populated without typing anything.
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
 
         // Taking a vehicle removes it from the dropdown.
-        vm.SelectedVehicle = vm.VehicleOptions[0];
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
         vm.AddForceCommand.Execute(null);
-        Assert.Equal(new[] { "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
 
         // Removing its row makes it available again.
         vm.Forces[0].RemoveCommand.Execute(null);
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
     }
 
     // --- Issue #215: a single Fahrzeug pick derives Feuerwehr, spanning every Wache ----------
@@ -311,10 +311,10 @@ public class ForcesViewModelTests
         var vm = NewVm();
 
         // Available before anything is typed, and unaffected by what Feuerwehr says.
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
 
         vm.NewBrigade = "does not matter";
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
     }
 
     [Fact]
@@ -404,7 +404,7 @@ public class ForcesViewModelTests
 
         // Nothing was taken, so every Stammdaten vehicle is still on offer.
         Assert.Equal(
-            new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" },
+            new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" },
             vm.VehicleOptions.Select(v => v.CallSign));
     }
 

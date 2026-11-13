@@ -27,6 +27,28 @@ public class GasmessprotokollSectionTests
         return (incident, clock, op);
     }
 
+    // #927: O2 at 24 Vol-% is above its Anreicherung-ab limit and prints in the Gefährlich red
+    // (#FF5A3C), the same way the tile shows it; the CO beside it stays uncoloured.
+    [Fact]
+    public void An_enriched_O2_reading_prints_in_the_dangerous_colour()
+    {
+        var (incident, clock, op) = Einsatz(GasDefinition.DefaultCo, O2 with { UpperAlarm = 23m });
+        var g = incident.Gases;
+        incident.RecordCoValues(clock, op, incident.Buildings[0].Id, 1, 1, new Dictionary<Guid, decimal?> { [g[0].Id] = 5, [g[1].Id] = 24 });
+        var pdf = IncidentPdf.Generate(incident, Started.AddHours(1), sections: IncidentPdfSections.CoMessprotokoll);
+
+        Assert.Contains("Whg. 1: CO 5 ppm · O2 24 Vol-%, Schlüssel", PdfText.Of(pdf), StringComparison.Ordinal);
+        using var document = UglyToad.PdfPig.PdfDocument.Open(pdf);
+        var letters = document.GetPages().SelectMany(p => p.Letters).Where(l => !string.IsNullOrWhiteSpace(l.Value)).ToList();
+        var run = string.Concat(letters.Select(l => l.Value));
+        var at = run.IndexOf("CO5ppm·O224Vol-%", StringComparison.Ordinal);
+        Assert.True(at >= 0, run);
+        var (r, gr, b) = letters[at + "CO5ppm·O2".Length].Color.ToRGBValues();
+        Assert.True(Math.Abs(r - 1.0) < 0.01 && Math.Abs(gr - (0x5A / 255.0)) < 0.01 && Math.Abs(b - (0x3C / 255.0)) < 0.01, $"O2 24 printed in ({r}, {gr}, {b})");
+        var (cr, cg, cb) = letters[at + "CO".Length].Color.ToRGBValues();
+        Assert.True(Math.Abs(cr - cg) < 0.01 && Math.Abs(cg - cb) < 0.01, $"CO 5 printed in ({cr}, {cg}, {cb})");
+    }
+
     [Fact]
     public void A_Wohnung_lists_its_Messwerte_with_names_in_list_order()
     {

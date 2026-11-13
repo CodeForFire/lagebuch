@@ -389,11 +389,29 @@ public class VersionHandshakeTests
     }
 
     [Fact]
-    public void The_Messprotokoll_raises_the_protocol_and_the_floor_to_forty_two()
+    public void The_upper_alarm_of_a_falling_gas_raises_the_protocol_but_not_the_floor()
     {
-        // 42 lets a client send the Messprotokoll's commands (#930), which a host at 41 does not
-        // know: a 41 and a 42 must not connect.
-        Assert.Equal(42, SyncProtocol.ProtocolVersion);
-        Assert.Equal(42, SyncProtocol.MinimumProtocolVersion);
+        // 42 adds an optional upperAlarm to every gas definition (#927). A peer at 41 drops it and
+        // only loses the enrichment colour of its O2, so 42 by itself kept the floor at 40.
+        Assert.InRange(SyncProtocol.ProtocolVersion, 42, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 40, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_fahrzeugkennungen_raise_the_protocol_but_not_the_floor()
+    {
+        // 43 adds vehicleTypeCodes to /masterdata. A peer at 42 drops the key and only types its
+        // new vehicles by hand, so 43 by itself kept the floor at 40.
+        Assert.InRange(SyncProtocol.ProtocolVersion, 43, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 40, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_Messprotokoll_raises_the_protocol_and_the_floor_to_forty_four()
+    {
+        // 44 lets a client send the Messprotokoll's commands (#930), which a host at 43 does not
+        // know: a 43 and a 44 must not connect.
+        Assert.Equal(44, SyncProtocol.ProtocolVersion);
+        Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
     }
 }

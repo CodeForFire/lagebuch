@@ -1,0 +1,1 @@
+A new Stammdaten list of Fahrzeugkennungen fills an empty Fahrzeugtyp from the middle number of a Funkrufname (the 12 in "FFB 1/12/1") in the editor, the Kräfte form and the alarm import, the Fahrzeugtyp pickers list the MZF and sort alphabetically, and the Kräfte Fahrzeug picker reads by Wache and Funkrufname with numbers in order.

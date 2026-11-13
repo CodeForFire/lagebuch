@@ -274,6 +274,23 @@ public class CoMeasurementPersistenceTests : IDisposable
             dwelling.Readings.Select(r => (r.GasId, r.Value)));
     }
 
+    // #927: the enrichment limit is copied into the Einsatz with the rest of the gas.
+    [Fact]
+    public void A_falling_gas_keeps_its_upper_alarm_through_save_and_load()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        var o2 = new GasDefinition("O2", "Vol-%", GasDirection.Falling, 19m, 17m, 10m, 25m, UpperAlarm: 23.5m);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, gases: [o2, GasDefinition.DefaultCo]);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(23.5m, loaded.Gases[0].Definition.UpperAlarm);
+        Assert.Null(loaded.Gases[1].Definition.UpperAlarm);
+    }
+
     // A file from before #410 has one CO value per Wohnung and a Messreihe of integers. It must
     // come back with exactly one gas, CO in ppm with the old bands, and every value on it.
     [Fact]

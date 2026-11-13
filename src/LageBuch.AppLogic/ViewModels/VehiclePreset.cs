@@ -10,12 +10,16 @@ namespace LageBuch.AppLogic.ViewModels;
 /// <param name="Zugfuehrer">1 when the vehicle carries a Zugführer, else 0.</param>
 /// <param name="Officers">The Führungskraft: one, while a seat is left for it.</param>
 /// <param name="Mannschaft">The remaining seats.</param>
-/// <param name="VehicleType">The catalogue's code when it knows the type, the Stammdaten's text when it does not.</param>
+/// <param name="VehicleType">
+/// The catalogue's code when it knows the type, the Stammdaten's text when it does not; for a
+/// vehicle with none, the type its Funkrufname's Kennung stands for in the Fahrzeugkennungen.
+/// </param>
 public sealed record VehiclePreset(int Zugfuehrer, int Officers, int Mannschaft, string? VehicleType)
 {
     public int Strength => Zugfuehrer + Officers + Mannschaft;
 
-    public static VehiclePreset Of(Vehicle vehicle)
+    /// <summary>What <paramref name="vehicle"/> brings in; <paramref name="typeCodes"/> only fill a type it lacks.</summary>
+    public static VehiclePreset Of(Vehicle vehicle, IReadOnlyList<VehicleTypeCode>? typeCodes = null)
     {
         ArgumentNullException.ThrowIfNull(vehicle);
 
@@ -24,7 +28,9 @@ public sealed record VehiclePreset(int Zugfuehrer, int Officers, int Mannschaft,
         // of being added on top (#260).
         var zugfuehrer = vehicle.HasZugfuehrer ? 1 : 0;
         var remainingSeats = Math.Max(vehicle.Seats - zugfuehrer, 0);
-        var vehicleType = Domain.VehicleTypes.Find(vehicle.VehicleType)?.Code ?? Domain.VehicleTypes.FromStored(vehicle.VehicleType);
+        var vehicleType = Domain.VehicleTypes.Find(vehicle.VehicleType)?.Code
+            ?? Domain.VehicleTypes.FromStored(vehicle.VehicleType)
+            ?? VehicleTypeCode.TypeFor(vehicle.CallSign, typeCodes ?? []);
         return new VehiclePreset(zugfuehrer, Math.Min(1, remainingSeats), Math.Max(remainingSeats - 1, 0), vehicleType);
     }
 }

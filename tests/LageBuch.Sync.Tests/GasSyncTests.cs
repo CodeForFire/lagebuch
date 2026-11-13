@@ -199,6 +199,58 @@ public class GasSyncTests
         Assert.Equal(20m, gas.Elevated);
     }
 
+    // #927: the enrichment limit of a falling gas travels with the rest of its definition.
+    [Fact]
+    public void The_first_Haus_from_a_peer_carries_the_upper_alarm_of_its_O2()
+    {
+        var clock = new FixedClock();
+
+        var incident = WithHaus(clock, H2S, O2 with { UpperAlarm = 23m });
+
+        Assert.Equal(23m, incident.Gases[1].Definition.UpperAlarm);
+        Assert.Null(incident.Gases[0].Definition.UpperAlarm);
+    }
+
+    [Fact]
+    public void A_joined_device_shows_the_upper_alarm_of_the_hosts_O2()
+    {
+        var clock = new FixedClock();
+        var original = WithHaus(clock, O2 with { UpperAlarm = 23.5m });
+
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(original));
+        var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Contains("\"upperAlarm\":23.5", json, StringComparison.Ordinal);
+        Assert.Equal(23.5m, Assert.Single(restored.Gases).Definition.UpperAlarm);
+    }
+
+    [Fact]
+    public void A_gas_from_a_peer_before_the_upper_alarm_reads_without_one()
+    {
+        var clock = new FixedClock();
+        var json = SyncJson.Serialize<SyncCommand>(new AddCoBuildingCommand(Huber, "Haus A", 2, 3, Gases: [O2]));
+        var older = json.Replace(",\"upperAlarm\":null", string.Empty, StringComparison.Ordinal);
+        Assert.NotEqual(json, older);
+        var incident = NewIncident(clock);
+
+        CommandApplier.Apply(SyncJson.Deserialize<SyncCommand>(older), incident, clock);
+
+        var gas = Assert.Single(incident.Gases).Definition;
+        Assert.Equal(19m, gas.Elevated);
+        Assert.Null(gas.UpperAlarm);
+    }
+
+    [Fact]
+    public void An_upper_alarm_a_peer_puts_on_a_rising_gas_or_below_the_bands_is_dropped()
+    {
+        var clock = new FixedClock();
+
+        var incident = WithHaus(clock, H2S with { UpperAlarm = 600m }, O2 with { UpperAlarm = 18m });
+
+        Assert.All(incident.Gases, g => Assert.Null(g.Definition.UpperAlarm));
+        Assert.Equal(19m, incident.Gases[1].Definition.Elevated);
+    }
+
     [Fact]
     public void The_record_command_round_trips_with_its_decimal_values()
     {

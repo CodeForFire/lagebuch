@@ -154,7 +154,7 @@ public class FocusEdgeTests
         AssertEdge(window, railItem);
 
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0];
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         var grid = window.GetVisualDescendants().OfType<DataGrid>().Single(g => g.Name == "ForcesGrid");

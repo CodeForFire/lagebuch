@@ -582,7 +582,7 @@ public sealed class IncidentRepository
             var g = incident.Gases[i];
             Run(
                 inserts,
-                "INSERT INTO co_gases (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to) VALUES ($id,$o,$n,$u,$d,$e,$g,$l,$p);",
+                "INSERT INTO co_gases (id, ordinal, name, unit, direction, elevated, dangerous, lethal, plausible_up_to, upper_alarm) VALUES ($id,$o,$n,$u,$d,$e,$g,$l,$p,$a);",
                 p =>
                 {
                     p("$id", g.Id.ToString());
@@ -594,6 +594,7 @@ public sealed class IncidentRepository
                     p("$g", (object?)GasDefinitionJson.ToText(g.Definition.Dangerous) ?? DBNull.Value);
                     p("$l", (object?)GasDefinitionJson.ToText(g.Definition.Lethal) ?? DBNull.Value);
                     p("$p", (object?)GasDefinitionJson.ToText(g.Definition.PlausibleUpTo) ?? DBNull.Value);
+                    p("$a", (object?)GasDefinitionJson.ToText(g.Definition.UpperAlarm) ?? DBNull.Value);
                 });
         }
     }
@@ -1099,7 +1100,7 @@ public sealed class IncidentRepository
 
         var gases = ReadAll(
             cn,
-            "SELECT id, name, unit, direction, elevated, dangerous, lethal, plausible_up_to FROM co_gases ORDER BY ordinal;",
+            "SELECT id, name, unit, direction, elevated, dangerous, lethal, plausible_up_to, upper_alarm FROM co_gases ORDER BY ordinal;",
             r => new Domain.CoMeasurement.IncidentGas(
                 Guid.Parse(r.GetString(0)),
                 new Domain.CoMeasurement.GasDefinition(
@@ -1109,7 +1110,8 @@ public sealed class IncidentRepository
                     GasDefinitionJson.FromText(Str(r, 4)),
                     GasDefinitionJson.FromText(Str(r, 5)),
                     GasDefinitionJson.FromText(Str(r, 6)),
-                    GasDefinitionJson.FromText(Str(r, 7)))));
+                    GasDefinitionJson.FromText(Str(r, 7)),
+                    GasDefinitionJson.FromText(Str(r, 8)))));
 
         var dwellings = ReadAll(
             cn,

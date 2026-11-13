@@ -692,12 +692,13 @@ updates wait on Play review. The rule is in
 [AGENTS.md › Sync protocol version](../AGENTS.md#sync-protocol-version), and
 the full changelog of the contract is the remarks on
 `SyncProtocol.ProtocolVersion` in
-[`SyncProtocol.cs`](../src/LageBuch.Sync/SyncProtocol.cs). In short:
+[`SyncProtocol.cs`](../src/LageBuch.Sync/SyncProtocol.cs), which is also the
+only place the current numbers are written down. In short:
 
 | Constant | Meaning |
 |---|---|
-| `ProtocolVersion` | the contract this build speaks (currently 25) |
-| `MinimumProtocolVersion` | the oldest contract it still serves (currently 24) |
+| `ProtocolVersion` | the contract this build speaks |
+| `MinimumProtocolVersion` | the oldest contract it still serves |
 | `LegacyProtocolVersion` | what an absent or `0` number means: the v0.6.1 contract, = 1 |
 
 ```mermaid

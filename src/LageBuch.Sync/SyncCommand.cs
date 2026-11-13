@@ -445,7 +445,7 @@ public sealed record SetApartmentCountCommand(
 public sealed record RemoveDwellingsCommand(
     OperatorDto Operator, Guid BuildingId, int FloorOrdinal, IReadOnlyList<int> ApartmentNumbers) : SyncCommand;
 
-// Protocol 41: the Messprotokoll (#930). Every command that writes an ETB line or stamps an author
+// Protocol 44: the Messprotokoll (#930). Every command that writes an ETB line or stamps an author
 // carries the operator; a Messgerät, and a Messgröße's Gerät, note or state, are silent equipment
 // edits like the Beteiligte and carry none. No recording time on the wire: the host stamps it with
 // its own clock. MeasuredAt and ObservedAt are what the Messtrupp reports, so they travel. The

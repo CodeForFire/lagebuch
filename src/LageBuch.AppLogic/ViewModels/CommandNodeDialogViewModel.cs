@@ -48,6 +48,11 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     private Guid? _placeParentId;
     private Guid? _placeBeforeId;
 
+    // The Einsatzleitung is called by its Führungsfahrzeug until someone says otherwise: while the
+    // post's RUFNAME is empty and untyped, it follows the Fahrzeug field. Post mode only.
+    private bool _rufnameFollowsFahrzeug;
+    private bool _fillingRufname;
+
     private CommandNodeDialogViewModel(
         IIncidentSession session,
         MasterDataSet masterData,
@@ -341,6 +346,27 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
 
     partial void OnNameChanged(string value) => NameError = ValidateName();
 
+    partial void OnFuehrungsfahrzeugChanged(string? value)
+    {
+        if (!_rufnameFollowsFahrzeug)
+        {
+            return;
+        }
+
+        _fillingRufname = true;
+        Rufname = Normalize(StammdatenCatalogue.Normalize(value, FahrzeugOptions));
+        _fillingRufname = false;
+    }
+
+    // A Rufname typed here stops the following; clearing it again starts it anew.
+    partial void OnRufnameChanged(string? value)
+    {
+        if (!_fillingRufname)
+        {
+            _rufnameFollowsFahrzeug = _mode == Mode.Post && Normalize(value) is null;
+        }
+    }
+
     private string? ValidateName()
     {
         if (!ShowName)
@@ -373,6 +399,7 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     private CommandNodeDialogViewModel Seeded()
     {
         _seeded = Current();
+        _rufnameFollowsFahrzeug = _mode == Mode.Post && _seeded.Rufname is null;
         return this;
     }
 
@@ -546,9 +573,17 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
                 if (HasChanges)
                 {
                     var post = _session.Incident.LeadershipPost;
-                    var save = Merge(
-                        typed,
-                        Seen(string.Empty, null, post.Standort, post.Rufname, post.Telefon, post.Funkgruppen, post.Fuehrungsfahrzeug));
+                    var live = Seen(string.Empty, null, post.Standort, post.Rufname, post.Telefon, post.Funkgruppen, post.Fuehrungsfahrzeug);
+                    var save = Merge(typed, live);
+
+                    // A Rufname only filled in from the Fahrzeug yields to one a peer saved meanwhile,
+                    // never to the one the dialog opened with: clearing that is what started the following.
+                    if (_rufnameFollowsFahrzeug && live.Rufname is not null
+                        && !string.Equals(live.Rufname, _seeded.Rufname, StringComparison.Ordinal))
+                    {
+                        save = save with { Rufname = live.Rufname };
+                    }
+
                     _session.UpdateLeadershipPost(save.Standort, save.Rufname, save.Telefon, save.Funkgruppen, save.Fuehrungsfahrzeug);
                     _onChanged?.Invoke();
                 }

@@ -259,6 +259,26 @@ public class FuehrungsorganisationSectionTests
     }
 
     [Fact]
+    public void The_einsatzleitungs_fuehrungsfahrzeug_is_printed_at_the_einsatzleitung_and_not_as_unplaced()
+    {
+        var incident = Fresh();
+        El(incident);
+        incident.AddForceUnit(Clock, Op, "FFB", 3, callSign: "FFB 1/12/1");
+        incident.AddForceUnit(Clock, Op, "Emmering", 3, callSign: "Florian Emmering 11/2");
+        incident.UpdateLeadershipPost(Clock, Op, null, null, null, null, "FFB 1/12/1");
+
+        var text = Print(incident);
+
+        PdfText.AssertInOrder(
+            text,
+            "Einsatzleitung Feuerwehr – EL Max Mustermann (Florian Emmering 1) · Fahrzeug FFB 1/12/1",
+            "Nicht zugeordnet: Florian Emmering 11/2");
+
+        // Named once, in the headline: the unplaced list leaves it out.
+        Assert.Equal(2, text.Split("FFB 1/12/1").Length);
+    }
+
+    [Fact]
     public void A_fuehrungsunterstuetzung_is_set_in_body_weight_under_the_bold_einsatzleitung()
     {
         using var document = PdfDocument.Open(IncidentPdf.Generate(FullBoard(), Started, sections: IncidentPdfSections.Fuehrungsorganisation));

@@ -1,0 +1,1 @@
+A Fahrzeug made the Einsatzleitung's Führungsfahrzeug, by drag-and-drop or in ERREICHBARKEIT BEARBEITEN, now gives an empty Rufname its Funkrufname and no longer shows as nicht zugeordnet on the Führung board or in the Bericht.

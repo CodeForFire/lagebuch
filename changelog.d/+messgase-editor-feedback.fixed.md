@@ -1,0 +1,1 @@
+The Stammdaten editor's Messgase unit field opens as a dropdown of every known unit, and a duplicate or nameless gas is now named inside the Messgase section, marked on its rows and given as the reason on the greyed-out SPEICHERN button.
