@@ -9,6 +9,8 @@ public sealed partial class VehicleTypeCodeRow : ObservableObject
 
     public VehicleTypeCodeRow(string kennung, string? vehicleType, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(kennung);
+        ArgumentNullException.ThrowIfNull(onChanged);
         _onChanged = onChanged;
         _kennung = kennung;
         _vehicleType = vehicleType;

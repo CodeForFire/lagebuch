@@ -18,7 +18,9 @@ public sealed partial class VehicleTypeCodesSection : EditorSection
     public VehicleTypeCodesSection(string title, IReadOnlyList<VehicleTypeCode> codes, Action onChanged, Action<string, Action>? requestConfirm = null)
         : base(title, requestConfirm)
     {
+        ArgumentNullException.ThrowIfNull(title);
         ArgumentNullException.ThrowIfNull(codes);
+        ArgumentNullException.ThrowIfNull(onChanged);
         _onChanged = onChanged;
         Rows = new ObservableCollection<VehicleTypeCodeRow>(
             codes.Select(c => new VehicleTypeCodeRow(c.Kennung, c.VehicleType, onChanged)));

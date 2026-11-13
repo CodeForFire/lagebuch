@@ -97,6 +97,21 @@ public class VehicleTypeCodesTests
     }
 
     [Fact]
+    public void The_section_rejects_a_missing_title_list_or_change_callback()
+    {
+        Assert.Equal("title", Assert.Throws<ArgumentNullException>(() => new VehicleTypeCodesSection(null!, [], () => { })).ParamName);
+        Assert.Equal("codes", Assert.Throws<ArgumentNullException>(() => new VehicleTypeCodesSection("Fahrzeugkennungen", null!, () => { })).ParamName);
+        Assert.Equal("onChanged", Assert.Throws<ArgumentNullException>(() => new VehicleTypeCodesSection("Fahrzeugkennungen", [], null!)).ParamName);
+    }
+
+    [Fact]
+    public void A_row_rejects_a_missing_kennung_or_change_callback()
+    {
+        Assert.Equal("kennung", Assert.Throws<ArgumentNullException>(() => new VehicleTypeCodeRow(null!, "MZF", () => { })).ParamName);
+        Assert.Equal("onChanged", Assert.Throws<ArgumentNullException>(() => new VehicleTypeCodeRow("12", "MZF", null!)).ParamName);
+    }
+
+    [Fact]
     public void A_row_that_is_not_in_the_section_is_left_alone()
     {
         var section = Section(new VehicleTypeCode("12", "MZF"));
