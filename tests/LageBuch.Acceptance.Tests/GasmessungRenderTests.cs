@@ -294,7 +294,7 @@ public class GasmessungRenderTests
         var window = new Window { Content = view, Width = 1280, Height = 800 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         Dispatcher.UIThread.RunJobs();
         Capture(window, "gasmessung-anreicherung.png");
 
