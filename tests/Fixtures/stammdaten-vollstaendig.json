@@ -225,6 +225,16 @@
       "vehicleType": null
     }
   ],
+  "vehicleTypeCodes": [
+    {
+      "kennung": "12",
+      "vehicleType": "MZF"
+    },
+    {
+      "kennung": "44",
+      "vehicleType": "LF 20"
+    }
+  ],
   "dispatchPlaceNames": [
     {
       "name": "Musterstadt",

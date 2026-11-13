@@ -903,6 +903,55 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Fahrzeugkennungen: the middle number of a Funkrufname and the Fahrzeugtyp it stands
+                   for. The type offers the Fahrzeuge's suggestions; free text stays valid. Only a
+                   repeated Kennung makes the order matter, so rows do not move. -->
+              <DataTemplate x:DataType="vm:VehicleTypeCodesSection">
+                <DockPanel Classes="add-below">
+                  <TextBlock x:Name="VehicleTypeCodesHint" DockPanel.Dock="Top" Classes="secondary" FontSize="12"
+                             TextWrapping="Wrap" Margin="0,0,0,10"
+                             Text="Die mittlere Zahl im Funkrufnamen nennt den Fahrzeugtyp: „FFB 1/12/1“ hat die Kennung 12. Ein Fahrzeug ohne Typ erhält ihn hiermit, sobald sein Funkrufname eingetragen ist. Ein gewählter Typ bleibt." />
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="120,*,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="KENNUNG" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="FAHRZEUGTYP" Classes="overline" FontSize="10" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VehicleTypeCodeRow">
+                          <Grid ColumnDefinitions="120,*,32" Margin="0,0,0,6">
+                            <TextBox x:Name="KennungBox" Grid.Column="0" AutomationProperties.Name="Kennung"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.VehicleKennungPlaceholder}"
+                                     MaxLength="{x:Static md:VehicleTypeCode.MaxLength}"
+                                     Text="{Binding Kennung}" Margin="0,0,6,0" />
+                            <Grid Grid.Column="1" Margin="0,0,6,0">
+                              <AutoCompleteBox x:Name="VehicleTypeCodeTypeBox" AutomationProperties.Name="Fahrzeugtyp"
+                                               PlaceholderText="{x:Static md:AnonymizedExampleData.VehicleKennungTypePlaceholder}"
+                                               ItemsSource="{x:Static vm:VehicleRow.VehicleTypeOptions}"
+                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                               Text="{Binding VehicleType}" />
+                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,9,0" IsHitTestVisible="False"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Grid>
+                            <!-- ReflectionBinding: see the Links rows. -->
+                            <Button Grid.Column="2" Classes="icon-btn" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Vehicles editor (#76): Wache + Funkrufname + Fahrzeugtyp + Fahrzeugtelefon + E-Mail + Sitzplätze. -->
               <DataTemplate x:DataType="vm:VehiclesSection">
                 <DockPanel Classes="add-below">

@@ -101,6 +101,12 @@
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true, "phone": "01 71 / 2 34 56 78", "email": "kdow@ff-musterstadt.example", "vehicleType": "KdoW" },
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false, "vehicleType": "LF" }
   ],
+  "vehicleTypeCodes": [
+    { "kennung": "10", "vehicleType": "KdoW" },
+    { "kennung": "11", "vehicleType": "ELW 1" },
+    { "kennung": "12", "vehicleType": "MZF" },
+    { "kennung": "44", "vehicleType": "LF 20" }
+  ],
   "dispatchPlaceNames": [
     { "name": "Musterstadt", "abbreviation": "MST" }
   ],

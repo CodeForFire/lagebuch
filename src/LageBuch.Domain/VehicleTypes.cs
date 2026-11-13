@@ -24,6 +24,7 @@ public static class VehicleTypes
         new("ELW 2", "Einsatzleitwagen 2"),
         new("KdoW", "Kommandowagen"),
         new("MTW", "Mannschaftstransportwagen"),
+        new("MZF", "Mehrzweckfahrzeug"),
         new("GW-A", "Gerätewagen Atemschutz", MiddleWheel: true),
         new("GW-G", "Gerätewagen Gefahrgut", MiddleWheel: true),
         new("GW-L", "Gerätewagen Logistik", MiddleWheel: true),

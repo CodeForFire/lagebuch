@@ -46,6 +46,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private PremisesSection _premises = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
+    private VehicleTypeCodesSection _vehicleTypeCodes = null!;
     private DispatchPlaceNamesSection _dispatchPlaceNames = null!;
     private StreetsSection _streets = null!;
     private TalkGroupsSection _talkGroups = null!;
@@ -300,7 +301,17 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
             // rows (plus the roster), so the vehicle list is the single place to maintain them.
             // The derived lists still serve as typing suggestions for further rows.
-            _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged, RequestConfirm),
+            // A Funkrufname typed into a row with no type takes the one its Kennung stands for,
+            // read from the Fahrzeugkennungen as they stand in the editor, saved or not.
+            _vehicles = new VehiclesSection(
+                "Fahrzeuge",
+                set.Vehicles,
+                set.Brigades,
+                set.RadioCallSigns,
+                OnVehiclesChanged,
+                RequestConfirm,
+                callSign => VehicleTypeCode.TypeFor(callSign, _vehicleTypeCodes.ToValues())),
+            _vehicleTypeCodes = new VehicleTypeCodesSection("Fahrzeugkennungen", set.VehicleTypeCodes, MarkDirty, RequestConfirm),
             _talkGroups = new TalkGroupsSection("Funkgruppen", set.TalkGroups, MarkDirty, RequestConfirm),
 
             // How the alarm mail spells a place the Funkrufnamen abbreviate, so its Einsatzmittel
@@ -447,6 +458,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
+        VehicleTypeCodes = _vehicleTypeCodes.ToValues(),
         DispatchPlaceNames = _dispatchPlaceNames.ToValues(),
         TalkGroups = _talkGroups.ToValues(),
         Gases = _gases.ToValues(),

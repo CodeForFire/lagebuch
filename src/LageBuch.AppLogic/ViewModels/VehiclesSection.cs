@@ -17,6 +17,7 @@ public sealed partial class VehiclesSection : EditorSection
     private readonly Action _onChanged;
     private readonly IReadOnlyList<string> _wacheOptions;
     private readonly IReadOnlyList<string> _callSignOptions;
+    private readonly Func<string, string?>? _typeForCallSign;
 
     public VehiclesSection(
         string title,
@@ -24,12 +25,14 @@ public sealed partial class VehiclesSection : EditorSection
         IReadOnlyList<string> wacheOptions,
         IReadOnlyList<string> callSignOptions,
         Action onChanged,
-        Action<string, Action>? requestConfirm = null)
+        Action<string, Action>? requestConfirm = null,
+        Func<string, string?>? typeForCallSign = null)
         : base(title, requestConfirm)
     {
         _onChanged = onChanged;
         _wacheOptions = wacheOptions;
         _callSignOptions = callSignOptions;
+        _typeForCallSign = typeForCallSign;
         Rows = new ObservableCollection<VehicleRow>(
             vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer, v.IsOwn, v.Phone, v.Email, v.VehicleType)));
     }
@@ -37,7 +40,7 @@ public sealed partial class VehiclesSection : EditorSection
     public ObservableCollection<VehicleRow> Rows { get; }
 
     private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer, bool isOwn, string? phone, string? email, string? vehicleType) =>
-        new(wache, callSign, seats, hasZugfuehrer, isOwn, phone, email, vehicleType, _wacheOptions, _callSignOptions, _onChanged);
+        new(wache, callSign, seats, hasZugfuehrer, isOwn, phone, email, vehicleType, _wacheOptions, _callSignOptions, _onChanged, _typeForCallSign);
 
     [RelayCommand]
     private void Add()

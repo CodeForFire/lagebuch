@@ -107,9 +107,11 @@ public sealed record DispatchImport(DispatchAlarm Alarm, IReadOnlyList<DispatchU
     /// Writes the alarm into a freshly started incident: the address, the Einsatzort, the alarm
     /// entry and the ticked Einsatzmittel. A street the Stammdaten know fills in Ortsteil, PLZ and
     /// Ort where all of its rows agree, as the Einsatzdaten dialog does (#461); otherwise the
-    /// alarm's own PLZ and Ort stand.
+    /// alarm's own PLZ and Ort stand. A unit without a Fahrzeugtyp takes the one its Funkrufname's
+    /// Kennung stands for in <paramref name="vehicleTypeCodes"/>; a type the Stammdaten give a
+    /// vehicle is never replaced.
     /// </summary>
-    public void ApplyTo(IIncidentSession session, IReadOnlyList<Street> streets)
+    public void ApplyTo(IIncidentSession session, IReadOnlyList<Street> streets, IReadOnlyList<VehicleTypeCode>? vehicleTypeCodes = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(streets);
@@ -137,13 +139,14 @@ public sealed record DispatchImport(DispatchAlarm Alarm, IReadOnlyList<DispatchU
         {
             if (unit.Vehicle is { } vehicle)
             {
-                var preset = VehiclePreset.Of(vehicle);
+                var preset = VehiclePreset.Of(vehicle, vehicleTypeCodes);
                 session.AddForceUnit(vehicle.Wache, preset.Strength, vehicle.CallSign, officerCount: preset.Officers, zugfuehrerCount: preset.Zugfuehrer, vehicleType: preset.VehicleType);
             }
             else
             {
-                // Not in the Stammdaten: the Funkrufname as alarmed, Stärke still to be reported.
-                session.AddForceUnit(Alarm.Organisation ?? unit.Name, 0, unit.Name);
+                // Not in the Stammdaten: the Funkrufname as alarmed, Stärke still to be reported,
+                // and the type its Kennung stands for.
+                session.AddForceUnit(Alarm.Organisation ?? unit.Name, 0, unit.Name, vehicleType: VehicleTypeCode.TypeFor(unit.Name, vehicleTypeCodes ?? []));
             }
         }
     }
