@@ -32,6 +32,12 @@ updates:
     open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    # global.json pins SDK 10.0.0 (rollForward: latestFeature), so an SDK 11 image
+    # cannot build the Android head. Moving to .NET 11 changes global.json, the
+    # TFMs and the Android workload together; drop this ignore in that PR.
+    ignore:
+      - dependency-name: "dotnet/sdk"
+        update-types: ["version-update:semver-major"]
 
   # The pinned towncrier behind the changelog check in ci.yml.
   - package-ecosystem: pip
