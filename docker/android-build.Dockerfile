@@ -7,7 +7,7 @@
 # Pinned by digest, not tag: a movable tag can be repointed, and OpenSSF
 # Scorecard's Pinned-Dependencies check reads this line. Dependabot's docker
 # ecosystem keeps the digest current (see .github/dependabot.yml).
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e
+FROM mcr.microsoft.com/dotnet/sdk:11.0@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea
 
 # Eclipse Temurin JDK 21 via Adoptium's apt repo. Codename is read from
 # /etc/os-release rather than hardcoded — the dotnet/sdk base image's own
