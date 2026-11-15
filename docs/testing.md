@@ -67,7 +67,8 @@ or a method, in the xunit v2 projects and in Acceptance's xunit.v3 alike. Use
 
 `FILTER` reaches `dotnet test` as a single argument, whatever it contains, so
 `|` combines filters, `FILTER='FullyQualifiedName~A|FullyQualifiedName~B'`, and
-embedded quotes survive, `FILTER='DisplayName~"Hauptstr. 12"'`.
+embedded quotes survive, `FILTER='DisplayName~"Hauptstr. 12"'`. A `$` stays
+literal too: make does not expand `FILTER='DisplayName~"Preis $10"'`.
 
 On a full run, do not trust the tail of the log: it says `0 Error(s)` even when
 a test assembly failed. Check, in this order:

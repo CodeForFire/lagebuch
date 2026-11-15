@@ -66,8 +66,10 @@ export DOTNET_ROOT ?= $(patsubst %/,%,$(dir $(realpath $(shell command -v $(DOTN
 # FILTER reaches the recipe as an environment variable and is expanded by the
 # shell, never pasted into the command text, so `|`, `&` and embedded quotes
 # (FILTER='DisplayName~"Hauptstr. 12"') all reach dotnet test as one argument.
-export FILTER
-TEST_FILTER := $${FILTER:+--filter "$$FILTER"}
+# $(value) takes FILTER as typed, before make would expand a `$5` inside it,
+# and := stores that text without expanding it again on export.
+export LAGEBUCH_TEST_FILTER := $(value FILTER)
+TEST_FILTER := $${LAGEBUCH_TEST_FILTER:+--filter "$$LAGEBUCH_TEST_FILTER"}
 # A FILTER that matches nothing runs no tests and currently still exits 0, so
 # narrow with PROJECT=tests/LageBuch.Domain.Tests and check for "Passed!".
 # The xunit adapters have no Name property, so Name~ matches nothing; use
