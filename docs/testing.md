@@ -65,12 +65,25 @@ or a method, in the xunit v2 projects and in Acceptance's xunit.v3 alike. Use
 `FullyQualifiedName~FormattingTests` or
 `FullyQualifiedName~TimeOfDay_is_clock_time_only`.
 
-`FILTER` is passed quoted, so `|` combines filters:
-`FILTER='FullyQualifiedName~A|FullyQualifiedName~B'`.
+`FILTER` reaches `dotnet test` as a single argument, whatever it contains, so
+`|` combines filters, `FILTER='FullyQualifiedName~A|FullyQualifiedName~B'`, and
+embedded quotes survive, `FILTER='DisplayName~"Hauptstr. 12"'`.
 
 On a full run, do not trust the tail of the log: it says `0 Error(s)` even when
-a test assembly failed. Search the whole log for `Test Run Failed`; see
-[AGENTS.md > Before you call it done](../AGENTS.md#before-you-call-it-done).
+a test assembly failed. Check, in this order:
+
+1. The exit status. `make` fails when a test fails; a non-zero exit is a failure
+   whatever the log says.
+2. The failure marker for the verbosity you ran at. `make ci` runs
+   `dotnet test --verbosity normal`, which prints `Test Run Failed`. `make test`
+   runs at the default minimal verbosity, which never prints that line; a
+   failed assembly shows up only as its `Failed!` summary line.
+3. That every test project reports a non-zero test count: a `Passed!` line
+   with `Total: N` at minimal verbosity, `Total tests: N` under
+   `Test Run Successful.` at normal. An assembly that discovered no tests does
+   not fail the run, so a missing project looks the same as a green one.
+
+See also [AGENTS.md > Before you call it done](../AGENTS.md#before-you-call-it-done).
 
 `make test-all` uses the full `LageBuch.sln`, including the Android head. It needs
 the Android workload and a compatible JDK (21 or earlier), as explained in
