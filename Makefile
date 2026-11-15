@@ -63,9 +63,17 @@ PUBLISH_FLAGS := -c Release --self-contained true -p:PublishSingleFile=true \
 # DOTNET_ROOT in the environment wins.
 export DOTNET_ROOT ?= $(patsubst %/,%,$(dir $(realpath $(shell command -v $(DOTNET)))))
 
-TEST_FILTER := $(if $(FILTER),--filter $(FILTER),)
-# FILTER on its own fails in assemblies that match nothing, so narrow with
-# PROJECT=tests/LageBuch.Domain.Tests when filtering.
+# FILTER reaches the recipe as an environment variable and is expanded by the
+# shell, never pasted into the command text, so `|`, `&` and embedded quotes
+# (FILTER='DisplayName~"Hauptstr. 12"') all reach dotnet test as one argument.
+# $(value) takes FILTER as typed, before make would expand a `$5` inside it,
+# and := stores that text without expanding it again on export.
+export LAGEBUCH_TEST_FILTER := $(value FILTER)
+TEST_FILTER := $${LAGEBUCH_TEST_FILTER:+--filter "$$LAGEBUCH_TEST_FILTER"}
+# A FILTER that matches nothing runs no tests and currently still exits 0, so
+# narrow with PROJECT=tests/LageBuch.Domain.Tests and check for "Passed!".
+# The xunit adapters have no Name property, so Name~ matches nothing; use
+# FullyQualifiedName~ for a class or a method (docs/testing.md).
 TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .DEFAULT_GOAL := help
@@ -94,7 +102,7 @@ build: ## Build everything except the Android head
 build-all: ## Build the full solution incl. Android (needs JDK <= 21)
 	$(DOTNET) build $(SLN) -c $(CONFIG)
 
-test: ## Run tests (PROJECT=path and/or FILTER=Name~Foo to narrow)
+test: ## Run tests (PROJECT=path and/or FILTER=FullyQualifiedName~Foo to narrow)
 	$(DOTNET) test $(TEST_TARGET) -c $(CONFIG) $(TEST_FILTER)
 
 test-all: ## Run tests over the full solution (needs JDK <= 21)
