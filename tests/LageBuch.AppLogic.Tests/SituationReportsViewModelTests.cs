@@ -40,7 +40,7 @@ public class SituationReportsViewModelTests
         Assert.Same(vm.Reports[0], vm.SelectedReport);
         Assert.Equal("Florian Musterstadt 11/1", vm.Reporter);
         Assert.Equal("Blumenstraße 13", vm.Location);
-        Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9, FF Beispieldorf 0/1/5/6", vm.Units);
+        Assert.Equal("HLF 1, FF Beispieldorf", vm.Units);
         Assert.Null(vm.Situation);
         Assert.True(vm.IsEditable);
     }
@@ -305,8 +305,8 @@ public class SituationReportsViewModelTests
 
         vm.RefreshUnitsCommand.Execute(null);
 
-        Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9", vm.Units);
-        Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9", session.Incident.SituationReports[0].Units);
+        Assert.Equal("HLF 1", vm.Units);
+        Assert.Equal("HLF 1", session.Incident.SituationReports[0].Units);
     }
 
     [Fact]
@@ -394,7 +394,33 @@ public class SituationReportsViewModelTests
 
         Assert.NotNull(text);
         Assert.True(text.Length <= SituationReportsViewModel.MaxFieldLength);
-        Assert.EndsWith("0/0/9/9 …", text, StringComparison.Ordinal);
+        Assert.EndsWith(", FF Musterstadt 32 …", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Units_are_named_by_their_funkrufname_alone()
+    {
+        ForceUnit[] forces =
+        [
+            ForceUnit.Create("FF Musterstadt", 9, callSign: "Florian Musterstadt 40/1", officerCount: 1),
+            ForceUnit.Create("FF Beispieldorf", 6, callSign: "Florian Beispieldorf 42/1", officerCount: 1),
+        ];
+
+        Assert.Equal(
+            "Florian Musterstadt 40/1, Florian Beispieldorf 42/1",
+            SituationReportsViewModel.DescribeUnits(forces));
+    }
+
+    [Fact]
+    public void A_unit_without_funkrufname_is_named_by_its_wache()
+    {
+        ForceUnit[] forces =
+        [
+            ForceUnit.Create("FF Musterstadt", 9, callSign: "Florian Musterstadt 40/1"),
+            ForceUnit.Create("FF Beispieldorf", 6),
+        ];
+
+        Assert.Equal("Florian Musterstadt 40/1, FF Beispieldorf", SituationReportsViewModel.DescribeUnits(forces));
     }
 
     // A draft with a Lage, saved, then opened read-only the way a closed Einsatz is reopened.
@@ -673,13 +699,13 @@ public class SituationReportsViewModelTests
     [Fact]
     public void Units_exactly_as_long_as_the_field_are_not_cut()
     {
-        // 290 + " 0/0/9/9" + ", " + 292 + " 0/0/9/9" = 600 characters.
-        ForceUnit[] forces = [ForceUnit.Create(new string('A', 290), 9), ForceUnit.Create(new string('B', 292), 9)];
+        // 299 + ", " + 299 = 600 characters.
+        ForceUnit[] forces = [ForceUnit.Create(new string('A', 299), 9), ForceUnit.Create(new string('B', 299), 9)];
 
         var text = SituationReportsViewModel.DescribeUnits(forces);
 
         Assert.Equal(SituationReportsViewModel.MaxFieldLength, text?.Length);
-        Assert.EndsWith("B 0/0/9/9", text, StringComparison.Ordinal);
+        Assert.Equal(new string('A', 299) + ", " + new string('B', 299), text);
     }
 
     [Fact]
@@ -688,8 +714,8 @@ public class SituationReportsViewModelTests
         // The second separator sits at 599, just past where a cut may still start.
         ForceUnit[] forces =
         [
-            ForceUnit.Create(new string('A', 291), 9),
-            ForceUnit.Create(new string('B', 290), 9),
+            ForceUnit.Create(new string('A', 299), 9),
+            ForceUnit.Create(new string('B', 298), 9),
             ForceUnit.Create("C", 9),
         ];
 
@@ -697,7 +723,7 @@ public class SituationReportsViewModelTests
 
         Assert.NotNull(text);
         Assert.True(text.Length <= SituationReportsViewModel.MaxFieldLength, $"{text.Length} characters");
-        Assert.Equal(new string('A', 291) + " 0/0/9/9 …", text);
+        Assert.Equal(new string('A', 299) + " …", text);
     }
 
     [Fact]
