@@ -143,6 +143,25 @@ public class MapOverlayRasterTests
     }
 
     [Fact]
+    public void An_Einsatz_takes_only_so_many_raster_Ebenen_but_still_GeoJSON_ones()
+    {
+        var (incident, clock, op) = NewIncident();
+        for (var i = 0; i < Incident.MaxRasterMapOverlays; i++)
+        {
+            incident.AddMapOverlay(clock, op, Guid.NewGuid(), Guid.NewGuid(), "a.png", "image/png", 10, Raster());
+        }
+
+        var refused = Assert.Throws<InvalidOperationException>(() =>
+            incident.AddMapOverlay(clock, op, Guid.NewGuid(), Guid.NewGuid(), "b.png", "image/png", 10, Raster()));
+        Assert.Equal($"Ein Einsatz hat höchstens {Incident.MaxRasterMapOverlays} Luftbild-Ebenen. Ältere entfernen.", refused.Message);
+        Assert.Equal(Incident.MaxRasterMapOverlays, incident.MapOverlays.Count);
+        Assert.Equal(Incident.MaxRasterMapOverlays, incident.Files.Count);
+
+        incident.AddMapOverlay(clock, op, Guid.NewGuid(), Guid.NewGuid(), "lage.geojson", "application/geo+json", 10, new MapOverlaySummary("lage", 1, null, null));
+        Assert.Equal(Incident.MaxRasterMapOverlays + 1, incident.MapOverlays.Count);
+    }
+
+    [Fact]
     public void A_loaded_raster_row_without_a_box_reads_back_as_a_vector_Ebene()
     {
         // The nearest valid Ebene: one the map cannot place is shown as unreadable, never placed anywhere.

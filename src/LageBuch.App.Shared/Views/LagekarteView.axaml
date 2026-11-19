@@ -208,6 +208,9 @@
                     IsVisible="{Binding Overlays.IsLoadingLuftbild}"
                     Command="{Binding Overlays.LoadLuftbildCancelCommand}" />
           </StackPanel>
+          <TextBlock x:Name="RasterBudgetHintText" Text="{Binding Overlays.RasterBudgetHint}" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     IsVisible="{Binding Overlays.RasterBudgetHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <TextBlock x:Name="LuftbildStatusText" Text="{Binding Overlays.LuftbildStatus}" TextWrapping="Wrap" FontSize="12"
                      Foreground="{StaticResource TextSecondaryBrush}"
                      IsVisible="{Binding Overlays.LuftbildStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />

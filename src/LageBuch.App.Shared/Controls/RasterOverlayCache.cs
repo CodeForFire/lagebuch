@@ -83,7 +83,7 @@ public sealed class RasterOverlayCache
         Bitmap? bitmap;
         try
         {
-            bitmap = await Task.Run(() => Decode(raster.Bytes));
+            bitmap = await Task.Run(() => Decode(raster));
         }
         catch (Exception)
         {
@@ -104,11 +104,23 @@ public sealed class RasterOverlayCache
         }
     }
 
-    private static Bitmap Decode(ReadOnlyMemory<byte> bytes)
+    // Decoded to the width its checked header names, so a picture whose real frame claims more than
+    // RasterImageInfo read is scaled down rather than held at full size; and a picture that does not
+    // come out at exactly the checked size is dropped, never drawn into a box made for another.
+    private static Bitmap? Decode(RasterImage raster)
     {
-        using var stream = MemoryMarshal.TryGetArray(bytes, out var segment) && segment.Array is { } array
+        using var stream = MemoryMarshal.TryGetArray(raster.Bytes, out var segment) && segment.Array is { } array
             ? new MemoryStream(array, segment.Offset, segment.Count, writable: false)
-            : new MemoryStream(bytes.ToArray(), writable: false);
-        return new Bitmap(stream);
+            : new MemoryStream(raster.Bytes.ToArray(), writable: false);
+        var bitmap = Bitmap.DecodeToWidth(stream, raster.Info.Width);
+        if (bitmap.PixelSize.Width == raster.Info.Width && bitmap.PixelSize.Height == raster.Info.Height)
+        {
+            return bitmap;
+        }
+
+        using (bitmap)
+        {
+            return null;
+        }
     }
 }

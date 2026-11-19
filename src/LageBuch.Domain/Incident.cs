@@ -26,6 +26,13 @@ public sealed class Incident
     public const int MaxMapOverlays = 100;
 
     /// <summary>
+    /// The most Luftbild and Flurstücksgrenzen Ebenen one Einsatz holds: ten sections of both. Each
+    /// is a picture of up to tens of megabytes in the file and in every device's memory, so a long
+    /// list of them is a burden on a tablet long before it is useful.
+    /// </summary>
+    public const int MaxRasterMapOverlays = 20;
+
+    /// <summary>
     /// Why <see cref="MoveForceUnit"/> refuses a partner's Einsatzleitung, in German. The Führung
     /// board says the same while a unit is held over one.
     /// </summary>
@@ -2030,6 +2037,11 @@ public sealed class Incident
         if (_mapOverlays.Count >= MaxMapOverlays)
         {
             throw new InvalidOperationException($"Ein Einsatz hat höchstens {MaxMapOverlays} Kartenebenen.");
+        }
+
+        if (summary.Kind == MapOverlayKind.Raster && _mapOverlays.Count(o => o.Kind == MapOverlayKind.Raster) >= MaxRasterMapOverlays)
+        {
+            throw new InvalidOperationException($"Ein Einsatz hat höchstens {MaxRasterMapOverlays} Luftbild-Ebenen. Ältere entfernen.");
         }
 
         if (_mapOverlays.Any(o => o.Id == overlayId) || _files.Any(f => f.Id == fileId))

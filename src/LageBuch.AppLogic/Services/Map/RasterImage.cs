@@ -10,8 +10,14 @@ namespace LageBuch.AppLogic.Services.Map;
 /// </summary>
 public sealed record RasterImage(Guid FileId, ReadOnlyMemory<byte> Bytes, GeoBox Bounds, RasterImageInfo Info)
 {
-    /// <summary>The longest side a picture may have to be drawn: past the 4096 LUFTBILD LADEN asks for, far short of a decoding bomb.</summary>
-    public const int MaxPixels = 8192;
+    /// <summary>
+    /// The longest side a picture may have to be drawn: what LUFTBILD LADEN asks for at most. A
+    /// picture from a file or a sync peer that claims more is refused before anything decodes it.
+    /// </summary>
+    public const int MaxPixels = LuftbildArea.MaxPixels;
+
+    /// <summary>What the picture takes in memory once decoded, four bytes a pixel.</summary>
+    public long DecodedBytes => 4L * Info.Width * Info.Height;
 
     /// <summary>
     /// The picture in <paramref name="bytes"/> laid into <paramref name="bounds"/>; false, with the

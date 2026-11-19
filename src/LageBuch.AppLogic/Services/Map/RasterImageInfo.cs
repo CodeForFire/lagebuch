@@ -43,11 +43,14 @@ public sealed record RasterImageInfo(RasterFormat Format, int Width, int Height)
         return width > 0 && height > 0 ? new RasterImageInfo(RasterFormat.Png, width, height) : null;
     }
 
-    // Walks the segments to the first frame header (SOF0 to SOF15, which are not DHT, JPG or DAC),
-    // whose payload is precision, then height and width. A scan before any frame header, or a
-    // segment that runs past the end, makes the file unreadable.
+    // Walks the segments up to the scan (SOS) the way a decoder does, and takes the size from the
+    // one frame header (SOF0 to SOF15, which are not DHT, JPG or DAC) before it. Anything a decoder
+    // could read differently makes the file unreadable rather than guessed at: a length-less marker
+    // (TEM, RSTn, a second SOI, a stuffed FF00) where only segments belong, a second frame header,
+    // a scan without one, the end of the image before any scan, or a segment running past the end.
     private static RasterImageInfo? ReadJpeg(ReadOnlySpan<byte> bytes)
     {
+        RasterImageInfo? frame = null;
         var at = 2;
         while (at + 1 < bytes.Length)
         {
@@ -64,27 +67,37 @@ public sealed record RasterImageInfo(RasterFormat Format, int Width, int Height)
                 continue;
             }
 
-            if (marker is 0xDA or 0xD9)
+            if (marker == 0xDA)
             {
-                return null;
+                return frame;
             }
 
-            if (at + 4 > bytes.Length)
+            if (marker is 0x00 or 0x01 or 0xD8 or 0xD9 or (>= 0xD0 and <= 0xD7) || at + 4 > bytes.Length)
             {
                 return null;
             }
 
             var length = BinaryPrimitives.ReadUInt16BigEndian(bytes.Slice(at + 2, 2));
+            if (length < 2)
+            {
+                return null;
+            }
+
             if (marker is >= 0xC0 and <= 0xCF and not 0xC4 and not 0xC8 and not 0xCC)
             {
-                if (length < 7 || at + 9 > bytes.Length)
+                if (frame is not null || length < 8 || at + 9 > bytes.Length)
                 {
                     return null;
                 }
 
                 var height = BinaryPrimitives.ReadUInt16BigEndian(bytes.Slice(at + 5, 2));
                 var width = BinaryPrimitives.ReadUInt16BigEndian(bytes.Slice(at + 7, 2));
-                return width > 0 && height > 0 ? new RasterImageInfo(RasterFormat.Jpeg, width, height) : null;
+                if (width == 0 || height == 0)
+                {
+                    return null;
+                }
+
+                frame = new RasterImageInfo(RasterFormat.Jpeg, width, height);
             }
 
             at += 2 + length;

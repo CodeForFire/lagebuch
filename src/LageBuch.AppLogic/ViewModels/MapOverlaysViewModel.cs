@@ -24,6 +24,14 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class MapOverlaysViewModel : ObservableObject
 {
+    /// <summary>
+    /// How much memory the shown pictures may take once decoded, together: one Luftbild and its
+    /// Flurstücksgrenzen at the largest LUFTBILD LADEN fetches (2 × 4096² × 4 bytes, 128 MiB), which
+    /// an Android tablet still holds beside the map. A picture past it stays off the map, newest
+    /// first kept, so a file or a peer with many pictures cannot exhaust a device's memory.
+    /// </summary>
+    public const long MaxVisibleRasterBytes = 2L * RasterImage.MaxPixels * RasterImage.MaxPixels * 4;
+
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly IFileDialogService? _dialogs;
@@ -104,13 +112,18 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(RasterAttribution))]
     private IReadOnlyList<RasterImage> _visibleRasters = [];
 
-    /// <summary>The licence lines of the shown raster Ebenen, each once; null while none is shown.</summary>
+    /// <summary>Why a switched-on picture is not on the map: the shown ones would take too much memory. Null otherwise.</summary>
+    [ObservableProperty]
+    private string? _rasterBudgetHint;
+
+    /// <summary>The licence lines of the pictures on the map, each once; null while none is.</summary>
     public string? RasterAttribution
     {
         get
         {
+            var shown = VisibleRasters.Select(r => r.FileId).ToHashSet();
             var lines = Items
-                .Where(i => i.IsVisible && i.Raster is not null)
+                .Where(i => shown.Contains(i.FileId))
                 .Select(i => i.Attribution)
                 .OfType<string>()
                 .Distinct(StringComparer.Ordinal)
@@ -170,7 +183,8 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         {
             if (!known.TryGetValue(overlay.Id, out var item))
             {
-                item = new MapOverlayItem(overlay, this, _timeZone);
+                var contentType = _session.Incident.Files.FirstOrDefault(f => f.Id == overlay.FileId)?.ContentType;
+                item = new MapOverlayItem(overlay, this, _timeZone, string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase));
                 Track(LoadAsync(item));
             }
 
@@ -181,9 +195,23 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         // the ones before it. On opening the Einsatz only the newest is shown. A raster Ebene lies
         // under them all and covers none, so it is shown when it arrives and on opening, and leaves
         // the others as they are.
-        foreach (var item in Items.Where(i => i.IsRaster && (first || !known.ContainsKey(i.Id))))
+        // On opening, only the newest Luftbild and the newest Flurstücksgrenzen: an Einsatz may hold
+        // many sections, and every picture shown takes its memory.
+        if (first)
         {
-            item.IsVisible = true;
+            var newestPhoto = Items.LastOrDefault(i => i.IsRaster && i.IsPhoto);
+            var newestDrawing = Items.LastOrDefault(i => i.IsRaster && !i.IsPhoto);
+            foreach (var item in Items.Where(i => i.IsRaster))
+            {
+                item.IsVisible = ReferenceEquals(item, newestPhoto) || ReferenceEquals(item, newestDrawing);
+            }
+        }
+        else
+        {
+            foreach (var item in Items.Where(i => i.IsRaster && !known.ContainsKey(i.Id)))
+            {
+                item.IsVisible = true;
+            }
         }
 
         if (Items.LastOrDefault(i => !i.IsRaster) is { } newest && (first || !known.ContainsKey(newest.Id)))
@@ -234,15 +262,28 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         }
     }
 
-    // Every photo first, then every drawing, each in the order the Einsatz has them.
+    // Every photo first, then every drawing, each in the order the Einsatz has them; within
+    // MaxVisibleRasterBytes, filled from the newest down.
     internal void UpdateVisibleRasters()
     {
-        var rasters = Items
-            .Where(i => i.IsVisible)
-            .Select(i => i.Raster)
-            .OfType<RasterImage>()
-            .OrderBy(r => r.Info.Format == RasterFormat.Png)
-            .ToList();
+        var budget = MaxVisibleRasterBytes;
+        var skipped = false;
+        var kept = new List<RasterImage>();
+        foreach (var raster in Items.Where(i => i.IsVisible).Select(i => i.Raster).OfType<RasterImage>().Reverse())
+        {
+            if (raster.DecodedBytes > budget)
+            {
+                skipped = true;
+                continue;
+            }
+
+            budget -= raster.DecodedBytes;
+            kept.Add(raster);
+        }
+
+        kept.Reverse();
+        var rasters = kept.OrderBy(r => r.Info.Format == RasterFormat.Png).ToList();
+        RasterBudgetHint = skipped ? "Nicht alle eingeblendeten Luftbilder passen in den Speicher. Ältere ausblenden." : null;
         if (!rasters.SequenceEqual(VisibleRasters, ReferenceEqualityComparer.Instance))
         {
             VisibleRasters = rasters;
@@ -522,8 +563,9 @@ public sealed partial class MapOverlayItem : ObservableObject
     private readonly MapOverlaysViewModel _owner;
     private readonly TimeZoneInfo _timeZone;
 
-    internal MapOverlayItem(MapOverlay overlay, MapOverlaysViewModel owner, TimeZoneInfo timeZone)
+    internal MapOverlayItem(MapOverlay overlay, MapOverlaysViewModel owner, TimeZoneInfo timeZone, bool isPhoto)
     {
+        IsPhoto = isPhoto;
         _timeZone = timeZone;
         Id = overlay.Id;
         FileId = overlay.FileId;
@@ -548,6 +590,9 @@ public sealed partial class MapOverlayItem : ObservableObject
 
     /// <summary>A raster Ebene: a Luftbild or Flurstücksgrenzen.</summary>
     public bool IsRaster => RasterBounds is not null;
+
+    /// <summary>The Ebene's file is a JPEG: for a raster Ebene, a Luftbild rather than Flurstücksgrenzen.</summary>
+    public bool IsPhoto { get; }
 
     /// <summary>The licence line the Ebene's source asks for, as recorded at its download.</summary>
     public string? Attribution { get; }

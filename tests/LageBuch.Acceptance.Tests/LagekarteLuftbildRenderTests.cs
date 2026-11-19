@@ -89,6 +89,18 @@ public sealed class LagekarteLuftbildRenderTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void A_picture_that_decodes_to_another_shape_than_its_header_claimed_is_not_drawn()
+    {
+        var (window, control) = ShowMap(rotation: 0);
+        var box = BoxOnScreen(control, new Rect(100, 50, 200, 200));
+        control.RasterOverlays = [new RasterImage(Guid.NewGuid(), RedPng(64, 64), box, new RasterImageInfo(RasterFormat.Png, 32, 16))];
+
+        using var frame = Settled(window, control);
+
+        Assert.NotEqual(Red, PixelAt(frame, 200, 150));
+    }
+
+    [AvaloniaFact]
     public void LUFTBILD_LADEN_adds_two_Ebenen_and_their_licence_line()
     {
         var session = TestSession.StartNew(
@@ -229,7 +241,7 @@ public sealed class LagekarteLuftbildRenderTests : IDisposable
 
         private static byte[] JpegHeader(int width, int height)
         {
-            var bytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xD9 };
+            var bytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0xFF, 0xD9 };
             BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(7), (ushort)height);
             BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(9), (ushort)width);
             return bytes;

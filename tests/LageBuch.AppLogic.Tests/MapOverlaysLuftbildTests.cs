@@ -293,6 +293,81 @@ public sealed class MapOverlaysLuftbildTests : IDisposable
         Assert.Empty(vm.VisibleRasters);
     }
 
+    [Fact]
+    public async Task On_opening_an_Einsatz_only_its_newest_Luftbild_and_Flurstuecksgrenzen_are_shown()
+    {
+        var session = NewSession();
+        await AddPair(session, 1000, 1000);
+        await AddPair(session, 1000, 1000);
+
+        var (vm, _) = Open(session, null);
+        await vm.SettledAsync();
+
+        Assert.Equal([false, false, true, true], vm.Items.Select(i => i.IsVisible));
+        Assert.Equal(2, vm.VisibleRasters.Count);
+    }
+
+    [Fact]
+    public async Task Pictures_past_the_memory_budget_stay_off_the_map_and_say_so()
+    {
+        var session = NewSession();
+        await AddPair(session, 4096, 4096);
+        await AddPair(session, 4096, 4096);
+        var (vm, _) = Open(session, null);
+        await vm.SettledAsync();
+        Assert.Null(vm.RasterBudgetHint);
+
+        // The older pair switched on as well: the newer pair fills the budget, so the older stays off.
+        vm.Items[0].IsVisible = true;
+        vm.Items[1].IsVisible = true;
+
+        Assert.Equal(2, vm.VisibleRasters.Count);
+        Assert.All(vm.VisibleRasters, r => Assert.Contains(r.FileId, vm.Items.Skip(2).Select(i => i.FileId)));
+        Assert.Equal("Nicht alle eingeblendeten Luftbilder passen in den Speicher. Ältere ausblenden.", vm.RasterBudgetHint);
+        Assert.True(MapOverlaysViewModel.MaxVisibleRasterBytes >= 2L * 4096 * 4096 * 4);
+
+        vm.Items[0].IsVisible = false;
+        vm.Items[1].IsVisible = false;
+        Assert.Null(vm.RasterBudgetHint);
+    }
+
+    [Fact]
+    public async Task A_hostile_file_of_many_pictures_never_lays_more_than_the_budget_on_the_map()
+    {
+        var session = NewSession();
+        for (var i = 0; i < 5; i++)
+        {
+            await AddPair(session, 4096, 4096);
+        }
+
+        var (vm, _) = Open(session, null);
+        await vm.SettledAsync();
+        foreach (var item in vm.Items)
+        {
+            item.IsVisible = true;
+        }
+
+        var bytes = vm.VisibleRasters.Sum(r => 4L * r.Info.Width * r.Info.Height);
+        Assert.InRange(bytes, 1, MapOverlaysViewModel.MaxVisibleRasterBytes);
+        Assert.NotNull(vm.RasterBudgetHint);
+    }
+
+    [Fact]
+    public void A_picture_is_drawn_up_to_what_LUFTBILD_LADEN_asks_for_and_no_larger()
+    {
+        Assert.True(RasterImage.TryRead(Guid.NewGuid(), TestImages.Png(LuftbildArea.MaxPixels, LuftbildArea.MaxPixels), Visible, out _, out _));
+        Assert.False(RasterImage.TryRead(Guid.NewGuid(), TestImages.Png(LuftbildArea.MaxPixels + 1, 10), Visible, out _, out var error));
+        Assert.Equal("Das Bild ist zu groß für die Karte.", error);
+    }
+
+    private static async Task AddPair(LocalIncidentSession session, int width, int height)
+    {
+        await session.AddMapOverlayAsync(
+            "luftbild.jpg", "image/jpeg", TestImages.Jpeg(width, height), new MapOverlaySummary("Luftbild (LDBV)", 1, null, null, MapOverlayKind.Raster, Visible, LdbvImageryClient.Attribution));
+        await session.AddMapOverlayAsync(
+            "flurstuecke.png", "image/png", TestImages.Png(width, height), new MapOverlaySummary("Flurstücksgrenzen (LDBV)", 1, null, null, MapOverlayKind.Raster, Visible, LdbvImageryClient.Attribution));
+    }
+
     private static HttpResponseMessage Jpeg(HttpRequestMessage request)
     {
         var query = HttpUtility.ParseQueryString(Assert.IsType<Uri>(request.RequestUri).Query);
