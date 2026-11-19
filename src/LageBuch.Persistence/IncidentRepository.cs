@@ -138,7 +138,7 @@ public sealed class IncidentRepository
             var e = incident.Journal[i];
             Run(
                 inserts,
-                "INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by) VALUES ($id,$o,$ts,$dir,$from,$to,$txt,$by);",
+                "INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by, section_id, section_name) VALUES ($id,$o,$ts,$dir,$from,$to,$txt,$by,$sid,$sname);",
                 p =>
                 {
                     p("$id", e.Id.ToString());
@@ -149,6 +149,8 @@ public sealed class IncidentRepository
                     p("$to", (object?)e.To ?? DBNull.Value);
                     p("$txt", e.Text);
                     p("$by", e.EnteredBy);
+                    p("$sid", (object?)e.SectionId?.ToString() ?? DBNull.Value);
+                    p("$sname", (object?)e.SectionName ?? DBNull.Value);
                 });
 
             for (var j = 0; j < e.Edits.Count; j++)
@@ -755,7 +757,7 @@ public sealed class IncidentRepository
 
         var journal = ReadAll(
             cn,
-            "SELECT id, timestamp, direction, from_party, to_party, text, entered_by FROM etb_entries ORDER BY ordinal;",
+            "SELECT id, timestamp, direction, from_party, to_party, text, entered_by, section_id, section_name FROM etb_entries ORDER BY ordinal;",
             r =>
             {
                 var id = Guid.Parse(r.GetString(0));
@@ -767,7 +769,9 @@ public sealed class IncidentRepository
                     r.GetString(6),
                     Str(r, 3),
                     Str(r, 4),
-                    editsByEntry.TryGetValue(id, out var eds) ? eds : null);
+                    editsByEntry.TryGetValue(id, out var eds) ? eds : null,
+                    NullableGuid(r, 7),
+                    Str(r, 8));
             });
 
         var roles = ReadAll(

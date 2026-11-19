@@ -447,15 +447,18 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Operator = op;
     }
 
-    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null)
+    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null, Guid? sectionId = null)
     {
         var id = Guid.NewGuid();
-        Send(new AddJournalEntryCommand(Op(), direction, text, from, to, id));
+        Send(new AddJournalEntryCommand(Op(), direction, text, from, to, id, sectionId));
         return id;
     }
 
     public void EditJournalEntry(Guid entryId, string text) =>
         Send(new EditJournalEntryCommand(Op(), entryId, text));
+
+    public void AssignJournalEntrySection(Guid entryId, Guid? sectionId) =>
+        Send(new AssignJournalEntrySectionCommand(Op(), entryId, sectionId));
 
     public void ToggleChecklistItem(Guid itemId) => Send(new ToggleChecklistItemCommand(Op(), itemId));
 

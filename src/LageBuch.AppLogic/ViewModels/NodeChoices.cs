@@ -38,6 +38,22 @@ public static class NodeChoices
     }
 
     /// <summary>
+    /// The live Abschnitte and Unterabschnitte an ETB entry can be filed under (#971), in
+    /// <see cref="ReportingLine"/> order, each with its label. No Bereitstellung and no partner:
+    /// the ETB is filtered by Einsatzabschnitt, and neither of those is one.
+    /// </summary>
+    public static IReadOnlyList<SectionOption> Einsatzabschnitte(Incident incident)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        return ReportingLine.Of(incident)
+            .Select(e => e.Node)
+            .OfType<CommandNode>()
+            .Where(n => n.Kind is CommandNodeKind.Abschnitt or CommandNodeKind.Unterabschnitt)
+            .Select(n => new SectionOption(n.Id, incident.NodeLabel(n.Id) ?? n.Name))
+            .ToList();
+    }
+
+    /// <summary>
     /// What a closed picker says: the label of the node marked current, or <see cref="UnplacedLabel"/>
     /// when the unit counts as unplaced, so an empty picker still reads as one rather than a bare dash.
     /// </summary>
@@ -86,3 +102,6 @@ public static class NodeChoices
 /// <param name="IsCurrent">Whether this is the entry in force, for the check mark.</param>
 /// <param name="SelectCommand">Reports <paramref name="NodeId"/> to the picker's owner.</param>
 public sealed record NodeChoice(Guid? NodeId, string Label, bool IsCurrent, IRelayCommand SelectCommand);
+
+/// <summary>An Einsatzabschnitt an ETB entry can be filed under, and what it is called (#971).</summary>
+public sealed record SectionOption(Guid Id, string Label);

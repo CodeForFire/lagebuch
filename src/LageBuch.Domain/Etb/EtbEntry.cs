@@ -26,6 +26,19 @@ public sealed record EtbEntry
 
     public IReadOnlyList<EtbEntryEdit> Edits { get; private init; } = Array.Empty<EtbEntryEdit>();
 
+    /// <summary>
+    /// The Einsatzabschnitt the entry belongs to (#971), or null for none. The quick filter matches
+    /// on this id, so a renamed Abschnitt does not split its entries in two.
+    /// </summary>
+    public Guid? SectionId { get; private init; }
+
+    /// <summary>
+    /// What <see cref="SectionId"/> was called when the entry was assigned to it, e.g.
+    /// "Nord / Zugang". A value, not a lookup: the entry reads the same once the Abschnitt is
+    /// renamed or dissolved, and in a file opened where the incident's nodes say otherwise.
+    /// </summary>
+    public string? SectionName { get; private init; }
+
     public static EtbEntry Create(
         DateTimeOffset timestamp,
         EtbDirection direction,
@@ -67,7 +80,9 @@ public sealed record EtbEntry
         string enteredBy,
         string? from,
         string? to,
-        IEnumerable<EtbEntryEdit>? edits = null)
+        IEnumerable<EtbEntryEdit>? edits = null,
+        Guid? sectionId = null,
+        string? sectionName = null)
         => new()
         {
             Id = id,
@@ -78,7 +93,17 @@ public sealed record EtbEntry
             From = from,
             To = to,
             Edits = (edits ?? Enumerable.Empty<EtbEntryEdit>()).ToList(),
+            SectionId = sectionId,
+            SectionName = sectionId is null ? null : sectionName,
         };
+
+    /// <summary>
+    /// This entry assigned to the Einsatzabschnitt <paramref name="sectionId"/>, called
+    /// <paramref name="sectionName"/>, or to none with null. Which nodes may be chosen is
+    /// <see cref="Incident.AssignJournalEntrySection"/>'s rule, not this method's.
+    /// </summary>
+    public EtbEntry WithSection(Guid? sectionId, string? sectionName) =>
+        this with { SectionId = sectionId, SectionName = sectionId is null ? null : sectionName };
 
     /// <summary>
     /// Corrects this entry's text, recording what it was before under <see cref="Edits"/> so every

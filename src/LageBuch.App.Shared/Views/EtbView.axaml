@@ -37,6 +37,37 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
     </Style>
+    <!-- An Einsatzabschnitt (#971): the entry line's and the quick filter's buttons, and the quiet
+         badge an entry filed under one carries. A chip rather than a full button, so a row of
+         eight Abschnitte still reads as one choice; the chosen one is lit in the link colour. -->
+    <Style Selector="Button.section-chip">
+      <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.section-chip.selected">
+      <Setter Property="Background" Value="{StaticResource LinkWashBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource LinkBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource LinkInkBrush}" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.section-chip">
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
+    <Style Selector="Border.section-badge">
+      <Setter Property="Background" Value="{StaticResource LinkWashBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="5,1" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.section-badge > TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource LinkInkBrush}" />
+    </Style>
     <Style Selector="StackPanel#EditFields">
       <Setter Property="Orientation" Value="Horizontal" />
     </Style>
@@ -115,6 +146,28 @@
                 IsChecked="{Binding HideSystemEntries}" />
     </WrapPanel>
 
+    <!-- The quick filter (#971): only the entries of one Einsatzabschnitt, combined with the two
+         checkboxes above. Shown once the incident has an Abschnitt to filter by. -->
+    <DockPanel DockPanel.Dock="Top" x:Name="SectionFilterBar" Margin="0,0,0,10"
+               IsVisible="{Binding HasFilterChoices}"
+               KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
+      <TextBlock DockPanel.Dock="Left" Text="ABSCHNITT" Classes="overline" VerticalAlignment="Center" Margin="0,0,12,0" />
+      <ItemsControl x:Name="SectionFilterStrip" ItemsSource="{Binding FilterChoices}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel ItemSpacing="6" LineSpacing="6" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:EtbSectionChoice">
+            <Button Classes="section-chip" Classes.selected="{Binding IsSelected}"
+                    Content="{Binding Label}" Command="{Binding SelectCommand}"
+                    ToolTip.Tip="Nur die Einträge dieses Abschnitts zeigen" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DockPanel>
+
     <!-- The phone's way in to the dock. Full width and at the bottom edge of the list, where the
          thumb already is; on a wide window the dock is simply always open and this never shows. -->
     <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
@@ -153,6 +206,26 @@
                         Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
             </Button>
           </Grid>
+          <!-- The Abschnitt the next entry is filed under (#971). Sticky, unlike VON: radio traffic
+               from one Abschnitt comes in runs, and the lit button says which one is in force.
+               A second tap on it files the next entry nowhere. Wraps on a phone. -->
+          <DockPanel x:Name="SectionEntryBar" IsVisible="{Binding HasSectionChoices}" Margin="0,0,0,4">
+            <TextBlock DockPanel.Dock="Left" Text="ABSCHNITT" Classes="overline" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <ItemsControl x:Name="SectionEntryStrip" ItemsSource="{Binding SectionChoices}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:EtbSectionChoice">
+                  <Button Classes="section-chip" Classes.selected="{Binding IsSelected}"
+                          Content="{Binding Label}" Command="{Binding SelectCommand}"
+                          ToolTip.Tip="Den neuen Eintrag diesem Abschnitt zuordnen" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DockPanel>
           <StackPanel x:Name="DockFields" Spacing="8">
             <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
                  a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
@@ -211,6 +284,12 @@
                  handling, so it saved the correction while the Textbaustein list still claimed Enter. -->
             <TextBox x:Name="EditTextBox" Text="{Binding EditText}" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
                      b:EnterSubmit.Command="{Binding SaveEditCommand}" />
+          </HeaderedContentControl>
+          <!-- Set, change or remove the entry's Einsatzabschnitt (#971); written with SPEICHERN. -->
+          <HeaderedContentControl Classes="field" Header="ABSCHNITT" IsVisible="{Binding HasEditSectionChoices}">
+            <ctrl:NodeChoicePicker x:Name="EditSectionPicker" Width="200"
+                                   Choices="{Binding EditSectionChoices}" Label="{Binding EditSectionLabel}"
+                                   PickerName="Abschnitt des Eintrags wählen" />
           </HeaderedContentControl>
           <Button x:Name="SaveEditButton" Classes="signal dock-action" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
@@ -284,6 +363,9 @@
                           Content="{Binding TaskBadge}" Command="{Binding ShowTasksCommand}"
                           ToolTip.Tip="Die Aufgaben zu diesem Eintrag zeigen" />
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Border Classes="section-badge" IsVisible="{Binding HasSection}">
+                        <TextBlock Text="{Binding SectionName}" />
+                      </Border>
                       <Border Classes="lm-badge" IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
                         <TextBlock Text="{Binding SituationReportLabel}" />
                       </Border>
@@ -352,6 +434,9 @@
                         </MultiBinding>
                       </TextBlock.Text>
                     </TextBlock>
+                    <Border Classes="section-badge" HorizontalAlignment="Left" IsVisible="{Binding HasSection}">
+                      <TextBlock Text="{Binding SectionName}" />
+                    </Border>
                     <Border Classes="lm-badge" HorizontalAlignment="Left"
                             IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
                       <TextBlock Text="{Binding SituationReportLabel}" />

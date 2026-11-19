@@ -71,6 +71,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         CallSignOptions = masterData.RadioCallSigns;
         TextSnippets = masterData.TextSnippets.Where(s => s.ForEtb).ToList();
         Entries = new ObservableCollection<EtbEntryRow>();
+        SectionChoices = new ObservableCollection<EtbSectionChoice>();
+        FilterChoices = new ObservableCollection<EtbSectionChoice>();
 
         // Any change to the incident — from this tab, another tab, or (when joined) another device —
         // brings the journal up to date through the same path.
@@ -102,6 +104,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     {
         var journal = _session.Incident.Journal;
         var reportNumbers = SituationReportNumbers();
+        var refiled = false;
         for (var i = _all.Count; i < journal.Count; i++)
         {
             var row = ToRow(journal[i]);
@@ -116,11 +119,13 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
         foreach (var entry in journal)
         {
-            if (!_byId.TryGetValue(entry.Id, out var current) || current.Edits.Count == entry.Edits.Count)
+            if (!_byId.TryGetValue(entry.Id, out var current)
+                || (current.Edits.Count == entry.Edits.Count && current.SectionId == entry.SectionId))
             {
                 continue;
             }
 
+            refiled |= current.SectionId != entry.SectionId;
             current.Update(entry);
 
             if (EditingEntry?.Id == entry.Id)
@@ -146,6 +151,86 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         if (marked && ShowOnlySituationReports)
         {
             ReconcileVisible();
+        }
+
+        SyncSections(refiled);
+    }
+
+    // The strips follow the Organisation: a formed, renamed or dissolved Abschnitt shows up here on
+    // the next change. Rebuilt only when what they show moved, so a focused chip keeps its focus.
+    private void SyncSections(bool refiled)
+    {
+        var live = NodeChoices.Einsatzabschnitte(_session.Incident);
+        if (!SameChoices(SectionChoices, live))
+        {
+            Replace(SectionChoices, live.Select(n => new EtbSectionChoice(n.Id, n.Label, ToggleNewSection)));
+            OnPropertyChanged(nameof(HasSectionChoices));
+        }
+
+        if (NewSectionId is { } chosen && live.All(n => n.Id != chosen))
+        {
+            NewSectionId = null; // dissolved meanwhile: the next entry must not be refused for it
+        }
+
+        // The filter also keeps every Abschnitt an entry is filed under, under the name it was filed
+        // with, so the entries of a dissolved Abschnitt stay findable.
+        var filters = new List<(Guid? Id, string Label)> { (null, AllSectionsLabel) };
+        filters.AddRange(live.Select(Option));
+        foreach (var row in _all)
+        {
+            if (row.SectionId is { } id && filters.All(f => f.Id != id))
+            {
+                filters.Add((id, row.SectionName ?? string.Empty));
+            }
+        }
+
+        if (!SameChoices(FilterChoices, filters))
+        {
+            Replace(FilterChoices, filters.Select(f => new EtbSectionChoice(f.Id, f.Label, id => SectionFilter = id)));
+            OnPropertyChanged(nameof(HasFilterChoices));
+        }
+
+        if (SectionFilter is { } filtered && filters.All(f => f.Id != filtered))
+        {
+            SectionFilter = null; // reconciles and marks "Alle" itself
+        }
+        else
+        {
+            MarkSelected();
+            if (refiled && SectionFilter is not null)
+            {
+                ReconcileVisible();
+            }
+        }
+    }
+
+    private static bool SameChoices(IEnumerable<EtbSectionChoice> shown, IEnumerable<(Guid? Id, string Label)> wanted) =>
+        shown.Select(c => (c.NodeId, c.Label)).SequenceEqual(wanted);
+
+    private static bool SameChoices(IEnumerable<EtbSectionChoice> shown, IEnumerable<SectionOption> wanted) =>
+        SameChoices(shown, wanted.Select(Option));
+
+    private static (Guid? Id, string Label) Option(SectionOption option) => (option.Id, option.Label);
+
+    private static void Replace(ObservableCollection<EtbSectionChoice> target, IEnumerable<EtbSectionChoice> items)
+    {
+        target.Clear();
+        foreach (var item in items)
+        {
+            target.Add(item);
+        }
+    }
+
+    private void MarkSelected()
+    {
+        foreach (var choice in SectionChoices)
+        {
+            choice.IsSelected = choice.NodeId == NewSectionId;
+        }
+
+        foreach (var choice in FilterChoices)
+        {
+            choice.IsSelected = choice.NodeId == SectionFilter;
         }
     }
 
@@ -189,6 +274,50 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
     public ObservableCollection<EtbEntryRow> Entries { get; }
 
+    /// <summary>The quick filter's first button, which shows every entry again.</summary>
+    public const string AllSectionsLabel = "Alle";
+
+    /// <summary>
+    /// The entry line's Abschnitt buttons (#971): one per live Abschnitt and Unterabschnitt, in the
+    /// Organisation's order. None is chosen at first, and a second tap on the chosen one clears it.
+    /// </summary>
+    public ObservableCollection<EtbSectionChoice> SectionChoices { get; }
+
+    /// <summary>Whether the incident has an Abschnitt to file an entry under; the strip hides otherwise.</summary>
+    public bool HasSectionChoices => SectionChoices.Count > 0;
+
+    /// <summary>
+    /// The Abschnitt the next entry is filed under, or null for none. Sticky on purpose, unlike VON:
+    /// radio traffic from one Abschnitt comes in runs, and the chosen button stays lit right above
+    /// the field, so the choice is always in view; VON is cleared because a leftover sender would
+    /// put the next message under the wrong unit without any such sign.
+    /// </summary>
+    [ObservableProperty]
+    private Guid? _newSectionId;
+
+    partial void OnNewSectionIdChanged(Guid? value) => MarkSelected();
+
+    private void ToggleNewSection(Guid? id) => NewSectionId = NewSectionId == id ? null : id;
+
+    /// <summary>
+    /// The quick filter above the grid: <see cref="AllSectionsLabel"/>, then every live Abschnitt,
+    /// then any dissolved one an entry is still filed under, by the name it was filed with.
+    /// </summary>
+    public ObservableCollection<EtbSectionChoice> FilterChoices { get; }
+
+    /// <summary>Whether there is an Abschnitt to filter by at all; "Alle" alone filters nothing.</summary>
+    public bool HasFilterChoices => FilterChoices.Count > 1;
+
+    /// <summary>Only the entries filed under this Abschnitt, by id; null shows them all.</summary>
+    [ObservableProperty]
+    private Guid? _sectionFilter;
+
+    partial void OnSectionFilterChanged(Guid? value)
+    {
+        MarkSelected();
+        ReconcileVisible();
+    }
+
     // System-generated lines (Kräfte, Atemschutz, Einsatz-Lebenszyklus) are usually less important
     // than human entries, so the operator can hide them. On by default (#223): a fresh incident
     // should open on an empty-looking journal, not the "Einsatz begonnen" trace.
@@ -229,7 +358,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
     private bool IsVisible(EtbEntryRow row) =>
         (!HideSystemEntries || row.DirectionValue != EtbDirection.System)
-        && (!ShowOnlySituationReports || row.SituationReportNumber is not null);
+        && (!ShowOnlySituationReports || row.SituationReportNumber is not null)
+        && (SectionFilter is null || row.SectionId == SectionFilter);
 
     // The dock and the edit panel below the grid are two separate forms, so each keeps its own
     // "the operator has asked" state: pressing one must not light up a field in the other (#412).
@@ -307,7 +437,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             return;
         }
 
-        _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo); // Changed → Sync() renders it
+        _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo, NewSectionId); // Changed → Sync() renders it
         var toDispatchCentre = IsToDispatchCentre(NewTo);
         ClearNewEntry();
         _onChanged();
@@ -323,7 +453,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             return;
         }
 
-        var entryId = _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo);
+        var entryId = _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo, NewSectionId);
         var text = NewText;
         var toDispatchCentre = IsToDispatchCentre(NewTo);
         ClearNewEntry();
@@ -392,10 +522,55 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
     private bool CanEdit(EtbEntryRow row) => !IsReadOnly && row.IsEditable;
 
+    /// <summary>The edit panel's Abschnitt, as the picker shows it until SPEICHERN writes it.</summary>
+    private Guid? _editSectionId;
+
+    /// <summary>
+    /// The edit panel's Abschnitt picker: "nicht zugeordnet", every live Abschnitt and, when the
+    /// entry is filed under one since dissolved, that one by the name it was filed with.
+    /// </summary>
+    [ObservableProperty]
+    private IReadOnlyList<NodeChoice> _editSectionChoices = Array.Empty<NodeChoice>();
+
+    /// <summary>What the closed picker says: the chosen Abschnitt, or "nicht zugeordnet".</summary>
+    public string EditSectionLabel =>
+        EditSectionChoices.FirstOrDefault(c => c.IsCurrent && c.NodeId is not null)?.Label ?? NodeChoices.UnplacedLabel;
+
+    /// <summary>Whether there is an Abschnitt to pick; "nicht zugeordnet" alone hides the picker.</summary>
+    public bool HasEditSectionChoices => EditSectionChoices.Count > 1;
+
+    partial void OnEditSectionChoicesChanged(IReadOnlyList<NodeChoice> value)
+    {
+        OnPropertyChanged(nameof(EditSectionLabel));
+        OnPropertyChanged(nameof(HasEditSectionChoices));
+    }
+
+    private void PickEditSection(Guid? id)
+    {
+        _editSectionId = id;
+        EditSectionChoices = BuildEditSectionChoices();
+    }
+
+    private List<NodeChoice> BuildEditSectionChoices()
+    {
+        var options = NodeChoices.Einsatzabschnitte(_session.Incident).Select(Option).ToList();
+        if (EditingEntry is { SectionId: { } filed } row && options.All(o => o.Id != filed))
+        {
+            options.Add((filed, row.SectionName ?? string.Empty));
+        }
+
+        options.Insert(0, (null, NodeChoices.UnplacedLabel));
+        return options
+            .Select(o => new NodeChoice(o.Id, o.Label, o.Id == _editSectionId, new RelayCommand(() => PickEditSection(o.Id))))
+            .ToList();
+    }
+
     private void BeginEdit(EtbEntryRow row)
     {
         EditingEntry = row;
         EditText = row.Text;
+        _editSectionId = row.SectionId;
+        EditSectionChoices = BuildEditSectionChoices();
         ShowEditErrors(false); // a freshly opened panel starts quiet
         HistoryEntry = null; // editing and viewing history are separate panels; only one at a time
     }
@@ -420,7 +595,16 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             return;
         }
 
-        _session.EditJournalEntry(EditingEntry!.Id, EditText); // Changed → Sync() renders it
+        // Read before the first write: its Changed may close this panel (see Sync).
+        var entry = EditingEntry!;
+        var section = _editSectionId;
+        var refiled = section != entry.SectionId;
+        _session.EditJournalEntry(entry.Id, EditText); // Changed → Sync() renders it
+        if (refiled)
+        {
+            _session.AssignJournalEntrySection(entry.Id, section);
+        }
+
         EditingEntry = null;
         EditText = string.Empty;
         ShowEditErrors(false);
@@ -487,6 +671,10 @@ public sealed class EtbEntryRow : ObservableObject
 {
     private int? _situationReportNumber;
 
+    private Guid? _sectionId;
+
+    private string? _sectionName;
+
     public EtbEntryRow(
         EtbEntry entry,
         Action<EtbEntryRow> beginEdit,
@@ -507,6 +695,8 @@ public sealed class EtbEntryRow : ObservableObject
         DirectionValue = entry.Direction;
         WasEdited = entry.Edits.Count > 0;
         Edits = entry.Edits;
+        _sectionId = entry.SectionId;
+        _sectionName = entry.SectionName;
         IsEditable = !EtbDirections.IsAppWritten(entry.Direction);
         BeginEditCommand = new RelayCommand(() => beginEdit(this), () => canEdit(this));
 
@@ -542,6 +732,14 @@ public sealed class EtbEntryRow : ObservableObject
     public IReadOnlyList<EtbEntryEdit> Edits { get; private set; }
 
     public bool IsEditable { get; }
+
+    /// <summary>The Einsatzabschnitt the entry is filed under (#971), or null; what the quick filter matches.</summary>
+    public Guid? SectionId => _sectionId;
+
+    /// <summary>The Abschnitt's name as it was when the entry was filed, for the row's badge.</summary>
+    public string? SectionName => _sectionName;
+
+    public bool HasSection => _sectionId is not null;
 
     public bool CanCreateTask { get; }
 
@@ -609,7 +807,8 @@ public sealed class EtbEntryRow : ObservableObject
     /// <summary>
     /// Re-points this row at the current version of its entry, instead of the view model replacing
     /// the row object, which the grid sees as a different item and deselects. An edit changes only
-    /// the text and its history (<see cref="EtbEntry.WithEditedText"/>), so nothing else is touched.
+    /// the text and its history (<see cref="EtbEntry.WithEditedText"/>), and a re-filing the
+    /// Abschnitt (<see cref="EtbEntry.WithSection"/>), so nothing else is touched.
     /// </summary>
     public void Update(EtbEntry entry)
     {
@@ -625,8 +824,42 @@ public sealed class EtbEntryRow : ObservableObject
         OnPropertyChanged(nameof(Text));
         OnPropertyChanged(nameof(Edits));
         OnPropertyChanged(nameof(WasEdited));
+        if (_sectionId != entry.SectionId || !string.Equals(_sectionName, entry.SectionName, StringComparison.Ordinal))
+        {
+            _sectionId = entry.SectionId;
+            _sectionName = entry.SectionName;
+            OnPropertyChanged(nameof(SectionId));
+            OnPropertyChanged(nameof(SectionName));
+            OnPropertyChanged(nameof(HasSection));
+        }
 
         // The first edit is what makes the history viewable at all.
         ShowHistoryCommand.NotifyCanExecuteChanged();
     }
+}
+
+/// <summary>
+/// One button of an ETB Abschnitt strip (#971): the entry line's, or the quick filter's. A command
+/// per button and not a selection, for the reason given on <see cref="NodeChoice"/>; the owner
+/// marks <see cref="IsSelected"/>, which the view shows as the lit button.
+/// </summary>
+public sealed partial class EtbSectionChoice : ObservableObject
+{
+    public EtbSectionChoice(Guid? nodeId, string label, Action<Guid?> onSelect)
+    {
+        ArgumentNullException.ThrowIfNull(onSelect);
+        NodeId = nodeId;
+        Label = label;
+        SelectCommand = new RelayCommand(() => onSelect(nodeId));
+    }
+
+    /// <summary>The Abschnitt, or null for the filter's "Alle".</summary>
+    public Guid? NodeId { get; }
+
+    public string Label { get; }
+
+    public IRelayCommand SelectCommand { get; }
+
+    [ObservableProperty]
+    private bool _isSelected;
 }
