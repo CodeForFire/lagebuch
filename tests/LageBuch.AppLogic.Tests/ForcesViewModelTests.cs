@@ -91,7 +91,7 @@ public class ForcesViewModelTests
 
         // The dropdown fills Wache, Funkrufname and the seat-derived Stärke in one go, and locks
         // the two text fields -- so the "or" branch of the rule needs nothing of its own.
-        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "FFB 1/40/1").Vehicle;
         vm.AddForceCommand.Execute(null);
 
         Assert.Single(vm.Forces);
@@ -292,16 +292,16 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
 
         // All Stammdaten vehicles, across every Wache (#215) -- populated without typing anything.
-        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
 
         // Taking a vehicle removes it from the dropdown.
-        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "FFB 1/40/1").Vehicle;
         vm.AddForceCommand.Execute(null);
-        Assert.Equal(new[] { "Aich 42/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
 
         // Removing its row makes it available again.
         vm.Forces[0].RemoveCommand.Execute(null);
-        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
     }
 
     // --- Issue #215: a single Fahrzeug pick derives Feuerwehr, spanning every Wache ----------
@@ -311,17 +311,17 @@ public class ForcesViewModelTests
         var vm = NewVm();
 
         // Available before anything is typed, and unaffected by what Feuerwehr says.
-        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
 
         vm.NewBrigade = "does not matter";
-        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
     }
 
     [Fact]
     public void Selecting_a_vehicle_derives_the_brigade()
     {
         var vm = NewVm();
-        var aichVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        var aichVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1").Vehicle;
 
         vm.SelectedVehicle = aichVehicle;
 
@@ -333,7 +333,7 @@ public class ForcesViewModelTests
     public void Manually_editing_brigade_after_a_pick_clears_the_selected_vehicle()
     {
         var vm = NewVm();
-        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "FFB 1/40/1").Vehicle;
         Assert.NotNull(vm.SelectedVehicle);
 
         // A manual edit no longer matches the picked vehicle's Wache -- the pick is stale.
@@ -405,7 +405,7 @@ public class ForcesViewModelTests
         // Nothing was taken, so every Stammdaten vehicle is still on offer.
         Assert.Equal(
             new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" },
-            vm.VehicleOptions.Select(v => v.CallSign));
+            vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
     }
 
     [Fact]
@@ -432,7 +432,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, new FixedClock(T0), masterData, () => { });
 
         // The duplicate collapses; the first occurrence's spelling is kept.
-        Assert.Equal(new[] { "FFB 1/40/1", "ffb 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "FFB 1/40/1", "ffb 1/44/1" }, vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
     }
 
     [Fact]
@@ -460,7 +460,7 @@ public class ForcesViewModelTests
         var vm = NewVm();
         Assert.False(vm.IsVehicleSelected);
 
-        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1").Vehicle;
 
         Assert.True(vm.IsVehicleSelected);
         Assert.Equal("Aich", vm.NewBrigade);
@@ -471,7 +471,7 @@ public class ForcesViewModelTests
     public void Clearing_the_selected_vehicle_empties_the_fields_it_prefilled()
     {
         var vm = NewVm();
-        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1").Vehicle;
 
         vm.ClearVehicleCommand.Execute(null);
 
@@ -489,7 +489,7 @@ public class ForcesViewModelTests
     public void Clearing_the_selected_vehicle_keeps_status_and_notes()
     {
         var vm = NewVm();
-        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1").Vehicle;
         vm.NewStatus = "Anfahrt";
         vm.NewNotes = "über B2";
 
@@ -497,6 +497,117 @@ public class ForcesViewModelTests
 
         Assert.Equal("Anfahrt", vm.NewStatus);
         Assert.Equal("über B2", vm.NewNotes);
+    }
+
+    // --- #967: FAHRZEUG is a suggestion box, filtered on Funkrufname and Wache ---
+    [Fact]
+    public void A_vehicle_option_reads_funkrufname_and_wache()
+    {
+        var option = new VehicleOption(new Vehicle(" FFB Wache 1 ", " FFB 1/40/1 ", 9));
+
+        Assert.Equal("FFB 1/40/1 · FFB Wache 1", option.Text);
+        Assert.Equal(option.Text, option.ToString()); // what the inline completion reads
+    }
+
+    [Fact]
+    public void A_vehicle_option_without_a_wache_reads_its_funkrufname_alone()
+    {
+        Assert.Equal("FFB 1/40/1", new VehicleOption(new Vehicle(" ", "FFB 1/40/1", 9)).Text);
+    }
+
+    [Fact]
+    public void The_selected_vehicle_option_follows_the_selected_vehicle()
+    {
+        var vm = NewVm();
+        Assert.Null(vm.SelectedVehicleOption);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1").Vehicle;
+
+        Assert.Equal("Aich 42/1 · Aich", vm.SelectedVehicleOption?.Text);
+        Assert.Contains(nameof(ForcesViewModel.SelectedVehicleOption), changed);
+    }
+
+    [Fact]
+    public void A_selected_vehicle_the_list_does_not_offer_has_no_option()
+    {
+        var vm = NewVm();
+
+        vm.SelectedVehicle = new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9);
+
+        Assert.Null(vm.SelectedVehicleOption);
+    }
+
+    [Fact]
+    public void Picking_a_vehicle_option_selects_its_vehicle()
+    {
+        var vm = NewVm();
+
+        vm.SelectedVehicleOption = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1");
+
+        Assert.Equal("Aich 42/1", vm.SelectedVehicle?.CallSign);
+        Assert.Equal("Aich", vm.NewBrigade);
+        Assert.Equal("Aich 42/1", vm.NewCallSign);
+    }
+
+    [Fact]
+    public void The_box_dropping_its_pick_drops_what_the_pick_filled_in_but_keeps_the_typed_text()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicleOption = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1");
+        vm.NewStatus = "Anfahrt";
+
+        vm.VehicleText = "Florian Nachbarort";
+        vm.SelectedVehicleOption = null;
+
+        Assert.Null(vm.SelectedVehicle);
+        Assert.Equal(string.Empty, vm.NewBrigade);
+        Assert.Null(vm.NewCallSign);
+        Assert.Null(vm.NewMannschaftCount);
+        Assert.Equal("Anfahrt", vm.NewStatus);
+        Assert.Equal("Florian Nachbarort", vm.VehicleText);
+    }
+
+    [Fact]
+    public void Text_matching_no_vehicle_leaves_what_was_typed_by_hand()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FF Nachbarort";
+        vm.NewCallSign = "Florian Nachbarort 40/1";
+
+        vm.VehicleText = "Florian Nachbarort";
+        vm.SelectedVehicleOption = null; // the box finds no row for it
+
+        Assert.Null(vm.SelectedVehicle);
+        Assert.Equal("FF Nachbarort", vm.NewBrigade);
+        Assert.Equal("Florian Nachbarort 40/1", vm.NewCallSign);
+    }
+
+    [Fact]
+    public void Clearing_the_selected_vehicle_empties_the_fahrzeug_text()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicleOption = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1");
+        vm.VehicleText = "Aich 42/1 · Aich";
+
+        vm.ClearVehicleCommand.Execute(null);
+
+        Assert.Null(vm.VehicleText);
+    }
+
+    [Fact]
+    public void Adding_a_unit_empties_the_fahrzeug_text_and_keeps_the_feuerwehr()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicleOption = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1");
+        vm.VehicleText = "Aich 42/1 · Aich";
+
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Single(vm.Forces);
+        Assert.Null(vm.VehicleText);
+        Assert.Equal("Aich", vm.NewBrigade); // sticky (#540)
     }
 
     [Fact]
@@ -1209,7 +1320,7 @@ public class ForcesViewModelTests
     public void A_vehicle_submit_keeps_its_feuerwehr_and_clears_the_vehicle()
     {
         var vm = NewVm();
-        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        vm.SelectedVehicle = vm.VehicleOptions.Single(o => o.Vehicle.CallSign == "Aich 42/1").Vehicle;
 
         vm.AddForceCommand.Execute(null);
 

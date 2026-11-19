@@ -42,7 +42,7 @@ public class KeyboardWalkthroughTests
             keys.Press(PhysicalKey.ArrowRight);
             keys.Press(PhysicalKey.ArrowRight);
             Dispatcher.UIThread.RunJobs();
-            keys.TabTo(Named<ComboBox>(window, "VehicleBox"));
+            keys.TabTo(Named<AutoCompleteBox>(window, "VehicleBox"));
             keys.Tab();
             keys.Type("FF Nachbarort");
             keys.Tab();

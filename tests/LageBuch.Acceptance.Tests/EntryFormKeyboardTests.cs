@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -107,7 +108,7 @@ public class EntryFormKeyboardTests
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        var vehicle = Named<ComboBox>(window, "VehicleBox");
+        var vehicle = Named<AutoCompleteBox>(window, "VehicleBox");
         FocusByTab(window, vehicle);
 
         window.Tab();
@@ -134,16 +135,142 @@ public class EntryFormKeyboardTests
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        var vehicle = Named<ComboBox>(window, "VehicleBox");
+        var vehicle = Named<AutoCompleteBox>(window, "VehicleBox");
         FocusByTab(window, vehicle);
 
-        window.Press(PhysicalKey.ArrowDown); // a closed ComboBox steps its selection
+        window.Press(PhysicalKey.ArrowDown); // opens the list, as in every suggestion box (#466)
+        Assert.True(vehicle.IsDropDownOpen);
+        window.Press(PhysicalKey.ArrowDown); // the first Stammdaten vehicle
         Assert.NotNull(vm.Forces.SelectedVehicle);
+        window.Press(PhysicalKey.Enter); // takes the row and closes the list
+        Assert.Empty(vm.Forces.Forces);
+        Assert.False(vehicle.IsDropDownOpen);
         window.Press(PhysicalKey.Enter);
 
         Assert.Single(vm.Forces.Forces);
         Assert.False(vehicle.IsDropDownOpen); // Enter submitted, it did not open the list
         window.AssertFocused(vehicle);
+        Assert.True(string.IsNullOrEmpty(vehicle.Text)); // the taken Fahrzeug leaves the field
+    }
+
+    // #967: the Fahrzeug field took no keyboard input. Typed, it filters like every other
+    // suggestion box, and the one Funkrufname it then completes is taken with Enter, which fills
+    // the fields the way picking it with the mouse does.
+    [AvaloniaFact]
+    public void Kraefte_typing_part_of_a_funkrufname_filters_the_fahrzeuge_and_enter_takes_it()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
+        var vehicle = Named<AutoCompleteBox>(window, "VehicleBox");
+        FocusByTab(window, vehicle);
+
+        window.Type("FFB 1/4");
+        Assert.True(vehicle.IsDropDownOpen);
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, ShownCallSigns(vehicle));
+        window.Type("0");
+        Assert.Equal(new[] { "FFB 1/40/1" }, ShownCallSigns(vehicle));
+
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Empty(vm.Forces.Forces); // Enter took the Fahrzeug, it did not submit yet
+        Assert.Equal("FFB 1/40/1", vm.Forces.SelectedVehicle?.CallSign);
+        Assert.Equal("FFB Wache 1", Named<TextBox>(window, "BrigadeBox").Text);
+        Assert.Equal("FFB 1/40/1", Named<TextBox>(window, "CallSignBox").Text);
+        Assert.Equal(9, (vm.Forces.NewZugfuehrerCount ?? 0) + (vm.Forces.NewOfficerCount ?? 0) + (vm.Forces.NewMannschaftCount ?? 0));
+
+        window.Press(PhysicalKey.Enter);
+
+        var unit = Assert.Single(vm.Forces.Forces);
+        Assert.Equal("FFB 1/40/1", unit.CallSign);
+        Assert.Equal("FFB Wache 1", unit.Brigade);
+    }
+
+    [AvaloniaFact]
+    public void Kraefte_typing_a_wache_offers_its_fahrzeuge()
+    {
+        var (window, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
+        var vehicle = Named<AutoCompleteBox>(window, "VehicleBox");
+        FocusByTab(window, vehicle);
+
+        window.Type("Wache 1");
+
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, ShownCallSigns(vehicle));
+    }
+
+    // A Fremdwehr has no Stammdaten vehicle. What is typed for it selects nothing and fills
+    // nothing in: no Fahrzeug is invented, and FEUERWEHR and FUNKRUFNAME stay open for typing.
+    [AvaloniaFact]
+    public void Kraefte_a_fahrzeug_not_in_the_stammdaten_selects_nothing()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
+        var vehicle = Named<AutoCompleteBox>(window, "VehicleBox");
+        FocusByTab(window, vehicle);
+
+        window.Type("Florian Nachbarort 40/1");
+        Assert.Empty(ShownCallSigns(vehicle));
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Null(vm.Forces.SelectedVehicle);
+        Assert.Empty(vm.Forces.Forces);
+        var brigade = Named<TextBox>(window, "BrigadeBox");
+        var callSign = Named<TextBox>(window, "CallSignBox");
+        Assert.True(string.IsNullOrEmpty(brigade.Text));
+        Assert.True(string.IsNullOrEmpty(callSign.Text));
+        Assert.False(brigade.IsReadOnly);
+        Assert.False(callSign.IsReadOnly);
+    }
+
+    // Typing over a picked Fahrzeug drops the pick, and with it what the pick filled in: the
+    // unlocked fields must not keep another vehicle's Wache and Funkrufname.
+    [AvaloniaFact]
+    public void Kraefte_typing_over_a_picked_fahrzeug_drops_what_it_filled_in()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
+        var vehicle = Named<AutoCompleteBox>(window, "VehicleBox");
+        FocusByTab(window, vehicle);
+        window.Type("Aich");
+        window.Press(PhysicalKey.Enter);
+        Assert.Equal("Aich 42/1", vm.Forces.SelectedVehicle?.CallSign);
+
+        window.Press(PhysicalKey.A, RawInputModifiers.Control);
+        window.Type("Florian Nachbarort");
+
+        Assert.Equal("Florian Nachbarort", vehicle.Text); // what was typed stays
+        Assert.Null(vm.Forces.SelectedVehicle);
+        Assert.True(string.IsNullOrEmpty(Named<TextBox>(window, "BrigadeBox").Text));
+        Assert.True(string.IsNullOrEmpty(Named<TextBox>(window, "CallSignBox").Text));
+        Assert.Null(vm.Forces.NewMannschaftCount);
+    }
+
+    [AvaloniaFact]
+    public void Kraefte_clearing_the_fahrzeug_empties_its_field()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
+        var vehicle = Named<AutoCompleteBox>(window, "VehicleBox");
+        FocusByTab(window, vehicle);
+        window.Type("Aich");
+        window.Press(PhysicalKey.Enter);
+        Assert.False(string.IsNullOrEmpty(vehicle.Text));
+
+        vm.Forces.ClearVehicleCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(vm.Forces.SelectedVehicle);
+        Assert.True(string.IsNullOrEmpty(vehicle.Text));
+    }
+
+    // The Funkrufnamen the open list shows, in its order.
+    private static string[] ShownCallSigns(AutoCompleteBox box)
+    {
+        var list = box.GetVisualDescendants().OfType<Popup>().Single().Child?.GetVisualDescendants().OfType<ListBox>().FirstOrDefault()
+            ?? box.GetVisualDescendants().OfType<Popup>().Single().Child as ListBox;
+        return list is null || !box.IsDropDownOpen
+            ? []
+            : [.. list.Items.OfType<VehicleOption>().Select(o => o.Vehicle.CallSign)];
     }
 
     [AvaloniaFact]
@@ -151,7 +278,7 @@ public class EntryFormKeyboardTests
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        FocusByTab(window, Named<ComboBox>(window, "VehicleBox"));
+        FocusByTab(window, Named<AutoCompleteBox>(window, "VehicleBox"));
         window.Tab();
         window.Type("FF Nachbarort");
         window.Tab();
@@ -200,7 +327,7 @@ public class EntryFormKeyboardTests
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        FocusByTab(window, Named<ComboBox>(window, "VehicleBox"));
+        FocusByTab(window, Named<AutoCompleteBox>(window, "VehicleBox"));
         window.Tab();
         window.Type("FF Nachbarort");
         window.Tab();
