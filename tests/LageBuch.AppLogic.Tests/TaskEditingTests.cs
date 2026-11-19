@@ -355,6 +355,33 @@ public class TaskEditingTests
         Assert.Null(vm.EditTimerMinutesError); // a usable value clears it as it is typed
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(IncidentTask.MaxTimerMinutes)]
+    public void Setzen_takes_the_ends_of_the_range(int minutes)
+    {
+        var (session, clock, vm) = WithOneTask();
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+
+        vm.EditTimerMinutes = minutes;
+        vm.SetEditingTimerCommand.Execute(null);
+
+        Assert.Null(vm.EditTimerMinutesError);
+        Assert.Equal(clock.Now.AddMinutes(minutes), session.Incident.Tasks.Single().DueAt);
+    }
+
+    [Fact]
+    public void The_panel_leaves_the_minutes_empty_at_the_moment_the_task_falls_due()
+    {
+        var (_, clock, vm) = WithOneTask();
+        clock.Now = T0.AddMinutes(15); // exactly due: nothing left to show
+        vm.Sync();
+
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+
+        Assert.Null(vm.EditTimerMinutes);
+    }
+
     [Fact]
     public void Speichern_also_applies_a_typed_reminder_time()
     {

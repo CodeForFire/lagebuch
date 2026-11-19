@@ -244,6 +244,42 @@ public class IncidentTaskAggregateTests
     }
 
     [Fact]
+    public void SetTaskTimer_accepts_a_single_minute()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.Low, TaskUrgency.Low, 5);
+
+        var updated = incident.SetTaskTimer(incident.Tasks[0].Id, 1, clock);
+
+        Assert.Equal(T0.AddMinutes(1), updated.DueAt);
+    }
+
+    // A joined client reads a refused command's message verbatim, so it has to say what was wrong.
+    [Fact]
+    public void SetTaskTimer_refusals_say_why_in_german()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var id = incident.Tasks[0].Id;
+
+        var range = Assert.Throws<ArgumentOutOfRangeException>(() => incident.SetTaskTimer(id, 0, clock));
+        Assert.StartsWith(
+            $"Die Minuten bis zur Erinnerung müssen zwischen 1 und {IncidentTask.MaxTimerMinutes} liegen.",
+            range.Message,
+            StringComparison.Ordinal);
+
+        var unknown = Guid.NewGuid();
+        var missing = Assert.Throws<KeyNotFoundException>(() => incident.SetTaskTimer(unknown, 5, clock));
+        Assert.Equal($"Aufgabe {unknown} nicht gefunden.", missing.Message);
+
+        incident.SetTaskCompleted(id, true, clock, op);
+        var done = Assert.Throws<InvalidOperationException>(() => incident.SetTaskTimer(id, 5, clock));
+        Assert.Equal("Eine erledigte Aufgabe hat keinen Timer mehr.", done.Message);
+    }
+
+    [Fact]
     public void SetTaskTimer_unknown_id_throws()
     {
         var (incident, clock) = NewIncident();
