@@ -400,11 +400,16 @@ public class WorkspaceCollaborationTests
     [Fact]
     public async Task A_trupp_the_host_refuses_leaves_no_bereitgestellt_line_in_the_etb()
     {
-        // The client's form cannot see the collision: the Funkrufname is free-typed, and only the
-        // host's guard knows "CSA-Trupp 1" is taken (#995).
+        // The client's form cannot see the collision: the Funkrufname is free-typed, and the first
+        // "CSA-Trupp 1" is already abgenommen, which frees its name for the form's duplicate check
+        // (#968) but not its number. Only the host's guard knows "CSA-Trupp 1" is taken (#995).
         var clock = new FixedClock();
         var hostSession = HostSession(clock);
         await hostSession.AddScbaTruppAsync("CSA-Trupp", TruppMember.Crew("Anna Beispiel", "Ben Muster", null), 300, callSign: "CSA-Trupp 1");
+        var first = hostSession.Incident.ScbaTrupps[0].Id;
+        hostSession.StartScbaTrupp(first);
+        hostSession.WithdrawScbaTrupp(first);
+        hostSession.MarkScbaRemoved(first);
         var (host, port) = await TestHost.StartAsync(hostSession, clock);
         await using var _ = host;
 

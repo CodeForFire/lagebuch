@@ -763,14 +763,15 @@ public class AtemschutzTests
         Assert.Single(incident.ScbaTrupps);
     }
 
-    // A vehicle's Funkrufname is shared by every Trupp it brings, so only the numbered shape is
-    // unique: two Angriffstrupps of one HLF stay allowed.
+    // A vehicle's Funkrufname is shared by every Trupp it brings, so it is not unique the way a
+    // numbered one is: the Angriffstrupp and the Wassertrupp of one HLF stand side by side. Only the
+    // same Trupp-Art twice is refused, which is #968's rule.
     [Fact]
     public void A_vehicle_call_sign_may_repeat()
     {
         var incident = NewIncident(out var clock);
         incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300, callSign: "HLF 1");
-        incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Huber", "Bauer"), entryPressure: 300, callSign: "HLF 1");
+        incident.AddScbaTrupp(clock, "Wassertrupp", TruppMember.Crew("Huber", "Bauer"), entryPressure: 300, callSign: "HLF 1");
 
         Assert.Equal(2, incident.ScbaTrupps.Count);
     }
