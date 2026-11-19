@@ -147,4 +147,81 @@ public class EtbEntryTests
         Assert.Equal("v1", afterSecond.Edits[0].PreviousText);
         Assert.Equal("v2", afterSecond.Edits[1].PreviousText);
     }
+
+    [Fact]
+    public void A_new_entry_has_no_notes()
+    {
+        var entry = EtbEntry.Create(At, EtbDirection.Internal, "Lage erkundet", new SessionOperator("Müller"));
+
+        Assert.Null(entry.Notes);
+    }
+
+    [Fact]
+    public void WithNotes_sets_trimmed_notes_and_leaves_text_and_history_alone()
+    {
+        var entry = EtbEntry.Create(At, EtbDirection.Incoming, "Lagemeldung", new SessionOperator("Müller"), from: "ILS");
+
+        var noted = entry.WithNotes("  Rückruf über Festnetz zugesagt  ");
+
+        Assert.Equal("Rückruf über Festnetz zugesagt", noted.Notes);
+        Assert.Equal(entry.Id, noted.Id);
+        Assert.Equal("Lagemeldung", noted.Text);
+        Assert.Empty(noted.Edits);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void WithNotes_clears_the_notes_when_given_nothing(string? blank)
+    {
+        var noted = EtbEntry.Create(At, EtbDirection.Internal, "Lage", new SessionOperator("Müller")).WithNotes("Hinweis");
+
+        Assert.Null(noted.WithNotes(blank).Notes);
+    }
+
+    [Fact]
+    public void WithNotes_is_a_no_op_when_the_notes_are_unchanged()
+    {
+        var noted = EtbEntry.Create(At, EtbDirection.Internal, "Lage", new SessionOperator("Müller")).WithNotes("Hinweis");
+
+        Assert.Same(noted, noted.WithNotes(" Hinweis "));
+    }
+
+    [Fact]
+    public void WithNotes_rejects_notes_longer_than_the_limit()
+    {
+        var entry = EtbEntry.Create(At, EtbDirection.Internal, "Lage", new SessionOperator("Müller"));
+
+        var ex = Assert.Throws<ArgumentException>(() => entry.WithNotes(new string('x', EtbEntry.MaxTextLength + 1)));
+        Assert.StartsWith($"Notiz ist länger als das Limit von {EtbEntry.MaxTextLength} Zeichen.", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    [InlineData("Rückruf zugesagt", "Rückruf zugesagt")]
+    public void Rehydrate_reads_blank_notes_as_none(string? stored, string? expected)
+    {
+        var entry = EtbEntry.Rehydrate(Guid.NewGuid(), At, EtbDirection.Internal, "Lage", "Müller", null, null, null, stored);
+
+        Assert.Equal(expected, entry.Notes);
+    }
+
+    [Fact]
+    public void WithNotes_accepts_notes_at_exactly_the_limit()
+    {
+        var entry = EtbEntry.Create(At, EtbDirection.Internal, "Lage", new SessionOperator("Müller"));
+
+        Assert.Equal(EtbEntry.MaxTextLength, entry.WithNotes(new string('x', EtbEntry.MaxTextLength)).Notes?.Length);
+    }
+
+    [Fact]
+    public void WithEditedText_keeps_the_notes()
+    {
+        var noted = EtbEntry.Create(At, EtbDirection.Internal, "Lage", new SessionOperator("Müller")).WithNotes("Hinweis");
+
+        Assert.Equal("Hinweis", noted.WithEditedText("Lage neu", new SessionOperator("Schmidt"), At).Notes);
+    }
 }

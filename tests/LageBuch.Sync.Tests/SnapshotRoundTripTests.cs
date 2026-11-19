@@ -31,6 +31,7 @@ public class SnapshotRoundTripTests
         clock.Now = clock.Now.AddMinutes(1);
         var journalEntry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erstmeldung", from: "Leitstelle", to: "ELW");
         incident.EditJournalEntry(clock, op, journalEntry.Id, "Erstmeldung korrigiert");
+        incident.SetJournalEntryNotes(clock, op, journalEntry.Id, "Rückruf über Festnetz zugesagt");
         incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[0].Id);
         incident.AssignRole(clock, op, "EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
 
@@ -129,6 +130,7 @@ public class SnapshotRoundTripTests
         var editedEntry = r.Journal.Single(e => e.Text == "Erstmeldung korrigiert");
         var history = Assert.Single(editedEntry.Edits);
         Assert.Equal("Erstmeldung", history.PreviousText);
+        Assert.Equal("Rückruf über Festnetz zugesagt", editedEntry.Notes);
         Assert.Equal(9, r.Forces[0].PersonnelCount);
         Assert.Equal("Im Einsatz", r.Forces[0].Status);
 

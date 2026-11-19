@@ -385,7 +385,7 @@ public class VersionHandshakeTests
         // 41 adds dispatchPlaceNames to /masterdata. A peer at 40 drops the key and only loses the
         // pre-ticked Einsatzmittel of an alarm, so a 40 and a 41 still connect.
         Assert.InRange(SyncProtocol.ProtocolVersion, 41, int.MaxValue);
-        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, SyncProtocol.ProtocolVersion);
     }
 
     [Fact]
@@ -394,7 +394,7 @@ public class VersionHandshakeTests
         // 42 adds an optional upperAlarm to every gas definition (#927). A peer at 41 drops it and
         // only loses the enrichment colour of its O2, so a 41 and a 42 still connect.
         Assert.InRange(SyncProtocol.ProtocolVersion, 42, int.MaxValue);
-        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, SyncProtocol.ProtocolVersion);
     }
 
     [Fact]
@@ -402,7 +402,16 @@ public class VersionHandshakeTests
     {
         // 43 adds vehicleTypeCodes to /masterdata. A peer at 42 drops the key and only types its
         // new vehicles by hand, so a 42 and a 43 still connect.
-        Assert.Equal(43, SyncProtocol.ProtocolVersion);
-        Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 43, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, SyncProtocol.ProtocolVersion);
+    }
+
+    [Fact]
+    public void The_notes_of_an_etb_entry_raise_the_protocol_and_the_floor()
+    {
+        // 44 lets a client send setJournalEntryNotes (#973), a command a host at 43 cannot read, so
+        // the floor rises with it.
+        Assert.Equal(44, SyncProtocol.ProtocolVersion);
+        Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
     }
 }

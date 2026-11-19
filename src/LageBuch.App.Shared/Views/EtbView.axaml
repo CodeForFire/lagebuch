@@ -52,6 +52,21 @@
     <Style Selector="TextBox#EditTextBox">
       <Setter Property="Width" Value="420" />
     </Style>
+    <Style Selector="TextBox#EditNotesBox">
+      <Setter Property="Width" Value="360" />
+    </Style>
+    <!-- An entry's notes (#973), folded under its line: quieter than the entry, set off by a rule. -->
+    <Style Selector="Border.etb-notes">
+      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+      <Setter Property="BorderThickness" Value="2,0,0,0" />
+      <Setter Property="Padding" Value="8,2,0,2" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+    <Style Selector="Border.etb-notes > TextBlock">
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
 
     <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#DockFields">
       <Setter Property="Orientation" Value="Vertical" />
@@ -76,6 +91,9 @@
       <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow TextBox#EtbTextBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#EditNotesBox">
       <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow TextBox#EditTextBox">
@@ -212,6 +230,14 @@
             <TextBox x:Name="EditTextBox" Text="{Binding EditText}" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
                      b:EnterSubmit.Command="{Binding SaveEditCommand}" />
           </HeaderedContentControl>
+          <!-- Background and follow-up to the entry (#973), folded under its line. Multi-line:
+               Enter breaks the line here and SPEICHERN saves, because Overlay leaves Enter to an
+               AcceptsReturn field. -->
+          <HeaderedContentControl Classes="field" Header="NOTIZ">
+            <TextBox x:Name="EditNotesBox" Text="{Binding EditNotes}" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
+                     AcceptsReturn="True" TextWrapping="Wrap" MinHeight="32" MaxHeight="120"
+                     MaxLength="{x:Static etb:EtbEntry.MaxTextLength}" />
+          </HeaderedContentControl>
           <Button x:Name="SaveEditButton" Classes="signal dock-action" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
           <Button x:Name="CancelEditButton" Classes="dock-action" Content="ABBRECHEN" Command="{Binding CancelEditCommand}"
@@ -267,7 +293,15 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
       <Border x:Name="EtbGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-        <DataGrid x:Name="EtbGrid" b:GridCopy.IsEnabled="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
+        <!-- Rows size to their content (#973): an entry's unfolded notes sit under its line, which
+             the shared 40px RowHeight from Styles.axaml would clip. A folded row keeps 40px. -->
+        <DataGrid x:Name="EtbGrid" b:GridCopy.IsEnabled="True" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False"
+                  RowHeight="NaN">
+          <DataGrid.Styles>
+            <Style Selector="DataGridCell">
+              <Setter Property="MinHeight" Value="40" />
+            </Style>
+          </DataGrid.Styles>
           <DataGrid.Columns>
             <DataGridTextColumn Header="ZEIT" Binding="{Binding Time}" />
             <DataGridTextColumn Header="VON" Binding="{Binding From}" />
@@ -283,11 +317,27 @@
                           IsVisible="{Binding HasTasks}" IsTabStop="False"
                           Content="{Binding TaskBadge}" Command="{Binding ShowTasksCommand}"
                           ToolTip.Tip="Die Aufgaben zu diesem Eintrag zeigen" />
-                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                      <Border Classes="lm-badge" IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
-                        <TextBlock Text="{Binding SituationReportLabel}" />
+                    <StackPanel VerticalAlignment="Center">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Classes="lm-badge" IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+                          <TextBlock Text="{Binding SituationReportLabel}" />
+                        </Border>
+                        <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                        <!-- Shows that the entry has notes and whether they are unfolded (#973). The row's own
+                             click toggles them too; this is the target for a pointer that wants it spelled out. -->
+                        <Button x:Name="NotesToggle" Classes="icon-btn"
+                                IsVisible="{Binding HasNotes}" IsTabStop="False" Command="{Binding ToggleNotesCommand}"
+                                ToolTip.Tip="{Binding NotesToggleLabel}" AutomationProperties.Name="{Binding NotesToggleLabel}">
+                          <StackPanel Orientation="Horizontal" Spacing="0">
+                            <PathIcon Width="14" Height="14" Data="M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z" />
+                            <PathIcon Width="12" Height="12" IsVisible="{Binding !IsNotesExpanded}" Data="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                            <PathIcon Width="12" Height="12" IsVisible="{Binding IsNotesExpanded}" Data="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+                          </StackPanel>
+                        </Button>
+                      </StackPanel>
+                      <Border Classes="etb-notes" IsVisible="{Binding IsNotesExpanded}">
+                        <TextBlock Text="{Binding Notes}" />
                       </Border>
-                      <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
                     </StackPanel>
                   </DockPanel>
                 </DataTemplate>
@@ -358,6 +408,20 @@
                     </Border>
                     <TextBlock Text="{Binding Text}" TextWrapping="Wrap"
                                Foreground="{StaticResource TextPrimaryBrush}" />
+                    <!-- Shows that the entry has notes and whether they are unfolded (#973). The row's own
+                         click toggles them too; this is the target for a pointer that wants it spelled out. -->
+                    <Button x:Name="CardNotesToggle" HorizontalAlignment="Left" Classes="icon-btn card-action"
+                            IsVisible="{Binding HasNotes}" IsTabStop="False" Command="{Binding ToggleNotesCommand}"
+                            ToolTip.Tip="{Binding NotesToggleLabel}" AutomationProperties.Name="{Binding NotesToggleLabel}">
+                      <StackPanel Orientation="Horizontal" Spacing="0">
+                        <PathIcon Width="14" Height="14" Data="M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z" />
+                        <PathIcon Width="12" Height="12" IsVisible="{Binding !IsNotesExpanded}" Data="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                        <PathIcon Width="12" Height="12" IsVisible="{Binding IsNotesExpanded}" Data="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+                      </StackPanel>
+                    </Button>
+                    <Border Classes="etb-notes" Margin="0" IsVisible="{Binding IsNotesExpanded}">
+                      <TextBlock Text="{Binding Notes}" />
+                    </Border>
                     <Button Classes="badge" Classes.open="{Binding HasOpenTasks}"
                             IsVisible="{Binding HasTasks}" IsTabStop="False" HorizontalAlignment="Left"
                             Content="{Binding TaskBadge}" Command="{Binding ShowTasksCommand}"

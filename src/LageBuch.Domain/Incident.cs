@@ -571,6 +571,40 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Sets or clears the notes of a manually-typed ETB entry (#973). App-written entries carry no
+    /// notes, for the same reason <see cref="EditJournalEntry"/> refuses them. A change appends a
+    /// System line, so an annotation added after the fact is as visible as a corrected wording.
+    /// </summary>
+    public EtbEntry SetJournalEntryNotes(IClock clock, SessionOperator op, Guid entryId, string? notes)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _journal.FindIndex(e => e.Id == entryId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"ETB-Eintrag {entryId} nicht gefunden.");
+        }
+
+        var existing = _journal[index];
+        if (EtbDirections.IsAppWritten(existing.Direction))
+        {
+            throw new InvalidOperationException(
+                "Automatisch erzeugte Einträge haben keine Notiz.");
+        }
+
+        var updated = existing.WithNotes(notes);
+        if (!ReferenceEquals(updated, existing))
+        {
+            _journal[index] = updated;
+            AppendSystemEntry(clock, op, $"Notiz zu ETB-Eintrag {existing.Timestamp:HH:mm} geändert");
+        }
+
+        return updated;
+    }
+
+    /// <summary>
     /// Records a new assignment and logs it to the ETB. Mirrors <see cref="AddForceUnit"/> and
     /// <see cref="TransferRole"/>: creating a new record is always a reportable event, so this logs
     /// unconditionally — unlike <see cref="EditRolePhone"/>, there is no prior state to compare

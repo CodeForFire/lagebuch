@@ -26,6 +26,12 @@ public sealed record EtbEntry
 
     public IReadOnlyList<EtbEntryEdit> Edits { get; private init; } = Array.Empty<EtbEntryEdit>();
 
+    /// <summary>
+    /// Background or follow-up detail that belongs to this entry without lengthening its line
+    /// (#973). <see langword="null"/> when there is none; never blank.
+    /// </summary>
+    public string? Notes { get; private init; }
+
     public static EtbEntry Create(
         DateTimeOffset timestamp,
         EtbDirection direction,
@@ -67,7 +73,8 @@ public sealed record EtbEntry
         string enteredBy,
         string? from,
         string? to,
-        IEnumerable<EtbEntryEdit>? edits = null)
+        IEnumerable<EtbEntryEdit>? edits = null,
+        string? notes = null)
         => new()
         {
             Id = id,
@@ -78,6 +85,7 @@ public sealed record EtbEntry
             From = from,
             To = to,
             Edits = (edits ?? Enumerable.Empty<EtbEntryEdit>()).ToList(),
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes,
         };
 
     /// <summary>
@@ -113,5 +121,22 @@ public sealed record EtbEntry
 
         var edits = new List<EtbEntryEdit>(Edits) { new(Text, editor.Display, editedAt) };
         return this with { Text = trimmed, Edits = edits };
+    }
+
+    /// <summary>
+    /// Replaces this entry's notes; blank clears them. Unlike <see cref="WithEditedText"/> this
+    /// keeps no prior version: the notes are an annotation beside the record, not the record, and
+    /// <see cref="Incident.SetJournalEntryNotes"/> leaves a System line for every change. The same
+    /// value, ignoring surrounding whitespace, returns this instance, so a resend is no change.
+    /// </summary>
+    public EtbEntry WithNotes(string? notes)
+    {
+        if (notes is not null && notes.Length > MaxTextLength)
+        {
+            throw new ArgumentException($"Notiz ist länger als das Limit von {MaxTextLength} Zeichen.", nameof(notes));
+        }
+
+        var normalized = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        return string.Equals(normalized, Notes, StringComparison.Ordinal) ? this : this with { Notes = normalized };
     }
 }

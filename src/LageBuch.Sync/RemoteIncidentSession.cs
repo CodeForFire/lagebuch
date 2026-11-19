@@ -457,6 +457,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void EditJournalEntry(Guid entryId, string text) =>
         Send(new EditJournalEntryCommand(Op(), entryId, text));
 
+    public void SetJournalEntryNotes(Guid entryId, string? notes) =>
+        Send(new SetJournalEntryNotesCommand(Op(), entryId, notes));
+
     public void ToggleChecklistItem(Guid itemId) => Send(new ToggleChecklistItemCommand(Op(), itemId));
 
     public void AssignRole(

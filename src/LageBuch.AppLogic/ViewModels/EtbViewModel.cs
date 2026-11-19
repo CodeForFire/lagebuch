@@ -116,7 +116,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
         foreach (var entry in journal)
         {
-            if (!_byId.TryGetValue(entry.Id, out var current) || current.Edits.Count == entry.Edits.Count)
+            if (!_byId.TryGetValue(entry.Id, out var current)
+                || (current.Edits.Count == entry.Edits.Count && string.Equals(current.Notes, entry.Notes, StringComparison.Ordinal)))
             {
                 continue;
             }
@@ -388,6 +389,10 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     [NotifyPropertyChangedFor(nameof(EditErrorSummary))]
     private string _editText = string.Empty;
 
+    /// <summary>The NOTIZ field of the edit panel (#973); blank clears the entry's notes.</summary>
+    [ObservableProperty]
+    private string _editNotes = string.Empty;
+
     public bool IsEditing => EditingEntry is not null;
 
     private bool CanEdit(EtbEntryRow row) => !IsReadOnly && row.IsEditable;
@@ -396,6 +401,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     {
         EditingEntry = row;
         EditText = row.Text;
+        EditNotes = row.Notes ?? string.Empty;
         ShowEditErrors(false); // a freshly opened panel starts quiet
         HistoryEntry = null; // editing and viewing history are separate panels; only one at a time
     }
@@ -415,15 +421,27 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     private void SaveEdit()
     {
         ShowEditErrors(true);
-        if (EditTextError is not null)
+        if (EditTextError is not null || EditingEntry is not { } row)
         {
             return;
         }
 
-        _session.EditJournalEntry(EditingEntry!.Id, EditText); // Changed → Sync() renders it
-        EditingEntry = null;
-        EditText = string.Empty;
-        ShowEditErrors(false);
+        // Read everything first: the first write raises Changed, and Sync() closes the panel when
+        // the entry it shows has changed. Each half goes out only when it changed, so a notes-only
+        // save leaves no "bearbeitet" line and sends a joined host one command, not two.
+        var text = EditText;
+        var notes = string.IsNullOrWhiteSpace(EditNotes) ? null : EditNotes.Trim();
+        if (!string.Equals(text.Trim(), row.Text, StringComparison.Ordinal))
+        {
+            _session.EditJournalEntry(row.Id, text); // Changed → Sync() renders it
+        }
+
+        if (!string.Equals(notes, row.Notes, StringComparison.Ordinal))
+        {
+            _session.SetJournalEntryNotes(row.Id, notes);
+        }
+
+        CancelEdit();
         _onChanged();
     }
 
@@ -432,6 +450,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     {
         EditingEntry = null;
         EditText = string.Empty;
+        EditNotes = string.Empty;
         ShowEditErrors(false);
     }
 
@@ -486,6 +505,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 public sealed class EtbEntryRow : ObservableObject
 {
     private int? _situationReportNumber;
+    private bool _isNotesExpanded;
 
     public EtbEntryRow(
         EtbEntry entry,
@@ -508,7 +528,12 @@ public sealed class EtbEntryRow : ObservableObject
         WasEdited = entry.Edits.Count > 0;
         Edits = entry.Edits;
         IsEditable = !EtbDirections.IsAppWritten(entry.Direction);
+        Notes = entry.Notes;
         BeginEditCommand = new RelayCommand(() => beginEdit(this), () => canEdit(this));
+
+        // A click on the row folds its notes in and out (#973); a row without notes has nothing to
+        // fold. Not gated on IsReadOnly: reading the notes of a closed incident is still reading.
+        ToggleNotesCommand = new RelayCommand(() => IsNotesExpanded = HasNotes && !IsNotesExpanded, () => HasNotes);
 
         // Deliberately not gated on IsReadOnly/IsEditable like BeginEditCommand: a closed or
         // remotely-joined-read-only incident must still let its history be read, since that is the
@@ -542,6 +567,29 @@ public sealed class EtbEntryRow : ObservableObject
     public IReadOnlyList<EtbEntryEdit> Edits { get; private set; }
 
     public bool IsEditable { get; }
+
+    /// <summary>The entry's notes (#973), or null when it has none.</summary>
+    public string? Notes { get; private set; }
+
+    public bool HasNotes => Notes is not null;
+
+    /// <summary>Whether the notes show below the line. Each row starts folded.</summary>
+    public bool IsNotesExpanded
+    {
+        get => _isNotesExpanded;
+        private set
+        {
+            if (SetProperty(ref _isNotesExpanded, value))
+            {
+                OnPropertyChanged(nameof(NotesToggleLabel));
+            }
+        }
+    }
+
+    /// <summary>What the fold glyph does next, for its tooltip and automation name.</summary>
+    public string NotesToggleLabel => IsNotesExpanded ? "Notiz ausblenden" : "Notiz einblenden";
+
+    public IRelayCommand ToggleNotesCommand { get; }
 
     public bool CanCreateTask { get; }
 
@@ -609,7 +657,8 @@ public sealed class EtbEntryRow : ObservableObject
     /// <summary>
     /// Re-points this row at the current version of its entry, instead of the view model replacing
     /// the row object, which the grid sees as a different item and deselects. An edit changes only
-    /// the text and its history (<see cref="EtbEntry.WithEditedText"/>), so nothing else is touched.
+    /// the text and its history (<see cref="EtbEntry.WithEditedText"/>) or the notes
+    /// (<see cref="EtbEntry.WithNotes"/>), so nothing else is touched.
     /// </summary>
     public void Update(EtbEntry entry)
     {
@@ -628,5 +677,18 @@ public sealed class EtbEntryRow : ObservableObject
 
         // The first edit is what makes the history viewable at all.
         ShowHistoryCommand.NotifyCanExecuteChanged();
+
+        if (!string.Equals(Notes, entry.Notes, StringComparison.Ordinal))
+        {
+            Notes = entry.Notes;
+            OnPropertyChanged(nameof(Notes));
+            OnPropertyChanged(nameof(HasNotes));
+            if (Notes is null)
+            {
+                IsNotesExpanded = false; // nothing left to show
+            }
+
+            ToggleNotesCommand.NotifyCanExecuteChanged();
+        }
     }
 }

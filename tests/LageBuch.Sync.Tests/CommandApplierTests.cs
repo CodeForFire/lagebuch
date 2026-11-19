@@ -371,6 +371,61 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void SetJournalEntryNotesCommand_sets_the_notes_of_the_entry()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        ApplyOverWire(
+            new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Lagemeldung", null, null),
+            incident,
+            clock);
+        var entry = incident.Journal.Last();
+
+        ApplyOverWire(
+            new SetJournalEntryNotesCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Rückruf zugesagt"),
+            incident,
+            clock);
+
+        Assert.Equal("Rückruf zugesagt", incident.Journal.Single(e => e.Id == entry.Id).Notes);
+        Assert.Equal("Editor (RUF 2)", incident.Journal[^1].EnteredBy);
+    }
+
+    [Fact]
+    public void SetJournalEntryNotesCommand_on_a_System_entry_throws()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var systemEntry = incident.Journal.Single(e => e.Direction == EtbDirection.System);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ApplyOverWire(
+                new SetJournalEntryNotesCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert"),
+                incident,
+                clock));
+    }
+
+    [Fact]
+    public void SetJournalEntryNotesCommand_with_oversized_notes_throws_and_changes_nothing()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        ApplyOverWire(
+            new AddJournalEntryCommand(new OperatorDto("Client", null), EtbDirection.Incoming, "Lagemeldung", null, null),
+            incident,
+            clock);
+        var entry = incident.Journal.Last();
+        var count = incident.Journal.Count;
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(
+                new SetJournalEntryNotesCommand(new OperatorDto("Client", null), entry.Id, new string('x', EtbEntry.MaxTextLength + 1)),
+                incident,
+                clock));
+        Assert.Null(incident.Journal.Single(e => e.Id == entry.Id).Notes);
+        Assert.Equal(count, incident.Journal.Count);
+    }
+
+    [Fact]
     public void EditJournalEntryCommand_on_a_System_entry_throws()
     {
         var clock = new FixedClock();

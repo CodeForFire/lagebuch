@@ -225,6 +225,23 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void An_etb_entrys_notes_survive_a_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var noted = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung", from: "ILS");
+        var plain = incident.AddJournalEntry(clock, op, EtbDirection.Internal, "Lage erkundet");
+        incident.SetJournalEntryNotes(clock, op, noted.Id, "Rückruf über Festnetz zugesagt.\nZweite Zeile.");
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal("Rückruf über Festnetz zugesagt.\nZweite Zeile.", loaded.Journal.Single(e => e.Id == noted.Id).Notes);
+        Assert.Null(loaded.Journal.Single(e => e.Id == plain.Id).Notes);
+    }
+
+    [Fact]
     public void An_edited_etb_entry_and_its_history_survive_a_round_trip()
     {
         var clock = new Clock();

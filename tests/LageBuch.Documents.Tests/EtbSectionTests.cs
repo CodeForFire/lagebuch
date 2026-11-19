@@ -56,6 +56,21 @@ public class EtbSectionTests
             "bearbeitet 22.06.2026 09:09 von Mayr, zuvor: „Zweit“ Huber");
     }
 
+    // #973: the notes folded under an entry on screen are part of the record, so the Bericht prints them.
+    [Fact]
+    public void An_entrys_notes_print_under_its_text()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Huber");
+        var incident = Incident.Start(clock, op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        incident.SetJournalEntryNotes(clock, op, entry.Id, "Rückruf über Festnetz zugesagt");
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Etb);
+
+        PdfText.AssertInOrder(text, "Lagemeldung Notiz: Rückruf über Festnetz zugesagt Huber");
+    }
+
     [Fact]
     public void Without_entries_the_section_says_so_instead_of_an_empty_table()
     {
