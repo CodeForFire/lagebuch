@@ -56,6 +56,14 @@ public static class EtbSection
                     // traceable in the artifact that leaves the app (#73).
                     table.Cell().Element(BodyCell).Column(col =>
                     {
+                        // The Einsatzabschnitt as the entry was filed (#971): a small line above
+                        // the text rather than a sixth column, which would squeeze the Eintrag on
+                        // every row for the few that carry one.
+                        if (entry.SectionName is { } section)
+                        {
+                            col.Item().Text($"Abschnitt {section}").FontSize(8).SemiBold().FontColor(Colors.Grey.Darken2);
+                        }
+
                         col.Item().Text(entry.Text);
                         foreach (var edit in entry.Edits)
                         {

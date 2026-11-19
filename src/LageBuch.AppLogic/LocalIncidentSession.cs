@@ -125,15 +125,18 @@ public sealed class LocalIncidentSession : IIncidentSession
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
-    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null)
+    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null, Guid? sectionId = null)
     {
         var id = Guid.Empty;
-        Mutate(() => id = Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to).Id);
+        Mutate(() => id = Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to, sectionId: sectionId).Id);
         return id;
     }
 
     public void EditJournalEntry(Guid entryId, string text) =>
         Mutate(() => Incident.EditJournalEntry(_clock, RequireOperator(), entryId, text));
+
+    public void AssignJournalEntrySection(Guid entryId, Guid? sectionId) =>
+        Mutate(() => Incident.AssignJournalEntrySection(_clock, RequireOperator(), entryId, sectionId));
 
     public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(_clock, RequireOperator(), itemId));
 

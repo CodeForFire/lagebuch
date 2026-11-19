@@ -650,6 +650,25 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void An_etb_entrys_abschnitt_survives_the_snapshot_by_id_and_stored_name()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var filed = incident.AddJournalEntry(clock, op, EtbDirection.Internal, "Lage Nord", sectionId: nord.Id);
+        incident.UpdateCommandNode(clock, op, nord.Id, "Nordost", null, null, null, null, null);
+
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        var back = restored.Journal.Single(e => e.Id == filed.Id);
+        Assert.Equal(nord.Id, back.SectionId);
+        Assert.Equal("Nord", back.SectionName);
+        Assert.Null(restored.Journal[0].SectionId);
+    }
+
+    [Fact]
     public void Situation_reports_round_trip_through_the_snapshot_over_the_wire()
     {
         var clock = new FixedClock();

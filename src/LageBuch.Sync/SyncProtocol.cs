@@ -262,15 +262,21 @@ public static class SyncProtocol
     /// in the Funkrufname a Trupp already had, so no command changes. A peer at 44 drops the key
     /// and offers its free Funkrufname box instead, so the floor stays at 44.
     /// </para>
+    /// <para>
+    /// 46: a client may send <c>assignJournalEntrySection</c>, <c>addJournalEntry</c> may carry a
+    /// <c>sectionId</c>, and the snapshot's ETB entries carry <c>sectionId</c> and
+    /// <c>sectionName</c>, the Einsatzabschnitt an entry is filed under (#971). A host at 45 would
+    /// reject the command, and would file a joined device's entry nowhere, so the floor rises to 46.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 45;
+    public const int ProtocolVersion = 46;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 44;
+    public const int MinimumProtocolVersion = 46;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

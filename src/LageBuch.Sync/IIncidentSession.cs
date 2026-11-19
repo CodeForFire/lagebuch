@@ -58,9 +58,12 @@ public interface IIncidentSession
     /// The new entry's id, known at once even on a joined device: it mints the id and the host
     /// keeps it, so an Aufgabe can be linked to the entry before the host's snapshot arrives.
     /// </returns>
-    Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
+    Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null, Guid? sectionId = null);
 
     void EditJournalEntry(Guid entryId, string text);
+
+    /// <summary>Files an ETB entry under an Einsatzabschnitt, or under none with null (#971).</summary>
+    void AssignJournalEntrySection(Guid entryId, Guid? sectionId);
 
     void ToggleChecklistItem(Guid itemId);
 

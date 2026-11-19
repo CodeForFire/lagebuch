@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 46;
+    public const int CurrentVersion = 47;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -313,6 +313,11 @@ public static class Migrations
         if (version < 46)
         {
             ApplyV46(cn, tx);
+        }
+
+        if (version < 47)
+        {
+            ApplyV47(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1381,6 +1386,18 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "east", "REAL");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "north", "REAL");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "attribution", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The Einsatzabschnitt an ETB entry belongs to (#971): its id, for the quick filter, and its
+    // label as it read at assignment, so the entry still reads the same once the Abschnitt is
+    // renamed or dissolved. Additive and nullable: an older entry reads back with no Abschnitt.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV47(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entries", "section_id", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entries", "section_name", "TEXT");
 
         // Stryker restore all
     }

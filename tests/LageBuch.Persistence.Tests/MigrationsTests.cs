@@ -619,4 +619,36 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(0));
         Assert.Equal(("19", "25"), (r.GetString(1), r.GetString(2)));
     }
+
+    [Fact]
+    public void V46_database_upgrades_to_v47_and_its_etb_entries_have_no_abschnitt()
+    {
+        // A V46 file: today's schema minus etb_entries.section_id/section_name, with one entry.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE etb_entries DROP COLUMN section_id;
+                ALTER TABLE etb_entries DROP COLUMN section_name;
+                INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by)
+                    VALUES ('e', 0, '2026-06-22T09:00:00+02:00', 2, NULL, NULL, 'Lage', 'Muster');
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (46);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT section_id, section_name, text FROM etb_entries WHERE id = 'e';";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.True(r.IsDBNull(0) && r.IsDBNull(1));
+        Assert.Equal("Lage", r.GetString(2));
+    }
 }
