@@ -377,6 +377,66 @@ public sealed class LagekarteRenderTests : IDisposable
         workspace.Dispose();
     }
 
+    // #965: the X beside a placed Fahrzeug opens the workspace's confirm overlay; only ENTFERNEN
+    // takes the unit off the map.
+    [AvaloniaFact]
+    public void Taking_a_Fahrzeug_off_the_map_asks_first_in_the_workspace()
+    {
+        var root = Path.Join(_dir, "regions");
+        FictionalRegionPack.Install(root);
+        var session = NewSession();
+        session.AddForceUnit("FF Musterstadt", 9, "Florian Musterstadt 40/1", "Im Einsatz", officerCount: 1, vehicleType: "HLF");
+        session.AddForceUnit("FF Musterstadt", 3, "Florian Musterstadt 11/1", "Im Einsatz", officerCount: 1, vehicleType: "ELW 1");
+        session.SetIncidentLocation(Marktplatz);
+        var unitAt = new GeoPoint(48.1792, 11.2541);
+        session.PlaceForceUnit(session.Incident.Forces[0].Id, unitAt);
+        session.PlaceForceUnit(session.Incident.Forces[1].Id, new GeoPoint(48.1779, 11.2572));
+        using var workspace = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            MasterDataSet.Empty,
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController(),
+            mapPacks: new RegionPackLibrary(_http, root));
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = workspace }, Width = 1920, Height = 1032 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "LAGEKARTE");
+        workspace.Lagekarte.Map.ChangeViewCommand.Execute(new MapViewChange(Marktplatz, 17));
+        Dispatcher.UIThread.RunJobs();
+
+        var remove = window.GetVisualDescendants().OfType<Button>().First(b =>
+            b.IsEffectivelyVisible
+            && Avalonia.Automation.AutomationProperties.GetName(b) == "Von der Karte nehmen"
+            && b.DataContext is LagekarteUnitRow { Title: "Florian Musterstadt 40/1" });
+        window.MouseDown(MiddleOf(remove, window), MouseButton.Left);
+        window.MouseUp(MiddleOf(remove, window), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        // The overlay is open and the unit still stands where it was.
+        var confirm = workspace.PendingConfirm;
+        Assert.NotNull(confirm);
+        Assert.Equal("Fahrzeug von der Karte nehmen?", confirm.Title);
+        Assert.Equal("„Florian Musterstadt 40/1“ wird von der Lagekarte genommen. Fortfahren?", confirm.Message);
+        Assert.Equal(unitAt, session.Incident.Forces[0].Position);
+        Assert.Single(window.GetVisualDescendants().OfType<ConfirmDialogView>());
+
+        // The PR screenshot.
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(Shots(), "fuehrung-karte-fahrzeug-entfernen.png"));
+        }
+
+        confirm.ConfirmCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(workspace.PendingConfirm);
+        Assert.Null(session.Incident.Forces[0].Position);
+        Assert.NotNull(session.Incident.Forces[1].Position);
+    }
+
     private (Window Window, LagekarteView View, LagekarteViewModel Vm, LocalIncidentSession Session) Show(IWeatherSource? weather = null, bool narrow = false)
     {
         var root = Path.Join(_dir, "regions");

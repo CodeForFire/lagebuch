@@ -38,6 +38,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     private readonly Action _onChanged;
     private readonly IRegionPackLibrary? _library;
     private readonly MapNightMode _nightMode;
+    private readonly Action<string, string, Action>? _requestConfirm;
     private IReadOnlyList<InstalledRegionPack> _packs = [];
 
     // Screen coordinates stay independent of the view's UI toolkit.
@@ -71,6 +72,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         IsReadOnly = session.IsReadOnly;
         _library = mapPacks;
         _nightMode = nightMode ?? new MapNightMode();
+        _requestConfirm = requestConfirm;
         _addressQuery = session.Incident.Location is null ? RecordedAddress(session.Incident) : string.Empty;
         Terrain = new TerrainOverlay(Map);
         Terrain.PropertyChanged += (_, e) =>
@@ -645,13 +647,27 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>Puts every mark back where the incident has it, after a drag that was abandoned.</summary>
     public void RestoreMarkers() => Refresh();
 
+    /// <summary>
+    /// Takes a Fahrzeug off the map once the Lagebuchführer confirms (#965): the X sits next to the
+    /// unit's other buttons, and a slip during an Einsatz must not lose its position. Without a host
+    /// to ask, as in a test or a standalone view, it is taken off at once, as a Kartenebene is.
+    /// </summary>
     [RelayCommand]
     private void RemoveUnit(LagekarteUnitRow? row)
     {
-        if (row is { IsPlaced: true } && CanEdit)
+        if (row is not { IsPlaced: true } || !CanEdit)
         {
-            Run(() => _session.PlaceForceUnit(row.UnitId, null));
+            return;
         }
+
+        void Remove() => Run(() => _session.PlaceForceUnit(row.UnitId, null));
+        if (_requestConfirm is null)
+        {
+            Remove();
+            return;
+        }
+
+        _requestConfirm("Fahrzeug von der Karte nehmen?", $"„{row.Title}“ wird von der Lagekarte genommen. Fortfahren?", Remove);
     }
 
     [RelayCommand]
