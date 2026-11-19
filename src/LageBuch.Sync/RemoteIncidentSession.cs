@@ -450,6 +450,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null, Guid? sectionId = null)
     {
         var id = Guid.NewGuid();
+
+        // Stryker disable once Statement : only Sync.Hosting.Tests drive RemoteIncidentSession (see AddChecklist).
         Send(new AddJournalEntryCommand(Op(), direction, text, from, to, id, sectionId));
         return id;
     }
