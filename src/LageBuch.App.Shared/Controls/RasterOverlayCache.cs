@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Avalonia.Media.Imaging;
 using LageBuch.AppLogic.Services.Map;
+using SkiaSharp;
 
 namespace LageBuch.App.Shared.Controls;
 
@@ -104,23 +105,38 @@ public sealed class RasterOverlayCache
         }
     }
 
-    // Decoded to the width its checked header names, so a picture whose real frame claims more than
-    // RasterImageInfo read is scaled down rather than held at full size; and a picture that does not
-    // come out at exactly the checked size is dropped, never drawn into a box made for another.
+    /// <summary>
+    /// Whether the decoder itself, asked before a single pixel is allocated, opens the picture and
+    /// reports exactly the size <see cref="RasterImageInfo"/> read from its header, within
+    /// <see cref="RasterImage.MaxPixels"/> a side. The header check in AppLogic is ours; this is the
+    /// codec's own reading, so a file crafted to read one way to us and another to Skia never decodes.
+    /// </summary>
+    public static bool CodecConfirms(RasterImage raster)
+    {
+        ArgumentNullException.ThrowIfNull(raster);
+        using var stream = Open(raster.Bytes);
+        using var codec = SKCodec.Create(stream);
+        return codec is { Info: var info }
+            && info.Width == raster.Info.Width
+            && info.Height == raster.Info.Height
+            && info.Width <= RasterImage.MaxPixels
+            && info.Height <= RasterImage.MaxPixels;
+    }
+
+    // Only a picture the codec vouches for is decoded; any other is drawn as nothing.
     private static Bitmap? Decode(RasterImage raster)
     {
-        using var stream = MemoryMarshal.TryGetArray(raster.Bytes, out var segment) && segment.Array is { } array
-            ? new MemoryStream(array, segment.Offset, segment.Count, writable: false)
-            : new MemoryStream(raster.Bytes.ToArray(), writable: false);
-        var bitmap = Bitmap.DecodeToWidth(stream, raster.Info.Width);
-        if (bitmap.PixelSize.Width == raster.Info.Width && bitmap.PixelSize.Height == raster.Info.Height)
-        {
-            return bitmap;
-        }
-
-        using (bitmap)
+        if (!CodecConfirms(raster))
         {
             return null;
         }
+
+        using var stream = Open(raster.Bytes);
+        return new Bitmap(stream);
     }
+
+    private static MemoryStream Open(ReadOnlyMemory<byte> bytes) =>
+        MemoryMarshal.TryGetArray(bytes, out var segment) && segment.Array is { } array
+            ? new MemoryStream(array, segment.Offset, segment.Count, writable: false)
+            : new MemoryStream(bytes.ToArray(), writable: false);
 }
