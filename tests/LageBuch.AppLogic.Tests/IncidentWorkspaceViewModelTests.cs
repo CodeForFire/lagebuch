@@ -2320,6 +2320,21 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal(LeadershipTabsViewModel.ForcesTab, vm.LeadershipTabs.SelectedTabIndex);
     }
 
+    [Theory]
+    [InlineData(LeadershipTabsViewModel.ForcesTab, LeadershipTabsViewModel.ForcesTab)]
+    [InlineData(LeadershipTabsViewModel.OrganisationTab, LeadershipTabsViewModel.OrganisationTab)]
+    [InlineData(LeadershipTabsViewModel.MapTab, LeadershipTabsViewModel.MapTab)]
+    [InlineData(LeadershipTabsViewModel.ForcesTab - 1, LeadershipTabsViewModel.ForcesTab)]
+    [InlineData(LeadershipTabsViewModel.MapTab + 1, LeadershipTabsViewModel.ForcesTab)]
+    public void A_fuehrung_tab_index_from_outside_the_four_tabs_opens_kraefte(int requested, int expected)
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+
+        var tabs = new LeadershipTabsViewModel(vm.Leadership, vm.Roles, vm.Forces, vm.Lagekarte, requested);
+
+        Assert.Equal(expected, tabs.SelectedTabIndex);
+    }
+
     [Fact]
     public void Opening_the_KARTE_tab_picks_up_a_pack_downloaded_while_the_Einsatz_is_open()
     {
