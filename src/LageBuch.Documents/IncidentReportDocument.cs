@@ -75,6 +75,11 @@ public sealed class IncidentReportDocument : IDocument
                     column.Item().Element(c => EtbSection.Compose(c, _incident));
                 }
 
+                if (_sections.HasFlag(IncidentPdfSections.Measurements) && MessungenSection.HasContent(_incident))
+                {
+                    column.Item().Element(c => MessungenSection.Compose(c, _incident));
+                }
+
                 if (_sections.HasFlag(IncidentPdfSections.SituationReports))
                 {
                     column.Item().Element(c => SituationReportsSection.Compose(c, _incident));

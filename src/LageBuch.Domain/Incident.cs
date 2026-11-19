@@ -342,9 +342,9 @@ public sealed class Incident
         AppendAutomaticEntry(clock, op, EtbDirection.System, text, from, to);
 
     // A professional record rather than bookkeeping -- what a Trupp measured (#424). Same
-    // machine-written provenance as AppendSystemEntry, but never hidden by the ETB's
-    // "Systemmeldungen ausblenden" filter, because hiding a measurement is what made the reading
-    // look undocumented in the first place.
+    // machine-written provenance as AppendSystemEntry, but its own filter, "Messwerte
+    // ausblenden", rather than "Systemmeldungen ausblenden" (#972), and the Bericht collects
+    // these values in its Messungen section instead of the ETB. Only measured values go here.
     private void AppendMeasurementEntry(IClock clock, SessionOperator op, string text) =>
         AppendAutomaticEntry(clock, op, EtbDirection.Measurement, text);
 
@@ -2000,7 +2000,7 @@ public sealed class Incident
         foreach (var overlay in _mapOverlays.Where(o => o.FileId == fileId).ToList())
         {
             _mapOverlays.Remove(overlay);
-            AppendMeasurementEntry(clock, op, $"Kartenebene entfernt: {overlay.Name}");
+            AppendSystemEntry(clock, op, $"Kartenebene entfernt: {overlay.Name}");
         }
 
         return file;
@@ -2008,9 +2008,9 @@ public sealed class Incident
 
     /// <summary>
     /// Imports a Kartenebene: its file (the GeoJSON or zip, unchanged) joins the Einsatz's files,
-    /// and the Ebene points at it. The ETB records the import as a professional record, not
-    /// bookkeeping — an Ausbreitungsprognose is what the Einsatzleitung decided on — so it stays
-    /// visible with Systemmeldungen hidden. The importing device generates both ids, the way
+    /// and the Ebene points at it. The ETB records the import as a system line (#972): it is
+    /// bookkeeping, not a measured value, so "Messwerte ausblenden" must not take it and the
+    /// Bericht keeps it in its ETB. The importing device generates both ids, the way
     /// <see cref="AddFile(IClock, SessionOperator, Guid, string, string, long)"/> takes the file's.
     /// </summary>
     public MapOverlay AddMapOverlay(
@@ -2041,7 +2041,7 @@ public sealed class Incident
         var overlay = MapOverlay.Create(overlayId, file.Id, summary, clock.Now, op.Display);
         _files.Add(file);
         _mapOverlays.Add(overlay);
-        AppendMeasurementEntry(clock, op, $"Kartenebene importiert: {overlay.Name}{TimeSpanText(overlay, clock)}");
+        AppendSystemEntry(clock, op, $"Kartenebene importiert: {overlay.Name}{TimeSpanText(overlay, clock)}");
         return overlay;
     }
 
@@ -2067,7 +2067,7 @@ public sealed class Incident
             _files.RemoveAt(fileIndex);
         }
 
-        AppendMeasurementEntry(clock, op, $"Kartenebene entfernt: {overlay.Name}");
+        AppendSystemEntry(clock, op, $"Kartenebene entfernt: {overlay.Name}");
         return file;
     }
 
