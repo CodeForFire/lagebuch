@@ -168,6 +168,68 @@ public class ScbaViewModelTests
         Assert.Empty(session.Incident.ScbaTrupps);
     }
 
+    // #968: a second "HLF 1 · Angriffstrupp" is refused on the press with the domain's own sentence,
+    // instead of the domain throwing out of the command. The form keeps what was typed, so changing
+    // the Trupp-Art or the Funkrufname is all it takes.
+    [Theory]
+    [InlineData("HLF 1", "Angriffstrupp")]
+    [InlineData(" hlf 1  ", "ANGRIFFSTRUPP ")]
+    public void AddTrupp_refuses_a_trupp_already_registered_and_says_which(string callSign, string designation)
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        using var vm = Vm(clock, session);
+        Register(vm, callSign: "HLF 1");
+        var journal = session.Incident.Journal.Count;
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        Register(vm, designation, truppfuehrer: "Huber", truppmann: "Maier", callSign: callSign);
+
+        Assert.Single(session.Incident.ScbaTrupps);
+        Assert.Equal(journal, session.Incident.Journal.Count);
+        Assert.Equal(new[] { false }, outcomes);
+        Assert.Equal("„HLF 1 · Angriffstrupp“ ist bereits eingetragen.", vm.NewDuplicateTruppError);
+        Assert.Equal("„HLF 1 · Angriffstrupp“ ist bereits eingetragen.", vm.ErrorSummary);
+        Assert.Equal("Huber", vm.NewTruppfuehrer);
+
+        vm.NewDesignation = "Sicherheitstrupp";
+        Assert.Null(vm.NewDuplicateTruppError);
+        vm.AddTruppCommand.Execute(null);
+        Assert.Equal(2, session.Incident.ScbaTrupps.Count);
+    }
+
+    [Fact]
+    public void AddTrupp_registers_the_next_round_once_the_first_trupp_is_abgenommen()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        using var vm = Vm(clock, session);
+        var first = Register(vm, callSign: "HLF 1");
+        first.StartCommand.Execute(null);
+        first.WithdrawCommand.Execute(null);
+        first.MarkRemovedCommand.Execute(null);
+
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Maier", callSign: "HLF 1");
+
+        Assert.NotEqual(first.Id, second.Id);
+        Assert.Equal("HLF 1 · Angriffstrupp", second.DisplayName);
+        Assert.Null(vm.ErrorSummary);
+    }
+
+    [Fact]
+    public void The_duplicate_message_stays_quiet_until_the_press()
+    {
+        var clock = new FixedClock(T0);
+        using var vm = Vm(clock, NewSession(clock));
+        Register(vm, callSign: "HLF 1");
+
+        vm.NewDesignation = "Angriffstrupp";
+        vm.NewCallSign = "HLF 1";
+
+        Assert.Null(vm.NewDuplicateTruppError);
+    }
+
     [Fact]
     public void AddTrupp_names_an_emptied_Einstiegsdruck()
     {
@@ -510,7 +572,7 @@ public class ScbaViewModelTests
         clock.Now = T0.AddMinutes(10);
         vm.NewMaxDurationMinutes = 30;
         vm.NewControlIntervalMinutes = 999;
-        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer").StartCommand.Execute(null);
+        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2").StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
         Assert.Equal("ALARM QUITTIEREN", vm.AlarmAcknowledgeLabel);
@@ -681,7 +743,7 @@ public class ScbaViewModelTests
         var raised = new List<string?>();
         row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
-        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2");
 
         Assert.Superset(
             new HashSet<string?>
@@ -726,7 +788,7 @@ public class ScbaViewModelTests
         vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
         var first = Register(vm);
         first.StartCommand.Execute(null);
-        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer").StartCommand.Execute(null);
+        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2").StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
         vm.AcknowledgeAlarmCommand.Execute(null);
@@ -913,7 +975,7 @@ public class ScbaViewModelTests
         clock.Now = T0.AddMinutes(10);
         vm.NewMaxDurationMinutes = 30;
         vm.NewControlIntervalMinutes = 999;
-        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2");
         second.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(31);
@@ -946,7 +1008,7 @@ public class ScbaViewModelTests
         clock.Now = T0.AddSeconds(5);
         vm.NewMaxDurationMinutes = 30;
         vm.NewControlIntervalMinutes = 999;
-        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2");
         second.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(30);
@@ -1044,7 +1106,7 @@ public class ScbaViewModelTests
 
         clock.Now = T0.AddMinutes(2);
         vm.NewControlIntervalMinutes = 5;
-        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2");
         second.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(6); // first trupp's interval elapsed, second's has not
@@ -1200,7 +1262,7 @@ public class ScbaViewModelTests
         Assert.Equal(1, first.TruppNumber);
 
         Assert.Equal(2, vm.NewTruppNumber);
-        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2");
         Assert.Equal(2, second.TruppNumber);
     }
 
@@ -1217,7 +1279,7 @@ public class ScbaViewModelTests
         session.AddScbaTrupp("Wassertrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
 
         Assert.Equal(2, vm.NewTruppNumber);
-        var row = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        var row = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer", callSign: "HLF 2");
         Assert.Equal(2, row.TruppNumber);
     }
 
@@ -1415,6 +1477,7 @@ public class ScbaViewModelTests
         vm.NewControlIntervalMinutes = controlIntervalMinutes;
         vm.NewTruppfuehrer = truppfuehrer;
         vm.NewTruppmann = "Schmidt";
+        vm.NewCallSign = $"HLF {vm.Trupps.Count + 1}"; // two Angriffstrupps need two Fahrzeuge (#968)
         vm.AddTruppCommand.Execute(null);
         var row = vm.Trupps[^1];
         row.StartCommand.Execute(null);
