@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -186,6 +187,58 @@ public class SituationReportsTabRenderTests
             "Schule – Ärger – Friedrich – Emil – Richard",
             Named<SelectableTextBlock>(window, "SpelledText").Text);
         Capture(window, "etb-buchstabier-helfer.png");
+    }
+
+    [AvaloniaFact]
+    public void The_docked_helper_clear_button_empties_the_word_and_returns_focus_to_it()
+    {
+        var (window, vm, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectModuleTab(window, "ETB", "LAGEMELDUNG");
+        var helper = Named<SpellingHelperView>(WorkspaceRenderHelper.SelectedTabContent(window), "ModuleHelper");
+
+        AssertClearButtonEmptiesTheWord(window, helper, vm.SituationReports.Helper);
+    }
+
+    [AvaloniaFact]
+    public void The_etb_overlay_clear_button_empties_the_word_and_keeps_the_overlay_open()
+    {
+        var (window, vm, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        var open = Named<Button>(WorkspaceRenderHelper.SelectedTabContent(window), "OpenSpellingHelperButton").Command;
+        Assert.NotNull(open);
+        open.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotNull(vm.PendingSpellingHelper);
+
+        AssertClearButtonEmptiesTheWord(window, Named<SpellingHelperView>(window, "DialogHelper"), vm.PendingSpellingHelper.Helper);
+        Assert.NotNull(vm.PendingSpellingHelper);
+    }
+
+    // Types a word, clicks the X inside the word field with the pointer and checks that the word,
+    // its spelling and the X itself are gone and the caret is back in the field for the next word.
+    private static void AssertClearButtonEmptiesTheWord(Window window, SpellingHelperView view, SpellingHelperViewModel helper)
+    {
+        var input = Named<TextBox>(view, "SpellInput");
+        var clear = Named<Button>(view, "ClearSpellInputButton");
+        Assert.False(clear.IsEffectivelyVisible);
+
+        input.Focus();
+        window.KeyTextInput("Schäfer");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Schäfer", helper.Input);
+        Assert.True(clear.IsEffectivelyVisible);
+
+        var centre = clear.TranslatePoint(new Point(clear.Bounds.Width / 2, clear.Bounds.Height / 2), window);
+        Assert.NotNull(centre);
+        window.MouseDown(centre.Value, MouseButton.Left);
+        window.MouseUp(centre.Value, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(string.IsNullOrEmpty(input.Text));
+        Assert.False(helper.HasSpelling);
+        Assert.False(Named<Border>(view, "SpelledCard").IsEffectivelyVisible);
+        Assert.False(clear.IsEffectivelyVisible);
+        window.AssertFocused(input);
     }
 
     [AvaloniaFact]

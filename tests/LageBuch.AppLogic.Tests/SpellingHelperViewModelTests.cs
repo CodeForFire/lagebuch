@@ -65,4 +65,20 @@ public class SpellingHelperViewModelTests
 
         Assert.Equal(SpellingHelperViewModel.MaxInputLength, vm.Input?.Length);
     }
+
+    [Fact]
+    public void Clearing_empties_the_word_and_its_spelling()
+    {
+        var vm = new SpellingHelperViewModel { Input = "Blumenstraße" };
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.ClearCommand.Execute(null);
+
+        Assert.True(string.IsNullOrEmpty(vm.Input));
+        Assert.Equal(string.Empty, vm.Spelled);
+        Assert.False(vm.HasSpelling);
+        Assert.Contains(nameof(SpellingHelperViewModel.Spelled), changed);
+        Assert.Contains(nameof(SpellingHelperViewModel.HasSpelling), changed);
+    }
 }

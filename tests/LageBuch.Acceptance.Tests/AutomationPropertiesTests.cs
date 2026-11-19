@@ -284,6 +284,19 @@ public class AutomationPropertiesTests
     }
 
     [AvaloniaFact]
+    public void Spelling_helper_clear_button_is_named_for_automation()
+    {
+        var view = new SpellingHelperView { DataContext = new SpellingHelperViewModel { Input = "Schäfer" } };
+        var window = new Window { Content = view, Width = 600, Height = 500 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var clearButton = view.GetControl<Button>("ClearSpellInputButton");
+        Assert.True(clearButton.IsVisible);
+        Assert.Equal("Eingabe löschen", Name(clearButton));
+    }
+
+    [AvaloniaFact]
     public void Files_remove_button_is_named_for_automation()
     {
         var clock = new FixedClock();
