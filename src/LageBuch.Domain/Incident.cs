@@ -2007,7 +2007,7 @@ public sealed class Incident
     }
 
     /// <summary>
-    /// Imports a Kartenebene: its file (the GeoJSON or zip, unchanged) joins the Einsatz's files,
+    /// Imports a Kartenebene: its file (the GeoJSON or zip, or a Luftbild's image, unchanged) joins the Einsatz's files,
     /// and the Ebene points at it. The ETB records the import as a professional record, not
     /// bookkeeping — an Ausbreitungsprognose is what the Einsatzleitung decided on — so it stays
     /// visible with Systemmeldungen hidden. The importing device generates both ids, the way
@@ -2037,7 +2037,7 @@ public sealed class Incident
             throw new ArgumentException("Diese Kartenebene ist schon im Einsatz.", nameof(overlayId));
         }
 
-        var file = IncidentFile.CreateMapOverlay(fileId, fileName, contentType, sizeBytes, clock.Now, op.Display);
+        var file = IncidentFile.CreateMapOverlay(fileId, fileName, contentType, sizeBytes, clock.Now, op.Display, summary.Kind);
         var overlay = MapOverlay.Create(overlayId, file.Id, summary, clock.Now, op.Display);
         _files.Add(file);
         _mapOverlays.Add(overlay);

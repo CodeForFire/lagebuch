@@ -371,7 +371,7 @@ public sealed class IncidentRepository
             var o = incident.MapOverlays[i];
             Run(
                 inserts,
-                "INSERT INTO map_overlays (id, ordinal, file_id, name, imported_at, imported_by, frame_count, first_time, last_time) VALUES ($id,$o,$file,$name,$at,$by,$frames,$first,$last);",
+                "INSERT INTO map_overlays (id, ordinal, file_id, name, imported_at, imported_by, frame_count, first_time, last_time, kind, west, south, east, north, attribution) VALUES ($id,$o,$file,$name,$at,$by,$frames,$first,$last,$kind,$west,$south,$east,$north,$attr);",
                 p =>
                 {
                     p("$id", o.Id.ToString());
@@ -383,6 +383,12 @@ public sealed class IncidentRepository
                     p("$frames", o.FrameCount);
                     p("$first", (object?)o.FirstTime?.ToString(Iso) ?? DBNull.Value);
                     p("$last", (object?)o.LastTime?.ToString(Iso) ?? DBNull.Value);
+                    p("$kind", (int)o.Kind);
+                    p("$west", (object?)o.Bounds?.West ?? DBNull.Value);
+                    p("$south", (object?)o.Bounds?.South ?? DBNull.Value);
+                    p("$east", (object?)o.Bounds?.East ?? DBNull.Value);
+                    p("$north", (object?)o.Bounds?.North ?? DBNull.Value);
+                    p("$attr", (object?)o.Attribution ?? DBNull.Value);
                 });
         }
     }
@@ -1056,7 +1062,7 @@ public sealed class IncidentRepository
         // Einsatz that will not open.
         var mapOverlays = ReadAll(
             cn,
-            "SELECT id, file_id, name, imported_at, imported_by, frame_count, first_time, last_time FROM map_overlays ORDER BY ordinal;",
+            "SELECT id, file_id, name, imported_at, imported_by, frame_count, first_time, last_time, kind, west, south, east, north, attribution FROM map_overlays ORDER BY ordinal;",
             r => Guid.TryParse(Str(r, 0), out var id) && Guid.TryParse(Str(r, 1), out var fileId)
                 ? Domain.Map.MapOverlay.Rehydrate(
                     id,
@@ -1066,7 +1072,10 @@ public sealed class IncidentRepository
                     Str(r, 4),
                     NullableInt(r, 5) ?? 1,
                     NullableDate(r, 6),
-                    NullableDate(r, 7))
+                    NullableDate(r, 7),
+                    (Domain.Map.MapOverlayKind)(NullableInt(r, 8) ?? 0),
+                    Domain.ValueObjects.GeoBox.TryCreate(NullableDouble(r, 9), NullableDouble(r, 10), NullableDouble(r, 11), NullableDouble(r, 12)),
+                    Str(r, 13))
                 : null)
             .OfType<Domain.Map.MapOverlay>()
             .ToList();

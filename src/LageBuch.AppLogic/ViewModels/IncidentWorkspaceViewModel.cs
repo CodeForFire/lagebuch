@@ -37,6 +37,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IRegionPackLibrary? _mapPacks;
     private readonly MapNightMode? _mapNightMode;
     private readonly IWeatherSource? _weather;
+    private readonly LdbvImageryClient? _luftbild;
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly ILastPdfExportStore? _lastPdfExportStore;
@@ -60,12 +61,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly Dictionary<Guid, ChecklistViewModel> _checklists = new();
     private bool _disposed;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null, IWeatherSource? weather = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null, IWeatherSource? weather = null, LdbvImageryClient? luftbild = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _mapPacks = mapPacks;
         _mapNightMode = mapNightMode;
         _weather = weather;
+        _luftbild = luftbild;
         _session = session;
         _local = session as LocalIncidentSession;
         _clock = clock;
@@ -1139,7 +1141,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OfferUndo,
             OpenDispatchChannelDialog);
 
-        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode, _dialogs, RequestConfirm, _weather, _clock);
+        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode, _dialogs, RequestConfirm, _weather, _clock, _luftbild);
 
         LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, Lagekarte, reopenTab);
 

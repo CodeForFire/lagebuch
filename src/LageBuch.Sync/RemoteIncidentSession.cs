@@ -905,7 +905,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 summary.Name,
                 summary.FrameCount,
                 summary.FirstTime,
-                summary.LastTime),
+                summary.LastTime,
+                summary.Kind,
+                summary.Bounds?.West,
+                summary.Bounds?.South,
+                summary.Bounds?.East,
+                summary.Bounds?.North,
+                summary.Attribution),
             cancellationToken);
 
         try

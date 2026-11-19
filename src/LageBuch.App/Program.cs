@@ -110,7 +110,8 @@ internal static class Program
             mapPacks: new RegionPackLibrary(http, AppPaths.RegionPacksDir),
             mapNightMode: new MapNightMode(AppPaths.MapNightJsonPath),
             weather: new BrightSkyClient(http),
-            dispatchInbox: new JsonDispatchInboxStore(AppPaths.DispatchInboxJsonPath));
+            dispatchInbox: new JsonDispatchInboxStore(AppPaths.DispatchInboxJsonPath),
+            luftbild: new LdbvImageryClient(http));
         OpenLaunchedFile(mainViewModel);
         return mainViewModel;
     }

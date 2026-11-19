@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain;
 using LageBuch.Domain.Map;
 using LageBuch.Domain.Time;
+using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -9,7 +10,11 @@ namespace LageBuch.Persistence.Tests;
 
 public sealed class MapOverlayRoundTripTests : IDisposable
 {
+    private const string LdbvAttribution = "Luftbild, Flurstücke: © Bayerische Vermessungsverwaltung (CC BY 4.0)";
+
     private static readonly DateTimeOffset First = new(2026, 3, 14, 9, 0, 0, TimeSpan.Zero);
+
+    private static readonly GeoBox Luftbild = new(11.24, 48.17, 11.26, 48.18);
 
     private readonly string _dir = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
 
@@ -71,6 +76,70 @@ public sealed class MapOverlayRoundTripTests : IDisposable
         var loaded = IncidentRepository.Load(Path_);
 
         Assert.All(loaded.MapOverlays, o => Assert.Equal(MapOverlay.MaxFrames, o.FrameCount));
+    }
+
+    [Fact]
+    public void A_Luftbild_keeps_its_kind_box_and_attribution_across_save_and_load()
+    {
+        var incident = IncidentWithEbenen();
+        AddLuftbild(incident);
+
+        IncidentRepository.Save(Path_, incident);
+        var loaded = IncidentRepository.Load(Path_);
+
+        Assert.Equal(incident.MapOverlays, loaded.MapOverlays);
+        var luftbild = loaded.MapOverlays[^1];
+        Assert.Equal(MapOverlayKind.Raster, luftbild.Kind);
+        Assert.Equal(Luftbild, luftbild.Bounds);
+        Assert.Equal(LdbvAttribution, luftbild.Attribution);
+        Assert.Equal("image/jpeg", loaded.Files.Single(f => f.Id == luftbild.FileId).ContentType);
+        Assert.All(loaded.MapOverlays.Take(2), o => Assert.Equal(MapOverlayKind.Vector, o.Kind));
+    }
+
+    [Fact]
+    public void An_Ebene_from_before_V46_reads_back_as_a_vector_Ebene()
+    {
+        IncidentRepository.Save(Path_, IncidentWithEbenen());
+
+        // A V45 file has no such columns; SchemaGuard adds them back at their defaults.
+        Tamper("ALTER TABLE map_overlays DROP COLUMN kind;");
+        Tamper("ALTER TABLE map_overlays DROP COLUMN west;");
+        Tamper("ALTER TABLE map_overlays DROP COLUMN attribution;");
+        Tamper("UPDATE schema_version SET version = 45;");
+        var loaded = IncidentRepository.Load(Path_);
+
+        Assert.Equal(2, loaded.MapOverlays.Count);
+        Assert.All(loaded.MapOverlays, o => Assert.Equal(MapOverlayKind.Vector, o.Kind));
+        Assert.All(loaded.MapOverlays, o => Assert.Null(o.Bounds));
+    }
+
+    [Fact]
+    public void A_raster_row_a_hostile_file_left_without_a_box_reads_back_as_vector()
+    {
+        var incident = IncidentWithEbenen();
+        AddLuftbild(incident);
+        IncidentRepository.Save(Path_, incident);
+        Tamper("UPDATE map_overlays SET north = NULL WHERE kind = 1;");
+
+        var loaded = IncidentRepository.Load(Path_);
+
+        Assert.Equal(3, loaded.MapOverlays.Count);
+        Assert.Equal(MapOverlayKind.Vector, loaded.MapOverlays[^1].Kind);
+        Assert.Null(loaded.MapOverlays[^1].Bounds);
+    }
+
+    private static void AddLuftbild(Incident incident)
+    {
+        var clock = new FixedTestClock();
+        incident.AddMapOverlay(
+            clock,
+            new SessionOperator("Muster", "FFB 12/1"),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "luftbild.jpg",
+            "image/jpeg",
+            300_000,
+            new MapOverlaySummary("Luftbild (LDBV)", 1, null, null, MapOverlayKind.Raster, Luftbild, LdbvAttribution));
     }
 
     private static Incident IncidentWithEbenen()

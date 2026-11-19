@@ -8,6 +8,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Map;
 using LageBuch.Domain.Time;
+using LageBuch.Domain.ValueObjects;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -17,7 +18,9 @@ namespace LageBuch.AppLogic.ViewModels;
 /// or off. Which Ebene is shown, and at which time, belongs to this screen and is not stored, like
 /// the HYDRANTEN switch; the Ebenen themselves are the Einsatz's and sync. A new Ebene is shown
 /// and the ones before it are hidden, so a newer Ausbreitungsprognose replaces the old one on the
-/// map while the old one stays on record.
+/// map while the old one stays on record. LUFTBILD LADEN adds the visible section's Luftbild and
+/// Flurstücksgrenzen as two raster Ebenen, which lie under every GeoJSON Ebene and so are shown
+/// beside them rather than in their place.
 /// </summary>
 public sealed partial class MapOverlaysViewModel : ObservableObject
 {
@@ -27,6 +30,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     private readonly Action<string, string, Action>? _requestConfirm;
     private readonly IClock _clock;
     private readonly Action<GeoBounds> _showBounds;
+    private readonly LdbvImageryClient? _luftbild;
 
     // Where the forecast times are read: a DWD file carries them in UTC, and a forecast reopened
     // after the clocks changed must still say the hour it said on the day.
@@ -36,7 +40,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     private readonly bool _opened;
 
     // Read and parsed once per file and session: the file never changes, only whether it is shown.
-    private readonly Dictionary<Guid, Task<(OverlayData? Data, string? Error, bool Parsed)>> _loads = [];
+    private readonly Dictionary<Guid, Task<LoadResult>> _loads = [];
 
     // Every row's load since the last settle, for a caller that has to wait on the files being read.
     private readonly List<Task> _pending = [];
@@ -51,7 +55,8 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         Action<string, string, Action>? requestConfirm,
         IClock clock,
         Action<GeoBounds> showBounds,
-        TimeZoneInfo? timeZone = null)
+        TimeZoneInfo? timeZone = null,
+        LdbvImageryClient? luftbild = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -64,6 +69,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         _clock = clock;
         _showBounds = showBounds;
         _timeZone = timeZone ?? TimeZoneInfo.Local;
+        _luftbild = luftbild;
         Refresh();
         _opened = true;
     }
@@ -89,6 +95,39 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     /// <summary>What the map draws: the current frame of every shown Ebene, the newest on top.</summary>
     [ObservableProperty]
     private IReadOnlyList<OverlayShape> _visibleShapes = [];
+
+    /// <summary>
+    /// What the map lays under its GeoJSON Ebenen: the image of every shown raster Ebene, every
+    /// photo below every drawing, so a newer Luftbild never covers an older one's Flurstücksgrenzen.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RasterAttribution))]
+    private IReadOnlyList<RasterImage> _visibleRasters = [];
+
+    /// <summary>The licence lines of the shown raster Ebenen, each once; null while none is shown.</summary>
+    public string? RasterAttribution
+    {
+        get
+        {
+            var lines = Items
+                .Where(i => i.IsVisible && i.Raster is not null)
+                .Select(i => i.Attribution)
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            return lines.Count == 0 ? null : string.Join(" ", lines);
+        }
+    }
+
+    /// <summary>LUFTBILD LADEN needs an open Einsatz and, on this device, the way to the LDBV.</summary>
+    public bool CanLoadLuftbild => !_session.IsReadOnly && _luftbild is not null;
+
+    [ObservableProperty]
+    private bool _isLoadingLuftbild;
+
+    /// <summary>How LUFTBILD LADEN is getting on, or how it ended when it was cancelled; null otherwise.</summary>
+    [ObservableProperty]
+    private string? _luftbildStatus;
 
     [ObservableProperty]
     private bool _isImporting;
@@ -138,13 +177,20 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             Items.Add(item);
         }
 
-        // The newest Ebene is shown when it arrives, here or from another device, and hides the
-        // ones before it. On opening the Einsatz only the newest is shown.
-        if (Items.Count > 0 && (first || !known.ContainsKey(Items[^1].Id)))
+        // The newest GeoJSON Ebene is shown when it arrives, here or from another device, and hides
+        // the ones before it. On opening the Einsatz only the newest is shown. A raster Ebene lies
+        // under them all and covers none, so it is shown when it arrives and on opening, and leaves
+        // the others as they are.
+        foreach (var item in Items.Where(i => i.IsRaster && (first || !known.ContainsKey(i.Id))))
         {
-            foreach (var item in Items)
+            item.IsVisible = true;
+        }
+
+        if (Items.LastOrDefault(i => !i.IsRaster) is { } newest && (first || !known.ContainsKey(newest.Id)))
+        {
+            foreach (var item in Items.Where(i => !i.IsRaster))
             {
-                item.IsVisible = ReferenceEquals(item, Items[^1]);
+                item.IsVisible = ReferenceEquals(item, newest);
             }
         }
 
@@ -156,6 +202,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(Header));
         UpdateVisibleShapes();
+        UpdateVisibleRasters();
     }
 
     private void Track(Task load)
@@ -186,6 +233,86 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             VisibleShapes = shapes;
         }
     }
+
+    // Every photo first, then every drawing, each in the order the Einsatz has them.
+    internal void UpdateVisibleRasters()
+    {
+        var rasters = Items
+            .Where(i => i.IsVisible)
+            .Select(i => i.Raster)
+            .OfType<RasterImage>()
+            .OrderBy(r => r.Info.Format == RasterFormat.Png)
+            .ToList();
+        if (!rasters.SequenceEqual(VisibleRasters, ReferenceEqualityComparer.Instance))
+        {
+            VisibleRasters = rasters;
+        }
+    }
+
+    /// <summary>
+    /// LUFTBILD LADEN: the Luftbild and the Flurstücksgrenzen of <paramref name="visible"/>, the
+    /// section the Lagekarte shows, become two Ebenen. Both pictures are fetched before either is
+    /// stored, so a failed download leaves the Einsatz as it was. The section goes to the LDBV, and
+    /// only on this tap (see docs/datenschutz-und-sicherheit.md).
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A store or upload failure after both downloads is heterogeneous; it surfaces in Error, as ImportAsync's does.")]
+    [RelayCommand(CanExecute = nameof(CanLoadLuftbild), IncludeCancelCommand = true)]
+    private async Task LoadLuftbildAsync(GeoBox? visible, CancellationToken cancellationToken)
+    {
+        if (!CanLoadLuftbild || _luftbild is null || visible is null)
+        {
+            return;
+        }
+
+        Error = null;
+        LuftbildStatus = null;
+        if (LuftbildArea.For(visible) is not { } area)
+        {
+            Error = LuftbildArea.OutsideBavaria;
+            return;
+        }
+
+        IsLoadingLuftbild = true;
+        var step = "Luftbild";
+        try
+        {
+            LuftbildStatus = "Luftbild wird geladen …";
+            var photo = await _luftbild.GetMapAsync(LuftbildLayer.Luftbild, area, cancellationToken);
+            step = "Flurstücksgrenzen";
+            LuftbildStatus = "Flurstücksgrenzen werden geladen …";
+            var parcels = await _luftbild.GetMapAsync(LuftbildLayer.Flurstuecke, area, cancellationToken);
+            LuftbildStatus = null;
+
+            // Not cancellable from here on: both pictures are in, and half an import is worse than a whole one.
+            await _session.AddMapOverlayAsync("luftbild.jpg", "image/jpeg", photo, Summary("Luftbild (LDBV)", area), CancellationToken.None);
+            await _session.AddMapOverlayAsync("flurstuecke.png", "image/png", parcels, Summary("Flurstücksgrenzen (LDBV)", area), CancellationToken.None);
+            _onChanged();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            LuftbildStatus = "Download abgebrochen.";
+        }
+        catch (LuftbildException ex)
+        {
+            LuftbildStatus = null;
+            Error = $"{step} nicht geladen: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            LuftbildStatus = null;
+            Error = $"Luftbild nicht übernommen: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingLuftbild = false;
+        }
+    }
+
+    private static MapOverlaySummary Summary(string name, LuftbildArea area) =>
+        new(name, 1, null, null, MapOverlayKind.Raster, area.Bounds, LdbvImageryClient.Attribution);
 
     [SuppressMessage(
         "Design",
@@ -307,6 +434,10 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         {
             _showBounds(data.Bounds);
         }
+        else if (item.Raster is { Bounds: var box })
+        {
+            _showBounds(new GeoBounds(box.South, box.West, box.North, box.East));
+        }
     }
 
     [SuppressMessage(
@@ -318,13 +449,13 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         var fileId = item.FileId;
         bool missing;
         bool again;
-        (OverlayData? Data, string? Error, bool Parsed) result;
+        LoadResult result;
         do
         {
             var changesAtStart = _changes;
             if (!_loads.TryGetValue(fileId, out var load))
             {
-                load = Fetch(fileId);
+                load = Fetch(fileId, item.RasterBounds);
                 _loads[fileId] = load;
             }
 
@@ -334,11 +465,11 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                result = (null, ex.Message, false);
+                result = new LoadResult(null, null, ex.Message, false);
             }
 
             // A file that could not be fetched is tried again; one that was read, or will never parse, stays.
-            missing = result.Data is null && !result.Parsed;
+            missing = !result.Parsed;
             if (missing && _loads.TryGetValue(fileId, out var cached) && ReferenceEquals(cached, load))
             {
                 _loads.Remove(fileId);
@@ -351,24 +482,38 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         }
         while (again);
 
-        item.Loaded(result.Data, result.Error, missing, _clock.Now);
+        item.Loaded(result.Data, result.Raster, result.Error, missing, _clock.Now);
         UpdateVisibleShapes();
+        UpdateVisibleRasters();
     }
 
-    private async Task<(OverlayData? Data, string? Error, bool Parsed)> Fetch(Guid fileId)
+    // A raster Ebene's file is only checked here, never decoded: that is the map's job, and the
+    // header check is what keeps a hostile file from asking it for more than it can hold.
+    private async Task<LoadResult> Fetch(Guid fileId, GeoBox? rasterBounds)
     {
         var bytes = await _session.GetFileBytesAsync(fileId);
         if (bytes is null)
         {
-            return (null, "Datei ist noch nicht verfügbar.", false);
+            return new LoadResult(null, null, "Datei ist noch nicht verfügbar.", false);
+        }
+
+        if (rasterBounds is not null)
+        {
+            return RasterImage.TryRead(fileId, bytes, rasterBounds, out var raster, out var rasterError)
+                ? new LoadResult(null, raster, null, true)
+                : new LoadResult(null, null, rasterError, true);
         }
 
         var (data, error) = await Task.Run(() => Parse(bytes));
-        return (data, error, true);
+        return new LoadResult(data, null, error, true);
     }
 
     private static (OverlayData? Data, string? Error) Parse(byte[] bytes) =>
         OverlayGeoJson.TryParse(bytes, out var data, out var error) ? (data, null) : (null, error);
+
+    // What reading an Ebene's file came to: shapes or a picture, or why neither, and whether the
+    // file was there to read at all.
+    private sealed record LoadResult(OverlayData? Data, RasterImage? Raster, string? Error, bool Parsed);
 }
 
 /// <summary>One Ebene in the EBENEN list.</summary>
@@ -383,6 +528,8 @@ public sealed partial class MapOverlayItem : ObservableObject
         Id = overlay.Id;
         FileId = overlay.FileId;
         Name = overlay.Name;
+        RasterBounds = overlay.Kind == MapOverlayKind.Raster ? overlay.Bounds : null;
+        Attribution = overlay.Attribution;
         Detail = $"{Formatting.Timestamp(overlay.ImportedAt)} · {overlay.ImportedBy}";
         _owner = owner;
     }
@@ -395,6 +542,21 @@ public sealed partial class MapOverlayItem : ObservableObject
 
     /// <summary>When and by whom it was imported.</summary>
     public string Detail { get; }
+
+    /// <summary>Where a raster Ebene's picture lies; null for a GeoJSON Ebene.</summary>
+    public GeoBox? RasterBounds { get; }
+
+    /// <summary>A raster Ebene: a Luftbild or Flurstücksgrenzen.</summary>
+    public bool IsRaster => RasterBounds is not null;
+
+    /// <summary>The licence line the Ebene's source asks for, as recorded at its download.</summary>
+    public string? Attribution { get; }
+
+    /// <summary>A raster Ebene's checked picture; null until its file is read, for a GeoJSON Ebene, and when it could not be.</summary>
+    public RasterImage? Raster { get; private set; }
+
+    /// <summary>The Ebene can be centred on: its file has been read.</summary>
+    public bool CanShow => Data is not null || Raster is not null;
 
     public string VisibilityAutomationName => $"{Name}: auf der Karte zeigen";
 
@@ -411,7 +573,7 @@ public sealed partial class MapOverlayItem : ObservableObject
     /// <summary>Null while the file is still being read, and when it could not be.</summary>
     public OverlayData? Data { get; private set; }
 
-    public bool IsLoading => Data is null && LoadError is null;
+    public bool IsLoading => !CanShow && LoadError is null;
 
     /// <summary>Why the Ebene cannot be drawn, in German.</summary>
     [ObservableProperty]
@@ -474,13 +636,16 @@ public sealed partial class MapOverlayItem : ObservableObject
 
     private bool CanStepForward => FrameIndex < MaxFrameIndex;
 
-    internal void Loaded(OverlayData? data, string? error, bool missing, DateTimeOffset now)
+    internal void Loaded(OverlayData? data, RasterImage? raster, string? error, bool missing, DateTimeOffset now)
     {
         IsMissing = missing;
         Data = data;
+        Raster = raster;
         FrameIndex = data?.FrameIndexAt(now) ?? 0;
-        LoadError = data is null ? $"Ebene konnte nicht gelesen werden: {error}" : null;
+        LoadError = data is null && raster is null ? $"Ebene konnte nicht gelesen werden: {error}" : null;
         OnPropertyChanged(nameof(Data));
+        OnPropertyChanged(nameof(Raster));
+        OnPropertyChanged(nameof(CanShow));
         OnPropertyChanged(nameof(IsLoading));
         OnPropertyChanged(nameof(IsTimeSeries));
         OnPropertyChanged(nameof(ShowsTimeline));
@@ -493,7 +658,11 @@ public sealed partial class MapOverlayItem : ObservableObject
         NextFrameCommand.NotifyCanExecuteChanged();
     }
 
-    partial void OnIsVisibleChanged(bool value) => _owner.UpdateVisibleShapes();
+    partial void OnIsVisibleChanged(bool value)
+    {
+        _owner.UpdateVisibleShapes();
+        _owner.UpdateVisibleRasters();
+    }
 
     partial void OnFrameIndexChanged(int value)
     {

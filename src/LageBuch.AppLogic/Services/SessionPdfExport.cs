@@ -1,4 +1,5 @@
 using LageBuch.Domain;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
 
@@ -39,7 +40,10 @@ public static class SessionPdfExport
         string? tempDirectory = null;
         try
         {
-            foreach (var file in incident.Files)
+            // A Luftbild's pictures are Kartenebenen, not attachments, and too large to print as
+            // one; the report lists their files by name like every other Ebene's.
+            var rasters = incident.MapOverlays.Where(o => o.Kind == MapOverlayKind.Raster).Select(o => o.FileId).ToHashSet();
+            foreach (var file in incident.Files.Where(f => !rasters.Contains(f.Id)))
             {
                 var bytes = await session.GetFileBytesAsync(file.Id, cancellationToken);
                 if (bytes is null)

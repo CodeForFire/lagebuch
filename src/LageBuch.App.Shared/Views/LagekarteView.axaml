@@ -196,6 +196,21 @@
                     IsEnabled="{Binding !Overlays.IsImporting}"
                     Command="{Binding Overlays.ImportCommand}" />
           </Grid>
+          <!-- LUFTBILD LADEN: the section on screen, from the LDBV, as two Ebenen. Asks the
+               network only on this tap; the section is what it sends. -->
+          <StackPanel x:Name="LuftbildRow" Orientation="Horizontal" Spacing="6"
+                      IsVisible="{Binding Overlays.CanLoadLuftbild}">
+            <Button x:Name="LoadLuftbildButton" Classes="ghost" Content="LUFTBILD LADEN"
+                    ToolTip.Tip="Luftbild und Flurstücksgrenzen des Kartenausschnitts von der Bayerischen Vermessungsverwaltung laden"
+                    IsEnabled="{Binding !Overlays.IsLoadingLuftbild}"
+                    Click="OnLoadLuftbild" />
+            <Button x:Name="CancelLuftbildButton" Classes="ghost" Content="ABBRECHEN"
+                    IsVisible="{Binding Overlays.IsLoadingLuftbild}"
+                    Command="{Binding Overlays.LoadLuftbildCancelCommand}" />
+          </StackPanel>
+          <TextBlock x:Name="LuftbildStatusText" Text="{Binding Overlays.LuftbildStatus}" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     IsVisible="{Binding Overlays.LuftbildStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <!-- A failed import says so even while the list is folded away. -->
           <TextBlock x:Name="OverlayErrorText" Text="{Binding Overlays.Error}" TextWrapping="Wrap" FontSize="12"
                      Foreground="{StaticResource ErrorBrush}"
@@ -229,7 +244,7 @@
                                Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                     <Button Grid.Column="2" Grid.RowSpan="2" Classes="icon-btn" Margin="4,0,0,0" VerticalAlignment="Top"
                             ToolTip.Tip="Auf der Karte zeigen" AutomationProperties.Name="{Binding ShowAutomationName}"
-                            IsEnabled="{Binding Data, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            IsEnabled="{Binding CanShow}"
                             Command="{Binding ShowCommand}">
                       <PathIcon Data="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />
                     </Button>
@@ -372,6 +387,7 @@
                             FlowPath="{Binding Terrain.FlowPoints}"
                             SelectedWaterPoint="{Binding SelectedWaterPoint}"
                             Overlays="{Binding MapShapes}"
+                            RasterOverlays="{Binding Overlays.VisibleRasters}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
                             Rotation="{Binding Map.Rotation}"
@@ -806,11 +822,11 @@
                          Foreground="{StaticResource TextSecondaryBrush}" />
             </StackPanel>
           </Border>
-          <!-- ODbL: every map drawn from OSM data names its source. -->
+          <!-- ODbL: every map drawn from OSM data names its source; CC BY 4.0 asks the same of a Luftbild. -->
           <Border x:Name="Attribution" HorizontalAlignment="Right" Padding="4,1"
-                  IsVisible="{Binding Map.Attribution, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  IsVisible="{Binding MapAttribution, Converter={x:Static ObjectConverters.IsNotNull}}">
             <StackPanel>
-              <TextBlock Text="{Binding Map.Attribution}" FontSize="10" TextWrapping="Wrap" />
+              <TextBlock x:Name="AttributionText" Text="{Binding MapAttribution}" FontSize="10" TextWrapping="Wrap" />
               <TextBlock x:Name="WaterPointsNote" Text="{Binding WaterPointsNote}" FontSize="10"
                          IsVisible="{Binding WaterPointsNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
             </StackPanel>
