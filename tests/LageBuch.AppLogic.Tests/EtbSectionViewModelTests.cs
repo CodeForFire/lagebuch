@@ -278,4 +278,74 @@ public class EtbSectionViewModelTests
         Assert.Same(row, Assert.Single(vm.Entries));
         Assert.Equal("Süd", row.SectionName);
     }
+
+    [Fact]
+    public void Forming_the_first_abschnitt_shows_both_strips()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(), clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        session.AddCommandNode(CommandNodeKind.Abschnitt, "Nord");
+
+        Assert.True(vm.HasSectionChoices);
+        Assert.True(vm.HasFilterChoices);
+        Assert.Contains(nameof(EtbViewModel.HasSectionChoices), raised);
+        Assert.Contains(nameof(EtbViewModel.HasFilterChoices), raised);
+    }
+
+    [Fact]
+    public void Picking_in_the_edit_panel_announces_the_new_label()
+    {
+        var (_, vm, _, _) = WithAbschnitte();
+        Add(vm, "Lage");
+        Row(vm, "Lage").BeginEditCommand.Execute(null);
+        Assert.Equal(NodeChoices.UnplacedLabel, vm.EditSectionLabel);
+        Assert.True(vm.HasEditSectionChoices);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.EditSectionChoices.Single(c => c.Label == "Nord").SelectCommand.Execute(null);
+
+        Assert.Equal("Nord", vm.EditSectionLabel);
+        Assert.Contains(nameof(EtbViewModel.EditSectionLabel), raised);
+        Assert.Contains(nameof(EtbViewModel.HasEditSectionChoices), raised);
+    }
+
+    [Fact]
+    public void Without_abschnitte_the_edit_panel_offers_no_picker()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(), clock, new SessionOperator("Müller"), "/x.lagebuch", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        Add(vm, "Lage");
+
+        Row(vm, "Lage").BeginEditCommand.Execute(null);
+
+        Assert.False(vm.HasEditSectionChoices);
+    }
+
+    [Fact]
+    public void A_refiled_row_announces_its_abschnitt_and_a_text_edit_does_not()
+    {
+        var (session, vm, nord, _) = WithAbschnitte();
+        Add(vm, "Lage");
+        var row = Row(vm, "Lage");
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        session.EditJournalEntry(row.Id, "Lage korrigiert");
+        Assert.DoesNotContain(nameof(EtbEntryRow.SectionName), raised);
+
+        session.AssignJournalEntrySection(row.Id, nord);
+
+        Assert.Contains(nameof(EtbEntryRow.SectionId), raised);
+        Assert.Contains(nameof(EtbEntryRow.SectionName), raised);
+        Assert.Contains(nameof(EtbEntryRow.HasSection), raised);
+        Assert.True(row.HasSection);
+    }
 }

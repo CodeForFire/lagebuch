@@ -238,4 +238,13 @@ public class EtbSectionAssignmentTests
         Assert.Equal(sectionId, entry.SectionId);
         Assert.Equal("Nord", entry.SectionName);
     }
+
+    [Fact]
+    public void A_name_without_an_abschnitt_is_not_kept()
+    {
+        var entry = EtbEntry.Rehydrate(Guid.NewGuid(), T0, EtbDirection.Internal, "Lage", "Muster", null, null, null, null, "Nord");
+
+        Assert.Null(entry.SectionName);
+        Assert.Null(entry.WithSection(Guid.NewGuid(), "Süd").WithSection(null, "Süd").SectionName);
+    }
 }

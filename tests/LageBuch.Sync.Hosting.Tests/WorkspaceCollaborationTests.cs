@@ -141,6 +141,33 @@ public class WorkspaceCollaborationTests
     }
 
     [Fact]
+    public async Task A_client_files_its_entry_under_an_abschnitt_and_moves_it_to_another()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        hostSession.AddCommandNode(CommandNodeKind.Abschnitt, "Nord");
+        hostSession.AddCommandNode(CommandNodeKind.Abschnitt, "Süd");
+        var nord = hostSession.Incident.CommandNodes.Single(n => n.Name == "Nord").Id;
+        var sued = hostSession.Incident.CommandNodes.Single(n => n.Name == "Süd").Id;
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        var added = NextChange(client);
+        var id = client.AddJournalEntry(EtbDirection.Internal, "Riegelstellung aufgebaut", sectionId: nord);
+        await added;
+        Assert.Equal("Nord", hostSession.Incident.Journal.Single(e => e.Id == id).SectionName);
+
+        var moved = NextChange(client);
+        client.AssignJournalEntrySection(id, sued);
+        await moved;
+        Assert.Equal(sued, hostSession.Incident.Journal.Single(e => e.Id == id).SectionId);
+        Assert.Equal("Süd", client.Incident.Journal.Single(e => e.Id == id).SectionName);
+    }
+
+    [Fact]
     public async Task Client_workspace_reflects_a_journal_entry_edited_on_the_host()
     {
         var clock = new FixedClock();
