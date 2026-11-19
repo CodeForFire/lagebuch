@@ -266,7 +266,9 @@ public sealed record CommandNodeDto(
     Guid Id, CommandNodeKind Kind, string Name, Guid? ParentId, string? Auftrag, string? Standort,
     string? Funkgruppe, string? Rufname, string? Telefon, DateTimeOffset? DissolvedAt,
     IReadOnlyList<string>? FunkgruppenTmo = null, IReadOnlyList<string>? FunkgruppenDmo = null,
-    string? Fuehrungsfahrzeug = null);
+    string? Fuehrungsfahrzeug = null,
+    double? PositionLatitude = null, double? PositionLongitude = null,
+    double? LabelDx = null, double? LabelDy = null);
 
 public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,

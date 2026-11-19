@@ -206,6 +206,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void MoveForceUnitLabel(Guid unitId, LabelOffset? offset) =>
         Mutate(() => Incident.MoveForceUnitLabel(_clock, RequireOperator(), unitId, offset));
 
+    public void PlaceCommandNode(Guid nodeId, GeoPoint? position) =>
+        Mutate(() => Incident.PlaceCommandNode(_clock, RequireOperator(), nodeId, position));
+
+    public void MoveCommandNodeLabel(Guid nodeId, LabelOffset? offset) =>
+        Mutate(() => Incident.MoveCommandNodeLabel(_clock, RequireOperator(), nodeId, offset));
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Mutate(() => Incident.PlaceRoleAssignment(_clock, RequireOperator(), assignmentId, nodeId, slot));
 

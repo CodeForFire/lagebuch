@@ -44,5 +44,7 @@ internal static class CommandNodeRepair
             n.Telefon,
             n.DissolvedAt,
             n.Funkgruppen,
-            n.Fuehrungsfahrzeug);
+            n.Fuehrungsfahrzeug,
+            n.Position,
+            n.LabelOffset);
 }

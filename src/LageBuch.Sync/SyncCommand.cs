@@ -30,6 +30,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(PlaceForceUnitCommand), "placeForceUnit")]
 [JsonDerivedType(typeof(SetForceUnitVehicleTypeCommand), "setForceUnitVehicleType")]
 [JsonDerivedType(typeof(MoveForceUnitLabelCommand), "moveForceUnitLabel")]
+[JsonDerivedType(typeof(PlaceCommandNodeCommand), "placeCommandNode")]
+[JsonDerivedType(typeof(MoveCommandNodeLabelCommand), "moveCommandNodeLabel")]
 [JsonDerivedType(typeof(AddMapOverlayCommand), "addMapOverlay")]
 [JsonDerivedType(typeof(RemoveMapOverlayCommand), "removeMapOverlay")]
 [JsonDerivedType(typeof(PlaceRoleAssignmentCommand), "placeRoleAssignment")]
@@ -167,6 +169,12 @@ public sealed record PlaceForceUnitCommand(OperatorDto Operator, Guid UnitId, do
 public sealed record SetForceUnitVehicleTypeCommand(OperatorDto Operator, Guid UnitId, string? VehicleType) : SyncCommand;
 
 public sealed record MoveForceUnitLabelCommand(OperatorDto Operator, Guid UnitId, double? Dx, double? Dy) : SyncCommand;
+
+// Protocol 44: a Bereitstellungsraum on the Lagekarte (#966), the same pair as a unit's. Both
+// coordinates null take it off the map; both offsets null put its sign back at its default place.
+public sealed record PlaceCommandNodeCommand(OperatorDto Operator, Guid NodeId, double? Latitude, double? Longitude) : SyncCommand;
+
+public sealed record MoveCommandNodeLabelCommand(OperatorDto Operator, Guid NodeId, double? Dx, double? Dy) : SyncCommand;
 
 // Protocol 38: Kartenebenen. Metadata only, like AddFileCommand: the client PUTs the file's bytes to
 // SyncProtocol.FilesPath(FileId) afterwards. Name and times are what the client read from the file;

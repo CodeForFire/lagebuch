@@ -249,15 +249,20 @@ public static class SyncProtocol
     /// Fahrzeugtyp is filled from. A peer at 42 drops the key and reads none, which only leaves its
     /// new vehicles to be typed by hand, so the floor stays at 40.
     /// </para>
+    /// <para>
+    /// 44: a Bereitstellungsraum on the Lagekarte (#966). A client may send <c>placeCommandNode</c>
+    /// and <c>moveCommandNodeLabel</c>, which a host at 43 does not know, so the floor rises to 44.
+    /// The snapshot's command nodes carry an optional position and sign offset.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 43;
+    public const int ProtocolVersion = 44;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 40;
+    public const int MinimumProtocolVersion = 44;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

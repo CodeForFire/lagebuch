@@ -619,4 +619,37 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(0));
         Assert.Equal(("19", "25"), (r.GetString(1), r.GetString(2)));
     }
+
+    [Fact]
+    public void V45_database_upgrades_to_v46_and_its_Bereitstellungsraeume_are_off_the_map()
+    {
+        // A V45 file: today's schema minus the command nodes' place on the Lagekarte (#966).
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE command_nodes DROP COLUMN position_lat;
+                ALTER TABLE command_nodes DROP COLUMN position_lon;
+                ALTER TABLE command_nodes DROP COLUMN label_dx;
+                ALTER TABLE command_nodes DROP COLUMN label_dy;
+                INSERT INTO command_nodes (id, ordinal, kind, name, standort) VALUES ('n', 0, 'bereitstellung', 'BR Nord', 'Parkplatz');
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (45);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT position_lat, position_lon, label_dx, label_dy, standort FROM command_nodes WHERE id = 'n';";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.True(r.IsDBNull(0) && r.IsDBNull(1) && r.IsDBNull(2) && r.IsDBNull(3));
+        Assert.Equal("Parkplatz", r.GetString(4));
+    }
 }

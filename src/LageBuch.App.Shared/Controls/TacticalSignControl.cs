@@ -18,6 +18,8 @@ namespace LageBuch.App.Shared.Controls;
 /// <see cref="SymbolCenter"/> it draws the Verbindungsstrich back to the unit's pin, which stands
 /// <see cref="MapMarkerPanel.ResolvedOffsetProperty"/> away (§1.5: a sign moved aside "mit Verbindungsstrichen zur jeweiligen
 /// Örtlichkeit"). The strich leaves the control's bounds on purpose; only the sign takes the pointer.
+/// A Bereitstellungsraum (#966) is drawn instead as the Grundzeichen "Stelle, Einrichtung", a red
+/// circle, marked "BR", around the same <see cref="SymbolCenter"/>.
 /// </summary>
 public sealed class TacticalSignControl : Control
 {
@@ -26,15 +28,24 @@ public sealed class TacticalSignControl : Control
 
     public const double BodyHeight = 26;
 
+    /// <summary>What a Bereitstellungsraum's circle says inside.</summary>
+    public const string BereitstellungsraumCode = "BR";
+
     public static readonly StyledProperty<string?> VehicleTypeProperty =
         AvaloniaProperty.Register<TacticalSignControl, string?>(nameof(VehicleType));
 
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<TacticalSignControl, string?>(nameof(Title));
 
+    public static readonly StyledProperty<bool> IsBereitstellungsraumProperty =
+        AvaloniaProperty.Register<TacticalSignControl, bool>(nameof(IsBereitstellungsraum));
+
     private const double WheelRadius = 2.4;
     private const double SymbolHeight = BodyHeight + 7;
     private const double Gap = 4;
+
+    // The Bereitstellungsraum's circle: a little taller than the vehicle's body, centred where it is.
+    private const double StelleRadius = (BodyHeight / 2) + 1;
 
     // The body's top edge sags towards the middle, as on the DV 102 Kraftfahrzeug sign.
     private const double Sag = 3.5;
@@ -69,8 +80,8 @@ public sealed class TacticalSignControl : Control
 
     static TacticalSignControl()
     {
-        AffectsMeasure<TacticalSignControl>(VehicleTypeProperty, TitleProperty);
-        AffectsRender<TacticalSignControl>(VehicleTypeProperty, TitleProperty, MapMarkerPanel.ResolvedOffsetProperty);
+        AffectsMeasure<TacticalSignControl>(VehicleTypeProperty, TitleProperty, IsBereitstellungsraumProperty);
+        AffectsRender<TacticalSignControl>(VehicleTypeProperty, TitleProperty, IsBereitstellungsraumProperty, MapMarkerPanel.ResolvedOffsetProperty);
     }
 
     /// <summary>The body's middle: where the sign is anchored to its offset from the pin.</summary>
@@ -89,6 +100,13 @@ public sealed class TacticalSignControl : Control
         set => SetValue(TitleProperty, value);
     }
 
+    /// <summary>Draws the Bereitstellungsraum's circle instead of a vehicle; <see cref="VehicleType"/> is ignored then.</summary>
+    public bool IsBereitstellungsraum
+    {
+        get => GetValue(IsBereitstellungsraumProperty);
+        set => SetValue(IsBereitstellungsraumProperty, value);
+    }
+
     protected override Size MeasureOverride(Size availableSize) => Layout().Size;
 
     public override void Render(DrawingContext context)
@@ -103,6 +121,12 @@ public sealed class TacticalSignControl : Control
             var pin = new Point(SymbolCenter.X - offset.Dx, SymbolCenter.Y - offset.Dy);
             context.DrawLine(StrichHalo, SymbolCenter, pin);
             context.DrawLine(Strich, SymbolCenter, pin);
+        }
+
+        if (IsBereitstellungsraum)
+        {
+            DrawStelle(context, layout);
+            return;
         }
 
         var body = Body();
@@ -139,11 +163,36 @@ public sealed class TacticalSignControl : Control
             context.DrawText(code, origin);
         }
 
+        DrawLines(context, layout);
+    }
+
+    private static void DrawLines(DrawingContext context, SignLayout layout)
+    {
         foreach (var (text, origin) in layout.Lines)
         {
             context.FillRectangle(TextBackground, new Rect(origin.X - 2, origin.Y, text.Width + 4, text.Height), 2);
             context.DrawText(text, origin);
         }
+    }
+
+    // The Grundzeichen "Stelle, Einrichtung" in Feuerwehr red, edged like the vehicle's body, with "BR" inside.
+    private static void DrawStelle(DrawingContext context, SignLayout layout)
+    {
+        var circle = new EllipseGeometry(new Rect(
+            SymbolCenter.X - StelleRadius, SymbolCenter.Y - StelleRadius, StelleRadius * 2, StelleRadius * 2));
+        context.DrawGeometry(Red, null, circle);
+        using (context.PushGeometryClip(circle))
+        {
+            context.DrawGeometry(null, InnerEdge, circle);
+        }
+
+        context.DrawGeometry(null, Outline, circle);
+        if (layout.Code is { } code)
+        {
+            context.DrawText(code, new Point(SymbolCenter.X - (code.Width / 2), SymbolCenter.Y - (code.Height / 2)));
+        }
+
+        DrawLines(context, layout);
     }
 
     // The marks inside the body, traced from the set's SVGs in its 256-unit coordinates.
@@ -271,6 +320,11 @@ public sealed class TacticalSignControl : Control
     private SignLayout Layout()
     {
         var bold = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Bold);
+        if (IsBereitstellungsraum)
+        {
+            var brCode = new FormattedText(BereitstellungsraumCode, Culture, FlowDirection.LeftToRight, bold, 11, Brushes.White);
+            return WithTitle(brCode, codeIsSmall: false, SymbolCenter.X + StelleRadius + Gap + 2, bold);
+        }
 
         // Where the code goes depends on the mark: in the middle of a bare sign, small above the
         // line of one that has a line, and nowhere on the ladder and the hose, which say it already.
@@ -301,12 +355,18 @@ public sealed class TacticalSignControl : Control
             code.Trimming = TextTrimming.CharacterEllipsis;
         }
 
+        return WithTitle(code, codeIsSmall, SymbolWidth + Gap + 2, bold);
+    }
+
+    // The name to the right of the sign, from titleLeft.
+    private SignLayout WithTitle(FormattedText? code, bool codeIsSmall, double titleLeft, Typeface bold)
+    {
         var lines = new List<(FormattedText Text, Point Origin)>();
         var width = SymbolWidth;
         if (!string.IsNullOrWhiteSpace(Title))
         {
             var title = new FormattedText(Title, Culture, FlowDirection.LeftToRight, bold, 12, TextInk);
-            var origin = new Point(SymbolWidth + Gap + 2, (BodyHeight - title.Height) / 2);
+            var origin = new Point(titleLeft, (BodyHeight - title.Height) / 2);
             lines.Add((title, origin));
             width = Math.Max(width, origin.X + title.Width + 2);
         }
