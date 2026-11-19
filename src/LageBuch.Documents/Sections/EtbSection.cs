@@ -1,4 +1,5 @@
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -16,7 +17,10 @@ public static class EtbSection
             column.Spacing(4);
             column.Item().Text("Einsatztagebuch (ETB)").FontSize(14).SemiBold().FontColor(Colors.Blue.Darken1);
 
-            if (incident.Journal.Count == 0)
+            // A measured value is printed in the Messungen section instead (#972); an older
+            // file's Kartenebene line is bookkeeping and stays here.
+            var entries = incident.Journal.Where(e => !EtbDirections.IsMeasurement(e.Direction, e.Text)).ToList();
+            if (entries.Count == 0)
             {
                 column.Item().Text("— keine Einträge —").Italic().FontColor(Colors.Grey.Medium);
                 return;
@@ -41,7 +45,7 @@ public static class EtbSection
                     }
                 });
 
-                foreach (var entry in incident.Journal)
+                foreach (var entry in entries)
                 {
                     table.Cell().Element(BodyCell).Text(Formatting.Timestamp(entry.Timestamp));
                     table.Cell().Element(BodyCell).Text(Formatting.OrDash(entry.From));

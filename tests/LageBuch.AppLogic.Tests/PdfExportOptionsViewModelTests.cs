@@ -9,14 +9,26 @@ public class PdfExportOptionsViewModelTests
         new(onExport ?? (_ => Task.CompletedTask));
 
     [Fact]
-    public void All_twelve_sections_are_selected_by_default()
+    public void All_thirteen_sections_are_selected_by_default()
     {
         var vm = NewVm();
 
-        Assert.Equal(12, vm.Items.Count);
-        Assert.Equal(IncidentPdfSections.Fuehrungsorganisation, vm.Items[4].Section);
-        Assert.Equal("Führungsorganisation", vm.Items[4].Label);
+        Assert.Equal(13, vm.Items.Count);
+        Assert.Equal(IncidentPdfSections.Fuehrungsorganisation, vm.Items[5].Section);
+        Assert.Equal("Führungsorganisation", vm.Items[5].Label);
         Assert.All(vm.Items, i => Assert.True(i.IsSelected));
+    }
+
+    // #972: the measured values, right after the ETB they were taken out of.
+    [Fact]
+    public void Messungen_is_offered_after_the_ETB()
+    {
+        var vm = NewVm();
+
+        Assert.Equal(IncidentPdfSections.Etb, vm.Items[1].Section);
+        Assert.Equal(IncidentPdfSections.Measurements, vm.Items[2].Section);
+        Assert.Equal("Messungen", vm.Items[2].Label);
+        Assert.Equal(IncidentPdfSections.All, vm.Items.Aggregate(IncidentPdfSections.None, (acc, i) => acc | i.Section));
     }
 
     [Fact]
