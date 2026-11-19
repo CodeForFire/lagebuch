@@ -1420,6 +1420,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void ExtendTaskTimer(Guid taskId, int minutes) => _inner.ExtendTaskTimer(taskId, minutes);
 
+    public void SetTaskTimer(Guid taskId, int minutes) => _inner.SetTaskTimer(taskId, minutes);
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

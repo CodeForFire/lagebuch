@@ -114,6 +114,7 @@ public class CommandSerializationTests
         new RemoveIssuedItemCommand(Guid.NewGuid()),
         new UpdateTaskCommand(Guid.NewGuid(), "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium),
         new ExtendTaskTimerCommand(Guid.NewGuid(), 5),
+        new SetTaskTimerCommand(Guid.NewGuid(), 30),
     }.Select(c => new object[] { c });
 
     [Theory]

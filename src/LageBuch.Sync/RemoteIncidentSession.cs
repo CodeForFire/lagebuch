@@ -636,6 +636,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void ExtendTaskTimer(Guid taskId, int minutes) =>
         Send(new ExtendTaskTimerCommand(taskId, minutes));
 
+    public void SetTaskTimer(Guid taskId, int minutes) =>
+        Send(new SetTaskTimerCommand(taskId, minutes));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

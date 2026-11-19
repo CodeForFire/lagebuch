@@ -312,6 +312,14 @@ public class WorkspaceCollaborationTests
 
         Assert.Equal(dueBefore.AddMinutes(5), Assert.Single(hostSession.Incident.Tasks).DueAt);
 
+        // Client types the time until the reminder (#964): the host counts it from its own clock.
+        var set = NextChange(client);
+        client.SetTaskTimer(task.Id, 30);
+        await set;
+
+        Assert.Equal(clock.Now.AddMinutes(30), Assert.Single(hostSession.Incident.Tasks).DueAt);
+        Assert.Equal(clock.Now.AddMinutes(30), Assert.Single(client.Incident.Tasks).DueAt);
+
         // Client completes -> the host's own aggregate flips too, attributed to the client device.
         var roundTrip = NextChange(client);
         client.SetTaskCompleted(task.Id, true);

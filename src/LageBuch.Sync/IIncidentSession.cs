@@ -249,6 +249,10 @@ public interface IIncidentSession
     /// <summary>Adds minutes to a task's due time (#246 "+5" quick action).</summary>
     void ExtendTaskTimer(Guid taskId, int minutes);
 
+    /// <summary>Sets the time until a task's reminder to minutes from now (#964): shorter or longer
+    /// than before, and on a task that had no timer too.</summary>
+    void SetTaskTimer(Guid taskId, int minutes);
+
     void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

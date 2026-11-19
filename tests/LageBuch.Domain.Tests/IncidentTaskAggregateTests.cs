@@ -153,6 +153,104 @@ public class IncidentTaskAggregateTests
     }
 
     [Fact]
+    public void SetTaskTimer_can_shorten_the_time_until_the_reminder()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.Low, TaskUrgency.Low, 30);
+
+        clock.Now = T0.AddMinutes(4);
+        var updated = incident.SetTaskTimer(incident.Tasks[0].Id, 2, clock);
+
+        // From now, not from the old due time or the creation: what was typed is what is left.
+        Assert.Equal(clock.Now.AddMinutes(2), updated.DueAt);
+        Assert.Same(updated, incident.Tasks[0]);
+    }
+
+    [Fact]
+    public void SetTaskTimer_can_lengthen_the_time_until_the_reminder()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        var updated = incident.SetTaskTimer(incident.Tasks[0].Id, 30, clock);
+
+        Assert.Equal(T0.AddMinutes(30), updated.DueAt);
+    }
+
+    [Fact]
+    public void SetTaskTimer_on_an_overdue_task_counts_from_now()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        clock.Now = T0.AddMinutes(20);
+        var updated = incident.SetTaskTimer(incident.Tasks[0].Id, 10, clock);
+
+        Assert.Equal(clock.Now.AddMinutes(10), updated.DueAt);
+    }
+
+    [Fact]
+    public void SetTaskTimer_gives_a_task_without_a_timer_one()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Kein Timer", null, TaskImportance.Low, TaskUrgency.Low, 0);
+
+        var updated = incident.SetTaskTimer(incident.Tasks[0].Id, 15, clock);
+
+        Assert.Equal(T0.AddMinutes(15), updated.DueAt);
+    }
+
+    [Fact]
+    public void SetTaskTimer_on_a_done_task_throws()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Erledigt", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var id = incident.Tasks[0].Id;
+        incident.SetTaskCompleted(id, true, clock, op);
+
+        Assert.Throws<InvalidOperationException>(() => incident.SetTaskTimer(id, 10, clock));
+        Assert.Equal(T0.AddMinutes(5), incident.Tasks[0].DueAt);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(IncidentTask.MaxTimerMinutes + 1)]
+    public void SetTaskTimer_outside_one_minute_to_the_cap_throws(int minutes)
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.Low, TaskUrgency.Low, 5);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => incident.SetTaskTimer(incident.Tasks[0].Id, minutes, clock));
+        Assert.Equal(T0.AddMinutes(5), incident.Tasks[0].DueAt);
+    }
+
+    [Fact]
+    public void SetTaskTimer_accepts_the_cap_itself()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.Low, TaskUrgency.Low, 5);
+
+        var updated = incident.SetTaskTimer(incident.Tasks[0].Id, IncidentTask.MaxTimerMinutes, clock);
+
+        Assert.Equal(T0.AddMinutes(IncidentTask.MaxTimerMinutes), updated.DueAt);
+    }
+
+    [Fact]
+    public void SetTaskTimer_unknown_id_throws()
+    {
+        var (incident, clock) = NewIncident();
+        Assert.Throws<KeyNotFoundException>(() => incident.SetTaskTimer(Guid.NewGuid(), 5, clock));
+    }
+
+    [Fact]
     public void Closed_incident_rejects_task_mutations()
     {
         var (incident, clock) = NewIncident();
@@ -167,6 +265,8 @@ public class IncidentTaskAggregateTests
             () => incident.UpdateTask(id, "Y", null, TaskImportance.Low, TaskUrgency.Low));
         Assert.Throws<IncidentClosedException>(
             () => incident.ExtendTaskTimer(id, 5, clock));
+        Assert.Throws<IncidentClosedException>(
+            () => incident.SetTaskTimer(id, 5, clock));
     }
 
     [Fact]
