@@ -78,9 +78,15 @@ public class KeystrokeBudgetTests(ITestOutputHelper output)
         // Führung, and Führung opens on it (#970), so the shortcut lands in the form.
         keys.Press(PhysicalKey.Digit4, RawInputModifiers.Control);
         Dispatcher.UIThread.RunJobs();
-        keys.TabTo(Named<ComboBox>(shell.Window, "VehicleBox"));
-        keys.Press(PhysicalKey.ArrowDown); // the first Stammdaten vehicle
-        keys.Press(PhysicalKey.Enter);
+        keys.TabTo(Named<AutoCompleteBox>(shell.Window, "VehicleBox"));
+
+        // FAHRZEUG is a suggestion box since #967, where ↓ opens the list rather than stepping
+        // through it as the ComboBox did. Typing part of the Funkrufname costs nothing here, and
+        // the one match it completes takes Enter to pick and Enter to submit: the same two keys
+        // that ↓ Enter were.
+        keys.Type("FFB 1/40");
+        keys.Press(PhysicalKey.Enter); // takes the completed Funkrufname
+        keys.Press(PhysicalKey.Enter); // submits
 
         Assert.Single(vm.Forces.Forces);
         AssertWithin(keys, budget: 3);

@@ -285,7 +285,7 @@ public class VehicleTypeCodesTests
 
         Assert.Equal(
             ["Aich 42/1", "FFB 2/11/1", "FFB 2/44/1", "FFB 2/44/2", "FFB 2/44/10", "FFB 10/44/1"],
-            vm.VehicleOptions.Select(v => v.CallSign));
+            vm.VehicleOptions.Select(o => o.Vehicle.CallSign));
     }
 
     [Fact]
@@ -297,7 +297,7 @@ public class VehicleTypeCodesTests
             VehicleTypeCodes = [new VehicleTypeCode("12", "MZF")],
         });
 
-        vm.SelectedVehicle = vm.VehicleOptions.Single();
+        vm.SelectedVehicle = vm.VehicleOptions.Single().Vehicle;
 
         Assert.Equal("MZF", vm.NewVehicleType);
     }
@@ -311,7 +311,7 @@ public class VehicleTypeCodesTests
             VehicleTypeCodes = [new VehicleTypeCode("12", "MZF")],
         });
 
-        vm.SelectedVehicle = vm.VehicleOptions.Single();
+        vm.SelectedVehicle = vm.VehicleOptions.Single().Vehicle;
 
         Assert.Equal("MTW", vm.NewVehicleType);
     }

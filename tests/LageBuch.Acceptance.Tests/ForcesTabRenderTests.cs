@@ -93,9 +93,9 @@ public class ForcesTabRenderTests
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
 
         // Available across every Wache without typing anything (#215).
-        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/40/1", "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(o => o.Vehicle.CallSign));
 
-        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(o => o.Vehicle.CallSign == "FFB 1/40/1").Vehicle;
         Assert.Equal("FFB Wache 1", vm.Forces.NewBrigade); // derived from the pick
         Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
         Assert.Equal(1, vm.Forces.NewOfficerCount);
@@ -336,7 +336,7 @@ public class ForcesTabRenderTests
         Assert.True(callSignBox.IsEnabled);
         Assert.False(clearButton.IsVisible);
 
-        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(o => o.Vehicle.CallSign == "FFB 1/40/1").Vehicle;
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(brigadeBox.IsEnabled);
@@ -367,7 +367,7 @@ public class ForcesTabRenderTests
         var view = HostForcesView(out var vm, out var window);
         var brigadeBox = view.GetControl<TextBox>("BrigadeBox");
         var callSignBox = view.GetControl<TextBox>("CallSignBox");
-        Assert.Empty(view.GetVisualDescendants().OfType<AutoCompleteBox>());
+        Assert.Equal(new[] { "VehicleBox" }, view.GetVisualDescendants().OfType<AutoCompleteBox>().Select(b => b.Name)); // FAHRZEUG is the form's one suggestion box (#967)
 
         vm.Forces.NewBrigade = "FF Nachbarort";
         vm.Forces.NewCallSign = "Nachbarort 40/1";
@@ -420,12 +420,12 @@ public class ForcesTabRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(o => o.Vehicle.CallSign == "FFB 1/40/1").Vehicle;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
         // The taken vehicle no longer appears in the dropdown, regardless of Wache (#215).
-        Assert.Equal(new[] { "Aich 42/1", "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "Aich 42/1", "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(o => o.Vehicle.CallSign));
 
         // Free-typing the taken call sign shows the hint and refuses the add. The button itself
         // stays live (#412) -- what refuses the row is the hint, which is already on screen.
@@ -483,7 +483,7 @@ public class ForcesTabRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var box = view.GetControl<ComboBox>("VehicleBox");
+        var box = view.GetControl<AutoCompleteBox>("VehicleBox");
         box.IsDropDownOpen = true;
         Dispatcher.UIThread.RunJobs();
         var popup = box.GetVisualDescendants().OfType<Popup>().Single();
