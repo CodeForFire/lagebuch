@@ -217,6 +217,37 @@ public class ScbaViewModelTests
         Assert.Null(vm.ErrorSummary);
     }
 
+    // The dock binds the message, so it has to be announced: on the press, and again when the
+    // Trupp holding the name is abgenommen (here or on another device) and frees it.
+    [Fact]
+    public void The_duplicate_message_is_announced_on_the_press_and_cleared_when_the_name_frees_up()
+    {
+        var clock = new FixedClock(T0);
+        using var vm = Vm(clock, NewSession(clock));
+        var first = Register(vm, callSign: "HLF 1");
+        vm.NewDesignation = "Angriffstrupp";
+        vm.NewCallSign = "HLF 1";
+        vm.NewTruppfuehrer = "Huber";
+        vm.NewTruppmann = "Maier";
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.AddTruppCommand.Execute(null);
+
+        Assert.Contains(nameof(ScbaViewModel.NewDuplicateTruppError), raised);
+        Assert.NotNull(vm.NewDuplicateTruppError);
+
+        raised.Clear();
+        first.StartCommand.Execute(null);
+        first.WithdrawCommand.Execute(null);
+        first.MarkRemovedCommand.Execute(null);
+
+        Assert.Contains(nameof(ScbaViewModel.NewDuplicateTruppError), raised);
+        Assert.Contains(nameof(ScbaViewModel.ErrorSummary), raised);
+        Assert.Null(vm.NewDuplicateTruppError);
+        Assert.Null(vm.ErrorSummary);
+    }
+
     [Fact]
     public void The_duplicate_message_stays_quiet_until_the_press()
     {

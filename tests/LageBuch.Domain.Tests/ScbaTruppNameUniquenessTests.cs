@@ -148,5 +148,8 @@ public class ScbaTruppNameUniquenessTests
         Assert.Null(incident.FindScbaTruppNamed("HLF 1", "Angriffstrupp", exceptTruppId: angriff.Id));
         Assert.Null(incident.FindScbaTruppNamed("HLF 1", "Sicherheitstrupp"));
         Assert.Null(incident.FindScbaTruppNamed(null, "Angriffstrupp"));
+
+        var unnamed = AddTrupp(incident, clock, "Wassertrupp", callSign: null);
+        Assert.Same(unnamed, incident.FindScbaTruppNamed(null, "Wassertrupp"));
     }
 }
