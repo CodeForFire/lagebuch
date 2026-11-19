@@ -34,15 +34,11 @@ public class KeyboardWalkthroughTests
             keys.Press(PhysicalKey.Enter);
             var vm = shell.Workspace;
 
-            // Kräfte: one vehicle from a neighbouring Feuerwehr. Führung opens on its board, which
-            // has no form, so its tab takes focus and → → walks to KRÄFTE.
+            // Kräfte: one vehicle from a neighbouring Feuerwehr. Führung opens on KRÄFTE, so its
+            // form takes focus straight away.
             keys.Press(PhysicalKey.Digit4, RawInputModifiers.Control);
             Dispatcher.UIThread.RunJobs();
-            window.AssertFocused(Named<TabItem>(window, "OrganisationTab"));
-            keys.Press(PhysicalKey.ArrowRight);
-            keys.Press(PhysicalKey.ArrowRight);
-            Dispatcher.UIThread.RunJobs();
-            keys.TabTo(Named<ComboBox>(window, "VehicleBox"));
+            window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
             keys.Tab();
             keys.Type("FF Nachbarort");
             keys.Tab();

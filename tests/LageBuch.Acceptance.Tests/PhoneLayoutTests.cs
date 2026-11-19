@@ -161,6 +161,7 @@ public class PhoneLayoutTests
     [InlineData("BETEILIGTE")]
     [InlineData("KONTAKTE")]
     [InlineData("FÜHRUNG")]
+    [InlineData("ORGANISATION")]
     [InlineData("AUFBAU")]
     public void No_module_runs_past_the_phone_viewport(string header)
     {

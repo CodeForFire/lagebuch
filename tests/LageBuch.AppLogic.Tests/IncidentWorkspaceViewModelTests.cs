@@ -2313,11 +2313,11 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
-    public void Fuehrung_opens_on_the_organisation_tab()
+    public void Fuehrung_opens_on_the_kraefte_tab()
     {
         var vm = EditableWorkspace(new FakeHostController());
 
-        Assert.Equal(LeadershipTabsViewModel.OrganisationTab, vm.LeadershipTabs.SelectedTabIndex);
+        Assert.Equal(LeadershipTabsViewModel.ForcesTab, vm.LeadershipTabs.SelectedTabIndex);
     }
 
     [Fact]
@@ -2336,13 +2336,13 @@ public class IncidentWorkspaceViewModelTests
     }
 
     // A read-only flip synced from another device rebuilds every module; the Lagebuchführer must
-    // not be thrown back from Kräfte to the board by something done elsewhere.
+    // not be thrown back from the board to Kräfte by something done elsewhere.
     [Fact]
     public void Rebuilding_after_close_keeps_the_open_fuehrung_tab()
     {
         var vm = EditableWorkspace(new FakeHostController());
         vm.SelectedNavItem = NavItemFor(vm, vm.LeadershipTabs);
-        vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.ForcesTab;
+        vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.OrganisationTab;
         var replaced = vm.LeadershipTabs;
 
         vm.CloseIncidentCommand.Execute(null);
@@ -2350,7 +2350,7 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.NotSame(replaced, vm.LeadershipTabs);
         Assert.Same(NavItemFor(vm, vm.LeadershipTabs), vm.SelectedNavItem);
-        Assert.Equal(LeadershipTabsViewModel.ForcesTab, vm.LeadershipTabs.SelectedTabIndex);
+        Assert.Equal(LeadershipTabsViewModel.OrganisationTab, vm.LeadershipTabs.SelectedTabIndex);
     }
 
     [Fact]
