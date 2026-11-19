@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -54,6 +55,19 @@ public class SituationReportsViewModelTests
         using var vm = new SituationReportsViewModel(session, () => { }, "ILS", callSigns: callSigns);
 
         Assert.Equal(callSigns, vm.CallSignOptions);
+    }
+
+    [Fact]
+    public void The_lage_fields_offer_the_textbausteine_they_are_given_and_none_without()
+    {
+        var (session, _) = NewSession();
+        TextSnippet[] snippets = [new("fuk", "Feuer unter Kontrolle")];
+
+        using var given = new SituationReportsViewModel(session, () => { }, "ILS", textSnippets: snippets);
+        using var none = NewVm(session);
+
+        Assert.Equal(snippets, given.TextSnippets);
+        Assert.Empty(none.TextSnippets);
     }
 
     [Fact]

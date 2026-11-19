@@ -451,6 +451,34 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal(EtbTabsViewModel.JournalTab, vm.EtbTabs.SelectedTabIndex);
     }
 
+    // #962: a Lagemeldung ends up in the ETB, so its fields offer the ETB's Textbausteine.
+    [Fact]
+    public void The_lagemeldung_offers_the_textbausteine_ticked_for_the_etb()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var md = Md() with
+        {
+            TextSnippets =
+            [
+                new TextSnippet("fuk", "Feuer unter Kontrolle", ForTasks: false),
+                new TextSnippet("stw", "Stadtwerke verständigen", ForEtb: false),
+                new TextSnippet("elw", "Lagemeldung an ELW"),
+            ],
+        };
+        using var vm = new IncidentWorkspaceViewModel(
+            session, clock, new FakeTicker(), md, new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+
+        Assert.Equal(["fuk", "elw"], vm.SituationReports.TextSnippets.Select(s => s.Shortcut));
+        Assert.Equal(vm.Etb.TextSnippets, vm.SituationReports.TextSnippets);
+    }
+
     [Fact]
     public void Ctrl_l_opens_the_lagemeldung_tab_and_starts_a_draft_when_there_is_none()
     {
