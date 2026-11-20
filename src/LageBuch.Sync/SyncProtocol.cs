@@ -255,15 +255,23 @@ public static class SyncProtocol
     /// in the Funkrufname a Trupp already had, so no command changes. A peer at 43 drops the key
     /// and offers its free Funkrufname box instead, so the floor stays at 40.
     /// </para>
+    /// <para>
+    /// 45: the Strahlenschutzüberwachung of a Strahlenschutztrupp (#994). A client may send
+    /// <c>recordScbaRadiation</c>, which a host at 44 does not know, and <c>addScbaTrupp</c> carries
+    /// <c>radiationMonitoring</c>, which a host at 44 would drop -- registering the Trupp outside
+    /// the Überwachung and letting the Einsatz close without its Ablesewerte. The snapshot's Trupps
+    /// and members carry the same, and a Trupp-Typ in <c>/masterdata</c> an optional
+    /// <c>radiationMonitoring</c>. The floor rises to 45.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 44;
+    public const int ProtocolVersion = 45;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 40;
+    public const int MinimumProtocolVersion = 45;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

@@ -177,7 +177,70 @@ public sealed record ForceUnitStrengthEditDto(
     DateTimeOffset EditedAt,
     int PreviousZugfuehrerCount = 0);
 
-public sealed record TruppMemberDto(TruppRole Role, string Name);
+/// <summary>A crew member. <see cref="Radiation"/> is their Strahlenschutzüberwachung (#994),
+/// absent for a Trupp not under it and for a peer that predates it.</summary>
+public sealed record TruppMemberDto(TruppRole Role, string Name, RadiationRecordDto? Radiation = null);
+
+/// <summary>
+/// A crew member's Strahlenschutzüberwachung on the wire (#994). The Ablesewert travels as value
+/// and unit; both or neither. A host's snapshot is read leniently through
+/// <see cref="RadiationRecord.FromUntrusted"/>; a client's command goes through
+/// <see cref="ToRecord"/>, which refuses what the domain refuses.
+/// </summary>
+public sealed record RadiationRecordDto(
+    string? OslDosimeterNumber,
+    bool OslDosimeterMissing,
+    string? AlarmDosimeterNumber,
+    bool AlarmDosimeterMissing,
+    string? MaskNumber,
+    string? PaNumber,
+    decimal? DoseValue = null,
+    DoseUnit? DoseUnit = null)
+{
+    public static RadiationRecordDto From(RadiationRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        return new(
+            record.OslDosimeterNumber,
+            record.OslDosimeterMissing,
+            record.AlarmDosimeterNumber,
+            record.AlarmDosimeterMissing,
+            record.MaskNumber,
+            record.PaNumber,
+            record.AlarmReading?.Value,
+            record.AlarmReading?.Unit);
+    }
+
+    /// <summary>The checked record, for a command. Throws ArgumentException on anything the
+    /// domain refuses, or a value without a unit.</summary>
+    public RadiationRecord ToRecord()
+    {
+        if (DoseValue.HasValue != DoseUnit.HasValue)
+        {
+            throw new ArgumentException("Ein Ablesewert braucht Wert und Einheit.");
+        }
+
+        return new RadiationRecord(
+            OslDosimeterNumber,
+            OslDosimeterMissing,
+            AlarmDosimeterNumber,
+            AlarmDosimeterMissing,
+            MaskNumber,
+            PaNumber,
+            DoseValue is { } v && DoseUnit is { } u ? new DoseReading(v, u) : null);
+    }
+
+    /// <summary>The record from a host's snapshot, built leniently.</summary>
+    public RadiationRecord ToUntrustedRecord() => RadiationRecord.FromUntrusted(
+        OslDosimeterNumber,
+        OslDosimeterMissing,
+        AlarmDosimeterNumber,
+        AlarmDosimeterMissing,
+        MaskNumber,
+        PaNumber,
+        DoseValue,
+        (int?)DoseUnit);
+}
 
 public sealed record PressureReadingDto(DateTimeOffset Time, int Bar, string? Location = null);
 
@@ -197,7 +260,8 @@ public sealed record ScbaTruppDto(
     int PressureControlIntervalMinutes,
     DateTimeOffset? ExitTime,
     IReadOnlyList<PressureReadingDto> Readings,
-    Guid? SafetyTruppId = null);
+    Guid? SafetyTruppId = null,
+    bool RadiationMonitoring = false);
 
 public sealed record AuditEventDto(DateTimeOffset At, string Action, string By);
 

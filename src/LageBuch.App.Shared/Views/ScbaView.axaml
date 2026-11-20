@@ -375,6 +375,21 @@
                   <TextBlock x:Name="SafetyTruppHintText" Text="{Binding SafetyTruppHint}"
                              FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
                              TextWrapping="Wrap" IsVisible="{Binding HasSafetyTruppHint}" />
+                  <!-- #994: a Strahlenschutztrupp's dosimeters, Maske, PA and Ablesewerte live in
+                       their own dialog: twelve fields for a three-person Trupp would swamp the
+                       row and the Bereitstellen form. Below the Sicherheitstrupp, for the same
+                       reason that is: rows have height to spare, not width. The amber line says
+                       what is still owed: the numbers before IM EINSATZ, the Ablesewert before
+                       the Einsatz can be closed. -->
+                  <Button x:Name="RadiationButton" Margin="0,4,0,0" Padding="8,4" FontSize="12"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                          IsVisible="{Binding IsRadiationMonitored}"
+                          Command="{Binding OpenRadiationCommand}"
+                          ToolTip.Tip="Dosimeter, Maske, PA und Ablesewerte"
+                          AutomationProperties.Name="Strahlenschutz" Content="Strahlenschutz" />
+                  <TextBlock x:Name="RadiationHintText" Text="{Binding RadiationHint}"
+                             FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                             TextWrapping="Wrap" IsVisible="{Binding HasRadiationHint}" />
                 </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>

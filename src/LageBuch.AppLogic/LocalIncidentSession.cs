@@ -317,7 +317,8 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        bool radiationMonitoring = false) =>
         Mutate(() => Incident.AddScbaTrupp(
             _clock,
             designation,
@@ -328,7 +329,8 @@ public sealed class LocalIncidentSession : IIncidentSession
             task,
             maxDurationMinutes,
             returnPressureBar,
-            pressureControlIntervalMinutes));
+            pressureControlIntervalMinutes,
+            radiationMonitoring));
 
     public void StartScbaTrupp(Guid truppId) =>
         Mutate(() => Incident.StartScbaTrupp(_clock, truppId));
@@ -347,6 +349,9 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void ChangeScbaTruppType(Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes) =>
         Mutate(() => Incident.ChangeScbaTruppType(truppId, designation, maxDurationMinutes, pressureControlIntervalMinutes));
+
+    public void RecordScbaRadiation(Guid truppId, TruppRole role, RadiationRecord record) =>
+        Mutate(() => Incident.RecordScbaRadiation(truppId, role, record));
 
     public void SetIncidentNumber(IncidentNumber? number) => Mutate(() => Incident.SetIncidentNumber(number));
 

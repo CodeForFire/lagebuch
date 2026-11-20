@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
@@ -51,6 +52,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(MarkScbaRemovedCommand), "markScbaRemoved")]
 [JsonDerivedType(typeof(SetScbaSafetyTruppCommand), "setScbaSafetyTrupp")]
 [JsonDerivedType(typeof(ChangeScbaTruppTypeCommand), "changeScbaTruppType")]
+[JsonDerivedType(typeof(RecordScbaRadiationCommand), "recordScbaRadiation")]
 [JsonDerivedType(typeof(SetIncidentNumberCommand), "setIncidentNumber")]
 [JsonDerivedType(typeof(SetKeywordCommand), "setKeyword")]
 [JsonDerivedType(typeof(SetAddressCommand), "setAddress")]
@@ -236,7 +238,7 @@ public sealed record RemoveForceUnitCommand(
 public sealed record AddScbaTruppCommand(
     string Designation, IReadOnlyList<TruppMemberDto> Members, string? CallSign, string? Task,
     int MaxDurationMinutes, int ReturnPressureBar, int PressureControlIntervalMinutes,
-    int EntryPressure, int? TruppNumber = null) : SyncCommand;
+    int EntryPressure, int? TruppNumber = null, bool RadiationMonitoring = false) : SyncCommand;
 
 public sealed record StartScbaTruppCommand(Guid TruppId) : SyncCommand;
 
@@ -259,6 +261,11 @@ public sealed record SetScbaSafetyTruppCommand(Guid TruppId, Guid? SafetyTruppId
 /// waits. Carries no operator, like <see cref="SetScbaSafetyTruppCommand"/>.</summary>
 public sealed record ChangeScbaTruppTypeCommand(
     Guid TruppId, string Designation, int MaxDurationMinutes, int PressureControlIntervalMinutes) : SyncCommand;
+
+/// <summary>Records one crew member's Strahlenschutzüberwachung (#994): numbers, Ablesewert or a
+/// dosimeter declared missing. Carries no operator: the ETB line is written by the sending device,
+/// like every other Atemschutz mutation.</summary>
+public sealed record RecordScbaRadiationCommand(Guid TruppId, TruppRole Role, RadiationRecordDto Record) : SyncCommand;
 
 public sealed record SetIncidentNumberCommand(string? IncidentNumber) : SyncCommand;
 

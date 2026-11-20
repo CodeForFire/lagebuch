@@ -181,14 +181,15 @@ public static class CommandApplier
                 incident.AddScbaTrupp(
                     clock,
                     c.Designation,
-                    c.Members.Select(m => new TruppMember(m.Role, m.Name)),
+                    c.Members.Select(m => new TruppMember(m.Role, m.Name, m.Radiation?.ToRecord())),
                     c.EntryPressure,
                     c.TruppNumber,
                     c.CallSign,
                     c.Task,
                     c.MaxDurationMinutes,
                     c.ReturnPressureBar,
-                    c.PressureControlIntervalMinutes);
+                    c.PressureControlIntervalMinutes,
+                    c.RadiationMonitoring);
                 break;
             case StartScbaTruppCommand c:
                 incident.StartScbaTrupp(clock, c.TruppId);
@@ -207,6 +208,9 @@ public static class CommandApplier
                 break;
             case ChangeScbaTruppTypeCommand c:
                 incident.ChangeScbaTruppType(c.TruppId, c.Designation, c.MaxDurationMinutes, c.PressureControlIntervalMinutes);
+                break;
+            case RecordScbaRadiationCommand c:
+                incident.RecordScbaRadiation(c.TruppId, c.Role, c.Record.ToRecord());
                 break;
             case SetIncidentNumberCommand c:
                 incident.SetIncidentNumber(c.IncidentNumber is { } n ? new IncidentNumber(n) : null);

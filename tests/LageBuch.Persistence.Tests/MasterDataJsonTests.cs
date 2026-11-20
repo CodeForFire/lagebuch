@@ -66,6 +66,23 @@ public class MasterDataJsonTests
         Assert.Equal(set.TruppTypes, Parse(MasterDataJson.Serialize(set)).TruppTypes);
     }
 
+    // #994: optional, so every export written before it reads as "not under Strahlenschutz".
+    [Fact]
+    public void Trupp_typ_strahlenschutz_flag_is_read_written_and_defaults_to_off()
+    {
+        var set = Parse("""
+            {
+              "truppTypes": [
+                { "name": "Strahlenschutztrupp", "memberCount": 3, "maxDurationMinutes": 30, "radiationMonitoring": true },
+                { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 }
+              ]
+            }
+            """);
+
+        Assert.Equal(new[] { true, false }, set.TruppTypes.Select(t => t.RadiationMonitoring));
+        Assert.Equal(set.TruppTypes, Parse(MasterDataJson.Serialize(set)).TruppTypes);
+    }
+
     [Fact]
     public void Parse_maps_the_legacy_flat_checklistTemplate_array_to_optional_aufbau_items()
     {

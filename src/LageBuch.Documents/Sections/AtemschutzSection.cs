@@ -84,6 +84,15 @@ public static class AtemschutzSection
                         }
 
                         cell.Item().Text(DetailLine(trupp, asOf)).FontSize(8).FontColor(Colors.Grey.Darken1);
+
+                        // #994: one line per crew member of a Strahlenschutztrupp. A dosimeter
+                        // declared missing breaks the documentation chain, so that line is not grey
+                        // but dark red and bold: it is what the Bericht is read for afterwards.
+                        foreach (var (text, gap) in RadiationLines(trupp))
+                        {
+                            var (color, weight) = RadiationLineStyle(gap);
+                            cell.Item().DefaultTextStyle(style => style.FontSize(8).FontColor(color).Weight(weight)).Text(text);
+                        }
                     });
                 }
             });
@@ -108,6 +117,31 @@ public static class AtemschutzSection
         var series = string.Join(" · ", trupp.PressureReadings.Select(Reading));
         return $"{status} · Messreihe: {series}";
     }
+
+    /// <summary>
+    /// The Strahlenschutzüberwachung of a Strahlenschutztrupp (#994), one line per crew member:
+    /// "Strahlenschutz Müller (Truppführer): OSL-Dosimeter 4711, …, PA 3 · Ablesewert 0,12 mSv".
+    /// Gap marks a line with a dosimeter declared missing. Empty for any other Trupp.
+    /// </summary>
+    public static IReadOnlyList<(string Text, bool Gap)> RadiationLines(AtemschutzTrupp trupp)
+    {
+        ArgumentNullException.ThrowIfNull(trupp);
+        var lines = new List<(string Text, bool Gap)>();
+        foreach (var m in trupp.Members)
+        {
+            if (m.Radiation is { } r)
+            {
+                lines.Add(($"Strahlenschutz {m.Name} ({m.RoleDisplay}): {r.NumbersDisplay} · {r.ReadingDisplay}", r.HasGap));
+            }
+        }
+
+        return lines;
+    }
+
+    /// <summary>How a Strahlenschutz line prints (#994): grey like the other sub-lines, or dark red
+    /// and semi-bold when a dosimeter is declared missing.</summary>
+    public static (Color Color, FontWeight Weight) RadiationLineStyle(bool gap) =>
+        gap ? (Colors.Red.Darken3, FontWeight.SemiBold) : (Colors.Grey.Darken1, FontWeight.Normal);
 
     private static string Reading(PressureReading r) =>
         r.Location is null

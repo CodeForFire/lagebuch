@@ -169,4 +169,61 @@ public class AtemschutzSectionTests
     {
         public DateTimeOffset Now { get; set; } = now;
     }
+
+    // #994: a Strahlenschutztrupp's crew, one line each, with the gap a missing dosimeter leaves.
+    [Fact]
+    public void Radiation_lines_list_numbers_and_readings_and_mark_a_gap()
+    {
+        var clock = new FixedClock(Started);
+        var incident = Incident.Start(clock, new SessionOperator("Huber", "FFB 12/1"));
+        var trupp = incident.AddScbaTrupp(
+            clock, "Strahlenschutztrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300, radiationMonitoring: true);
+        incident.RecordScbaRadiation(
+            trupp.Id, TruppRole.Truppfuehrer, new RadiationRecord("4711", false, "0815", false, "12", "3", new DoseReading(0.12m, DoseUnit.MilliSievert)));
+        incident.RecordScbaRadiation(
+            trupp.Id, TruppRole.Truppmann, new RadiationRecord("4712", false, "0816", alarmDosimeterMissing: true));
+
+        Assert.Equal(
+            new[]
+            {
+                ("Strahlenschutz Müller (Truppführer): OSL-Dosimeter 4711, Alarmdosimeter 0815, Maske 12, PA 3 · Ablesewert 0,12 mSv", false),
+                ("Strahlenschutz Schmidt (Truppmann): OSL-Dosimeter 4712, Alarmdosimeter 0816 (nicht vorhanden), Maske —, PA — · Ablesewert: nicht vorhanden", true),
+            },
+            AtemschutzSection.RadiationLines(trupp));
+    }
+
+    [Fact]
+    public void An_ordinary_trupp_has_no_radiation_lines()
+    {
+        var (_, trupp, _) = UnderAir();
+
+        Assert.Empty(AtemschutzSection.RadiationLines(trupp));
+    }
+
+    [Fact]
+    public void Pdf_prints_the_strahlenschutz_lines()
+    {
+        var clock = new FixedClock(Started);
+        var incident = Incident.Start(clock, new SessionOperator("Huber", "FFB 12/1"));
+        var trupp = incident.AddScbaTrupp(
+            clock, "Strahlenschutztrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300, radiationMonitoring: true);
+        incident.RecordScbaRadiation(trupp.Id, TruppRole.Truppfuehrer, new RadiationRecord("4711", false, "0815", false));
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Atemschutz);
+
+        Assert.Contains("Strahlenschutz Müller (Truppführer)", text, StringComparison.Ordinal);
+        Assert.Contains("Ablesewert offen", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_gap_prints_dark_red_and_semibold_everything_else_grey()
+    {
+        var (gapColor, gapWeight) = AtemschutzSection.RadiationLineStyle(gap: true);
+        var (plainColor, plainWeight) = AtemschutzSection.RadiationLineStyle(gap: false);
+
+        Assert.Equal(QuestPDF.Helpers.Colors.Red.Darken3, gapColor);
+        Assert.Equal(QuestPDF.Infrastructure.FontWeight.SemiBold, gapWeight);
+        Assert.Equal(QuestPDF.Helpers.Colors.Grey.Darken1, plainColor);
+        Assert.Equal(QuestPDF.Infrastructure.FontWeight.Normal, plainWeight);
+    }
 }

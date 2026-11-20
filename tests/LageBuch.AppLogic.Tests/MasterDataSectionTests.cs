@@ -481,6 +481,23 @@ public class MasterDataSectionTests
         Assert.Equal(new[] { true, true }, s.ToValues().Select(t => t.NamedByNumber));
     }
 
+    // #994: the "Strahlenschutz" box survives the editor in both directions.
+    [Fact]
+    public void TruppTypes_strahlenschutz_flag_round_trips_and_flags_a_change()
+    {
+        var changes = 0;
+        var s = new TruppTypesSection(
+            "Trupp-Typen",
+            new[] { new TruppType("Strahlenschutztrupp", 3, 30, RadiationMonitoring: true), new TruppType("Angriffstrupp") },
+            () => changes++);
+
+        Assert.True(s.Rows[0].RadiationMonitoring);
+        s.Rows[1].RadiationMonitoring = true;
+
+        Assert.Equal(1, changes);
+        Assert.Equal(new[] { true, true }, s.ToValues().Select(t => t.RadiationMonitoring));
+    }
+
     [Fact]
     public void TruppTypes_editing_a_row_flags_a_change()
     {

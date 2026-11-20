@@ -333,6 +333,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private RoleAssignmentDialogViewModel? _pendingRoleAssignmentDialog;
 
+    /// <summary>The Strahlenschutz dialog of a Strahlenschutztrupp (#994), opened from its row.</summary>
+    [ObservableProperty]
+    private RadiationDialogViewModel? _pendingRadiationDialog;
+
     // ===== Header: display projections of the incident's head data. None of these write back --
     // the only write path is the Einsatzdaten dialog (EditIncidentData), which replaced the inline
     // Einsatznummer editor of #69. They are seeded in the constructor and refreshed from the
@@ -444,6 +448,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     {
         dialog.Closed += (_, _) => PendingRoleAssignmentDialog = null;
         PendingRoleAssignmentDialog = dialog;
+    }
+
+    private void OpenRadiationDialog(RadiationDialogViewModel dialog)
+    {
+        dialog.Closed += (_, _) => PendingRadiationDialog = null;
+        PendingRadiationDialog = dialog;
     }
 
     private void RefreshIncidentData()
@@ -781,7 +791,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         || PendingSpellingHelper is not null
         || PendingCommandNodeDialog is not null || PendingDispatchChannelDialog is not null
         || PendingLeadershipPersonDialog is not null
-        || PendingRoleAssignmentDialog is not null;
+        || PendingRoleAssignmentDialog is not null
+        || PendingRadiationDialog is not null;
 
     private bool StepRail(int step)
     {
@@ -1146,7 +1157,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         IssuedItems = new IssuedItemsViewModel(
             _session, OnChanged, _masterData.Devices, RequestConfirm, ContactEntry.Roster(_masterData.Personnel, _masterData.Vehicles));
 
-        Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
+        Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged, OpenRadiationDialog);
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnHeaderSourceChanged;
 
@@ -1741,6 +1752,21 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [RelayCommand(CanExecute = nameof(CanClose))]
     private void CloseIncident()
     {
+        // #994: refused, not merely warned about -- a closed Einsatz is read-only, so an Ablesewert
+        // still missing now could never be added. The way out leads to where it is entered.
+        if (_session.Incident.ScbaTruppsAwaitingDoseReading is { Count: > 0 } awaiting)
+        {
+            var missing = string.Join(", ", awaiting.Select(t => t.DisplayName));
+            var refusal = new ConfirmDialogViewModel(
+                "Einsatz noch nicht abschließbar",
+                $"Ablesewerte fehlen: {missing}. Erst die Alarmdosimeter ablesen lassen und eintragen oder als nicht vorhanden bestätigen.",
+                "ZUR ATEMSCHUTZÜBERWACHUNG",
+                () => ShowModule(Scba));
+            refusal.Closed += (_, _) => PendingConfirm = null;
+            PendingConfirm = refusal;
+            return;
+        }
+
         var activeTrupps = _session.Incident.ScbaTrupps.Count(t => t.IsActive || t.IsWithdrawing);
         var itemsOut = _session.Incident.ItemsOut;
         var warnings = string.Concat(

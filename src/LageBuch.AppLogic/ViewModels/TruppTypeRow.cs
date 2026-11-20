@@ -12,13 +12,15 @@ public sealed partial class TruppTypeRow : ObservableObject
 {
     private readonly Action _onChanged;
 
-    public TruppTypeRow(string name, int memberCount, int maxDurationMinutes, Action onChanged, bool namedByNumber = false)
+    public TruppTypeRow(
+        string name, int memberCount, int maxDurationMinutes, Action onChanged, bool namedByNumber = false, bool radiationMonitoring = false)
     {
         _onChanged = onChanged;
         _name = name;
         _memberCount = memberCount;
         _maxDurationMinutes = maxDurationMinutes;
         _namedByNumber = namedByNumber;
+        _radiationMonitoring = radiationMonitoring;
     }
 
     /// <summary>Lowest crew the view's NumericUpDown offers -- a Trupp is never one person.</summary>
@@ -48,6 +50,11 @@ public sealed partial class TruppTypeRow : ObservableObject
     [ObservableProperty]
     private bool _namedByNumber;
 
+    /// <summary>Strahlenschutzüberwachung (#994): the Trupp's crew get dosimeter, Maske and PA
+    /// numbers and an Alarmdosimeter Ablesewert.</summary>
+    [ObservableProperty]
+    private bool _radiationMonitoring;
+
     partial void OnNameChanged(string value) => _onChanged();
 
     partial void OnMemberCountChanged(int value) => _onChanged();
@@ -55,4 +62,6 @@ public sealed partial class TruppTypeRow : ObservableObject
     partial void OnMaxDurationMinutesChanged(int value) => _onChanged();
 
     partial void OnNamedByNumberChanged(bool value) => _onChanged();
+
+    partial void OnRadiationMonitoringChanged(bool value) => _onChanged();
 }

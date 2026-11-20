@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.RadiationDialogView"
+             x:DataType="vm:RadiationDialogViewModel">
+  <!-- The Strahlenschutzüberwachung of one Strahlenschutztrupp (#994): one block per crew member.
+       The person dialogs' shell (MaxWidth, Stretch, 16px scrim inset) so it shrinks onto a phone,
+       and a WrapPanel per block so the five fields stack there instead of running off the card. -->
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CancelCommand}" b:Overlay.PrimaryCommand="{Binding SaveCommand}">
+    <Border x:Name="RadiationDialogCard" MaxWidth="760" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="26,22,26,24" Spacing="14">
+            <TextBlock x:Name="RadiationDialogTitle" Text="{Binding Title}" Classes="display" FontSize="20"
+                       TextWrapping="Wrap" />
+            <ItemsControl x:Name="RadiationMembers" ItemsSource="{Binding Members}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RadiationMemberRow">
+                  <StackPanel Margin="0,0,0,14" Spacing="6">
+                    <TextBlock Classes="overline">
+                      <Run Text="{Binding Name}" />
+                      <Run Text=" · " />
+                      <Run Text="{Binding RoleDisplay}" />
+                    </TextBlock>
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="8">
+                      <!-- A dosimeter is either numbered or declared missing; the declaration
+                           asks first and then stands in for the box, so the gap is visible. -->
+                      <HeaderedContentControl Classes="field" Header="OSL-DOSIMETER">
+                        <StackPanel Spacing="4">
+                          <TextBox Classes="mono" Width="130" Text="{Binding OslNumber}"
+                                   MaxLength="{Binding MaxNumberLength}"
+                                   AutomationProperties.Name="OSL-Dosimeter Nummer" />
+                          <Button Classes="ghost" Padding="4,2" FontSize="11" Content="nicht vorhanden"
+                                  IsVisible="{Binding OslPresent}" Command="{Binding DeclareOslMissingCommand}"
+                                  AutomationProperties.Name="OSL-Dosimeter nicht vorhanden" />
+                          <Button Classes="ghost" Padding="4,2" FontSize="11" FontWeight="SemiBold"
+                                  Foreground="{StaticResource AmberBrush}" Content="NICHT VORHANDEN · rückgängig"
+                                  IsVisible="{Binding OslMissing}" Command="{Binding UndoOslMissingCommand}"
+                                  AutomationProperties.Name="OSL-Dosimeter wieder vorhanden" />
+                        </StackPanel>
+                      </HeaderedContentControl>
+                      <HeaderedContentControl Classes="field" Header="ALARMDOSIMETER">
+                        <StackPanel Spacing="4">
+                          <TextBox Classes="mono" Width="130" Text="{Binding AlarmNumber}"
+                                   MaxLength="{Binding MaxNumberLength}"
+                                   AutomationProperties.Name="Alarmdosimeter Nummer" />
+                          <Button Classes="ghost" Padding="4,2" FontSize="11" Content="nicht vorhanden"
+                                  IsVisible="{Binding AlarmPresent}" Command="{Binding DeclareAlarmMissingCommand}"
+                                  AutomationProperties.Name="Alarmdosimeter nicht vorhanden" />
+                          <Button Classes="ghost" Padding="4,2" FontSize="11" FontWeight="SemiBold"
+                                  Foreground="{StaticResource AmberBrush}" Content="NICHT VORHANDEN · rückgängig"
+                                  IsVisible="{Binding AlarmMissing}" Command="{Binding UndoAlarmMissingCommand}"
+                                  AutomationProperties.Name="Alarmdosimeter wieder vorhanden" />
+                        </StackPanel>
+                      </HeaderedContentControl>
+                      <HeaderedContentControl Classes="field" Header="MASKE">
+                        <TextBox Classes="mono" Width="100" Text="{Binding MaskNumber}"
+                                 MaxLength="{Binding MaxNumberLength}"
+                                 AutomationProperties.Name="Maske Nummer" />
+                      </HeaderedContentControl>
+                      <HeaderedContentControl Classes="field" Header="PA">
+                        <TextBox Classes="mono" Width="100" Text="{Binding PaNumber}"
+                                 MaxLength="{Binding MaxNumberLength}"
+                                 AutomationProperties.Name="PA Nummer" />
+                      </HeaderedContentControl>
+                      <!-- Value and unit as the display showed them, mSv preselected. Disabled for
+                           a missing Alarmdosimeter: there is nothing to read off. -->
+                      <HeaderedContentControl Classes="field" Header="ABLESEWERT"
+                                              IsEnabled="{Binding AlarmPresent}">
+                        <StackPanel Spacing="4">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBox Classes="mono" Width="90" Text="{Binding DoseText}" MaxLength="12"
+                                     PlaceholderText="z. B. 0,12"
+                                     AutomationProperties.Name="Ablesewert Alarmdosimeter" />
+                            <ComboBox Width="80" ItemsSource="{Binding UnitOptions}"
+                                      SelectedItem="{Binding DoseUnitLabel}"
+                                      AutomationProperties.Name="Einheit" />
+                          </StackPanel>
+                          <TextBlock Classes="field-error" TextWrapping="Wrap" Text="{Binding DoseError}"
+                                     IsVisible="{Binding DoseError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        </StackPanel>
+                      </HeaderedContentControl>
+                    </WrapPanel>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <!-- The confirmation a missing dosimeter needs (#994), inside the card rather than a
+                 second overlay, so the rows it is about stay in sight. -->
+            <Border x:Name="MissingWarningPanel" IsVisible="{Binding IsMissingPending}"
+                    Background="{StaticResource AmberWashBrush}" BorderBrush="{StaticResource AmberBrush}"
+                    BorderThickness="1" CornerRadius="{StaticResource RadiusMd}" Padding="14">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding MissingWarning}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <Button x:Name="ConfirmMissingButton" Classes="signal" Content="NICHT VORHANDEN"
+                          Command="{Binding ConfirmMissingCommand}" />
+                  <Button x:Name="CancelMissingButton" Content="ABBRECHEN" Command="{Binding CancelMissingCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+            <TextBlock x:Name="RadiationDialogSaveError" Classes="field-error" TextWrapping="Wrap"
+                       Text="{Binding SaveError}"
+                       IsVisible="{Binding SaveError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <!-- Left, primary first (#694). -->
+            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
+              <Button x:Name="RadiationDialogSaveButton" Classes="signal" Content="SPEICHERN"
+                      Command="{Binding SaveCommand}" />
+              <Button x:Name="RadiationDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

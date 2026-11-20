@@ -143,13 +143,14 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_trupp_types (value, member_count, max_duration_minutes, named_by_number) VALUES ($v,$m,$d,$n);",
+                "INSERT INTO md_trupp_types (value, member_count, max_duration_minutes, named_by_number, radiation_monitoring) VALUES ($v,$m,$d,$n,$r);",
                 p =>
                 {
                     p("$v", t.Name);
                     p("$m", t.MemberCount);
                     p("$d", t.MaxDurationMinutes);
                     p("$n", t.NamedByNumber ? 1 : 0);
+                    p("$r", t.RadiationMonitoring ? 1 : 0);
                 });
         }
 
@@ -425,7 +426,8 @@ public sealed class MasterDataStore
                 value TEXT NOT NULL,
                 member_count INTEGER NOT NULL DEFAULT 2,
                 max_duration_minutes INTEGER NOT NULL DEFAULT 30,
-                named_by_number INTEGER NOT NULL DEFAULT 0
+                named_by_number INTEGER NOT NULL DEFAULT 0,
+                radiation_monitoring INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS md_personnel (
                 last_name TEXT NOT NULL,
@@ -546,6 +548,10 @@ public sealed class MasterDataStore
         // one-time step switches the CSA-Trupp over, since that is the type the request is about.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_trupp_types", "named_by_number", "INTEGER NOT NULL DEFAULT 0");
         MigrateTruppTypeNamedByNumber(cn);
+
+        // Strahlenschutzüberwachung (#994). No one-time step: no Trupp-Typ was under it before, and
+        // which one is, is the brigade's to tick.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_trupp_types", "radiation_monitoring", "INTEGER NOT NULL DEFAULT 0");
 
         // Widen a pre-#470 md_roles, where a Funktion was a bare name and nothing said how often it
         // could be held. Unlike the Trupp-Typen above there is deliberately NO one-time marker: those
@@ -1041,7 +1047,7 @@ public sealed class MasterDataStore
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT value, member_count, max_duration_minutes, named_by_number FROM md_trupp_types;";
+        cmd.CommandText = "SELECT value, member_count, max_duration_minutes, named_by_number, radiation_monitoring FROM md_trupp_types;";
         using var r = cmd.ExecuteReader();
         var list = new List<TruppType>();
         while (r.Read())
@@ -1053,7 +1059,8 @@ public sealed class MasterDataStore
                 r.GetString(0),
                 TruppType.ClampMemberCount(r.GetInt32(1)),
                 TruppType.ClampMaxDurationMinutes(r.GetInt32(2)),
-                r.GetInt32(3) != 0));
+                r.GetInt32(3) != 0,
+                r.GetInt32(4) != 0));
         }
 
         return list;

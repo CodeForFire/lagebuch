@@ -925,6 +925,20 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(set.TruppTypes, MasterDataStore.GetOrCreate(_path).TruppTypes);
     }
 
+    [Fact]
+    public void The_strahlenschutz_flag_survives_a_save_and_a_reload()
+    {
+        var set = MasterDataStore.GetOrCreate(_path) with
+        {
+            TruppTypes = new[] { new TruppType("Strahlenschutztrupp", 3, 30, RadiationMonitoring: true), new TruppType("Angriffstrupp") },
+        };
+
+        MasterDataStore.Save(_path, set);
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(set.TruppTypes, MasterDataStore.GetOrCreate(_path).TruppTypes);
+    }
+
     /// <summary>Writes a md_trupp_types in its pre-#398 shape: names only, no rules.</summary>
     private void WriteLegacyTruppTypes(params string[] names)
     {

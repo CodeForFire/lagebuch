@@ -1,0 +1,1 @@
+A Trupp-Typ marked "Strahlenschutz" in the Stammdaten records the OSL-Dosimeter, Alarmdosimeter, Maske and PA numbers of every Einsatzkraft before IM EINSATZ and the Alarmdosimeter Ablesewert in mSv or µSv, which may follow late from the Dekon-Platz but must be entered, or the dosimeter confirmed as nicht vorhanden, before the Einsatz can be closed (#994).
