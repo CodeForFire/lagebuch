@@ -325,9 +325,10 @@ public interface IIncidentSession
     /// <summary>
     /// Imports a Kartenebene: the file's bytes go in as an attachment and the Ebene points at it.
     /// Awaited like <see cref="AddFileAsync"/>, for the same reasons. The caller has parsed the file
-    /// already; <paramref name="summary"/> is what it read.
+    /// already; <paramref name="summary"/> is what it read. Returns the new Ebene's id. A failed add
+    /// leaves no Ebene behind: one whose bytes could not be stored is taken back out.
     /// </summary>
-    Task AddMapOverlayAsync(
+    Task<Guid> AddMapOverlayAsync(
         string fileName, string contentType, byte[] bytes, MapOverlaySummary summary, CancellationToken cancellationToken = default);
 
     /// <summary>Takes a Kartenebene off the Lagekarte and its file out of the Einsatz, bytes included.

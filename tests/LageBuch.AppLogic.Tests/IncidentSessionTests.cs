@@ -581,8 +581,19 @@ internal sealed class FakeStore : IIncidentStore
 
     private readonly Dictionary<string, byte[]> _files = new();
 
+    /// <summary>When set, <see cref="SaveFileBytesAsync"/> throws it for a file whose storage name contains <see cref="WriteFailureFor"/>.</summary>
+    public Exception? WriteFailure { get; set; }
+
+    /// <summary>Which files <see cref="WriteFailure"/> hits; empty hits every one.</summary>
+    public string WriteFailureFor { get; set; } = string.Empty;
+
     public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
     {
+        if (WriteFailure is not null && storageFileName.Contains(WriteFailureFor, StringComparison.Ordinal))
+        {
+            throw WriteFailure;
+        }
+
         _files[$"{path}/{storageFileName}"] = bytes;
         return Task.CompletedTask;
     }

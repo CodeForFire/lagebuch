@@ -76,8 +76,8 @@ public sealed class MapOverlaysLuftbildTests : IDisposable
         return new LdbvImageryClient(http);
     }
 
-    private static LocalIncidentSession NewSession() => TestSession.StartNew(
-        new FakeStore(),
+    private static LocalIncidentSession NewSession(FakeStore? store = null) => TestSession.StartNew(
+        store ?? new FakeStore(),
         new FixedClock(T0),
         new SessionOperator("Müller", "FFB 12/1"),
         "/x.lagebuch",
@@ -320,6 +320,46 @@ public sealed class MapOverlaysLuftbildTests : IDisposable
         Assert.Equal("Ebene konnte nicht gelesen werden: Das Bild lässt sich nicht darstellen.", vm.Items[0].LoadError);
         Assert.Null(vm.Items[1].LoadError);
         Assert.Null(vm.Error);
+    }
+
+    [Fact]
+    public async Task A_session_s_failed_byte_write_leaves_no_Ebene_behind()
+    {
+        var store = new FakeStore { WriteFailure = new IOException("Datenträger voll") };
+        var session = NewSession(store);
+
+        await Assert.ThrowsAsync<IOException>(() => session.AddMapOverlayAsync(
+            "luftbild.png", "image/png", TestImages.Png(10, 10), new MapOverlaySummary("Luftbild", 1, null, null, MapOverlayKind.Raster, Visible)));
+
+        Assert.Empty(session.Incident.MapOverlays);
+        Assert.Empty(session.Incident.Files);
+    }
+
+    [Fact]
+    public async Task A_session_names_the_Ebene_it_added()
+    {
+        var session = NewSession();
+
+        var id = await session.AddMapOverlayAsync(
+            "luftbild.png", "image/png", TestImages.Png(10, 10), new MapOverlaySummary("Luftbild", 1, null, null, MapOverlayKind.Raster, Visible));
+
+        Assert.Equal(id, Assert.Single(session.Incident.MapOverlays).Id);
+    }
+
+    [Fact]
+    public async Task When_the_Flurstuecksgrenzen_cannot_be_stored_the_Luftbild_is_taken_back_out()
+    {
+        var store = new FakeStore { WriteFailure = new IOException("Datenträger voll"), WriteFailureFor = ".png" };
+        var session = NewSession(store);
+        var other = await session.AddMapOverlayAsync(
+            "lage.geojson", "application/geo+json", Encoding.UTF8.GetBytes(Sperrgebiet), new MapOverlaySummary("Lage", 1, null, null));
+        var (vm, _) = Open(session, Client(new LdbvHandler()));
+
+        await vm.LoadLuftbildCommand.ExecuteAsync(Visible);
+
+        Assert.Equal("Luftbild nicht übernommen: Datenträger voll", vm.Error);
+        Assert.Equal(other, Assert.Single(session.Incident.MapOverlays).Id);
+        Assert.Single(session.Incident.Files);
     }
 
     [Fact]

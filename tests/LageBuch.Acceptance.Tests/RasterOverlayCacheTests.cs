@@ -80,16 +80,24 @@ public class RasterOverlayCacheTests
     {
         using var decoder = new GatedDecoder();
         var cache = new RasterOverlayCache(decode: decoder.Decode);
-        var photo = Full();
+        try
+        {
+            var photo = Full();
 
-        cache.Use([photo]);
-        cache.Use([]);
-        cache.Use([photo]);
-        decoder.ReleaseAll();
-        Pump(() => !cache.IsBusy);
+            cache.Use([photo]);
+            cache.Use([]);
+            cache.Use([photo]);
+            decoder.ReleaseAll();
+            Pump(() => !cache.IsBusy);
 
-        Assert.Equal(1, decoder.Started);
-        Assert.Single(cache.Use([photo]));
+            Assert.Equal(1, decoder.Started);
+            Assert.Single(cache.Use([photo]));
+        }
+        finally
+        {
+            // Releases the decoded bitmaps the test leaves behind.
+            cache.Clear();
+        }
     }
 
     [AvaloniaFact]
@@ -97,23 +105,31 @@ public class RasterOverlayCacheTests
     {
         using var decoder = new GatedDecoder();
         var cache = new RasterOverlayCache(decode: decoder.Decode);
-        RasterImage[] old = [Full(), Full()];
-        RasterImage[] replacement = [Full(), Full()];
+        try
+        {
+            RasterImage[] old = [Full(), Full()];
+            RasterImage[] replacement = [Full(), Full()];
 
-        cache.Use(old);
-        Pump(() => decoder.Started == 2);
-        cache.Use(replacement);
+            cache.Use(old);
+            Pump(() => decoder.Started == 2);
+            cache.Use(replacement);
 
-        // Two full-size pictures still decoding fill the budget: the new ones may not start yet.
-        Assert.Equal(2, decoder.Started);
-        decoder.ReleaseAll();
-        Pump(() => decoder.Running == 0 && !cache.IsDecoding);
-        cache.Use(replacement);
-        Pump(() => decoder.Started == 4);
-        decoder.ReleaseAll();
-        Pump(() => !cache.IsBusy);
+            // Two full-size pictures still decoding fill the budget: the new ones may not start yet.
+            Assert.Equal(2, decoder.Started);
+            decoder.ReleaseAll();
+            Pump(() => decoder.Running == 0 && !cache.IsDecoding);
+            cache.Use(replacement);
+            Pump(() => decoder.Started == 4);
+            decoder.ReleaseAll();
+            Pump(() => !cache.IsBusy);
 
-        Assert.Equal(2, cache.Use(replacement).Count);
+            Assert.Equal(2, cache.Use(replacement).Count);
+        }
+        finally
+        {
+            // Releases the decoded bitmaps the test leaves behind.
+            cache.Clear();
+        }
     }
 
     [AvaloniaFact]
@@ -121,21 +137,29 @@ public class RasterOverlayCacheTests
     {
         using var decoder = new GatedDecoder();
         var cache = new RasterOverlayCache(decode: decoder.Decode);
-        cache.Use([Full(), Full()]);
-        Pump(() => decoder.Started == 2);
+        try
+        {
+            cache.Use([Full(), Full()]);
+            Pump(() => decoder.Started == 2);
 
-        cache.Clear();
-        RasterImage[] next = [Full()];
-        cache.Use(next);
+            cache.Clear();
+            RasterImage[] next = [Full()];
+            cache.Use(next);
 
-        Assert.Equal(2, decoder.Started);
-        decoder.ReleaseAll();
-        Pump(() => !cache.IsDecoding);
-        cache.Use(next);
-        Pump(() => decoder.Started == 3);
-        decoder.ReleaseAll();
-        Pump(() => !cache.IsBusy);
-        Assert.Single(cache.Use(next));
+            Assert.Equal(2, decoder.Started);
+            decoder.ReleaseAll();
+            Pump(() => !cache.IsDecoding);
+            cache.Use(next);
+            Pump(() => decoder.Started == 3);
+            decoder.ReleaseAll();
+            Pump(() => !cache.IsBusy);
+            Assert.Single(cache.Use(next));
+        }
+        finally
+        {
+            // Releases the decoded bitmaps the test leaves behind.
+            cache.Clear();
+        }
     }
 
     [AvaloniaFact]
@@ -143,13 +167,21 @@ public class RasterOverlayCacheTests
     {
         var failed = new List<Guid>();
         var cache = new RasterOverlayCache(failed: failed.Add, decode: _ => throw new InvalidOperationException("kaputt"));
-        var photo = Full();
+        try
+        {
+            var photo = Full();
 
-        cache.Use([photo]);
-        Pump(() => !cache.IsBusy);
+            cache.Use([photo]);
+            Pump(() => !cache.IsBusy);
 
-        Assert.Empty(cache.Use([photo]));
-        Assert.Equal([photo.FileId], failed);
+            Assert.Empty(cache.Use([photo]));
+            Assert.Equal([photo.FileId], failed);
+        }
+        finally
+        {
+            // Releases the decoded bitmaps the test leaves behind.
+            cache.Clear();
+        }
     }
 
     private static RasterImage Full() =>

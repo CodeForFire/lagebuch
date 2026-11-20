@@ -369,18 +369,19 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         }
     }
 
-    // The Luftbild, then its Flurstücksgrenzen; null when both are in, else what went wrong. Should
-    // the second be refused -- a peer took the last slot meanwhile, the host went away -- the first
-    // is taken back out, so the Einsatz holds both or neither; if even that fails, the message says
-    // which one stayed. A failure of the first add is thrown: nothing was stored then.
+    // The Luftbild, then its Flurstücksgrenzen; null when both are in, else what went wrong. A
+    // failed add leaves nothing of itself behind (IIncidentSession.AddMapOverlayAsync), so should
+    // the second fail -- a peer took the last slot, the disk is full, the host went away -- the
+    // first is taken back out by the id it was given, never another device's Ebene; if even that
+    // fails, the message says which one stayed. A failure of the first add is thrown: nothing was
+    // stored then.
     [SuppressMessage(
         "Design",
         "CA1031",
-        Justification = "A refused second add is heterogeneous (domain cap, network, host); it is returned as the German error the caller shows.")]
+        Justification = "A refused second add is heterogeneous (domain cap, disk, network, host); it is returned as the German error the caller shows.")]
     private async Task<string?> StoreBothAsync(byte[] photo, byte[] parcels, LuftbildArea area)
     {
-        var before = _session.Incident.MapOverlays.Select(o => o.Id).ToHashSet();
-        await _session.AddMapOverlayAsync("luftbild.jpg", "image/jpeg", photo, Summary("Luftbild (LDBV)", area), CancellationToken.None);
+        var luftbild = await _session.AddMapOverlayAsync("luftbild.jpg", "image/jpeg", photo, Summary("Luftbild (LDBV)", area), CancellationToken.None);
         try
         {
             await _session.AddMapOverlayAsync("flurstuecke.png", "image/png", parcels, Summary("Flurstücksgrenzen (LDBV)", area), CancellationToken.None);
@@ -388,8 +389,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            var added = _session.Incident.MapOverlays.FirstOrDefault(o => !before.Contains(o.Id));
-            return added is null || await TryRemoveAsync(added.Id)
+            return await TryRemoveAsync(luftbild)
                 ? $"Luftbild nicht übernommen: {ex.Message}"
                 : $"Nur das Luftbild wurde übernommen, die Flurstücksgrenzen nicht: {ex.Message}";
         }
