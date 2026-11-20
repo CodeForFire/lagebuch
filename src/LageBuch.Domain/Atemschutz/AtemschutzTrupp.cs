@@ -87,9 +87,40 @@ public sealed class AtemschutzTrupp
     public string DisplayName => FormatDisplayName(CallSign, Designation);
 
     /// <summary>Same formatting as <see cref="DisplayName"/>, usable before an instance exists —
-    /// e.g. to compose the registration ETB line from form inputs, before the mutation commits.</summary>
-    public static string FormatDisplayName(string? callSign, string designation) =>
-        string.IsNullOrWhiteSpace(callSign) ? designation : $"{callSign.Trim()} · {designation}";
+    /// e.g. to compose the registration ETB line from form inputs, before the mutation commits.
+    /// <para>
+    /// A Funkrufname that already names the Trupp-Art -- "CSA-Trupp 1" for a CSA-Trupp, the name
+    /// a Trupp-Typ numbered per <see cref="NumberedCallSign"/> gets (#995) -- stands alone: adding
+    /// the designation again would read "CSA-Trupp 1 · CSA-Trupp".
+    /// </para>
+    /// </summary>
+    public static string FormatDisplayName(string? callSign, string designation)
+    {
+        ArgumentNullException.ThrowIfNull(designation);
+        if (string.IsNullOrWhiteSpace(callSign))
+        {
+            return designation;
+        }
+
+        var name = callSign.Trim();
+        return NamesTruppArt(name, designation.Trim()) ? name : $"{name} · {designation}";
+    }
+
+    /// <summary>
+    /// The Funkrufname of a Trupp named by its number rather than a vehicle (#995): "CSA-Trupp 1".
+    /// Which Trupp-Typen are named this way is Stammdaten; the name is composed here so the form,
+    /// the free-number query and the display rule above can never disagree about its shape.
+    /// </summary>
+    public static string NumberedCallSign(string designation, int number)
+    {
+        ArgumentNullException.ThrowIfNull(designation);
+        return $"{designation.Trim()} {number.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+    }
+
+    private static bool NamesTruppArt(string callSign, string designation) =>
+        designation.Length > 0
+        && (string.Equals(callSign, designation, StringComparison.Ordinal)
+            || callSign.StartsWith(designation + " ", StringComparison.Ordinal));
 
     /// <summary>
     /// The crew, in position order: between <see cref="StandardMemberCount"/> and

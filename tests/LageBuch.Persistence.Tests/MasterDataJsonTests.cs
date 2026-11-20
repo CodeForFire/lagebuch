@@ -49,6 +49,23 @@ public class MasterDataJsonTests
         Assert.Equal("Land 1", max.CallSign);
     }
 
+    // #995: optional, so every export written before it reads as "named by Funkrufname".
+    [Fact]
+    public void Trupp_typ_numbering_flag_is_read_written_and_defaults_to_off()
+    {
+        var set = Parse("""
+            {
+              "truppTypes": [
+                { "name": "CSA-Trupp", "memberCount": 3, "maxDurationMinutes": 20, "namedByNumber": true },
+                { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 }
+              ]
+            }
+            """);
+
+        Assert.Equal(new[] { true, false }, set.TruppTypes.Select(t => t.NamedByNumber));
+        Assert.Equal(set.TruppTypes, Parse(MasterDataJson.Serialize(set)).TruppTypes);
+    }
+
     [Fact]
     public void Parse_maps_the_legacy_flat_checklistTemplate_array_to_optional_aufbau_items()
     {
@@ -620,11 +637,11 @@ public class MasterDataJsonTests
             new[]
             {
                 new TruppType("Angriffstrupp", 2, 30),
-                new TruppType("CSA-Trupp", 3, 20),
+                new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true),
                 new TruppType("LPA-Trupp", 2, 60),
 
                 // Trimmed and case-insensitive, matching what the old runtime rule accepted.
-                new TruppType("csa-trupp", 3, 20),
+                new TruppType("csa-trupp", 3, 20, NamedByNumber: true),
             },
             set.TruppTypes);
     }
@@ -652,7 +669,7 @@ public class MasterDataJsonTests
             new[]
             {
                 new TruppType("Angriffstrupp", 2, 25),
-                new TruppType("CSA-Trupp", 3, 15),
+                new TruppType("CSA-Trupp", 3, 15, NamedByNumber: true),
                 new TruppType("LPA-Trupp", 2, 45),
             },
             set.TruppTypes);

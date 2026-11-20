@@ -1694,6 +1694,21 @@ public sealed class Incident
     public int NextFreeScbaTruppNumber() =>
         Enumerable.Range(1, _scbaTrupps.Count + 1).First(n => _scbaTrupps.All(t => t.TruppNumber != n));
 
+    /// <summary>The smallest positive number not yet in a Funkrufname of the shape
+    /// <see cref="AtemschutzTrupp.NumberedCallSign"/> gives for <paramref name="designation"/>,
+    /// counted per Trupp-Art (#995): two Angriffstrupps before it leave the first CSA-Trupp "1".
+    /// An abgenommen Trupp keeps its number. Pure query, like <see cref="NextFreeScbaTruppNumber"/>.</summary>
+    public int NextFreeTypeNumber(string designation) =>
+        Enumerable.Range(1, _scbaTrupps.Count + 1).First(n => !IsTypeNumberInUse(designation, n));
+
+    /// <summary>Whether a Trupp of this incident, running or abgenommen, already carries the
+    /// Funkrufname <see cref="AtemschutzTrupp.NumberedCallSign"/> composes from these two.</summary>
+    public bool IsTypeNumberInUse(string designation, int number)
+    {
+        var callSign = AtemschutzTrupp.NumberedCallSign(designation, number);
+        return _scbaTrupps.Any(t => string.Equals(t.CallSign, callSign, StringComparison.Ordinal));
+    }
+
     /// <summary>
     /// The running assignment holding <paramref name="role"/> in <paramref name="section"/>, or null
     /// when that slot is free. A pure query — it decides nothing and writes nothing, the same stance

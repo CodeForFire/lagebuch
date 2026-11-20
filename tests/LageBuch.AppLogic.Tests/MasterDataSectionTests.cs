@@ -462,6 +462,25 @@ public class MasterDataSectionTests
         Assert.Equal(1, s.ToValues()[0].MaxDurationMinutes);
     }
 
+    // #995: the "Funkrufname aus Nummer" box survives the editor in both directions.
+    [Fact]
+    public void TruppTypes_numbering_flag_round_trips_and_flags_a_change()
+    {
+        var changes = 0;
+        var s = new TruppTypesSection(
+            "Trupp-Typen",
+            new[] { new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true), new TruppType("Angriffstrupp") },
+            () => changes++);
+
+        Assert.True(s.Rows[0].NamedByNumber);
+        Assert.False(s.Rows[1].NamedByNumber);
+
+        s.Rows[1].NamedByNumber = true;
+
+        Assert.Equal(1, changes);
+        Assert.Equal(new[] { true, true }, s.ToValues().Select(t => t.NamedByNumber));
+    }
+
     [Fact]
     public void TruppTypes_editing_a_row_flags_a_change()
     {

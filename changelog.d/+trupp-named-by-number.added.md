@@ -1,0 +1,1 @@
+A Trupp-Typ can be set to "Funkrufname aus Nummer" in the Stammdaten, so the Atemschutz form asks for a number instead of a Funkrufname and the Trupp is called "CSA-Trupp 1" rather than "1 · CSA-Trupp" (#995).

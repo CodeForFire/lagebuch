@@ -402,7 +402,17 @@ public class VersionHandshakeTests
     {
         // 43 adds vehicleTypeCodes to /masterdata. A peer at 42 drops the key and only types its
         // new vehicles by hand, so a 42 and a 43 still connect.
-        Assert.Equal(43, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 43, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
+    }
+
+    [Fact]
+    public void The_numbered_trupp_typ_raises_the_protocol_but_not_the_floor()
+    {
+        // 44 adds namedByNumber to a Trupp-Typ in /masterdata (#995). A peer at 43 drops the key and
+        // offers its free Funkrufname box, while the name itself travels in the existing callSign,
+        // so a 43 and a 44 still connect.
+        Assert.Equal(44, SyncProtocol.ProtocolVersion);
         Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
     }
 }
