@@ -370,7 +370,8 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
     }
 
     // The Luftbild, then its Flurstücksgrenzen; null when both are in, else what went wrong. A
-    // failed add leaves nothing of itself behind (IIncidentSession.AddMapOverlayAsync), so should
+    // failed add normally leaves nothing of itself behind (IIncidentSession.AddMapOverlayAsync; on a
+    // joined client whose host is gone, its take-back can fail too, which this cannot see), so should
     // the second fail -- a peer took the last slot, the disk is full, the host went away -- the
     // first is taken back out by the id it was given, never another device's Ebene; if even that
     // fails, the message says which one stayed. A failure of the first add is thrown: nothing was
