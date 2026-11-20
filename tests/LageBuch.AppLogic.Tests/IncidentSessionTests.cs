@@ -587,8 +587,12 @@ internal sealed class FakeStore : IIncidentStore
     /// <summary>Which files <see cref="WriteFailure"/> hits; empty hits every one.</summary>
     public string WriteFailureFor { get; set; } = string.Empty;
 
+    /// <summary>Runs just before every byte write, like a user acting while the write is under way.</summary>
+    public Action? BeforeWrite { get; set; }
+
     public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
     {
+        BeforeWrite?.Invoke();
         if (WriteFailure is not null && storageFileName.Contains(WriteFailureFor, StringComparison.Ordinal))
         {
             throw WriteFailure;

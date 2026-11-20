@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Web;
@@ -112,7 +111,7 @@ public sealed class LagekarteLuftbildRenderTests : IDisposable
             Array.Empty<(string, bool)>());
         var http = new HttpClient(new LdbvHandler());
         _clients.Add(http);
-        var vm = new LagekarteViewModel(session, () => { }, luftbild: new LdbvImageryClient(http));
+        using var vm = new LagekarteViewModel(session, () => { }, luftbild: new LdbvImageryClient(http));
         vm.Map.ChangeViewCommand.Execute(new MapViewChange(Fuerstenfeldbruck, 16));
         var view = new LagekarteView { DataContext = vm };
         var window = new Window { Content = view, Width = 1280, Height = 800 };
@@ -223,28 +222,18 @@ public sealed class LagekarteLuftbildRenderTests : IDisposable
             var width = int.Parse(query["WIDTH"] ?? "0", System.Globalization.CultureInfo.InvariantCulture);
             var height = int.Parse(query["HEIGHT"] ?? "0", System.Globalization.CultureInfo.InvariantCulture);
             var photo = query["LAYERS"] == "by_dop40c";
-            var content = new ByteArrayContent(photo ? JpegHeader(width, height) : PngHeader(width, height));
+            var content = new ByteArrayContent(Encoded(width, height, photo));
             content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(photo ? "image/jpeg" : "image/png");
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
         }
 
-        private static byte[] PngHeader(int width, int height)
+        // A real, decodable picture of the size asked for: the map draws only what decodes.
+        private static byte[] Encoded(int width, int height, bool photo)
         {
-            var bytes = new byte[33];
-            new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }.CopyTo(bytes, 0);
-            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(8), 13);
-            "IHDR"u8.CopyTo(bytes.AsSpan(12));
-            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(16), width);
-            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(20), height);
-            return bytes;
-        }
-
-        private static byte[] JpegHeader(int width, int height)
-        {
-            var bytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0xFF, 0xD9 };
-            BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(7), (ushort)height);
-            BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(9), (ushort)width);
-            return bytes;
+            using var bitmap = new WriteableBitmap(new PixelSize(width, height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+            using var stream = new MemoryStream();
+            bitmap.Save(stream, photo ? JpegBitmapEncoderOptions.Default : PngBitmapEncoderOptions.Default);
+            return stream.ToArray();
         }
     }
 }

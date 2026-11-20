@@ -279,7 +279,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         var budget = MaxVisibleRasterBytes;
         var skipped = false;
         var kept = new List<RasterImage>();
-        foreach (var raster in Items.Where(i => i.IsVisible).Select(i => i.Raster).OfType<RasterImage>().Reverse())
+        foreach (var raster in Items.Where(i => i.IsVisible && !i.DrawFailedOnMap).Select(i => i.Raster).OfType<RasterImage>().Reverse())
         {
             if (raster.DecodedBytes > budget)
             {
@@ -396,6 +396,9 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         }
     }
 
+    // True when the Ebene is out of the Einsatz. A removal that took the Ebene out and then failed
+    // to wipe its bytes still took it out: what counts is whether the Einsatz holds it, not whether
+    // the call threw.
     [SuppressMessage(
         "Design",
         "CA1031",
@@ -409,7 +412,7 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         }
         catch (Exception)
         {
-            return false;
+            return _session.Incident.MapOverlays.All(o => o.Id != overlayId);
         }
     }
 
@@ -436,6 +439,9 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         {
             item.DrawFailed();
         }
+
+        // A picture the map cannot draw takes no share of the budget: the next one may have it.
+        UpdateVisibleRasters();
     }
 
     private static MapOverlaySummary Summary(string name, LuftbildArea area) =>
@@ -789,8 +795,15 @@ public sealed partial class MapOverlayItem : ObservableObject
         NextFrameCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>The map could not decode the picture; it is left out of what the map is handed.</summary>
+    public bool DrawFailedOnMap { get; private set; }
+
     // The picture passed every check but the map could not decode it: it stays listed and removable.
-    internal void DrawFailed() => LoadError = "Ebene konnte nicht gelesen werden: Das Bild lässt sich nicht darstellen.";
+    internal void DrawFailed()
+    {
+        DrawFailedOnMap = true;
+        LoadError = "Ebene konnte nicht gelesen werden: Das Bild lässt sich nicht darstellen.";
+    }
 
     partial void OnIsVisibleChanged(bool value)
     {

@@ -428,15 +428,17 @@ public sealed class LocalIncidentSession : IIncidentSession
         string fileName, string contentType, byte[] bytes, MapOverlaySummary summary, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(bytes);
+        var op = RequireOperator();
         var overlay = Incident.AddMapOverlay(
-            _clock, RequireOperator(), Guid.NewGuid(), Guid.NewGuid(), fileName, contentType, bytes.LongLength, summary);
+            _clock, op, Guid.NewGuid(), Guid.NewGuid(), fileName, contentType, bytes.LongLength, summary);
         var file = Incident.Files.First(f => f.Id == overlay.FileId);
         Save();
 
         // As AddFileAsync: the incident file must exist before the bytes go in, so the Ebene is
         // recorded first. Should the bytes not go in, the Ebene is taken back out -- an Ebene without
-        // its file is drawn from nothing -- and the failure still reaches the caller. Changed is
-        // raised either way, because the domain changed.
+        // its file is drawn from nothing -- even if the Einsatz was closed while they were being
+        // written, and the storage failure is what reaches the caller. Changed is raised either way,
+        // because the domain changed.
         try
         {
             await _store.FlushAsync(cancellationToken);
@@ -445,7 +447,7 @@ public sealed class LocalIncidentSession : IIncidentSession
         }
         catch
         {
-            Incident.RemoveMapOverlay(_clock, RequireOperator(), overlay.Id);
+            Incident.DiscardFailedMapOverlay(_clock, op, overlay.Id);
             Save();
             throw;
         }

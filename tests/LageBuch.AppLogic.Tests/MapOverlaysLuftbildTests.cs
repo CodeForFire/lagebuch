@@ -363,6 +363,59 @@ public sealed class MapOverlaysLuftbildTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_byte_write_on_an_Einsatz_closed_meanwhile_keeps_its_error_and_leaves_no_Ebene()
+    {
+        var store = new FakeStore { WriteFailure = new IOException("Datenträger voll") };
+        var session = NewSession(store);
+        store.BeforeWrite = session.Close;
+
+        var e = await Assert.ThrowsAsync<IOException>(() => session.AddMapOverlayAsync(
+            "luftbild.png", "image/png", TestImages.Png(10, 10), new MapOverlaySummary("Luftbild", 1, null, null, MapOverlayKind.Raster, Visible)));
+
+        Assert.Equal("Datenträger voll", e.Message);
+        Assert.Equal(IncidentState.Closed, session.Incident.State);
+        Assert.Empty(session.Incident.MapOverlays);
+        Assert.Empty(session.Incident.Files);
+    }
+
+    [Fact]
+    public async Task A_Luftbild_taken_back_whose_bytes_will_not_go_away_is_still_not_reported_as_kept()
+    {
+        var store = new FakeStore
+        {
+            WriteFailure = new IOException("Datenträger voll"),
+            WriteFailureFor = ".png",
+            DeleteFailure = new IOException("Datei gesperrt"),
+        };
+        var session = NewSession(store);
+        var (vm, _) = Open(session, Client(new LdbvHandler()));
+
+        await vm.LoadLuftbildCommand.ExecuteAsync(Visible);
+
+        Assert.Equal("Luftbild nicht übernommen: Datenträger voll", vm.Error);
+        Assert.Empty(session.Incident.MapOverlays);
+    }
+
+    [Fact]
+    public async Task A_pair_the_map_could_not_draw_gives_its_memory_to_the_next_pair()
+    {
+        var session = NewSession();
+        await AddPair(session, 4096, 4096);
+        await AddPair(session, 4096, 4096);
+        var (vm, _) = Open(session, null);
+        await vm.SettledAsync();
+        vm.Items[0].IsVisible = true;
+        vm.Items[1].IsVisible = true;
+        Assert.NotNull(vm.RasterBudgetHint);
+
+        vm.RasterFailedCommand.Execute(vm.Items[2].FileId);
+        vm.RasterFailedCommand.Execute(vm.Items[3].FileId);
+
+        Assert.Equal([vm.Items[0].FileId, vm.Items[1].FileId], vm.VisibleRasters.Select(r => r.FileId));
+        Assert.Null(vm.RasterBudgetHint);
+    }
+
+    [Fact]
     public async Task Reopening_an_Einsatz_shows_its_Luftbilder_and_can_centre_on_one()
     {
         var session = NewSession();

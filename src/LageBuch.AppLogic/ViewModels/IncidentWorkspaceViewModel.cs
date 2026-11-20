@@ -1765,23 +1765,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             "Einsatz abschließen?",
             message,
             "ABSCHLIESSEN",
-            () =>
-            {
-                PerformClose();
-                if (dialog?.IsOptionChecked != true)
-                {
-                    return;
-                }
-
-                if (dialog.IsSubOptionChecked)
-                {
-                    OpenPdfExportOptions(RunExportAndMailAsync, "PDF ERSTELLEN & MAILEN");
-                }
-                else
-                {
-                    OpenPdfExportOptions(RunExportAsync);
-                }
-            },
+            () => _ = CloseThenOfferPdfAsync(dialog),
             CanExport ? "PDF exportieren" : null,
             CanMailPdf ? "und per E-Mail senden" : null);
 
@@ -1808,6 +1792,29 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var dialog = new SpellingHelperDialogViewModel();
         dialog.Closed += (_, _) => PendingSpellingHelper = null;
         PendingSpellingHelper = dialog;
+    }
+
+    // A LUFTBILD LADEN under way is cancelled and waited for first -- one already storing its two
+    // Ebenen finishes them -- so the closed Einsatz holds both or neither. Idle, the wait is no wait
+    // and the close happens at once, as it always did. The stop never throws: the command surfaces
+    // its own failures.
+    private async Task CloseThenOfferPdfAsync(ConfirmDialogViewModel? dialog)
+    {
+        await Lagekarte.Overlays.StopLuftbildAsync();
+        PerformClose();
+        if (dialog?.IsOptionChecked != true)
+        {
+            return;
+        }
+
+        if (dialog.IsSubOptionChecked)
+        {
+            OpenPdfExportOptions(RunExportAndMailAsync, "PDF ERSTELLEN & MAILEN");
+        }
+        else
+        {
+            OpenPdfExportOptions(RunExportAsync);
+        }
     }
 
     private void PerformClose()

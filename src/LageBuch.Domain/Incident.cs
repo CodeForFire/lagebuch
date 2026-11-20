@@ -2094,6 +2094,28 @@ public sealed class Incident
         return file;
     }
 
+    /// <summary>
+    /// Takes back a Kartenebene whose file never arrived, open Einsatz or closed: the import failed
+    /// as a whole, so nothing of it may stay. On an open Einsatz the ETB says so, as
+    /// <see cref="RemoveMapOverlay"/> does; a closed one's journal is not written to any more.
+    /// </summary>
+    public void DiscardFailedMapOverlay(IClock clock, SessionOperator op, Guid overlayId)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        if (State != IncidentState.Closed)
+        {
+            RemoveMapOverlay(clock, op, overlayId);
+            return;
+        }
+
+        if (_mapOverlays.Find(o => o.Id == overlayId) is { } overlay)
+        {
+            _mapOverlays.Remove(overlay);
+            _files.RemoveAll(f => f.Id == overlay.FileId);
+        }
+    }
+
     // The forecast times as the Lagebuchführer reads them: in the Einsatz's own time zone, which is
     // the clock's, not the UTC a DWD file carries.
     private static string TimeSpanText(MapOverlay overlay, IClock clock)
