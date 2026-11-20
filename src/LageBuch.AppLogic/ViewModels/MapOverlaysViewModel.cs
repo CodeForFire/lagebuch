@@ -166,6 +166,13 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             Rebuild(overlays);
         }
 
+        // A removed Ebene's file is let go: a Luftbild holds megabytes. A hidden one's stays read.
+        var files = overlays.Select(o => o.FileId).ToHashSet();
+        foreach (var gone in _loads.Keys.Where(id => !files.Contains(id)).ToList())
+        {
+            _loads.Remove(gone);
+        }
+
         // A file not there yet -- a peer's upload still under way -- is looked for again on every
         // change, the upload's own announcement included.
         foreach (var item in Items.Where(i => i.IsMissing))
@@ -239,6 +246,9 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         _pending.RemoveAll(t => t.IsCompleted);
         _pending.Add(load);
     }
+
+    /// <summary>How many files' contents are held; the files of removed Ebenen are let go.</summary>
+    internal int LoadedFileCount => _loads.Count;
 
     /// <summary>Completes when every Ebene's file has been looked for. Tests wait on it; the view never needs to.</summary>
     internal async Task SettledAsync()
@@ -316,6 +326,13 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             return;
         }
 
+        // Both Ebenen or neither: without room for two, nothing is fetched.
+        if (_session.Incident.FreeRasterMapOverlaySlots < 2)
+        {
+            Error = $"Kein Platz für ein weiteres Luftbild: Ein Einsatz hat höchstens {Incident.MaxRasterMapOverlays} Luftbild-Ebenen. Ältere entfernen.";
+            return;
+        }
+
         IsLoadingLuftbild = true;
         var step = "Luftbild";
         try
@@ -327,9 +344,9 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
             var parcels = await _luftbild.GetMapAsync(LuftbildLayer.Flurstuecke, area, cancellationToken);
             LuftbildStatus = null;
 
-            // Not cancellable from here on: both pictures are in, and half an import is worse than a whole one.
-            await _session.AddMapOverlayAsync("luftbild.jpg", "image/jpeg", photo, Summary("Luftbild (LDBV)", area), CancellationToken.None);
-            await _session.AddMapOverlayAsync("flurstuecke.png", "image/png", parcels, Summary("Flurstücksgrenzen (LDBV)", area), CancellationToken.None);
+            // Not cancellable from here on: both pictures are in, and half an import is worse than a
+            // whole one. Leaving waits for this (StopLuftbildAsync).
+            Error = await StoreBothAsync(photo, parcels, area);
             _onChanged();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -349,6 +366,74 @@ public sealed partial class MapOverlaysViewModel : ObservableObject
         finally
         {
             IsLoadingLuftbild = false;
+        }
+    }
+
+    // The Luftbild, then its Flurstücksgrenzen; null when both are in, else what went wrong. Should
+    // the second be refused -- a peer took the last slot meanwhile, the host went away -- the first
+    // is taken back out, so the Einsatz holds both or neither; if even that fails, the message says
+    // which one stayed. A failure of the first add is thrown: nothing was stored then.
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A refused second add is heterogeneous (domain cap, network, host); it is returned as the German error the caller shows.")]
+    private async Task<string?> StoreBothAsync(byte[] photo, byte[] parcels, LuftbildArea area)
+    {
+        var before = _session.Incident.MapOverlays.Select(o => o.Id).ToHashSet();
+        await _session.AddMapOverlayAsync("luftbild.jpg", "image/jpeg", photo, Summary("Luftbild (LDBV)", area), CancellationToken.None);
+        try
+        {
+            await _session.AddMapOverlayAsync("flurstuecke.png", "image/png", parcels, Summary("Flurstücksgrenzen (LDBV)", area), CancellationToken.None);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            var added = _session.Incident.MapOverlays.FirstOrDefault(o => !before.Contains(o.Id));
+            return added is null || await TryRemoveAsync(added.Id)
+                ? $"Luftbild nicht übernommen: {ex.Message}"
+                : $"Nur das Luftbild wurde übernommen, die Flurstücksgrenzen nicht: {ex.Message}";
+        }
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The take-back is best effort: its failure is reported by the caller's error, which then names the Ebene that stayed.")]
+    private async Task<bool> TryRemoveAsync(Guid overlayId)
+    {
+        try
+        {
+            await _session.RemoveMapOverlayAsync(overlayId, CancellationToken.None);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Cancels a LUFTBILD LADEN still downloading and waits until it has ended. One already storing
+    /// its two Ebenen is let finish, so the Einsatz is left with both or neither.
+    /// </summary>
+    public async Task StopLuftbildAsync()
+    {
+        if (LoadLuftbildCommand.ExecutionTask is not { IsCompleted: false } running)
+        {
+            return;
+        }
+
+        LoadLuftbildCommand.Cancel();
+        await running;
+    }
+
+    /// <summary>The map could not draw the picture of the Ebene whose file this is: its row says so.</summary>
+    [RelayCommand]
+    private void RasterFailed(Guid fileId)
+    {
+        foreach (var item in Items.Where(i => i.FileId == fileId))
+        {
+            item.DrawFailed();
         }
     }
 
@@ -702,6 +787,9 @@ public sealed partial class MapOverlayItem : ObservableObject
         PreviousFrameCommand.NotifyCanExecuteChanged();
         NextFrameCommand.NotifyCanExecuteChanged();
     }
+
+    // The picture passed every check but the map could not decode it: it stays listed and removable.
+    internal void DrawFailed() => LoadError = "Ebene konnte nicht gelesen werden: Das Bild lässt sich nicht darstellen.";
 
     partial void OnIsVisibleChanged(bool value)
     {

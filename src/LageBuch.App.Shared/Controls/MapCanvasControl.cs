@@ -70,6 +70,10 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<IReadOnlyList<RasterImage>?> RasterOverlaysProperty =
         AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<RasterImage>?>(nameof(RasterOverlays));
 
+    /// <summary>Invoked with the <see cref="Guid"/> file of a raster picture that would not decode, so its Ebene can say so.</summary>
+    public static readonly StyledProperty<ICommand?> RasterFailedCommandProperty =
+        AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(RasterFailedCommand));
+
     /// <summary>The Fließweg from the Einsatzort, start first; null draws none.</summary>
     public static readonly StyledProperty<IReadOnlyList<GeoPoint>?> FlowPathProperty =
         AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<GeoPoint>?>(nameof(FlowPath));
@@ -115,7 +119,7 @@ public sealed class MapCanvasControl : Control
     public MapCanvasControl()
     {
         _terrain = new TerrainTileCache(InvalidateVisual);
-        _rasters = new RasterOverlayCache(InvalidateVisual);
+        _rasters = new RasterOverlayCache(InvalidateVisual, OnRasterFailed);
         GestureRecognizers.Add(new PinchGestureRecognizer());
         AddHandler(PinchEvent, OnPinch);
         AddHandler(PinchEndedEvent, OnPinchEnded);
@@ -194,6 +198,12 @@ public sealed class MapCanvasControl : Control
     {
         get => GetValue(RasterOverlaysProperty);
         set => SetValue(RasterOverlaysProperty, value);
+    }
+
+    public ICommand? RasterFailedCommand
+    {
+        get => GetValue(RasterFailedCommandProperty);
+        set => SetValue(RasterFailedCommandProperty, value);
     }
 
     /// <summary>Whether Luftbild pictures are still being decoded; the map redraws as each is ready.</summary>
@@ -514,6 +524,14 @@ public sealed class MapCanvasControl : Control
         var anchor = WebMercator.ToGeo(centerX + dx, centerY + dy, Zoom);
         var (anchorX, anchorY) = WebMercator.ToWorldPixel(anchor, zoom);
         Report(WebMercator.ToGeo(anchorX - dx, anchorY - dy, zoom), zoom);
+    }
+
+    private void OnRasterFailed(Guid fileId)
+    {
+        if (RasterFailedCommand?.CanExecute(fileId) == true)
+        {
+            RasterFailedCommand.Execute(fileId);
+        }
     }
 
     // A pan or zoom leaves the turn as it is: the rotation is null unless the hand turned the map.

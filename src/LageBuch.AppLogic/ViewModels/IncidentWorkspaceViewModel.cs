@@ -886,6 +886,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     public async ValueTask LeaveAsync()
     {
+        // A LUFTBILD LADEN under way would otherwise store into this session after it is gone,
+        // or surface its failure in the next workspace: cancel the download and wait for it.
+        if (Lagekarte is { } lagekarte)
+        {
+            await lagekarte.Overlays.StopLuftbildAsync();
+        }
+
         // The host controller is app-lifetime too (#463): left running, it would keep serving this
         // incident to its clients after the operator moved on, and a later share would come back
         // with the old PIN and the Stammdaten it serialized at the start.

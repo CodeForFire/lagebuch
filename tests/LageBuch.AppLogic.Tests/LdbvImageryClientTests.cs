@@ -96,6 +96,45 @@ public sealed class LdbvImageryClientTests : IDisposable
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
+    /// <summary>Hands out <paramref name="start"/>, then fails the way a dropped connection does.</summary>
+    private sealed class BreakingStream(byte[] start) : Stream
+    {
+        private int _position;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_position >= start.Length)
+            {
+                throw new HttpIOException(HttpRequestError.ResponseEnded, "The response ended prematurely.");
+            }
+
+            var n = Math.Min(count, start.Length - _position);
+            Array.Copy(start, _position, buffer, offset, n);
+            _position += n;
+            return n;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     private static HttpResponseMessage Image(byte[] bytes, string contentType)
     {
         var content = new ByteArrayContent(bytes);
@@ -234,6 +273,22 @@ public sealed class LdbvImageryClientTests : IDisposable
         var e = await Assert.ThrowsAsync<LuftbildException>(() => client.GetMapAsync(LuftbildLayer.Luftbild, Area));
 
         Assert.Equal("Das Bild des Kartendienstes ist zu groß.", e.Message);
+    }
+
+    [Fact]
+    public async Task A_connection_that_breaks_off_inside_the_picture_becomes_a_German_error()
+    {
+        var (client, _) = Create(_ =>
+        {
+            var content = new StreamContent(new BreakingStream(TestImages.Jpeg(Area.Width, Area.Height)[..8]));
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+        });
+
+        var e = await Assert.ThrowsAsync<LuftbildException>(() => client.GetMapAsync(LuftbildLayer.Luftbild, Area));
+
+        Assert.Equal("Die Verbindung zum Kartendienst der Vermessungsverwaltung ist abgebrochen. Erneut versuchen.", e.Message);
+        Assert.IsAssignableFrom<IOException>(e.InnerException);
     }
 
     [Fact]

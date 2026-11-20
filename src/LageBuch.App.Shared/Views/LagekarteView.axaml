@@ -391,6 +391,7 @@
                             SelectedWaterPoint="{Binding SelectedWaterPoint}"
                             Overlays="{Binding MapShapes}"
                             RasterOverlays="{Binding Overlays.VisibleRasters}"
+                            RasterFailedCommand="{Binding Overlays.RasterFailedCommand}"
                             Center="{Binding Map.Center}"
                             Zoom="{Binding Map.Zoom}"
                             Rotation="{Binding Map.Rotation}"

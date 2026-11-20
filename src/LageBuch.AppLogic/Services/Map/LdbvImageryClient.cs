@@ -90,6 +90,11 @@ public sealed class LdbvImageryClient
         {
             throw new LuftbildException($"{Service} nicht erreichbar. Internetverbindung prüfen.", e);
         }
+        catch (IOException e)
+        {
+            // The connection dropped after the headers, inside the picture (HttpIOException and kin).
+            throw new LuftbildException($"Die Verbindung zum {Service} ist abgebrochen. Erneut versuchen.", e);
+        }
         catch (OperationCanceledException e) when (!cancellationToken.IsCancellationRequested)
         {
             // Our own timeout, or HttpClient's, reported as a cancellation nobody asked for.

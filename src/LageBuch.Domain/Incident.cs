@@ -33,6 +33,17 @@ public sealed class Incident
     public const int MaxRasterMapOverlays = 20;
 
     /// <summary>
+    /// How many more raster Ebenen this Einsatz takes: within <see cref="MaxRasterMapOverlays"/>
+    /// and within <see cref="MaxMapOverlays"/> overall. LUFTBILD LADEN needs two, and checks for
+    /// both before it adds either.
+    /// </summary>
+    public int FreeRasterMapOverlaySlots => Math.Max(
+        0,
+        Math.Min(
+            MaxRasterMapOverlays - _mapOverlays.Count(o => o.Kind == MapOverlayKind.Raster),
+            MaxMapOverlays - _mapOverlays.Count));
+
+    /// <summary>
     /// Why <see cref="MoveForceUnit"/> refuses a partner's Einsatzleitung, in German. The Führung
     /// board says the same while a unit is held over one.
     /// </summary>

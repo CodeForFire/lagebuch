@@ -246,6 +246,83 @@ public sealed class MapOverlaysLuftbildTests : IDisposable
     }
 
     [Fact]
+    public async Task Leaving_cancels_a_download_under_way_and_waits_for_it_to_end()
+    {
+        var session = NewSession();
+        var handler = new HangingHandler();
+        var (vm, _) = Open(session, Client(handler));
+        var load = vm.LoadLuftbildCommand.ExecuteAsync(Visible);
+        await handler.Started.Task;
+
+        await vm.StopLuftbildAsync();
+
+        Assert.True(load.IsCompleted);
+        Assert.False(vm.IsLoadingLuftbild);
+        Assert.Empty(session.Incident.MapOverlays);
+    }
+
+    [Fact]
+    public async Task Stopping_with_no_download_under_way_does_nothing()
+    {
+        var (vm, _) = Open(NewSession(), Client(new LdbvHandler()));
+
+        await vm.StopLuftbildAsync();
+
+        Assert.False(vm.IsLoadingLuftbild);
+        Assert.Null(vm.LuftbildStatus);
+    }
+
+    [Fact]
+    public async Task Without_room_for_both_Ebenen_nothing_is_downloaded_or_stored()
+    {
+        var session = NewSession();
+        for (var i = 0; i < Incident.MaxRasterMapOverlays - 1; i++)
+        {
+            await session.AddMapOverlayAsync(
+                "luftbild.png", "image/png", TestImages.Png(10, 10), new MapOverlaySummary("alt", 1, null, null, MapOverlayKind.Raster, Visible));
+        }
+
+        var handler = new LdbvHandler();
+        var (vm, _) = Open(session, Client(handler));
+
+        await vm.LoadLuftbildCommand.ExecuteAsync(Visible);
+
+        Assert.Equal($"Kein Platz für ein weiteres Luftbild: Ein Einsatz hat höchstens {Incident.MaxRasterMapOverlays} Luftbild-Ebenen. Ältere entfernen.", vm.Error);
+        Assert.Empty(handler.Layers);
+        Assert.Equal(Incident.MaxRasterMapOverlays - 1, session.Incident.MapOverlays.Count);
+    }
+
+    [Fact]
+    public async Task A_removed_Ebene_s_picture_is_not_kept_in_memory()
+    {
+        var session = NewSession();
+        var (vm, _) = Open(session, Client(new LdbvHandler()));
+        await vm.LoadLuftbildCommand.ExecuteAsync(Visible);
+        await vm.SettledAsync();
+        Assert.Equal(2, vm.LoadedFileCount);
+
+        await session.RemoveMapOverlayAsync(session.Incident.MapOverlays[0].Id);
+        await vm.SettledAsync();
+
+        Assert.Equal(1, vm.LoadedFileCount);
+    }
+
+    [Fact]
+    public async Task A_picture_the_map_could_not_draw_says_so_on_its_row()
+    {
+        var session = NewSession();
+        var (vm, _) = Open(session, Client(new LdbvHandler()));
+        await vm.LoadLuftbildCommand.ExecuteAsync(Visible);
+        await vm.SettledAsync();
+
+        vm.RasterFailedCommand.Execute(vm.Items[0].FileId);
+
+        Assert.Equal("Ebene konnte nicht gelesen werden: Das Bild lässt sich nicht darstellen.", vm.Items[0].LoadError);
+        Assert.Null(vm.Items[1].LoadError);
+        Assert.Null(vm.Error);
+    }
+
+    [Fact]
     public async Task Reopening_an_Einsatz_shows_its_Luftbilder_and_can_centre_on_one()
     {
         var session = NewSession();

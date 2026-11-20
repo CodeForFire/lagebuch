@@ -162,6 +162,24 @@ public class MapOverlayRasterTests
     }
 
     [Fact]
+    public void The_free_raster_slots_count_down_with_each_Luftbild_and_the_overall_cap()
+    {
+        var (incident, clock, op) = NewIncident();
+        Assert.Equal(Incident.MaxRasterMapOverlays, incident.FreeRasterMapOverlaySlots);
+
+        incident.AddMapOverlay(clock, op, Guid.NewGuid(), Guid.NewGuid(), "a.png", "image/png", 10, Raster());
+        Assert.Equal(Incident.MaxRasterMapOverlays - 1, incident.FreeRasterMapOverlaySlots);
+
+        // GeoJSON Ebenen take no raster slot until the Einsatz runs out of Ebenen altogether.
+        for (var i = 1; i < Incident.MaxMapOverlays - 1; i++)
+        {
+            incident.AddMapOverlay(clock, op, Guid.NewGuid(), Guid.NewGuid(), "lage.geojson", "application/geo+json", 10, new MapOverlaySummary("lage", 1, null, null));
+        }
+
+        Assert.Equal(1, incident.FreeRasterMapOverlaySlots);
+    }
+
+    [Fact]
     public void A_loaded_raster_row_without_a_box_reads_back_as_a_vector_Ebene()
     {
         // The nearest valid Ebene: one the map cannot place is shown as unreadable, never placed anywhere.

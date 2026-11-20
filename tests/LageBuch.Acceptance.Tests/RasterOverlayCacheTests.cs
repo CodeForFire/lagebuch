@@ -75,6 +75,126 @@ public class RasterOverlayCacheTests
         Assert.False(RasterOverlayCache.CodecConfirms(raster));
     }
 
+    [AvaloniaFact]
+    public void Hiding_and_showing_a_picture_while_it_decodes_reuses_the_decode_under_way()
+    {
+        using var decoder = new GatedDecoder();
+        var cache = new RasterOverlayCache(decode: decoder.Decode);
+        var photo = Full();
+
+        cache.Use([photo]);
+        cache.Use([]);
+        cache.Use([photo]);
+        decoder.ReleaseAll();
+        Pump(() => !cache.IsBusy);
+
+        Assert.Equal(1, decoder.Started);
+        Assert.Single(cache.Use([photo]));
+    }
+
+    [AvaloniaFact]
+    public void A_new_pair_waits_until_the_pair_it_replaces_has_finished_decoding()
+    {
+        using var decoder = new GatedDecoder();
+        var cache = new RasterOverlayCache(decode: decoder.Decode);
+        RasterImage[] old = [Full(), Full()];
+        RasterImage[] replacement = [Full(), Full()];
+
+        cache.Use(old);
+        Pump(() => decoder.Started == 2);
+        cache.Use(replacement);
+
+        // Two full-size pictures still decoding fill the budget: the new ones may not start yet.
+        Assert.Equal(2, decoder.Started);
+        decoder.ReleaseAll();
+        Pump(() => decoder.Running == 0 && !cache.IsDecoding);
+        cache.Use(replacement);
+        Pump(() => decoder.Started == 4);
+        decoder.ReleaseAll();
+        Pump(() => !cache.IsBusy);
+
+        Assert.Equal(2, cache.Use(replacement).Count);
+    }
+
+    [AvaloniaFact]
+    public void A_cleared_cache_still_counts_the_decodes_it_left_running()
+    {
+        using var decoder = new GatedDecoder();
+        var cache = new RasterOverlayCache(decode: decoder.Decode);
+        cache.Use([Full(), Full()]);
+        Pump(() => decoder.Started == 2);
+
+        cache.Clear();
+        RasterImage[] next = [Full()];
+        cache.Use(next);
+
+        Assert.Equal(2, decoder.Started);
+        decoder.ReleaseAll();
+        Pump(() => !cache.IsDecoding);
+        cache.Use(next);
+        Pump(() => decoder.Started == 3);
+        decoder.ReleaseAll();
+        Pump(() => !cache.IsBusy);
+        Assert.Single(cache.Use(next));
+    }
+
+    [AvaloniaFact]
+    public void A_picture_that_fails_to_decode_is_reported_once_and_drawn_as_nothing()
+    {
+        var failed = new List<Guid>();
+        var cache = new RasterOverlayCache(failed: failed.Add, decode: _ => throw new InvalidOperationException("kaputt"));
+        var photo = Full();
+
+        cache.Use([photo]);
+        Pump(() => !cache.IsBusy);
+
+        Assert.Empty(cache.Use([photo]));
+        Assert.Equal([photo.FileId], failed);
+    }
+
+    private static RasterImage Full() =>
+        new(Guid.NewGuid(), new byte[] { 1 }, Box, new RasterImageInfo(RasterFormat.Jpeg, RasterImage.MaxPixels, RasterImage.MaxPixels));
+
+    private static void Pump(Func<bool> until) =>
+        Assert.True(SpinWait.SpinUntil(
+            () =>
+            {
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+                return until();
+            },
+            TimeSpan.FromSeconds(10)));
+
+    /// <summary>Decodes to a 1 × 1 bitmap, but only once the test lets it.</summary>
+    private sealed class GatedDecoder : IDisposable
+    {
+        private readonly SemaphoreSlim _gate = new(0);
+        private int _started;
+        private int _running;
+
+        public int Started => Volatile.Read(ref _started);
+
+        public int Running => Volatile.Read(ref _running);
+
+        public WriteableBitmap? Decode(RasterImage raster)
+        {
+            Interlocked.Increment(ref _started);
+            Interlocked.Increment(ref _running);
+            try
+            {
+                _gate.Wait(TimeSpan.FromSeconds(10));
+                return new WriteableBitmap(new PixelSize(1, 1), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _running);
+            }
+        }
+
+        public void ReleaseAll() => _gate.Release(16);
+
+        public void Dispose() => _gate.Dispose();
+    }
+
     private static RasterImage Read(byte[] bytes)
     {
         Assert.True(RasterImage.TryRead(Guid.NewGuid(), bytes, Box, out var raster, out var error), error);
