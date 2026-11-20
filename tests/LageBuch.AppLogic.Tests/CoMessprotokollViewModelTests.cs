@@ -1429,7 +1429,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        bool radiationMonitoring = false) =>
         _inner.AddScbaTrupp(
             designation,
             members,
@@ -1439,7 +1440,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
             task,
             maxDurationMinutes,
             returnPressureBar,
-            pressureControlIntervalMinutes);
+            pressureControlIntervalMinutes,
+            radiationMonitoring);
 
     public void StartScbaTrupp(Guid truppId) => _inner.StartScbaTrupp(truppId);
 
@@ -1454,6 +1456,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void ChangeScbaTruppType(Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes) =>
         _inner.ChangeScbaTruppType(truppId, designation, maxDurationMinutes, pressureControlIntervalMinutes);
+
+    public void RecordScbaRadiation(Guid truppId, TruppRole role, RadiationRecord record) =>
+        _inner.RecordScbaRadiation(truppId, role, record);
 
     public void SetIncidentNumber(IncidentNumber? number) => _inner.SetIncidentNumber(number);
 

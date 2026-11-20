@@ -164,6 +164,28 @@ public sealed class AtemschutzTrupp
 
     public int PressureControlIntervalMinutes { get; private set; }
 
+    /// <summary>
+    /// Whether this Trupp is under Strahlenschutzüberwachung (#994): every crew member then carries
+    /// a <see cref="RadiationRecord"/>. Copied from the Trupp-Typ at <see cref="Register"/>, never
+    /// looked up again, so a Trupp-Typ edited in the Stammdaten later cannot take it away.
+    /// </summary>
+    public bool RadiationMonitoring { get; private init; }
+
+    /// <summary>
+    /// A Strahlenschutztrupp that may not go under Atemschutz yet: a crew member's OSL-Dosimeter or
+    /// Alarmdosimeter has neither a number nor "nicht vorhanden" (#994).
+    /// </summary>
+    public bool LacksDosimeterNumbers =>
+        RadiationMonitoring && _members.Any(m => m.Radiation?.HasDosimeterNumbers != true);
+
+    /// <summary>
+    /// A Strahlenschutztrupp that went under Atemschutz and still owes an Alarmdosimeter answer --
+    /// a reading or "nicht vorhanden" -- for a crew member (#994). The Einsatz cannot be closed while
+    /// one does. A Trupp that never started has no dose to report.
+    /// </summary>
+    public bool AwaitsDoseReading =>
+        RadiationMonitoring && HasStarted && _members.Any(m => m.Radiation?.HasAlarmAnswer != true);
+
     /// <summary>When the Trupp began its Rückzug. Null before withdrawing, and while still waiting/active.</summary>
     public DateTimeOffset? WithdrawTime { get; private set; }
 
@@ -182,7 +204,8 @@ public sealed class AtemschutzTrupp
         string? task = null,
         int maxDurationMinutes = DefaultMaxDurationMinutes,
         int returnPressureBar = DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = DefaultPressureControlIntervalMinutes)
+        int pressureControlIntervalMinutes = DefaultPressureControlIntervalMinutes,
+        bool radiationMonitoring = false)
     {
         ArgumentNullException.ThrowIfNull(members);
         if (string.IsNullOrWhiteSpace(designation))
@@ -214,8 +237,15 @@ public sealed class AtemschutzTrupp
             MaxDurationMinutes = maxDurationMinutes,
             ReturnPressureBar = returnPressureBar,
             PressureControlIntervalMinutes = pressureControlIntervalMinutes,
+            RadiationMonitoring = radiationMonitoring,
         };
-        trupp._members.AddRange(crew);
+
+        // Every crew member of a Strahlenschutztrupp carries a record from the start, and nobody
+        // else does: "under Strahlenschutzüberwachung" is a property of the Trupp, not of a person.
+        trupp._members.AddRange(crew.Select(m => m with
+        {
+            Radiation = radiationMonitoring ? m.Radiation ?? RadiationRecord.Empty : null,
+        }));
         return trupp;
     }
 
@@ -268,7 +298,8 @@ public sealed class AtemschutzTrupp
         int pressureControlIntervalMinutes,
         DateTimeOffset? exitTime,
         IEnumerable<PressureReading> readings,
-        Guid? safetyTruppId = null)
+        Guid? safetyTruppId = null,
+        bool radiationMonitoring = false)
     {
         var trupp = new AtemschutzTrupp
         {
@@ -286,6 +317,7 @@ public sealed class AtemschutzTrupp
             PressureControlIntervalMinutes = pressureControlIntervalMinutes,
             ExitTime = exitTime,
             SafetyTruppId = safetyTruppId,
+            RadiationMonitoring = radiationMonitoring,
         };
 
         // Rehydrate deliberately does not re-run ValidateCrew: a stored Trupp is history, and
@@ -356,7 +388,37 @@ public sealed class AtemschutzTrupp
             throw new InvalidOperationException("Trupp ist bereits unter Atemschutz.");
         }
 
+        // #994: the dose a Strahlenschutztrupp takes in has to be traceable to a dosimeter, so the
+        // numbers come before the Trupp goes under Atemschutz, not after.
+        if (LacksDosimeterNumbers)
+        {
+            throw new InvalidOperationException(
+                "Dosimeter-Nummern fehlen: erst eintragen oder als nicht vorhanden bestätigen.");
+        }
+
         StartTime = time;
+    }
+
+    /// <summary>
+    /// Records the Strahlenschutzüberwachung of the crew member in <paramref name="role"/> (#994),
+    /// replacing what was there. Accepted in every state, abgenommen included: the Dekon-Platz often
+    /// reports the Ablesewert to the ELW well after the Trupp is out. The caller writes the ETB line.
+    /// </summary>
+    public void RecordRadiation(TruppRole role, RadiationRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        if (!RadiationMonitoring)
+        {
+            throw new InvalidOperationException("Dieser Trupp steht nicht unter Strahlenschutzüberwachung.");
+        }
+
+        var index = _members.FindIndex(m => m.Role == role);
+        if (index < 0)
+        {
+            throw new ArgumentException("Diese Truppfunktion ist nicht besetzt.", nameof(role));
+        }
+
+        _members[index] = _members[index] with { Radiation = record };
     }
 
     /// <summary>

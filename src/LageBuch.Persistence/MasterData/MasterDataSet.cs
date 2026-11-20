@@ -759,8 +759,14 @@ public sealed record Device(string Name, int Count)
 /// "CSA-Trupp 1". It is a setting on the row, not a check on the name, for the same reason the
 /// crew size is.
 /// </para>
+/// <para>
+/// <see cref="RadiationMonitoring"/> puts the Trupp under Strahlenschutzüberwachung (#994): every
+/// crew member then gets dosimeter, Maske and PA numbers and an Alarmdosimeter Ablesewert. The
+/// Trupp copies the flag when it is registered.
+/// </para>
 /// </summary>
-public sealed record TruppType(string Name, int MemberCount, int MaxDurationMinutes, bool NamedByNumber = false)
+public sealed record TruppType(
+    string Name, int MemberCount, int MaxDurationMinutes, bool NamedByNumber = false, bool RadiationMonitoring = false)
 {
     /// <summary>An ordinary two-person Trupp on the standard Einsatzzeit -- the shape every type
     /// has until someone says otherwise. Keeps the many construction sites to just a name.</summary>
@@ -1384,7 +1390,8 @@ public static class MasterDataJson
                 TruppType.ClampMemberCount(Int(x, "memberCount", AtemschutzTrupp.StandardMemberCount)),
                 TruppType.ClampMaxDurationMinutes(
                     Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes)),
-                x.TryGetProperty("namedByNumber", out var numbered) && numbered.ValueKind == JsonValueKind.True));
+                x.TryGetProperty("namedByNumber", out var numbered) && numbered.ValueKind == JsonValueKind.True,
+                x.TryGetProperty("radiationMonitoring", out var radiation) && radiation.ValueKind == JsonValueKind.True));
         }
 
         return result;
@@ -1685,6 +1692,7 @@ public static class MasterDataJson
                 memberCount = t.MemberCount,
                 maxDurationMinutes = t.MaxDurationMinutes,
                 namedByNumber = t.NamedByNumber,
+                radiationMonitoring = t.RadiationMonitoring,
             }),
             checklists = ChecklistsForExport(set),
             navigation = NavigationForExport(set),

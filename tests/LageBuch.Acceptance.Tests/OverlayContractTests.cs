@@ -12,6 +12,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
@@ -58,6 +59,7 @@ public class OverlayContractTests
         new("Workspace.DispatchChannelDialog", typeof(IncidentWorkspaceViewModel), typeof(DispatchChannelDialogViewModel), OpenWorkspaceDispatchChannelDialog),
         new("Workspace.LeadershipPersonDialog", typeof(IncidentWorkspaceViewModel), typeof(LeadershipPersonDialogViewModel), OpenWorkspaceLeadershipPersonDialog),
         new("Workspace.RoleAssignmentDialog", typeof(IncidentWorkspaceViewModel), typeof(RoleAssignmentDialogViewModel), OpenWorkspaceRoleAssignmentDialog),
+        new("Workspace.RadiationDialog", typeof(IncidentWorkspaceViewModel), typeof(RadiationDialogViewModel), OpenWorkspaceRadiationDialog),
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
         new("Main.About", typeof(MainWindowViewModel), typeof(AboutViewModel), OpenMainAbout),
         new("Main.ShortcutOverview", typeof(MainWindowViewModel), typeof(ShortcutOverviewViewModel), OpenMainShortcutOverview),
@@ -375,6 +377,25 @@ public class OverlayContractTests
         var opener = RowButton(window, "RolesGrid", b => b.Name == "EditRowButton");
         Activate(opener);
         return new(window, opener, ViewOf<RoleAssignmentDialogView>(window), () => vm.PendingRoleAssignmentDialog is null, () => vm.PendingRoleAssignmentDialog?.CancelCommand.Execute(null));
+    }
+
+    // #994: a Strahlenschutztrupp's own STRAHLENSCHUTZ button. Cancel leaves its records as they were.
+    private static Opened OpenWorkspaceRadiationDialog()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AddScbaTrupp(
+            "Strahlenschutztrupp",
+            TruppMember.Crew(AnonymizedExampleData.OperatorSurname, AnonymizedExampleData.OperatorSurnameAlt, AnonymizedExampleData.PersonLastName),
+            300,
+            radiationMonitoring: true));
+        WorkspaceRenderHelper.SelectTab(window, "ATEMSCHUTZ");
+        var opener = RowButton(window, "TruppGrid", b => b.Name == "RadiationButton");
+        Activate(opener);
+        return new(
+            window,
+            opener,
+            ViewOf<RadiationDialogView>(window),
+            () => vm.PendingRadiationDialog is null && vm.Scba.Trupps[0].RadiationHint == "Dosimeter-Nr. fehlen",
+            () => vm.PendingRadiationDialog?.CancelCommand.Execute(null));
     }
 
     // A row's own button, the way a keyboard user reaches it: Tab into the grid, then to the row.

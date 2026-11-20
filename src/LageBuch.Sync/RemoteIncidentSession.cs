@@ -645,17 +645,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        bool radiationMonitoring = false) =>
         Send(new AddScbaTruppCommand(
             designation,
-            members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
+            members.Select(m => new TruppMemberDto(
+                m.Role, m.Name, m.Radiation is { } r ? RadiationRecordDto.From(r) : null)).ToList(),
             callSign,
             task,
             maxDurationMinutes,
             returnPressureBar,
             pressureControlIntervalMinutes,
             entryPressure,
-            truppNumber));
+            truppNumber,
+            radiationMonitoring));
 
     public void StartScbaTrupp(Guid truppId) => Send(new StartScbaTruppCommand(truppId));
 
@@ -671,6 +674,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void ChangeScbaTruppType(Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes) =>
         Send(new ChangeScbaTruppTypeCommand(truppId, designation, maxDurationMinutes, pressureControlIntervalMinutes));
+
+    public void RecordScbaRadiation(Guid truppId, TruppRole role, RadiationRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        Send(new RecordScbaRadiationCommand(truppId, role, RadiationRecordDto.From(record)));
+    }
 
     public void SetIncidentNumber(IncidentNumber? number) => Send(new SetIncidentNumberCommand(number?.Value));
 

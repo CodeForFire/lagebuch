@@ -308,7 +308,8 @@ public static class SnapshotMapper
         t.StartTime,
         t.WithdrawTime,
         t.Designation,
-        t.Members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
+        t.Members.Select(m => new TruppMemberDto(
+            m.Role, m.Name, m.Radiation is { } r ? RadiationRecordDto.From(r) : null)).ToList(),
         t.CallSign,
         t.Task,
         t.EntryPressure,
@@ -317,7 +318,8 @@ public static class SnapshotMapper
         t.PressureControlIntervalMinutes,
         t.ExitTime,
         t.PressureReadings.Select(p => new PressureReadingDto(p.Time, p.Bar, p.Location)).ToList(),
-        t.SafetyTruppId);
+        t.SafetyTruppId,
+        t.RadiationMonitoring);
 
     private static AtemschutzTrupp FromDto(ScbaTruppDto d) => AtemschutzTrupp.Rehydrate(
         d.Id,
@@ -326,7 +328,7 @@ public static class SnapshotMapper
         d.StartTime,
         d.WithdrawTime,
         d.Designation,
-        d.Members.Select(m => new TruppMember(m.Role, m.Name)),
+        d.Members.Select(m => new TruppMember(m.Role, m.Name, m.Radiation?.ToUntrustedRecord())),
         d.CallSign,
         d.Task,
         d.EntryPressure,
@@ -335,5 +337,6 @@ public static class SnapshotMapper
         d.PressureControlIntervalMinutes,
         d.ExitTime,
         d.Readings.Select(p => new PressureReading(p.Time, p.Bar, p.Location)),
-        d.SafetyTruppId);
+        d.SafetyTruppId,
+        d.RadiationMonitoring);
 }

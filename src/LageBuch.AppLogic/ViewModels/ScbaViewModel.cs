@@ -31,6 +31,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
     private readonly Action _onWithdraw;
     private readonly Action _onMarkRemoved;
     private readonly Action<Guid?> _onAssignSafetyTrupp;
+    private readonly Action? _onOpenRadiation;
 
     // Re-pointed by Update rather than replaced with a whole new row (#294) -- see Update's remarks.
     private AtemschutzTrupp _trupp;
@@ -51,10 +52,12 @@ public sealed partial class ScbaTruppRow : ObservableObject
         string? safetyTruppHint,
         string? coveredTrupps,
         IReadOnlyList<TruppTypeChoice> truppTypeChoices,
-        Action<Guid?> onAssignSafetyTrupp)
+        Action<Guid?> onAssignSafetyTrupp,
+        Action? onOpenRadiation = null)
     {
         ArgumentNullException.ThrowIfNull(trupp);
         _trupp = trupp;
+        _onOpenRadiation = onOpenRadiation;
         _clock = clock;
         _isReadOnly = isReadOnly;
         _onStart = onStart;
@@ -228,7 +231,26 @@ public sealed partial class ScbaTruppRow : ObservableObject
     // Only the error: a warning is about the Druck, and still stands whatever the Ort says.
     partial void OnLocationInputChanged(string? value) => PressureError = null;
 
-    private bool CanStart => !_isReadOnly && _trupp.IsWaiting;
+    // A Strahlenschutztrupp waits for its dosimeter numbers (#994); the row's hint says so.
+    private bool CanStart => !_isReadOnly && _trupp.IsWaiting && !_trupp.LacksDosimeterNumbers;
+
+    /// <summary>Whether this Trupp is under Strahlenschutzüberwachung (#994), which shows the
+    /// STRAHLENSCHUTZ button.</summary>
+    public bool IsRadiationMonitored => _trupp.RadiationMonitoring;
+
+    /// <summary>What the Strahlenschutzüberwachung still waits for (#994): the dosimeter numbers
+    /// before IM EINSATZ, the Ablesewerte before the Einsatz is closed. Null once nothing is owed.</summary>
+    public string? RadiationHint =>
+        _trupp.LacksDosimeterNumbers ? "Dosimeter-Nr. fehlen"
+        : _trupp.AwaitsDoseReading ? "Ablesewert offen"
+        : null;
+
+    public bool HasRadiationHint => RadiationHint is not null;
+
+    /// <summary>Opens the Strahlenschutz dialog. Also on a closed Einsatz, to read what was recorded;
+    /// the dialog itself refuses to save there.</summary>
+    [RelayCommand]
+    private void OpenRadiation() => _onOpenRadiation?.Invoke();
 
     [RelayCommand(CanExecute = nameof(CanStart))]
     private void Start() => _onStart();
@@ -340,6 +362,8 @@ public sealed partial class ScbaTruppRow : ObservableObject
         OnPropertyChanged(nameof(StatusDisplay));
         OnPropertyChanged(nameof(CanAssignSafetyTrupp));
         OnPropertyChanged(nameof(CanChangeTruppType));
+        OnPropertyChanged(nameof(RadiationHint));
+        OnPropertyChanged(nameof(HasRadiationHint));
         StartCommand.NotifyCanExecuteChanged();
         RecordPressureCommand.NotifyCanExecuteChanged();
         WithdrawCommand.NotifyCanExecuteChanged();
@@ -355,6 +379,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
+    private readonly Action<RadiationDialogViewModel>? _openRadiationDialog;
     private readonly IDisposable? _subscription;
     private readonly HashSet<Guid> _alarmLogged = new();
 
@@ -395,8 +420,16 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
     private bool _applyingDefault;
 
-    public ScbaViewModel(IIncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
+    public ScbaViewModel(
+        IIncidentSession session,
+        MasterDataSet masterData,
+        IClock clock,
+        ITicker ticker,
+        IAlarmService alarm,
+        Action onChanged,
+        Action<RadiationDialogViewModel>? openRadiationDialog = null)
     {
+        _openRadiationDialog = openRadiationDialog;
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
         ArgumentNullException.ThrowIfNull(ticker);
@@ -970,7 +1003,8 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             task: null,
             maxDurationMinutes: NewMaxDurationMinutes,
             returnPressureBar: NewReturnPressureBar,
-            pressureControlIntervalMinutes: NewControlIntervalMinutes);
+            pressureControlIntervalMinutes: NewControlIntervalMinutes,
+            radiationMonitoring: StammdatenCatalogue.Find(designation, _truppTypes)?.RadiationMonitoring == true);
         _session.AddJournalEntry(
             EtbDirection.System,
             $"{displayName} bereitgestellt: {membersDisplay}, Einstiegsdruck {entryPressure} bar",
@@ -1014,7 +1048,8 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             SafetyTruppHintFor(trupp),
             CoveredTruppsFor(trupp),
             TruppTypeChoicesFor(trupp),
-            safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId));
+            safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId),
+            () => _openRadiationDialog?.Invoke(new RadiationDialogViewModel(_session, trupp.Id, _onChanged)));
 
     /// <summary>The Trupp-Art flyout entries for one row (#835): today's Trupp-Arten, plus the
     /// Trupp's own when the Stammdaten no longer list it, so the record is shown, never lost.</summary>

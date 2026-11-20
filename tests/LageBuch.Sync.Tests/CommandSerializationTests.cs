@@ -77,6 +77,24 @@ public class CommandSerializationTests
         new SetScbaSafetyTruppCommand(Guid.NewGuid(), Guid.NewGuid()),
         new SetScbaSafetyTruppCommand(Guid.NewGuid(), null),
         new ChangeScbaTruppTypeCommand(Guid.NewGuid(), "Angriffstrupp", 30, 10),
+        new AddScbaTruppCommand(
+            "Strahlenschutztrupp",
+            new[]
+            {
+                new TruppMemberDto(TruppRole.Truppfuehrer, "Müller", new RadiationRecordDto("OSL 1", false, "EPD 7", false, "M 2", "PA 3")),
+                new TruppMemberDto(TruppRole.Truppmann, "Schmidt", new RadiationRecordDto(null, true, "EPD 8", false, null, null)),
+            },
+            "HLF 1",
+            null,
+            30,
+            60,
+            10,
+            EntryPressure: 300,
+            RadiationMonitoring: true),
+        new RecordScbaRadiationCommand(
+            Guid.NewGuid(), TruppRole.Truppmann, new RadiationRecordDto("OSL 1", false, "EPD 7", false, null, null, 0.125m, DoseUnit.MilliSievert)),
+        new RecordScbaRadiationCommand(
+            Guid.NewGuid(), TruppRole.ZweiterTruppmann, new RadiationRecordDto("OSL 1", false, "EPD 7", true, null, null)),
         new SetIncidentNumberCommand("B 1.2 260812 001"),
         new SetKeywordCommand("Brand 2"),
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),

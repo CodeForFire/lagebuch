@@ -58,7 +58,7 @@ public class MasterDataEditorRenderTests
 
                 // Three people like the CSA-Trupp but the full 30 minutes (#418) -- the pair no
                 // rule keyed off a designation could ever have expressed.
-                new TruppType("Strahlenschutztrupp", 3, 30),
+                new TruppType("Strahlenschutztrupp", 3, 30, RadiationMonitoring: true),
             },
 
             // Wachen and Funkrufnamen derive from these rows (plus the roster's "Land 1").
@@ -388,6 +388,13 @@ public class MasterDataEditorRenderTests
             .ToList();
         Assert.Equal(4, numbered.Count);
         Assert.Equal(1, numbered.Count(c => c.IsChecked == true));
+
+        // #994: one "Strahlenschutz" box per row, ticked for the Strahlenschutztrupp alone.
+        var radiation = view.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Strahlenschutz")
+            .ToList();
+        Assert.Equal(4, radiation.Count);
+        Assert.Equal(1, radiation.Count(c => c.IsChecked == true));
 
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);

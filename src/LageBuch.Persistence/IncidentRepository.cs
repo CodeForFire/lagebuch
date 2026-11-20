@@ -252,7 +252,7 @@ public sealed class IncidentRepository
             var t = incident.ScbaTrupps[i];
             Run(
                 inserts,
-                "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time, safety_trupp_id) " + "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit,$safety);",
+                "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time, safety_trupp_id, radiation_monitoring) " + "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit,$safety,$rad);",
                 p =>
                 {
                     p("$id", t.Id.ToString());
@@ -270,6 +270,7 @@ public sealed class IncidentRepository
                     p("$interval", t.PressureControlIntervalMinutes);
                     p("$exit", (object?)t.ExitTime?.ToString(Iso) ?? DBNull.Value);
                     p("$safety", (object?)t.SafetyTruppId?.ToString() ?? DBNull.Value);
+                    p("$rad", t.RadiationMonitoring ? 1 : 0);
                 });
 
             for (var j = 0; j < t.Members.Count; j++)
@@ -277,13 +278,23 @@ public sealed class IncidentRepository
                 var member = t.Members[j];
                 Run(
                     inserts,
-                    "INSERT INTO scba_trupp_members (trupp_id, ordinal, role, name) VALUES ($tid,$o,$role,$name);",
+                    "INSERT INTO scba_trupp_members (trupp_id, ordinal, role, name, has_radiation, osl_number, osl_missing, alarm_number, alarm_missing, mask_number, pa_number, dose_value, dose_unit) VALUES ($tid,$o,$role,$name,$hasrad,$osl,$oslmiss,$alarm,$alarmmiss,$mask,$pa,$dose,$unit);",
                     p =>
                     {
+                        var rad = member.Radiation;
                         p("$tid", t.Id.ToString());
                         p("$o", j);
                         p("$role", (int)member.Role);
                         p("$name", member.Name);
+                        p("$hasrad", rad is null ? 0 : 1);
+                        p("$osl", (object?)rad?.OslDosimeterNumber ?? DBNull.Value);
+                        p("$oslmiss", rad?.OslDosimeterMissing == true ? 1 : 0);
+                        p("$alarm", (object?)rad?.AlarmDosimeterNumber ?? DBNull.Value);
+                        p("$alarmmiss", rad?.AlarmDosimeterMissing == true ? 1 : 0);
+                        p("$mask", (object?)rad?.MaskNumber ?? DBNull.Value);
+                        p("$pa", (object?)rad?.PaNumber ?? DBNull.Value);
+                        p("$dose", (object?)rad?.AlarmReading?.Value.ToString(CultureInfo.InvariantCulture) ?? DBNull.Value);
+                        p("$unit", (object?)(int?)rad?.AlarmReading?.Unit ?? DBNull.Value);
                     });
             }
 
@@ -814,10 +825,10 @@ public sealed class IncidentRepository
 
         var membersByTrupp = ReadAll(
             cn,
-            "SELECT trupp_id, role, name FROM scba_trupp_members ORDER BY ordinal;",
+            "SELECT trupp_id, role, name, has_radiation, osl_number, osl_missing, alarm_number, alarm_missing, mask_number, pa_number, dose_value, dose_unit FROM scba_trupp_members ORDER BY ordinal;",
             r => (TruppId: Guid.Parse(r.GetString(0)),
                   Member: new Domain.Atemschutz.TruppMember(
-                      (Domain.Atemschutz.TruppRole)r.GetInt32(1), r.GetString(2))))
+                      (Domain.Atemschutz.TruppRole)r.GetInt32(1), r.GetString(2), ReadRadiation(r))))
             .GroupBy(x => x.TruppId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Member).ToList());
 
@@ -831,7 +842,7 @@ public sealed class IncidentRepository
 
         var scbaTrupps = ReadAll(
             cn,
-            "SELECT id, trupp_number, designation, call_sign, task, registered_at, start_time, withdraw_time, entry_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time, safety_trupp_id FROM scba_trupps ORDER BY ordinal;",
+            "SELECT id, trupp_number, designation, call_sign, task, registered_at, start_time, withdraw_time, entry_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time, safety_trupp_id, radiation_monitoring FROM scba_trupps ORDER BY ordinal;",
             r =>
             {
                 var id = Guid.Parse(r.GetString(0));
@@ -851,7 +862,8 @@ public sealed class IncidentRepository
                     r.GetInt32(11),
                     NullableDate(r, 12),
                     readingsByTrupp.TryGetValue(id, out var rs) ? rs : Enumerable.Empty<Domain.Atemschutz.PressureReading>(),
-                    NullableGuid(r, 13));
+                    NullableGuid(r, 13),
+                    r.GetInt32(14) != 0);
             });
 
         var audit = ReadAll(
@@ -1124,6 +1136,23 @@ public sealed class IncidentRepository
     private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
     private static int? NullableInt(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
+
+    /// <summary>A crew member's Strahlenschutzüberwachung (#994) from columns 3..11 of the member
+    /// query, or null when the member carries none. A file is untrusted, so the record is built
+    /// through <see cref="Domain.Atemschutz.RadiationRecord.FromUntrusted"/>; a dose that does not
+    /// even parse as a number is simply no reading.</summary>
+    private static Domain.Atemschutz.RadiationRecord? ReadRadiation(SqliteDataReader r) =>
+        r.GetInt32(3) == 0
+            ? null
+            : Domain.Atemschutz.RadiationRecord.FromUntrusted(
+                Str(r, 4),
+                r.GetInt32(5) != 0,
+                Str(r, 6),
+                r.GetInt32(7) != 0,
+                Str(r, 8),
+                Str(r, 9),
+                decimal.TryParse(Str(r, 10), NumberStyles.Number, CultureInfo.InvariantCulture, out var dose) ? dose : null,
+                NullableInt(r, 11));
 
     // A coordinate is only taken as a number. A hostile file can store text in a REAL column, and a
     // position that does not read costs the mark on the Lagekarte, not the Einsatz.

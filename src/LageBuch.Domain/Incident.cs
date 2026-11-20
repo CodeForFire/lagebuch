@@ -375,6 +375,15 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(closedBy);
         EnsureOpen();
 
+        // #994: a closed Einsatz is read-only, so an Ablesewert missing now could never be added.
+        // Refused here as well as in the view model, because a joined client's close reaches the
+        // host as a command.
+        if (ScbaTruppsAwaitingDoseReading is { Count: > 0 } awaiting)
+        {
+            throw new InvalidOperationException(
+                "Ablesewerte fehlen: " + string.Join(", ", awaiting.Select(t => t.DisplayName)) + ".");
+        }
+
         // Must precede the state flip — a closed incident rejects journal writes.
         AppendSystemEntry(clock, closedBy, "Einsatz abgeschlossen");
 
@@ -1812,7 +1821,8 @@ public sealed class Incident
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes)
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        bool radiationMonitoring = false)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -1832,10 +1842,26 @@ public sealed class Incident
             task,
             maxDurationMinutes,
             returnPressureBar,
-            pressureControlIntervalMinutes);
+            pressureControlIntervalMinutes,
+            radiationMonitoring);
         _scbaTrupps.Add(trupp);
         return trupp;
     }
+
+    /// <summary>Records one crew member's Strahlenschutzüberwachung (#994); see
+    /// <see cref="AtemschutzTrupp.RecordRadiation"/>. The ETB line is written by the caller.</summary>
+    public AtemschutzTrupp RecordScbaRadiation(Guid truppId, TruppRole role, RadiationRecord record)
+    {
+        EnsureOpen();
+        var trupp = FindScbaTrupp(truppId);
+        trupp.RecordRadiation(role, record);
+        return trupp;
+    }
+
+    /// <summary>The Strahlenschutztrupps still owing an Alarmdosimeter answer (#994), in Trupp
+    /// order. While any does, the Einsatz cannot be closed.</summary>
+    public IReadOnlyList<AtemschutzTrupp> ScbaTruppsAwaitingDoseReading =>
+        _scbaTrupps.Where(t => t.AwaitsDoseReading).OrderBy(t => t.TruppNumber).ToList();
 
     public AtemschutzTrupp StartScbaTrupp(IClock clock, Guid truppId)
     {

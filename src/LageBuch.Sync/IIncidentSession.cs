@@ -258,7 +258,8 @@ public interface IIncidentSession
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes);
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        bool radiationMonitoring = false);
 
     void StartScbaTrupp(Guid truppId);
 
@@ -275,6 +276,10 @@ public interface IIncidentSession
     /// <summary>Gives a Trupp another Trupp-Art (#835). The Einsatzzeit and Abfrage-Intervall
     /// apply only while the Trupp still waits.</summary>
     void ChangeScbaTruppType(Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes);
+
+    /// <summary>Records one crew member's Strahlenschutzüberwachung (#994): numbers, the
+    /// Alarmdosimeter's Ablesewert, or a dosimeter declared missing.</summary>
+    void RecordScbaRadiation(Guid truppId, TruppRole role, RadiationRecord record);
 
     void SetIncidentNumber(IncidentNumber? number);
 

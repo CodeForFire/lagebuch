@@ -31,7 +31,7 @@ internal static class WorkspaceRenderHelper
                 new ChecklistTemplateItem("Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?", false),
             },
             new[] { new ChecklistTemplateItem("Fahrzeug abgerüstet und einsatzbereit?", true) }),
-        TruppTypes = new[] { new TruppType("Angriffstrupp"), new TruppType("Sicherheitstrupp"), new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true) },
+        TruppTypes = new[] { new TruppType("Angriffstrupp"), new TruppType("Sicherheitstrupp"), new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true), new TruppType("Strahlenschutztrupp", 3, 30, RadiationMonitoring: true) },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
 
         // Wachen and Funkrufnamen suggestions derive from the vehicles (and the roster below).

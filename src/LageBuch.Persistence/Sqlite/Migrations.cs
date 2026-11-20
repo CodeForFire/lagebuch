@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 45;
+    public const int CurrentVersion = 46;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -308,6 +308,11 @@ public static class Migrations
         if (version < 45)
         {
             ApplyV45(cn, tx);
+        }
+
+        if (version < 46)
+        {
+            ApplyV46(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1360,6 +1365,27 @@ public static class Migrations
     private static void ApplyV45(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_gases", "upper_alarm", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The Strahlenschutzüberwachung of a Strahlenschutztrupp (#994): a flag on the Trupp, and per
+    // crew member the dosimeter, Maske and PA numbers and the Alarmdosimeter's Ablesewert. Additive:
+    // an older file reads back with no Trupp under it. has_radiation marks a member who carries a
+    // record at all, so an empty record and none at all stay apart.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV46(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupps", "radiation_monitoring", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "has_radiation", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "osl_number", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "osl_missing", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "alarm_number", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "alarm_missing", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "mask_number", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "pa_number", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "dose_value", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupp_members", "dose_unit", "INTEGER");
 
         // Stryker restore all
     }

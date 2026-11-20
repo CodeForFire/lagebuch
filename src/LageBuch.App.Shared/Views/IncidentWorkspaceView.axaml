@@ -1104,5 +1104,9 @@
     <!-- Correct or hand over a Funktion already held: FÜHRUNG's Führungsunterstützung, FUNKTIONEN's BEARBEITEN -->
     <ContentControl Content="{Binding PendingRoleAssignmentDialog}"
                     IsVisible="{Binding PendingRoleAssignmentDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Strahlenschutz of a Strahlenschutztrupp (#994), from its row in ATEMSCHUTZ -->
+    <ContentControl Content="{Binding PendingRadiationDialog}"
+                    IsVisible="{Binding PendingRadiationDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>

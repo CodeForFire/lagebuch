@@ -17,6 +17,23 @@ A Trupp is never fewer than two people and never more than three: the
 Atemschutzüberwachung has exactly three positions (Truppführer, Truppmann,
 2. Truppmann) and nowhere to write a fourth name.
 
+Two switches on the row change how a Trupp of that type is handled, again by the
+row and never by its name:
+
+- **Nummer** (`namedByNumber`): the Trupp is called by a number rather than a
+  vehicle's Funkrufname. The form asks for the number and names the Trupp
+  "CSA-Trupp 1" (#995).
+- **Strahlenschutz** (`radiationMonitoring`): the Trupp is under
+  Strahlenschutzüberwachung (#994). Every Einsatzkraft gets OSL-Dosimeter,
+  Alarmdosimeter, Maske and PA numbers, and the Trupp cannot go under
+  Atemschutz before both dosimeters are numbered or confirmed as nicht
+  vorhanden. The Alarmdosimeter's Ablesewert may come in late from the
+  Dekon-Platz, but the Einsatz cannot be closed before it is entered or the
+  dosimeter is confirmed as nicht vorhanden.
+
+A Trupp copies both switches when it is registered, so a row edited later does
+not change a Trupp already in an Einsatz.
+
 There is no separate list of brigades (Wachen) or radio call signs
 (Funkrufnamen): both are derived from the **vehicles** — every vehicle's Wache
 becomes a brigade suggestion, and every vehicle's call sign (plus every roster

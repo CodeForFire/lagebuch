@@ -16,8 +16,11 @@ public enum TruppRole
     ZweiterTruppmann = 2,
 }
 
-/// <summary>One named person in a Trupp, addressable by their position.</summary>
-public sealed record TruppMember(TruppRole Role, string Name)
+/// <summary>
+/// One named person in a Trupp, addressable by their position. <see cref="Radiation"/> is their
+/// Strahlenschutzüberwachung (#994) -- present exactly when the Trupp is under it, null otherwise.
+/// </summary>
+public sealed record TruppMember(TruppRole Role, string Name, RadiationRecord? Radiation = null)
 {
     public static TruppMember Create(TruppRole role, string name)
     {

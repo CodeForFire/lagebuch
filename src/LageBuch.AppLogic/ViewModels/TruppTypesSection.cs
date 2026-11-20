@@ -20,13 +20,14 @@ public sealed partial class TruppTypesSection : EditorSection
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<TruppTypeRow>(
-            truppTypes.Select(t => NewRow(t.Name, t.MemberCount, t.MaxDurationMinutes, t.NamedByNumber)));
+            truppTypes.Select(t => NewRow(t.Name, t.MemberCount, t.MaxDurationMinutes, t.NamedByNumber, t.RadiationMonitoring)));
     }
 
     public ObservableCollection<TruppTypeRow> Rows { get; }
 
-    private TruppTypeRow NewRow(string name, int memberCount, int maxDurationMinutes, bool namedByNumber = false) =>
-        new(name, memberCount, maxDurationMinutes, _onChanged, namedByNumber);
+    private TruppTypeRow NewRow(
+        string name, int memberCount, int maxDurationMinutes, bool namedByNumber = false, bool radiationMonitoring = false) =>
+        new(name, memberCount, maxDurationMinutes, _onChanged, namedByNumber, radiationMonitoring);
 
     [RelayCommand]
     private void Add()
@@ -74,7 +75,8 @@ public sealed partial class TruppTypesSection : EditorSection
                     name,
                     TruppType.ClampMemberCount(row.MemberCount),
                     TruppType.ClampMaxDurationMinutes(row.MaxDurationMinutes),
-                    row.NamedByNumber));
+                    row.NamedByNumber,
+                    row.RadiationMonitoring));
             }
         }
 
