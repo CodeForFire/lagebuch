@@ -26,6 +26,24 @@ public sealed class Incident
     public const int MaxMapOverlays = 100;
 
     /// <summary>
+    /// The most Luftbild and Flurstücksgrenzen Ebenen one Einsatz holds: ten sections of both. Each
+    /// is a picture of up to tens of megabytes in the file and in every device's memory, so a long
+    /// list of them is a burden on a tablet long before it is useful.
+    /// </summary>
+    public const int MaxRasterMapOverlays = 20;
+
+    /// <summary>
+    /// How many more raster Ebenen this Einsatz takes: within <see cref="MaxRasterMapOverlays"/>
+    /// and within <see cref="MaxMapOverlays"/> overall. LUFTBILD LADEN needs two, and checks for
+    /// both before it adds either.
+    /// </summary>
+    public int FreeRasterMapOverlaySlots => Math.Max(
+        0,
+        Math.Min(
+            MaxRasterMapOverlays - _mapOverlays.Count(o => o.Kind == MapOverlayKind.Raster),
+            MaxMapOverlays - _mapOverlays.Count));
+
+    /// <summary>
     /// Why <see cref="MoveForceUnit"/> refuses a partner's Einsatzleitung, in German. The Führung
     /// board says the same while a unit is held over one.
     /// </summary>
@@ -2007,7 +2025,7 @@ public sealed class Incident
     }
 
     /// <summary>
-    /// Imports a Kartenebene: its file (the GeoJSON or zip, unchanged) joins the Einsatz's files,
+    /// Imports a Kartenebene: its file (the GeoJSON or zip, or a Luftbild's image, unchanged) joins the Einsatz's files,
     /// and the Ebene points at it. The ETB records the import as a professional record, not
     /// bookkeeping — an Ausbreitungsprognose is what the Einsatzleitung decided on — so it stays
     /// visible with Systemmeldungen hidden. The importing device generates both ids, the way
@@ -2032,12 +2050,17 @@ public sealed class Incident
             throw new InvalidOperationException($"Ein Einsatz hat höchstens {MaxMapOverlays} Kartenebenen.");
         }
 
+        if (summary.Kind == MapOverlayKind.Raster && _mapOverlays.Count(o => o.Kind == MapOverlayKind.Raster) >= MaxRasterMapOverlays)
+        {
+            throw new InvalidOperationException($"Ein Einsatz hat höchstens {MaxRasterMapOverlays} Luftbild-Ebenen. Ältere entfernen.");
+        }
+
         if (_mapOverlays.Any(o => o.Id == overlayId) || _files.Any(f => f.Id == fileId))
         {
             throw new ArgumentException("Diese Kartenebene ist schon im Einsatz.", nameof(overlayId));
         }
 
-        var file = IncidentFile.CreateMapOverlay(fileId, fileName, contentType, sizeBytes, clock.Now, op.Display);
+        var file = IncidentFile.CreateMapOverlay(fileId, fileName, contentType, sizeBytes, clock.Now, op.Display, summary.Kind);
         var overlay = MapOverlay.Create(overlayId, file.Id, summary, clock.Now, op.Display);
         _files.Add(file);
         _mapOverlays.Add(overlay);
@@ -2069,6 +2092,28 @@ public sealed class Incident
 
         AppendMeasurementEntry(clock, op, $"Kartenebene entfernt: {overlay.Name}");
         return file;
+    }
+
+    /// <summary>
+    /// Takes back a Kartenebene whose file never arrived, open Einsatz or closed: the import failed
+    /// as a whole, so nothing of it may stay. On an open Einsatz the ETB says so, as
+    /// <see cref="RemoveMapOverlay"/> does; a closed one's journal is not written to any more.
+    /// </summary>
+    public void DiscardFailedMapOverlay(IClock clock, SessionOperator op, Guid overlayId)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        if (State != IncidentState.Closed)
+        {
+            RemoveMapOverlay(clock, op, overlayId);
+            return;
+        }
+
+        if (_mapOverlays.Find(o => o.Id == overlayId) is { } overlay)
+        {
+            _mapOverlays.Remove(overlay);
+            _files.RemoveAll(f => f.Id == overlay.FileId);
+        }
     }
 
     // The forecast times as the Lagebuchführer reads them: in the Einsatz's own time zone, which is

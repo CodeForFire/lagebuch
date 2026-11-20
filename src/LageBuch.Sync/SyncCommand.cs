@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
@@ -181,7 +182,17 @@ public sealed record AddMapOverlayCommand(
     string Name,
     int FrameCount,
     DateTimeOffset? FirstTime,
-    DateTimeOffset? LastTime) : SyncCommand;
+    DateTimeOffset? LastTime,
+
+    // Protocol 44: a raster Ebene, a Luftbild or Flurstücksgrenzen. Its file is a JPEG or PNG laid
+    // on the map at West/South/East/North (WGS84); the host checks the box (GeoBox) and the kind.
+    // Defaulted, so a GeoJSON Ebene reads exactly as it did at 38.
+    MapOverlayKind Kind = MapOverlayKind.Vector,
+    double? West = null,
+    double? South = null,
+    double? East = null,
+    double? North = null,
+    string? Attribution = null) : SyncCommand;
 
 public sealed record RemoveMapOverlayCommand(OperatorDto Operator, Guid OverlayId) : SyncCommand;
 

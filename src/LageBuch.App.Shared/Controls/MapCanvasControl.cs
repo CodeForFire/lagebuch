@@ -66,6 +66,14 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<IReadOnlyList<OverlayShape>?> OverlaysProperty =
         AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<OverlayShape>?>(nameof(Overlays));
 
+    /// <summary>The pictures of the visible raster Kartenebenen, drawn on the tiles in this order; null draws none.</summary>
+    public static readonly StyledProperty<IReadOnlyList<RasterImage>?> RasterOverlaysProperty =
+        AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<RasterImage>?>(nameof(RasterOverlays));
+
+    /// <summary>Invoked with the <see cref="Guid"/> file of a raster picture that would not decode, so its Ebene can say so.</summary>
+    public static readonly StyledProperty<ICommand?> RasterFailedCommandProperty =
+        AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(RasterFailedCommand));
+
     /// <summary>The Fließweg from the Einsatzort, start first; null draws none.</summary>
     public static readonly StyledProperty<IReadOnlyList<GeoPoint>?> FlowPathProperty =
         AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<GeoPoint>?>(nameof(FlowPath));
@@ -87,6 +95,7 @@ public sealed class MapCanvasControl : Control
 
     private readonly MapTileCache _tiles = new();
     private readonly TerrainTileCache _terrain;
+    private readonly RasterOverlayCache _rasters;
 
     // Where a drag started, on screen and on the map; null while no drag is under way.
     private Point? _dragStart;
@@ -102,7 +111,7 @@ public sealed class MapCanvasControl : Control
 
     static MapCanvasControl()
     {
-        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty, IsNightProperty, OverlaysProperty, FlowPathProperty);
+        AffectsRender<MapCanvasControl>(TileSourceProperty, CenterProperty, ZoomProperty, RotationProperty, WaterPointsProperty, SelectedWaterPointProperty, ElevationProperty, TerrainStyleProperty, IsNightProperty, OverlaysProperty, FlowPathProperty, RasterOverlaysProperty);
         FocusableProperty.OverrideDefaultValue<MapCanvasControl>(true);
         ClipToBoundsProperty.OverrideDefaultValue<MapCanvasControl>(true);
     }
@@ -110,6 +119,7 @@ public sealed class MapCanvasControl : Control
     public MapCanvasControl()
     {
         _terrain = new TerrainTileCache(InvalidateVisual);
+        _rasters = new RasterOverlayCache(InvalidateVisual, OnRasterFailed);
         GestureRecognizers.Add(new PinchGestureRecognizer());
         AddHandler(PinchEvent, OnPinch);
         AddHandler(PinchEndedEvent, OnPinchEnded);
@@ -184,6 +194,37 @@ public sealed class MapCanvasControl : Control
         set => SetValue(OverlaysProperty, value);
     }
 
+    public IReadOnlyList<RasterImage>? RasterOverlays
+    {
+        get => GetValue(RasterOverlaysProperty);
+        set => SetValue(RasterOverlaysProperty, value);
+    }
+
+    public ICommand? RasterFailedCommand
+    {
+        get => GetValue(RasterFailedCommandProperty);
+        set => SetValue(RasterFailedCommandProperty, value);
+    }
+
+    /// <summary>Whether Luftbild pictures are still being decoded; the map redraws as each is ready.</summary>
+    public bool IsRasterBusy => _rasters.IsBusy;
+
+    /// <summary>
+    /// The box on the map the control shows, its turned corners included; null before the map has
+    /// a centre or a size. What LUFTBILD LADEN asks the LDBV for.
+    /// </summary>
+    public GeoBox? VisibleBounds()
+    {
+        if (Center is null || Bounds.Width <= 0 || Bounds.Height <= 0)
+        {
+            return null;
+        }
+
+        Point[] corners = [new(0, 0), new(Bounds.Width, 0), new(0, Bounds.Height), new(Bounds.Width, Bounds.Height)];
+        var points = corners.Select(ScreenToGeo).OfType<GeoPoint>().ToList();
+        return GeoBox.TryCreate(points.Min(p => p.Longitude), points.Min(p => p.Latitude), points.Max(p => p.Longitude), points.Max(p => p.Latitude));
+    }
+
     public bool WheelZoomNeedsControl
     {
         get => GetValue(WheelZoomNeedsControlProperty);
@@ -231,7 +272,8 @@ public sealed class MapCanvasControl : Control
         // Missing tiles are painted too, so the whole control stays hit-testable for a drag.
         _tiles.Use(TileSource);
         _terrain.Use(Elevation, TerrainStyle);
-        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint, _terrain, Overlays, FlowPath);
+        var rasters = _rasters.Use(RasterOverlays);
+        MapDrawing.Draw(context, _tiles, center, Zoom, Bounds.Size, Rotation, WaterPoints, SelectedWaterPoint, _terrain, Overlays, FlowPath, rasters);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -239,6 +281,7 @@ public sealed class MapCanvasControl : Control
         base.OnDetachedFromVisualTree(e);
         _tiles.Clear();
         _terrain.Clear();
+        _rasters.Clear();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -481,6 +524,14 @@ public sealed class MapCanvasControl : Control
         var anchor = WebMercator.ToGeo(centerX + dx, centerY + dy, Zoom);
         var (anchorX, anchorY) = WebMercator.ToWorldPixel(anchor, zoom);
         Report(WebMercator.ToGeo(anchorX - dx, anchorY - dy, zoom), zoom);
+    }
+
+    private void OnRasterFailed(Guid fileId)
+    {
+        if (RasterFailedCommand?.CanExecute(fileId) == true)
+        {
+            RasterFailedCommand.Execute(fileId);
+        }
     }
 
     // A pan or zoom leaves the turn as it is: the rotation is null unless the hand turned the map.

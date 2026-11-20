@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 45;
+    public const int CurrentVersion = 46;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -308,6 +308,11 @@ public static class Migrations
         if (version < 45)
         {
             ApplyV45(cn, tx);
+        }
+
+        if (version < 46)
+        {
+            ApplyV46(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1360,6 +1365,22 @@ public static class Migrations
     private static void ApplyV45(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_gases", "upper_alarm", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // Raster Kartenebenen, the Luftbild and the Flurstücksgrenzen: what kind of file an Ebene is,
+    // the box an image lies in, and the licence line copied at the download. Additive: an older
+    // file's Ebenen read back as GeoJSON without a box, which is all they ever were.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV46(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "kind", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "west", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "south", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "east", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "north", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "map_overlays", "attribution", "TEXT");
 
         // Stryker restore all
     }

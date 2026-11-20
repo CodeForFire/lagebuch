@@ -384,8 +384,8 @@ public class VersionHandshakeTests
     {
         // 41 adds dispatchPlaceNames to /masterdata. A peer at 40 drops the key and only loses the
         // pre-ticked Einsatzmittel of an alarm, so a 40 and a 41 still connect.
+        // The floor has risen past 40 since, for the raster Kartenebenen (44).
         Assert.InRange(SyncProtocol.ProtocolVersion, 41, int.MaxValue);
-        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
     }
 
     [Fact]
@@ -393,8 +393,8 @@ public class VersionHandshakeTests
     {
         // 42 adds an optional upperAlarm to every gas definition (#927). A peer at 41 drops it and
         // only loses the enrichment colour of its O2, so a 41 and a 42 still connect.
+        // The floor has risen past 40 since, for the raster Kartenebenen (44).
         Assert.InRange(SyncProtocol.ProtocolVersion, 42, int.MaxValue);
-        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
     }
 
     [Fact]
@@ -402,7 +402,17 @@ public class VersionHandshakeTests
     {
         // 43 adds vehicleTypeCodes to /masterdata. A peer at 42 drops the key and only types its
         // new vehicles by hand, so a 42 and a 43 still connect.
-        Assert.Equal(43, SyncProtocol.ProtocolVersion);
-        Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
+        // The floor has risen past 40 since, for the raster Kartenebenen (44).
+        Assert.InRange(SyncProtocol.ProtocolVersion, 43, int.MaxValue);
+    }
+
+    [Fact]
+    public void Raster_Kartenebenen_raise_the_protocol_and_the_floor_to_forty_four()
+    {
+        // 44 lets addMapOverlay carry a Luftbild: a JPEG or PNG with its box. A host at 43 refuses
+        // the image type, and a peer at 43 would read the image as GeoJSON, so a 43 and a 44 must
+        // not connect.
+        Assert.Equal(44, SyncProtocol.ProtocolVersion);
+        Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
     }
 }

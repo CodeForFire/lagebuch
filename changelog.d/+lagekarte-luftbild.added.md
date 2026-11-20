@@ -1,0 +1,1 @@
+LUFTBILD LADEN on the Lagekarte downloads the visible section's Luftbild and Flurstücksgrenzen from the Bayerische Vermessungsverwaltung (BayernAtlas data, CC BY 4.0) and keeps them in the Einsatz as two Kartenebenen that sync and work offline.

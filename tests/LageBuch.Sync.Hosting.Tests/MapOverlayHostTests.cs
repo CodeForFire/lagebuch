@@ -1,6 +1,7 @@
 using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Map;
+using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Sync.Hosting.Tests;
 
@@ -45,6 +46,40 @@ public class MapOverlayHostTests
         var overlay = Assert.Single(hostSession.Incident.MapOverlays);
         Assert.Equal(Bytes, await hostSession.GetFileBytesAsync(overlay.FileId));
         Assert.Equal(Bytes, await observer.GetFileBytesAsync(overlay.FileId));
+    }
+
+    [Fact]
+    public async Task A_Luftbild_loaded_on_a_client_reaches_every_peer_with_its_box_and_picture()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+        await using var importer = await Join(port, "A");
+        await using var observer = await Join(port, "B");
+        var observed = new TaskCompletionSource();
+        observer.Changed += () =>
+        {
+            if (observer.Incident.MapOverlays.Count > 0)
+            {
+                observed.TrySetResult();
+            }
+        };
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
+        var box = new GeoBox(11.24, 48.17, 11.26, 48.18);
+
+        await importer.AddMapOverlayAsync(
+            "flurstuecke.png",
+            "image/png",
+            png,
+            new MapOverlaySummary("Flurstücksgrenzen (LDBV)", 1, null, null, MapOverlayKind.Raster, box, "© Bayerische Vermessungsverwaltung (CC BY 4.0)"));
+        await observed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var overlay = Assert.Single(observer.Incident.MapOverlays);
+        Assert.Equal(MapOverlayKind.Raster, overlay.Kind);
+        Assert.Equal(box, overlay.Bounds);
+        Assert.Equal(Assert.Single(hostSession.Incident.MapOverlays), overlay);
+        Assert.Equal(png, await observer.GetFileBytesAsync(overlay.FileId));
     }
 
     [Fact]

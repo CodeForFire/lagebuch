@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Media.Immutable;
 using LageBuch.AppLogic.Services.Map;
 using LageBuch.Domain.ValueObjects;
@@ -30,8 +31,10 @@ public static class MapDrawing
     /// <paramref name="overlays"/> over the terrain, under the names, and the
     /// <paramref name="flowPath"/> over the Kartenebenen. All of it but the terrain, the
     /// Kartenebenen and the Fließweg in the colours of the cache's <see cref="MapTileCache.Style"/>.
+    /// The <paramref name="rasters"/>, the pictures of the Luftbild Ebenen, lie on the tiles and
+    /// under the terrain, in their own colours by day and by night.
     /// </summary>
-    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null, TerrainTileCache? terrain = null, IReadOnlyList<OverlayShape>? overlays = null, IReadOnlyList<GeoPoint>? flowPath = null)
+    public static void Draw(DrawingContext context, MapTileCache tiles, GeoPoint center, int zoom, Size size, double rotation = 0, IReadOnlyList<WaterPoint>? waterPoints = null, WaterPoint? selected = null, TerrainTileCache? terrain = null, IReadOnlyList<OverlayShape>? overlays = null, IReadOnlyList<GeoPoint>? flowPath = null, IReadOnlyList<(Bitmap Image, GeoBox Bounds)>? rasters = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(tiles);
@@ -45,21 +48,29 @@ public static class MapDrawing
         context.FillRectangle(style.Background, new Rect(size));
         var marks = waterPoints is null ? [] : WaterPointMarkers.LayOut(waterPoints, center, zoom, size, selected, rotation);
         var labels = new List<(MapLabel Label, Point At)>();
-        if (tiles.Source is { } source)
+        var turn = Turn(size, rotation);
+        IReadOnlyList<IMapTileSource> layers = tiles.Source switch
         {
             // Several packs are drawn one over the other. Each pack's tiles are cut to its area when
             // it is built, so outside it a pack draws nothing that could cover its neighbour's streets.
-            IReadOnlyList<IMapTileSource> layers = source is CombinedMapTileSource combined ? combined.Layers : [source];
-            var turn = Turn(size, rotation);
-            foreach (var layer in layers)
-            {
-                DrawLayer(context, tiles, layer, center, zoom, size, turn, labels);
-            }
+            CombinedMapTileSource combined => combined.Layers,
+            { } single => [single],
+            _ => [],
+        };
+        foreach (var layer in layers)
+        {
+            DrawLayer(context, tiles, layer, center, zoom, size, turn, labels);
+        }
 
-            if (terrain is not null && zoom >= TerrainSampler.MinZoom)
-            {
-                DrawTerrain(context, terrain, center, zoom, size, turn, rotation);
-            }
+        // A Luftbild covers the streets, but not their names, which are laid over everything below.
+        if (rasters is { Count: > 0 })
+        {
+            DrawRasters(context, rasters, center, zoom, size, turn);
+        }
+
+        if (layers.Count > 0 && terrain is not null && zoom >= TerrainSampler.MinZoom)
+        {
+            DrawTerrain(context, terrain, center, zoom, size, turn, rotation);
         }
 
         // Kartenebenen lie on the map and its terrain but under its names and the water points, so
@@ -198,6 +209,25 @@ public static class MapDrawing
                         labels.AddRange(tiles.Labels(layer, zoom, tx, ty).Select(l => (l, turn.Transform(target.TopLeft + l.Anchor))));
                     }
                 }
+            }
+        }
+    }
+
+    // Each picture into the rectangle between its corners on the north-up map, turned with it. A
+    // WMS picture in EPSG:3857 is linear in Web Mercator, so its corners are all it takes to lay it
+    // exactly where the tiles are.
+    private static void DrawRasters(DrawingContext context, IReadOnlyList<(Bitmap Image, GeoBox Bounds)> rasters, GeoPoint center, int zoom, Size size, Matrix turn)
+    {
+        var (centerX, centerY) = WebMercator.ToWorldPixel(center, zoom);
+        var left = centerX - (size.Width / 2);
+        var top = centerY - (size.Height / 2);
+        using (context.PushTransform(turn))
+        {
+            foreach (var (image, bounds) in rasters)
+            {
+                var (westX, northY) = WebMercator.ToWorldPixel(new GeoPoint(bounds.North, bounds.West), zoom);
+                var (eastX, southY) = WebMercator.ToWorldPixel(new GeoPoint(bounds.South, bounds.East), zoom);
+                context.DrawImage(image, new Rect(westX - left, northY - top, eastX - westX, southY - northY));
             }
         }
     }

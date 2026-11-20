@@ -121,7 +121,8 @@ public class MainActivity : AvaloniaMainActivity
             alarmMute: new AlarmMute(AndroidAppPaths.AlarmMuteJsonPath(this)),
             mapPacks: new RegionPackLibrary(MapPackHttp, AndroidAppPaths.RegionPacksDir(this)),
             mapNightMode: new MapNightMode(AndroidAppPaths.MapNightJsonPath(this)),
-            weather: new BrightSkyClient(MapPackHttp)));
+            weather: new BrightSkyClient(MapPackHttp),
+            luftbild: new LdbvImageryClient(MapPackHttp)));
 
         base.OnCreate(savedInstanceState);
     }
