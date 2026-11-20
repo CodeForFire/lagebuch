@@ -927,7 +927,6 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         OnPropertyChanged(nameof(NewDesignationError));
         OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTypeNumberError));
-        OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTruppfuehrerError));
         OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTruppmannError));
@@ -980,7 +979,8 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
         _maxDurationUserEdited = false;
         _controlIntervalUserEdited = false;
-        _typeNumberUserEdited = false;
+
+        // _typeNumberUserEdited needs no reset here: clearing NewDesignation below does it.
         NewDesignation = string.Empty;
         NewTruppfuehrer = string.Empty;
         NewTruppmann = string.Empty;
