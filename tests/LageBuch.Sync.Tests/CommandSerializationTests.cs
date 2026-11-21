@@ -14,6 +14,9 @@ public class CommandSerializationTests
     {
         new AddJournalEntryCommand(Op, EtbDirection.Outgoing, "Text", "Von", "An"),
         new EditJournalEntryCommand(Op, Guid.NewGuid(), "Korrigierter Text"),
+        new AddJournalEntryCommand(Op, EtbDirection.Internal, "Lage Nord", null, null, Guid.NewGuid(), Guid.NewGuid()),
+        new AssignJournalEntrySectionCommand(Op, Guid.NewGuid(), Guid.NewGuid()),
+        new AssignJournalEntrySectionCommand(Op, Guid.NewGuid(), null),
         new ChangeOperatorCommand(Op, new OperatorDto("Schmidt", null)),
         new ToggleChecklistItemCommand(Op, Guid.NewGuid()),
         new AssignRoleCommand(Op, "EL", "Huber", "FFB 1", DateTimeOffset.UnixEpoch, null, "Abschnitt", "0171"),
@@ -322,6 +325,31 @@ public class CommandSerializationTests
 
         Assert.Equal(entryId, Assert.IsType<AddJournalEntryCommand>(entry).EntryId);
         Assert.Equal(entryId, Assert.IsType<AddTaskCommand>(task).SourceEntryId);
+    }
+
+    // A client at 43 or older files its entry nowhere: it reads with no Abschnitt (#971).
+    [Fact]
+    public void An_addJournalEntry_without_a_section_id_reads_as_filed_nowhere()
+    {
+        const string entryJson = """
+            {"$type":"addJournalEntry","operator":{"name":"Müller","callSign":null},
+             "direction":"Internal","text":"Lage","from":null,"to":null,"entryId":"0b0e3d0a-5a41-4d7c-9a26-9a2f4d1f4f10"}
+            """;
+
+        Assert.Null(Assert.IsType<AddJournalEntryCommand>(SyncJson.Deserialize<SyncCommand>(entryJson)).SectionId);
+    }
+
+    [Fact]
+    public void The_section_id_survives_the_wire_and_its_command_name_is_fixed()
+    {
+        var sectionId = Guid.NewGuid();
+        var entry = SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize<SyncCommand>(
+            new AddJournalEntryCommand(Op, EtbDirection.Internal, "Lage", null, null, null, sectionId)));
+        var json = SyncJson.Serialize<SyncCommand>(new AssignJournalEntrySectionCommand(Op, Guid.NewGuid(), sectionId));
+
+        Assert.Equal(sectionId, Assert.IsType<AddJournalEntryCommand>(entry).SectionId);
+        Assert.Contains("\"$type\":\"assignJournalEntrySection\"", json, StringComparison.Ordinal);
+        Assert.Equal(sectionId, Assert.IsType<AssignJournalEntrySectionCommand>(SyncJson.Deserialize<SyncCommand>(json)).SectionId);
     }
 
     // The Lagemeldung discriminators are a wire contract between joined devices (#592).

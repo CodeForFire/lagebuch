@@ -250,6 +250,31 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void An_etb_entrys_abschnitt_survives_a_round_trip_by_id_and_stored_name()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var zugang = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Zugang", nord.Id);
+        var filed = incident.AddJournalEntry(clock, op, EtbDirection.Internal, "Tür offen", sectionId: zugang.Id);
+        var loose = incident.AddJournalEntry(clock, op, EtbDirection.Internal, "Lage allgemein");
+
+        // The stored name is the value the entry was filed under, not what the node is called now.
+        incident.UpdateCommandNode(clock, op, zugang.Id, "Treppenhaus", null, null, null, null, null);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var reloaded = loaded.Journal.Single(e => e.Id == filed.Id);
+        Assert.Equal(zugang.Id, reloaded.SectionId);
+        Assert.Equal("Nord / Zugang", reloaded.SectionName);
+        var unfiled = loaded.Journal.Single(e => e.Id == loose.Id);
+        Assert.Null(unfiled.SectionId);
+        Assert.Null(unfiled.SectionName);
+    }
+
+    [Fact]
     public void Closed_incident_round_trips_and_stays_closed()
     {
         var clock = new Clock();

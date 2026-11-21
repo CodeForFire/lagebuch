@@ -1,0 +1,1 @@
+ETB entries can be filed under an Einsatzabschnitt from the entry line or the edit panel, carry the Abschnitt as a badge in the grid and in the PDF, and a quick filter above the table shows one Abschnitt at a time (#971).

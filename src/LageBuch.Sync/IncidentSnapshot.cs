@@ -131,7 +131,9 @@ public sealed record EtbEntryDto(
     string EnteredBy,
     string? From,
     string? To,
-    IReadOnlyList<EtbEntryEditDto> Edits);
+    IReadOnlyList<EtbEntryEditDto> Edits,
+    Guid? SectionId = null,
+    string? SectionName = null);
 
 public sealed record EtbEntryEditDto(string PreviousText, string EditedBy, DateTimeOffset EditedAt);
 
