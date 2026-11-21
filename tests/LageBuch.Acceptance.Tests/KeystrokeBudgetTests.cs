@@ -74,21 +74,16 @@ public class KeystrokeBudgetTests(ITestOutputHelper output)
         StartIn(shell, NavModules.Etb, "EtbTextBox");
         var keys = new CountingKeyboard(shell.Window);
 
-        // Dearer than the 3 it was while Kräfte had a rail entry of its own: Kräfte is a tab of
-        // Führung now, which opens on its board, so → → from the board's tab and two Tabs into the
-        // form. The trade bought a rail two entries shorter and Kräfte out from behind the phone's
-        // MEHR; Führung reopens on the tab last used, so only the first visit pays the arrows.
+        // Back to the 3 it was while Kräfte had a rail entry of its own: Kräfte is a tab of
+        // Führung, and Führung opens on it (#970), so the shortcut lands in the form.
         keys.Press(PhysicalKey.Digit4, RawInputModifiers.Control);
-        Dispatcher.UIThread.RunJobs();
-        keys.Press(PhysicalKey.ArrowRight);
-        keys.Press(PhysicalKey.ArrowRight);
         Dispatcher.UIThread.RunJobs();
         keys.TabTo(Named<ComboBox>(shell.Window, "VehicleBox"));
         keys.Press(PhysicalKey.ArrowDown); // the first Stammdaten vehicle
         keys.Press(PhysicalKey.Enter);
 
         Assert.Single(vm.Forces.Forces);
-        AssertWithin(keys, budget: 7);
+        AssertWithin(keys, budget: 3);
     }
 
     // Where the Lagebuchführer's hands are when the flow starts: in another module's form.
