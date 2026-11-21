@@ -9,14 +9,26 @@ public class PdfExportOptionsViewModelTests
         new(onExport ?? (_ => Task.CompletedTask));
 
     [Fact]
-    public void All_twelve_sections_are_selected_by_default()
+    public void All_thirteen_sections_are_selected_by_default()
     {
         var vm = NewVm();
 
-        Assert.Equal(12, vm.Items.Count);
+        Assert.Equal(13, vm.Items.Count);
         Assert.Equal(IncidentPdfSections.Fuehrungsorganisation, vm.Items[4].Section);
         Assert.Equal("Führungsorganisation", vm.Items[4].Label);
         Assert.All(vm.Items, i => Assert.True(i.IsSelected));
+    }
+
+    // #930: the Messprotokoll is offered beside the Gasmessprotokoll, and every item together is All.
+    [Fact]
+    public void The_messprotokoll_is_offered_after_the_gasmessprotokoll_and_the_items_make_up_all()
+    {
+        var vm = NewVm();
+
+        var gas = vm.Items.ToList().FindIndex(i => i.Section == IncidentPdfSections.CoMessprotokoll);
+        Assert.Equal(IncidentPdfSections.Messprotokoll, vm.Items[gas + 1].Section);
+        Assert.Equal("Messprotokoll", vm.Items[gas + 1].Label);
+        Assert.Equal(IncidentPdfSections.All, vm.Items.Aggregate(IncidentPdfSections.None, (all, i) => all | i.Section));
     }
 
     [Fact]

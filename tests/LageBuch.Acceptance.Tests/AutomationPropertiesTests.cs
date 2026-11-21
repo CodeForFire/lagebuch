@@ -323,6 +323,38 @@ public class AutomationPropertiesTests
         }
     }
 
+    // The Messprotokoll (#930): every box is named for its header, every value cell for its
+    // Messgröße and reading, on each of the four pages and in both dialogs.
+    [AvaloniaFact]
+    public void Every_textless_control_of_the_messprotokoll_is_named_for_automation()
+    {
+        var session = MeasurementLogRenderTests.NewSession();
+        using var vm = new MeasurementLogViewModel(session, new FixedClock(), () => { }, MeasurementLogRenderTests.Gases);
+        var view = new MeasurementLogView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1600, Height = 1400 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        foreach (var page in Enum.GetValues<MeasurementLogPage>())
+        {
+            vm.SelectPageCommand.Execute(page);
+            Dispatcher.UIThread.RunJobs();
+            AssertEveryTextlessControlIsNamed(view);
+        }
+
+        vm.SelectPageCommand.Execute(MeasurementLogPage.Messreihe);
+        vm.Rows[0].AssessCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        AssertEveryTextlessControlIsNamed(view);
+        vm.CancelAssessmentCommand.Execute(null);
+        vm.Rows[0].Cells[0].CorrectCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        AssertEveryTextlessControlIsNamed(view);
+        Assert.Contains(
+            "CO: 210 – korrigieren",
+            view.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("cell")).Select(Name));
+    }
+
     private static LocalIncidentSession DialogSession() =>
         TestSession.StartNew(
             new FakeStore(),
@@ -431,7 +463,7 @@ public class AutomationPropertiesTests
     {
         var (window, _, session) = Workspace(1920, 1032);
         session.AddCoBuilding("Mehrfamilienhaus A", 2, 2);
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         Dispatcher.UIThread.RunJobs();
 
         List<Button> Tiles() => window.GetVisualDescendants().OfType<Button>()

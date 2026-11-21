@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.MeasurementTabsView"
+             x:DataType="vm:MeasurementTabsViewModel">
+  <!-- MESSUNG (#930): the Gasmessprotokoll of a building and the ABC/Gefahrstoff Messprotokoll as
+       one rail entry. The strip is the module-tabs style in Theme/Styles.axaml, as on the ETB and
+       Führung: it stays visible on a phone, where the bottom bar only says MESSUNG. -->
+  <TabControl x:Name="MeasurementTabStrip" Classes="module-tabs" TabStripPlacement="Top"
+              SelectedIndex="{Binding SelectedTabIndex}">
+    <TabItem x:Name="GebaeudeTab" Header="GEBÄUDE" AutomationProperties.Name="Gebäude"
+             Content="{Binding Building}" />
+    <TabItem x:Name="MessprotokollTab" Header="MESSPROTOKOLL" AutomationProperties.Name="Messprotokoll"
+             Content="{Binding Log}" />
+  </TabControl>
+</UserControl>

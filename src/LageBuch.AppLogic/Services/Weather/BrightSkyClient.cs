@@ -179,7 +179,10 @@ public sealed class BrightSkyClient : IWeatherSource
             First(weather, -90, 60, "temperature"),
             Text(weather, "condition"),
             First(weather, 0, 500, "precipitation_60"),
-            []);
+            [])
+        {
+            CloudCoverPercent = First(weather, 0, 100, "cloud_cover"),
+        };
     }
 
     // The observation names its station by id; the sources list says which station that is.

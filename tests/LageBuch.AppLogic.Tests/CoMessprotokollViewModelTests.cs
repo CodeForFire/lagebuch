@@ -5,6 +5,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Sync;
@@ -1521,6 +1522,57 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers) =>
         _inner.RemoveDwellings(buildingId, floorOrdinal, apartmentNumbers);
+
+    public void AddMeasuringPoint(string name, string? location, MeasurementZone zone, IReadOnlyList<GasDefinition>? seedGases = null) =>
+        _inner.AddMeasuringPoint(name, location, zone, seedGases);
+
+    public void UpdateMeasuringPoint(Guid pointId, string name, string? location, MeasurementZone zone) =>
+        _inner.UpdateMeasuringPoint(pointId, name, location, zone);
+
+    public void AddMeasuringDevice(DeviceKind kind, string name, string? number, string? vehicle, string? check) =>
+        _inner.AddMeasuringDevice(kind, name, number, vehicle, check);
+
+    public void UpdateMeasuringDevice(Guid deviceId, DeviceKind kind, string name, string? number, string? vehicle, string? check) =>
+        _inner.UpdateMeasuringDevice(deviceId, kind, name, number, vehicle, check);
+
+    public void RemoveMeasuringDevice(Guid deviceId) => _inner.RemoveMeasuringDevice(deviceId);
+
+    public void AddMeasurementChannel(GasDefinition definition, Guid? deviceId, string? note, IReadOnlyList<GasDefinition>? seedGases = null) =>
+        _inner.AddMeasurementChannel(definition, deviceId, note, seedGases);
+
+    public void UpdateMeasurementChannel(Guid channelId, Guid? deviceId, bool isActive, string? note, GasDefinition? definition = null) =>
+        _inner.UpdateMeasurementChannel(channelId, deviceId, isActive, note, definition);
+
+    public void RemoveMeasurementChannel(Guid channelId) => _inner.RemoveMeasurementChannel(channelId);
+
+    public void RecordMeasurement(
+        DateTimeOffset measuredAt,
+        string? order,
+        Guid pointId,
+        string? team,
+        ProtectiveEquipment protection,
+        MeasurementMode mode,
+        bool odour,
+        bool deposits,
+        string? note,
+        IReadOnlyDictionary<Guid, MeasuredValue> values) =>
+        _inner.RecordMeasurement(measuredAt, order, pointId, team, protection, mode, odour, deposits, note, values);
+
+    public void AssessMeasurement(Guid measurementId, MeasurementStatus status, string by, string? text) =>
+        _inner.AssessMeasurement(measurementId, status, by, text);
+
+    public void CorrectMeasurementValue(Guid measurementId, Guid channelId, MeasuredValue? value, string reason) =>
+        _inner.CorrectMeasurementValue(measurementId, channelId, value, reason);
+
+    public void AddWeatherObservation(
+        DateTimeOffset observedAt,
+        WindDirection wind,
+        decimal? windSpeedKmh,
+        decimal? temperatureCelsius,
+        CloudCover clouds,
+        Precipitation precipitation,
+        string? source) =>
+        _inner.AddWeatherObservation(observedAt, wind, windSpeedKmh, temperatureCelsius, clouds, precipitation, source);
 
     private void RailEdit(Action edit)
     {

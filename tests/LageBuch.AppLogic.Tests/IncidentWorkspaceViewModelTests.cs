@@ -507,6 +507,44 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void The_messung_rail_entry_holds_the_gebaeude_and_the_messprotokoll_as_tabs()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        var item = NavItemFor(vm, vm.MeasurementTabs);
+        Assert.NotNull(item);
+        Assert.Equal("MESSUNG", item.Header);
+        Assert.Null(NavItemFor(vm, vm.CoMessprotokoll));
+        Assert.Same(vm.CoMessprotokoll, vm.MeasurementTabs.Building);
+        Assert.Same(vm.MeasurementLog, vm.MeasurementTabs.Log);
+        Assert.Equal(MeasurementTabsViewModel.GebaeudeTab, vm.MeasurementTabs.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void The_open_messung_tab_survives_a_rebuild()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.SelectedNavItem = NavItemFor(vm, vm.MeasurementTabs);
+        vm.MeasurementTabs.SelectedTabIndex = MeasurementTabsViewModel.MessprotokollTab;
+        var before = vm.MeasurementTabs;
+        var log = vm.MeasurementLog;
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        // Closing goes read-only, which rebuilds every rail entry.
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.MeasurementLog), raised);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.MeasurementTabs), raised);
+        Assert.NotSame(before, vm.MeasurementTabs);
+        Assert.NotSame(log, vm.MeasurementLog);
+        Assert.True(vm.MeasurementLog.IsReadOnly);
+        Assert.Equal(MeasurementTabsViewModel.MessprotokollTab, vm.MeasurementTabs.SelectedTabIndex);
+        Assert.Same(NavItemFor(vm, vm.MeasurementTabs), vm.SelectedNavItem);
+    }
+
+    [Fact]
     public void The_lagemeldung_offers_each_stammdaten_strasse_once_by_its_name_without_the_ort()
     {
         var clock = new FixedClock(T0);

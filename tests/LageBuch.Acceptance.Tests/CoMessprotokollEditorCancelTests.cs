@@ -73,7 +73,7 @@ public class CoMessprotokollEditorCancelTests
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
 
         var co = vm.CoMessprotokoll;
         var buildingId = session.Incident.Buildings[0].Id;
@@ -127,7 +127,7 @@ public class CoMessprotokollEditorCancelTests
         var (window, vm, session) = ShowWorkspace();
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         var co = vm.CoMessprotokoll;
         co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -158,7 +158,7 @@ public class CoMessprotokollEditorCancelTests
         var (window, vm, session) = ShowWorkspace();
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         var co = vm.CoMessprotokoll;
         co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -179,7 +179,7 @@ public class CoMessprotokollEditorCancelTests
         session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
 
         var co = vm.CoMessprotokoll;
         var buildingId = session.Incident.Buildings[0].Id;

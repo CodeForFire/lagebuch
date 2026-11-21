@@ -183,7 +183,7 @@ public sealed partial class NavRow : ObservableObject
             [NavModules.InvolvedParties] = "Beteiligte",
             [NavModules.IssuedItems] = "Ausgabe",
             [NavModules.Scba] = "Atemschutz",
-            [NavModules.Co] = "Gasmessung",
+            [NavModules.Co] = "Messung",
             [NavModules.Files] = "Dateien",
             [NavModules.Links] = "Links",
             [NavModules.Contacts] = "Kontakte",

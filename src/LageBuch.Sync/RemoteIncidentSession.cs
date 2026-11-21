@@ -11,6 +11,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Map;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -980,6 +981,73 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers) =>
         Send(new RemoveDwellingsCommand(Op(), buildingId, floorOrdinal, apartmentNumbers));
+
+    public void AddMeasuringPoint(string name, string? location, MeasurementZone zone, IReadOnlyList<GasDefinition>? seedGases = null) =>
+        Send(new AddMeasuringPointCommand(Op(), name, location, zone, seedGases?.Select(GasDefinitionDto.From).ToList()));
+
+    public void UpdateMeasuringPoint(Guid pointId, string name, string? location, MeasurementZone zone) =>
+        Send(new UpdateMeasuringPointCommand(Op(), pointId, name, location, zone));
+
+    public void AddMeasuringDevice(DeviceKind kind, string name, string? number, string? vehicle, string? check) =>
+        Send(new AddMeasuringDeviceCommand(kind, name, number, vehicle, check));
+
+    public void UpdateMeasuringDevice(Guid deviceId, DeviceKind kind, string name, string? number, string? vehicle, string? check) =>
+        Send(new UpdateMeasuringDeviceCommand(deviceId, kind, name, number, vehicle, check));
+
+    public void RemoveMeasuringDevice(Guid deviceId) =>
+        Send(new RemoveMeasuringDeviceCommand(deviceId));
+
+    public void AddMeasurementChannel(GasDefinition definition, Guid? deviceId, string? note, IReadOnlyList<GasDefinition>? seedGases = null) =>
+        Send(new AddMeasurementChannelCommand(Op(), GasDefinitionDto.From(definition), deviceId, note, seedGases?.Select(GasDefinitionDto.From).ToList()));
+
+    public void UpdateMeasurementChannel(Guid channelId, Guid? deviceId, bool isActive, string? note, GasDefinition? definition = null) =>
+        Send(new UpdateMeasurementChannelCommand(channelId, deviceId, isActive, note, definition is null ? null : GasDefinitionDto.From(definition)));
+
+    public void RemoveMeasurementChannel(Guid channelId) =>
+        Send(new RemoveMeasurementChannelCommand(channelId));
+
+    public void RecordMeasurement(
+        DateTimeOffset measuredAt,
+        string? order,
+        Guid pointId,
+        string? team,
+        ProtectiveEquipment protection,
+        MeasurementMode mode,
+        bool odour,
+        bool deposits,
+        string? note,
+        IReadOnlyDictionary<Guid, MeasuredValue> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        Send(new RecordMeasurementCommand(
+            Op(),
+            measuredAt,
+            order,
+            pointId,
+            team,
+            protection,
+            mode,
+            odour,
+            deposits,
+            note,
+            values.Select(kv => new MeasurementValueDto(kv.Key, kv.Value.Low, kv.Value.High)).ToList()));
+    }
+
+    public void AssessMeasurement(Guid measurementId, MeasurementStatus status, string by, string? text) =>
+        Send(new AssessMeasurementCommand(Op(), measurementId, status, by, text));
+
+    public void CorrectMeasurementValue(Guid measurementId, Guid channelId, MeasuredValue? value, string reason) =>
+        Send(new CorrectMeasurementValueCommand(Op(), measurementId, channelId, value is null ? null : MeasuredValueDto.From(value), reason));
+
+    public void AddWeatherObservation(
+        DateTimeOffset observedAt,
+        WindDirection wind,
+        decimal? windSpeedKmh,
+        decimal? temperatureCelsius,
+        CloudCover clouds,
+        Precipitation precipitation,
+        string? source) =>
+        Send(new AddWeatherObservationCommand(Op(), observedAt, wind, windSpeedKmh, temperatureCelsius, clouds, precipitation, source));
 
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 

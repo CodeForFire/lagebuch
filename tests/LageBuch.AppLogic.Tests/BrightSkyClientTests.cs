@@ -160,6 +160,7 @@ public sealed class BrightSkyClientTests : IDisposable
         Assert.Equal(0.3, Assert.NotNull(reading.TemperatureCelsius), precision: 3);
         Assert.Equal(0, Assert.NotNull(reading.PrecipitationMm), precision: 3);
         Assert.Equal("dry", reading.Condition);
+        Assert.Equal(0, Assert.NotNull(reading.CloudCoverPercent), precision: 3);
         Assert.Empty(reading.Alerts);
     }
 
@@ -369,7 +370,7 @@ public sealed class BrightSkyClientTests : IDisposable
     {
         const string hostile = """
             {"weather":{"timestamp":"2026-11-05T21:10:00+00:00","wind_direction_10":9999,"wind_speed_10":-5,
-            "wind_gust_speed_10":1e308,"temperature":-400,"precipitation_60":-1,"condition":"dry","source_id":1},
+            "wind_gust_speed_10":1e308,"temperature":-400,"precipitation_60":-1,"cloud_cover":101,"condition":"dry","source_id":1},
             "sources":[{"id":1,"distance":-3}]}
             """;
         var (client, _) = Create(Answer(hostile, NoAlerts));
@@ -381,6 +382,7 @@ public sealed class BrightSkyClientTests : IDisposable
         Assert.Null(reading.WindGustKmh);
         Assert.Null(reading.TemperatureCelsius);
         Assert.Null(reading.PrecipitationMm);
+        Assert.Null(reading.CloudCoverPercent);
         Assert.Null(reading.StationDistanceMetres);
         Assert.Null(reading.StationName);
     }

@@ -22,6 +22,9 @@ public enum IncidentPdfSections
     SituationReports = 1 << 9,
     IssuedItems = 1 << 10,
     Fuehrungsorganisation = 1 << 11,
+
+    // The ABC/Gefahrstoff Messprotokoll (#930), left out of the report while the log is empty.
+    Messprotokoll = 1 << 12,
     All = Checklist | Etb | Roles | Forces | Tasks | Atemschutz | CoMessprotokoll | Files | InvolvedParties
-        | SituationReports | IssuedItems | Fuehrungsorganisation,
+        | SituationReports | IssuedItems | Fuehrungsorganisation | Messprotokoll,
 }

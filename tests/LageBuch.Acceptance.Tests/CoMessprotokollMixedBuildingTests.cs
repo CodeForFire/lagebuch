@@ -92,7 +92,7 @@ public class CoMessprotokollMixedBuildingTests
         session.SetDwellingDetails(id, 3, 1, "Fam. Kellner", KeyAvailability.Unknown);
         Dispatcher.UIThread.RunJobs();
 
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
 
         return (window, vm);
     }

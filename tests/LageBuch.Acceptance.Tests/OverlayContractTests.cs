@@ -418,7 +418,7 @@ public class OverlayContractTests
     private static Opened OpenCoAddBuildingPanel()
     {
         var (window, vm) = ShowWorkspace();
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         var opener = Named<Button>(window, "AddBuildingButton");
         Activate(opener);
         var co = vm.CoMessprotokoll;
@@ -428,7 +428,7 @@ public class OverlayContractTests
     private static Opened OpenCoRemoveBuildingPanel()
     {
         var (window, vm) = ShowWorkspace(s => s.AddCoBuilding("Mehrfamilienhaus A", 2, 2));
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         var opener = Named<Button>(window, "RemoveBuildingButton");
         Activate(opener);
         var co = vm.CoMessprotokoll;
@@ -444,7 +444,7 @@ public class OverlayContractTests
             var building = s.Incident.Buildings[0];
             s.RecordCoValue(building.Id, building.FloorCount, 1, 45);
         });
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         var co = vm.CoMessprotokoll;
         co.IsStructureMode = true;
         Dispatcher.UIThread.RunJobs();
@@ -457,7 +457,7 @@ public class OverlayContractTests
     private static Opened OpenCoDwellingEditor()
     {
         var (window, vm) = ShowWorkspace(s => s.AddCoBuilding("Mehrfamilienhaus A", 2, 2));
-        WorkspaceRenderHelper.SelectTab(window, "GASMESSUNG");
+        WorkspaceRenderHelper.SelectTab(window, "MESSUNG");
         var co = vm.CoMessprotokoll;
         var opener = window.GetVisualDescendants().OfType<Button>().First(b => b.DataContext is DwellingCellViewModel && b.IsEffectivelyVisible);
         Activate(opener);

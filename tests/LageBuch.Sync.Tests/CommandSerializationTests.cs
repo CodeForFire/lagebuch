@@ -1,7 +1,9 @@
 using System.Text.Json;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync.Tests;
@@ -9,6 +11,7 @@ namespace LageBuch.Sync.Tests;
 public class CommandSerializationTests
 {
     private static readonly OperatorDto Op = new("Müller", "FFB 12/1");
+    private static readonly GasDefinitionDto Ex = new("Ex", "%UEG", GasDirection.Rising, 10m, 20m, null, 100m);
 
     public static IEnumerable<object[]> AllCommands() => new SyncCommand[]
     {
@@ -114,6 +117,33 @@ public class CommandSerializationTests
         new RemoveIssuedItemCommand(Guid.NewGuid()),
         new UpdateTaskCommand(Guid.NewGuid(), "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium),
         new ExtendTaskTimerCommand(Guid.NewGuid(), 5),
+        new AddMeasuringPointCommand(Op, "Kellerabgang", "Hauptstraße 12", MeasurementZone.Danger, [Ex]),
+        new AddMeasuringPointCommand(Op, "MP 2", null, MeasurementZone.Outside),
+        new UpdateMeasuringPointCommand(Op, Guid.NewGuid(), "Kellerabgang", null, MeasurementZone.Transition),
+        new AddMeasuringDeviceCommand(DeviceKind.MultiGas, "X-am 8000", "ARAA-0001", "GW-Mess", "Begasung 01.11."),
+        new UpdateMeasuringDeviceCommand(Guid.NewGuid(), DeviceKind.Pid, "PID", null, null, null),
+        new RemoveMeasuringDeviceCommand(Guid.NewGuid()),
+        new AddMeasurementChannelCommand(Op, Ex, Guid.NewGuid(), "Sensor neu", [Ex]),
+        new UpdateMeasurementChannelCommand(Guid.NewGuid(), null, false, "Sensor defekt"),
+        new UpdateMeasurementChannelCommand(Guid.NewGuid(), Guid.NewGuid(), true, null, Ex),
+        new RemoveMeasurementChannelCommand(Guid.NewGuid()),
+        new RecordMeasurementCommand(
+            Op,
+            DateTimeOffset.UnixEpoch,
+            "MA 04",
+            Guid.NewGuid(),
+            "Florian Musterstadt 40/1",
+            ProtectiveEquipment.ScbaForm1,
+            MeasurementMode.Remote,
+            Odour: true,
+            Deposits: false,
+            "stechender Geruch",
+            [new MeasurementValueDto(Guid.NewGuid(), 8m, 14m)]),
+        new AssessMeasurementCommand(Op, Guid.NewGuid(), MeasurementStatus.Outlier, "Fachberater", "Sensor übersteuert"),
+        new CorrectMeasurementValueCommand(Op, Guid.NewGuid(), Guid.NewGuid(), new MeasuredValueDto(14m, 14m), "Ablesefehler"),
+        new CorrectMeasurementValueCommand(Op, Guid.NewGuid(), Guid.NewGuid(), null, "falsche Messgröße"),
+        new AddWeatherObservationCommand(Op, DateTimeOffset.UnixEpoch, WindDirection.SW, 12.5m, -3m, CloudCover.Overcast, Precipitation.Snow, "DWD"),
+        new AddWeatherObservationCommand(Op, DateTimeOffset.UnixEpoch, WindDirection.Calm, null, null, CloudCover.Clear, Precipitation.None, null),
     }.Select(c => new object[] { c });
 
     [Theory]
@@ -444,5 +474,44 @@ public class CommandSerializationTests
 
         Assert.Null(c.NodeId);
         Assert.Equal(RoleSlot.None, c.Slot);
+    }
+
+    // The Messprotokoll's discriminators (#930) are a wire contract between joined devices.
+    [Theory]
+    [InlineData("addMeasuringPoint")]
+    [InlineData("updateMeasuringPoint")]
+    [InlineData("addMeasuringDevice")]
+    [InlineData("updateMeasuringDevice")]
+    [InlineData("removeMeasuringDevice")]
+    [InlineData("addMeasurementChannel")]
+    [InlineData("updateMeasurementChannel")]
+    [InlineData("removeMeasurementChannel")]
+    [InlineData("recordMeasurement")]
+    [InlineData("assessMeasurement")]
+    [InlineData("correctMeasurementValue")]
+    [InlineData("addWeatherObservation")]
+    public void Messprotokoll_commands_use_their_discriminators(string discriminator)
+    {
+        var id = Guid.NewGuid();
+        SyncCommand command = discriminator switch
+        {
+            "addMeasuringPoint" => new AddMeasuringPointCommand(Op, "Kellerabgang", null, MeasurementZone.Danger),
+            "updateMeasuringPoint" => new UpdateMeasuringPointCommand(Op, id, "Kellerabgang", null, MeasurementZone.Danger),
+            "addMeasuringDevice" => new AddMeasuringDeviceCommand(DeviceKind.MultiGas, "X-am", null, null, null),
+            "updateMeasuringDevice" => new UpdateMeasuringDeviceCommand(id, DeviceKind.MultiGas, "X-am", null, null, null),
+            "removeMeasuringDevice" => new RemoveMeasuringDeviceCommand(id),
+            "addMeasurementChannel" => new AddMeasurementChannelCommand(Op, Ex, null, null),
+            "updateMeasurementChannel" => new UpdateMeasurementChannelCommand(id, null, true, null),
+            "removeMeasurementChannel" => new RemoveMeasurementChannelCommand(id),
+            "recordMeasurement" => new RecordMeasurementCommand(Op, DateTimeOffset.UnixEpoch, null, id, null, ProtectiveEquipment.None, MeasurementMode.Remote, true, false, null, []),
+            "assessMeasurement" => new AssessMeasurementCommand(Op, id, MeasurementStatus.Confirmed, "Fachberater", null),
+            "correctMeasurementValue" => new CorrectMeasurementValueCommand(Op, id, id, null, "Ablesefehler"),
+            _ => new AddWeatherObservationCommand(Op, DateTimeOffset.UnixEpoch, WindDirection.W, null, null, CloudCover.Clear, Precipitation.None, null),
+        };
+
+        var json = SyncJson.Serialize(command);
+
+        Assert.Contains($"\"$type\":\"{discriminator}\"", json, StringComparison.Ordinal);
+        Assert.Equal(command.GetType(), SyncJson.Deserialize<SyncCommand>(json).GetType());
     }
 }

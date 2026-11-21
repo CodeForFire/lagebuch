@@ -4,6 +4,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -703,6 +704,106 @@ public class SnapshotRoundTripTests
         var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(snapshot)));
 
         Assert.Empty(restored.IssuedItems);
+    }
+
+    // #930: the whole Messprotokoll -- a Gerät and the Messgröße linked to it, an inactive
+    // Messgröße, a Messung with a range, a correction and an assessment, and the Wetter.
+    private static Incident WithMeasurementLog()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        GasDefinition[] gases = [GasDefinition.DefaultCo, new GasDefinition("Ex", "%UEG", GasDirection.Rising, 10m, 20m, null, 100m)];
+        var point = incident.AddMeasuringPoint(clock, op, "Kellerabgang", "Hauptstraße 12", MeasurementZone.Danger, gases);
+        var device = incident.AddMeasuringDevice(DeviceKind.MultiGas, "X-am 8000", "ARAA-0001", "GW-Mess", "Begasung 01.11.");
+        var co = incident.MeasurementChannels[0].Id;
+        var ex = incident.MeasurementChannels[1].Id;
+        incident.UpdateMeasurementChannel(co, device.Id, isActive: true, note: "Sensor getauscht");
+        incident.UpdateMeasurementChannel(ex, null, isActive: false, note: null);
+        var values = new Dictionary<Guid, MeasuredValue> { [co] = new MeasuredValue(30m, 45m) };
+        var measurement = incident.RecordMeasurement(
+            clock, op, clock.Now, "MA 04", point.Id, "Angriffstrupp", ProtectiveEquipment.ScbaForm2, MeasurementMode.FromVehicle, true, true, "Ruß am Kellerfenster", values);
+        incident.CorrectMeasurementValue(clock, op, measurement.Id, co, MeasuredValue.Single(38m), "Ablesefehler");
+        incident.AssessMeasurement(clock, op, measurement.Id, MeasurementStatus.Outlier, "Fachberater", "Sensor übersteuert");
+        incident.AddWeatherObservation(clock, op, clock.Now, WindDirection.NE, 8m, -2.5m, CloudCover.Overcast, Precipitation.Fog, "DWD");
+        return incident;
+    }
+
+    private static Incident OverTheWire(IncidentSnapshot snapshot) =>
+        SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(snapshot)));
+
+    [Fact]
+    public void The_Messprotokoll_round_trips_through_the_snapshot_over_the_wire()
+    {
+        var incident = WithMeasurementLog();
+
+        var restored = OverTheWire(SnapshotMapper.ToSnapshot(incident));
+
+        Assert.Equal(
+            SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident).MeasurementLog),
+            SyncJson.Serialize(SnapshotMapper.ToSnapshot(restored).MeasurementLog));
+        Assert.Equal(incident.MeasuringPoints, restored.MeasuringPoints);
+        Assert.Equal(incident.MeasuringDevices, restored.MeasuringDevices);
+        Assert.Equal(incident.MeasurementChannels, restored.MeasurementChannels);
+        Assert.Equal(incident.WeatherObservations, restored.WeatherObservations);
+        var measurement = Assert.Single(restored.Measurements);
+        Assert.Equal(MeasurementStatus.Outlier, measurement.Status);
+        Assert.Equal(new MeasuredValue(30m, 45m), Assert.Single(measurement.Corrections).Previous);
+    }
+
+    [Fact]
+    public void A_snapshot_without_a_Messprotokoll_reads_as_an_empty_one()
+    {
+        var snapshot = SnapshotMapper.ToSnapshot(WithMeasurementLog()) with { MeasurementLog = null };
+
+        var restored = OverTheWire(snapshot);
+
+        Assert.Empty(restored.MeasuringPoints);
+        Assert.Empty(restored.MeasurementChannels);
+        Assert.Empty(restored.Measurements);
+    }
+
+    // A host is a peer like any other: null entries, a Messgröße without a gas, a number that is no
+    // reading and a Messung at an unknown Messpunkt are dropped, and the rest still arrives.
+    [Fact]
+    public void A_hostile_snapshots_Messprotokoll_is_repaired_not_trusted()
+    {
+        var snapshot = SnapshotMapper.ToSnapshot(WithMeasurementLog());
+        var log = snapshot.MeasurementLog ?? throw new InvalidOperationException("Kein Messprotokoll.");
+        var points = log.Points ?? [];
+        var channels = log.Channels ?? [];
+        var measurement = (log.Measurements ?? [])[0];
+        var co = channels[0].Id;
+        var hostile = log with
+        {
+            Points = [.. points, new MeasuringPointDto(Guid.NewGuid(), null, null, (MeasurementZone)99)],
+            Channels = [.. channels, new MeasurementChannelDto(Guid.NewGuid(), null, null, true, null)],
+            Measurements =
+            [
+                measurement with
+                {
+                    Values = [new MeasurementValueDto(co, -1m, 3m)],
+                    Corrections = [.. measurement.Corrections ?? [], new MeasurementCorrectionDto(co, null, new MeasuredValueDto(-2m, 1m), "Grund", "Huber", measurement.RecordedAt)],
+                    Assessment = new MeasurementAssessmentDto(MeasurementStatus.Confirmed, null, "ohne Namen", measurement.RecordedAt),
+                },
+                measurement with { Id = Guid.NewGuid(), PointId = Guid.NewGuid() },
+            ],
+        };
+
+        // A null entry cannot be built in C# without silencing the compiler, so it goes into the JSON.
+        var json = SyncJson.Serialize(snapshot with { MeasurementLog = hostile });
+        Assert.Contains("\"points\":[{", json, StringComparison.Ordinal);
+        json = json.Replace("\"points\":[{", "\"points\":[null,{", StringComparison.Ordinal);
+
+        var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        Assert.Single(restored.MeasuringPoints);
+        Assert.Equal(2, restored.MeasurementChannels.Count);
+        var kept = Assert.Single(restored.Measurements);
+        Assert.Empty(kept.Values);
+        Assert.Single(kept.Corrections);
+        Assert.Null(kept.Assessment);
+        Assert.Equal(MeasurementStatus.Unconfirmed, kept.Status);
     }
 }
 

@@ -405,7 +405,7 @@ public sealed class DemoFlowRenderTests : IDisposable
         session.SetDwellingStatus(haus, 1, 1, DwellingStatus.Searched);
         session.SetDwellingStatus(haus, 1, 2, DwellingStatus.Searched);
         session.SetDwellingDetails(haus, 0, 1, "Mustermann", KeyAvailability.NotAvailable);
-        SelectTab(window, "GASMESSUNG");
+        SelectTab(window, "MESSUNG");
         Assert.NotNull(vm.CoMessprotokoll.SelectedBuilding);
         Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);
         Capture(window, "co-messung.png");

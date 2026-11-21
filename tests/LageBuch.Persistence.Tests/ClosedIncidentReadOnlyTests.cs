@@ -1,4 +1,5 @@
 using LageBuch.Domain;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -154,5 +155,25 @@ public class ClosedIncidentReadOnlyTests : IDisposable
         Assert.Equal("AED", Assert.Single(loaded.IssuedItems).Device);
         Assert.Throws<IncidentClosedException>(
             () => loaded.IssueItem(clock, op, "Fernglas", "Max Beispiel", null, null, null));
+    }
+
+    [Fact]
+    public void A_closed_incident_keeps_its_Messprotokoll_and_rejects_new_Messungen()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op);
+        var point = incident.AddMeasuringPoint(clock, op, "Kellerabgang", null, MeasurementZone.Danger);
+        var co = incident.MeasurementChannels[0].Id;
+        var values = new Dictionary<Guid, MeasuredValue> { [co] = MeasuredValue.Single(38m) };
+        incident.RecordMeasurement(clock, op, clock.Now, null, point.Id, null, ProtectiveEquipment.None, MeasurementMode.Remote, false, false, null, values);
+        incident.Close(clock, op);
+        IncidentRepository.Save(_path, incident);
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(MeasuredValue.Single(38m), Assert.Single(loaded.Measurements).Values[co]);
+        Assert.Throws<IncidentClosedException>(
+            () => loaded.AddMeasuringPoint(clock, op, "MP 2", null, MeasurementZone.Outside));
     }
 }

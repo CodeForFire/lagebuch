@@ -5,6 +5,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Map;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 
@@ -363,4 +364,54 @@ public interface IIncidentSession
     /// <summary>Removes the named Wohnungen from one floor, closing the gap behind them
     /// (#419) -- the pick-which counterpart to <see cref="SetApartmentCount"/>.</summary>
     void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers);
+
+    /// <summary>Opens a Messpunkt of the Messprotokoll (#930). <paramref name="seedGases"/> are the
+    /// Stammdaten Messgase, copied in as Messgrößen only while the Einsatz has none; see
+    /// <see cref="Incident.AddMeasuringPoint"/>.</summary>
+    void AddMeasuringPoint(string name, string? location, MeasurementZone zone, IReadOnlyList<GasDefinition>? seedGases = null);
+
+    void UpdateMeasuringPoint(Guid pointId, string name, string? location, MeasurementZone zone);
+
+    /// <summary>Silent, like the Beteiligte: a Messgerät writes no ETB line.</summary>
+    void AddMeasuringDevice(DeviceKind kind, string name, string? number, string? vehicle, string? check);
+
+    void UpdateMeasuringDevice(Guid deviceId, DeviceKind kind, string name, string? number, string? vehicle, string? check);
+
+    void RemoveMeasuringDevice(Guid deviceId);
+
+    void AddMeasurementChannel(GasDefinition definition, Guid? deviceId, string? note, IReadOnlyList<GasDefinition>? seedGases = null);
+
+    /// <summary>A null <paramref name="definition"/> keeps the Messgröße's gas; see
+    /// <see cref="Incident.UpdateMeasurementChannel"/>.</summary>
+    void UpdateMeasurementChannel(Guid channelId, Guid? deviceId, bool isActive, string? note, GasDefinition? definition = null);
+
+    void RemoveMeasurementChannel(Guid channelId);
+
+    /// <summary>Records one Messung, keyed by the Einsatz's own Messgröße ids; see
+    /// <see cref="Incident.RecordMeasurement"/>.</summary>
+    void RecordMeasurement(
+        DateTimeOffset measuredAt,
+        string? order,
+        Guid pointId,
+        string? team,
+        ProtectiveEquipment protection,
+        MeasurementMode mode,
+        bool odour,
+        bool deposits,
+        string? note,
+        IReadOnlyDictionary<Guid, MeasuredValue> values);
+
+    void AssessMeasurement(Guid measurementId, MeasurementStatus status, string by, string? text);
+
+    /// <summary>A null <paramref name="value"/> takes the Messgröße's value out of the Messung.</summary>
+    void CorrectMeasurementValue(Guid measurementId, Guid channelId, MeasuredValue? value, string reason);
+
+    void AddWeatherObservation(
+        DateTimeOffset observedAt,
+        WindDirection wind,
+        decimal? windSpeedKmh,
+        decimal? temperatureCelsius,
+        CloudCover clouds,
+        Precipitation precipitation,
+        string? source);
 }

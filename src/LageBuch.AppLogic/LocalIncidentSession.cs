@@ -7,6 +7,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Map;
+using LageBuch.Domain.Measurements;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -533,6 +534,59 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers) =>
         Mutate(() => Incident.RemoveDwellings(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumbers));
+
+    public void AddMeasuringPoint(string name, string? location, MeasurementZone zone, IReadOnlyList<GasDefinition>? seedGases = null) =>
+        Mutate(() => Incident.AddMeasuringPoint(_clock, RequireOperator(), name, location, zone, seedGases));
+
+    public void UpdateMeasuringPoint(Guid pointId, string name, string? location, MeasurementZone zone) =>
+        Mutate(() => Incident.UpdateMeasuringPoint(_clock, RequireOperator(), pointId, name, location, zone));
+
+    public void AddMeasuringDevice(DeviceKind kind, string name, string? number, string? vehicle, string? check) =>
+        Mutate(() => Incident.AddMeasuringDevice(kind, name, number, vehicle, check));
+
+    public void UpdateMeasuringDevice(Guid deviceId, DeviceKind kind, string name, string? number, string? vehicle, string? check) =>
+        Mutate(() => Incident.UpdateMeasuringDevice(deviceId, kind, name, number, vehicle, check));
+
+    public void RemoveMeasuringDevice(Guid deviceId) =>
+        Mutate(() => Incident.RemoveMeasuringDevice(deviceId));
+
+    public void AddMeasurementChannel(GasDefinition definition, Guid? deviceId, string? note, IReadOnlyList<GasDefinition>? seedGases = null) =>
+        Mutate(() => Incident.AddMeasurementChannel(_clock, RequireOperator(), definition, deviceId, note, seedGases));
+
+    public void UpdateMeasurementChannel(Guid channelId, Guid? deviceId, bool isActive, string? note, GasDefinition? definition = null) =>
+        Mutate(() => Incident.UpdateMeasurementChannel(channelId, deviceId, isActive, note, definition));
+
+    public void RemoveMeasurementChannel(Guid channelId) =>
+        Mutate(() => Incident.RemoveMeasurementChannel(channelId));
+
+    public void RecordMeasurement(
+        DateTimeOffset measuredAt,
+        string? order,
+        Guid pointId,
+        string? team,
+        ProtectiveEquipment protection,
+        MeasurementMode mode,
+        bool odour,
+        bool deposits,
+        string? note,
+        IReadOnlyDictionary<Guid, MeasuredValue> values) =>
+        Mutate(() => Incident.RecordMeasurement(_clock, RequireOperator(), measuredAt, order, pointId, team, protection, mode, odour, deposits, note, values));
+
+    public void AssessMeasurement(Guid measurementId, MeasurementStatus status, string by, string? text) =>
+        Mutate(() => Incident.AssessMeasurement(_clock, RequireOperator(), measurementId, status, by, text));
+
+    public void CorrectMeasurementValue(Guid measurementId, Guid channelId, MeasuredValue? value, string reason) =>
+        Mutate(() => Incident.CorrectMeasurementValue(_clock, RequireOperator(), measurementId, channelId, value, reason));
+
+    public void AddWeatherObservation(
+        DateTimeOffset observedAt,
+        WindDirection wind,
+        decimal? windSpeedKmh,
+        decimal? temperatureCelsius,
+        CloudCover clouds,
+        Precipitation precipitation,
+        string? source) =>
+        Mutate(() => Incident.AddWeatherObservation(_clock, RequireOperator(), observedAt, wind, windSpeedKmh, temperatureCelsius, clouds, precipitation, source));
 
     public void Close()
     {

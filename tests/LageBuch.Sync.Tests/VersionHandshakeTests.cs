@@ -383,26 +383,35 @@ public class VersionHandshakeTests
     public void The_alarm_place_names_raise_the_protocol_but_not_the_floor()
     {
         // 41 adds dispatchPlaceNames to /masterdata. A peer at 40 drops the key and only loses the
-        // pre-ticked Einsatzmittel of an alarm, so a 40 and a 41 still connect.
+        // pre-ticked Einsatzmittel of an alarm, so 41 by itself kept the floor at 40.
         Assert.InRange(SyncProtocol.ProtocolVersion, 41, int.MaxValue);
-        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 40, int.MaxValue);
     }
 
     [Fact]
     public void The_upper_alarm_of_a_falling_gas_raises_the_protocol_but_not_the_floor()
     {
         // 42 adds an optional upperAlarm to every gas definition (#927). A peer at 41 drops it and
-        // only loses the enrichment colour of its O2, so a 41 and a 42 still connect.
+        // only loses the enrichment colour of its O2, so 42 by itself kept the floor at 40.
         Assert.InRange(SyncProtocol.ProtocolVersion, 42, int.MaxValue);
-        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, 40);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 40, int.MaxValue);
     }
 
     [Fact]
     public void The_fahrzeugkennungen_raise_the_protocol_but_not_the_floor()
     {
         // 43 adds vehicleTypeCodes to /masterdata. A peer at 42 drops the key and only types its
-        // new vehicles by hand, so a 42 and a 43 still connect.
-        Assert.Equal(43, SyncProtocol.ProtocolVersion);
-        Assert.Equal(40, SyncProtocol.MinimumProtocolVersion);
+        // new vehicles by hand, so 43 by itself kept the floor at 40.
+        Assert.InRange(SyncProtocol.ProtocolVersion, 43, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 40, int.MaxValue);
+    }
+
+    [Fact]
+    public void The_Messprotokoll_raises_the_protocol_and_the_floor_to_forty_four()
+    {
+        // 44 lets a client send the Messprotokoll's commands (#930), which a host at 43 does not
+        // know: a 43 and a 44 must not connect.
+        Assert.Equal(44, SyncProtocol.ProtocolVersion);
+        Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
     }
 }

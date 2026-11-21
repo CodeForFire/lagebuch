@@ -121,6 +121,11 @@ public sealed class IncidentReportDocument : IDocument
                     column.Item().Element(c => CoMessprotokollSection.Compose(c, _incident));
                 }
 
+                if (_sections.HasFlag(IncidentPdfSections.Messprotokoll) && MeasurementLogSection.HasContent(_incident))
+                {
+                    column.Item().Element(c => MeasurementLogSection.Compose(c, _incident));
+                }
+
                 if (_sections.HasFlag(IncidentPdfSections.Files))
                 {
                     column.Item().Element(c => FilesSection.Compose(c, _incident.Files, _imageBytesById));
