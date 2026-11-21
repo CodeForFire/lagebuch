@@ -49,6 +49,10 @@ public static class ValidationMessages
     /// <summary>An Ausgabe without the person it went to, which nobody could ask back for.</summary>
     public const string IssuedToRequired = "Ausgegeben an: Name eingeben";
 
+    /// <summary>A numbered Trupp's number already names another Trupp of the same Trupp-Art in
+    /// this Einsatz (#995) -- two "CSA-Trupp 1" on the radio are one too many.</summary>
+    public const string TypeNumberInUse = "Nummer bereits vergeben";
+
     /// <summary>The Wache a Kräfte row belongs to, without which the row reports nobody.</summary>
     public const string BrigadeRequired = "Wache eingeben";
 

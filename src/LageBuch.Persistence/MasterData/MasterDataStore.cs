@@ -23,6 +23,10 @@ public sealed class MasterDataStore
     /// </summary>
     private const string TruppTypeDefaultsMigratedKey = "trupp_type_defaults_migrated";
 
+    /// <summary>Marks a store as having had its CSA-Trupp switched to "Funkrufname aus Nummer"
+    /// once (#995), so a brigade that switches it off again keeps it off.</summary>
+    private const string TruppTypeNamedByNumberMigratedKey = "trupp_type_named_by_number_migrated";
+
     public static MasterDataSet GetOrCreate(string path)
     {
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
@@ -139,12 +143,13 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_trupp_types (value, member_count, max_duration_minutes) VALUES ($v,$m,$d);",
+                "INSERT INTO md_trupp_types (value, member_count, max_duration_minutes, named_by_number) VALUES ($v,$m,$d,$n);",
                 p =>
                 {
                     p("$v", t.Name);
                     p("$m", t.MemberCount);
                     p("$d", t.MaxDurationMinutes);
+                    p("$n", t.NamedByNumber ? 1 : 0);
                 });
         }
 
@@ -419,7 +424,8 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_trupp_types (
                 value TEXT NOT NULL,
                 member_count INTEGER NOT NULL DEFAULT 2,
-                max_duration_minutes INTEGER NOT NULL DEFAULT 30
+                max_duration_minutes INTEGER NOT NULL DEFAULT 30,
+                named_by_number INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS md_personnel (
                 last_name TEXT NOT NULL,
@@ -536,6 +542,11 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_trupp_types", "max_duration_minutes", "INTEGER NOT NULL DEFAULT 30");
         MigrateTruppTypeDefaults(cn);
 
+        // "Funkrufname aus Nummer" (#995). The DEFAULT leaves every row named by Funkrufname; the
+        // one-time step switches the CSA-Trupp over, since that is the type the request is about.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_trupp_types", "named_by_number", "INTEGER NOT NULL DEFAULT 0");
+        MigrateTruppTypeNamedByNumber(cn);
+
         // Widen a pre-#470 md_roles, where a Funktion was a bare name and nothing said how often it
         // could be held. Unlike the Trupp-Typen above there is deliberately NO one-time marker: those
         // rows needed MigrateTruppTypeDefaults because the old string rule gave two of them values
@@ -644,6 +655,45 @@ public sealed class MasterDataStore
 
             cmd.ExecuteNonQuery();
         }
+    }
+
+    /// <summary>
+    /// Switches an existing CSA-Trupp to "Funkrufname aus Nummer" once (#995), so a brigade sees
+    /// "CSA-Trupp 1" without having to find the setting. Gated on a marker like
+    /// <see cref="MigrateTruppTypeDefaults"/>, and marked on a fresh store too: a CSA-Trupp added
+    /// by hand later, or the flag switched off again, is the brigade's decision and stays.
+    /// <para>
+    /// The name is compared in C# through <see cref="LegacyTruppTypeDefaults.IsChemical"/>, so this
+    /// step matches exactly what the #398 migration matched and adds no literal of its own.
+    /// </para>
+    /// </summary>
+    private static void MigrateTruppTypeNamedByNumber(SqliteConnection cn)
+    {
+        if (ReadSetting(cn, TruppTypeNamedByNumberMigratedKey) is not null)
+        {
+            return;
+        }
+
+        var names = new List<string>();
+        using (var select = cn.CreateCommand())
+        {
+            select.CommandText = "SELECT value FROM md_trupp_types;";
+            using var r = select.ExecuteReader();
+            while (r.Read())
+            {
+                names.Add(r.GetString(0));
+            }
+        }
+
+        foreach (var name in names.Where(LegacyTruppTypeDefaults.IsChemical))
+        {
+            using var update = cn.CreateCommand();
+            update.CommandText = "UPDATE md_trupp_types SET named_by_number = 1 WHERE value = $v;";
+            update.Parameters.AddWithValue("$v", name);
+            update.ExecuteNonQuery();
+        }
+
+        WriteSetting(cn, TruppTypeNamedByNumberMigratedKey, 1);
     }
 
     /// <summary>
@@ -991,7 +1041,7 @@ public sealed class MasterDataStore
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT value, member_count, max_duration_minutes FROM md_trupp_types;";
+        cmd.CommandText = "SELECT value, member_count, max_duration_minutes, named_by_number FROM md_trupp_types;";
         using var r = cmd.ExecuteReader();
         var list = new List<TruppType>();
         while (r.Read())
@@ -1002,7 +1052,8 @@ public sealed class MasterDataStore
             list.Add(new TruppType(
                 r.GetString(0),
                 TruppType.ClampMemberCount(r.GetInt32(1)),
-                TruppType.ClampMaxDurationMinutes(r.GetInt32(2))));
+                TruppType.ClampMaxDurationMinutes(r.GetInt32(2)),
+                r.GetInt32(3) != 0));
         }
 
         return list;

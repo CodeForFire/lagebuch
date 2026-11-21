@@ -249,8 +249,14 @@ public static class SyncProtocol
     /// Fahrzeugtyp is filled from. A peer at 42 drops the key and reads none, which only leaves its
     /// new vehicles to be typed by hand, so the floor stays at 40.
     /// </para>
+    /// <para>
+    /// 44: a Trupp-Typ in <c>/masterdata</c> may carry <c>namedByNumber</c> (#995), which makes the
+    /// Atemschutz form ask for a number and name the Trupp "CSA-Trupp 1". The resulting name travels
+    /// in the Funkrufname a Trupp already had, so no command changes. A peer at 43 drops the key
+    /// and offers its free Funkrufname box instead, so the floor stays at 40.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 43;
+    public const int ProtocolVersion = 44;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

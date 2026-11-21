@@ -54,7 +54,7 @@ public class MasterDataEditorRenderTests
             {
                 new TruppType("Angriffstrupp"),
                 new TruppType("Wassertrupp"),
-                new TruppType("CSA-Trupp", 3, 20),
+                new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true),
 
                 // Three people like the CSA-Trupp but the full 30 minutes (#418) -- the pair no
                 // rule keyed off a designation could ever have expressed.
@@ -381,6 +381,13 @@ public class MasterDataEditorRenderTests
         Assert.Equal(2, numbers.Count(n => n.Value == 3));
         Assert.Contains(numbers, n => n.Value == 20);
         Assert.Contains(numbers, n => n.Value == 30);
+
+        // #995: one "Funkrufname aus Nummer" box per row, ticked for the CSA-Trupp alone.
+        var numbered = view.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Funkrufname aus Nummer")
+            .ToList();
+        Assert.Equal(4, numbered.Count);
+        Assert.Equal(1, numbered.Count(c => c.IsChecked == true));
 
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
