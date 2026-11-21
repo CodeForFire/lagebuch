@@ -135,6 +135,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void EditJournalEntry(Guid entryId, string text) =>
         Mutate(() => Incident.EditJournalEntry(_clock, RequireOperator(), entryId, text));
 
+    public void SetJournalEntryNotes(Guid entryId, string? notes) =>
+        Mutate(() => Incident.SetJournalEntryNotes(_clock, RequireOperator(), entryId, notes));
+
     public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(_clock, RequireOperator(), itemId));
 
     public void AssignRole(

@@ -1260,6 +1260,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void EditJournalEntry(Guid entryId, string text) => _inner.EditJournalEntry(entryId, text);
 
+    public void SetJournalEntryNotes(Guid entryId, string? notes) => _inner.SetJournalEntryNotes(entryId, notes);
+
     public void ToggleChecklistItem(Guid itemId) => _inner.ToggleChecklistItem(itemId);
 
     public void AssignRole(

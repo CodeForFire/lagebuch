@@ -356,6 +356,245 @@ public class EtbViewModelTests
     }
 
     [Fact]
+    public void BeginEdit_populates_EditNotes_from_the_entry()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+        vm.EditNotes = "Rückruf zugesagt";
+        vm.SaveEditCommand.Execute(null);
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+
+        row.BeginEditCommand.Execute(null);
+
+        Assert.Equal("Rückruf zugesagt", vm.EditNotes);
+    }
+
+    [Fact]
+    public void SaveEdit_with_only_new_notes_sets_the_notes_and_leaves_the_text_unedited()
+    {
+        var vm = NewVm(out var session);
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+
+        vm.EditNotes = "  Rückruf über Festnetz zugesagt  ";
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.False(vm.IsEditing);
+        Assert.Equal(string.Empty, vm.EditNotes);
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+        Assert.Equal("Rückruf über Festnetz zugesagt", row.Notes);
+        Assert.True(row.HasNotes);
+        Assert.False(row.WasEdited);
+        Assert.DoesNotContain(session.Incident.Journal, e => e.Text.EndsWith("bearbeitet", StringComparison.Ordinal));
+        Assert.Single(session.Incident.Journal, e => e.Text.StartsWith("Notiz zu ETB-Eintrag", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SaveEdit_with_only_new_text_writes_no_notes_trace()
+    {
+        var vm = NewVm(out var session);
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+
+        vm.EditText = "Lagemeldung korrigiert";
+        vm.SaveEditCommand.Execute(null);
+
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung korrigiert");
+        Assert.Null(row.Notes);
+        Assert.DoesNotContain(session.Incident.Journal, e => e.Text.StartsWith("Notiz zu", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SaveEdit_changes_text_and_notes_together()
+    {
+        var vm = NewVm(out _);
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+
+        vm.EditText = "Lagemeldung korrigiert";
+        vm.EditNotes = "Rückruf zugesagt";
+        vm.SaveEditCommand.Execute(null);
+
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung korrigiert");
+        Assert.Equal("Rückruf zugesagt", row.Notes);
+        Assert.True(row.WasEdited);
+    }
+
+    [Fact]
+    public void Emptying_the_notes_clears_them_and_folds_the_row()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+        vm.EditNotes = "Rückruf zugesagt";
+        vm.SaveEditCommand.Execute(null);
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+        row.ToggleNotesCommand.Execute(null);
+        Assert.True(row.IsNotesExpanded);
+
+        row.BeginEditCommand.Execute(null);
+        vm.EditNotes = "   ";
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.Null(row.Notes);
+        Assert.False(row.HasNotes);
+        Assert.False(row.IsNotesExpanded);
+        Assert.False(row.ToggleNotesCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Notes_reach_the_row_through_a_snapshot_round_trip()
+    {
+        var clock = new FixedClock(T0);
+        var inner = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new EtbViewModel(new SnapshotRoundTrippingSession(inner), clock, MasterDataSet.Empty, () => { });
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+        row.BeginEditCommand.Execute(null);
+
+        vm.EditNotes = "Rückruf zugesagt";
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.Same(row, Assert.Single(vm.Entries, e => e.Text == "Lagemeldung"));
+        Assert.Equal("Rückruf zugesagt", row.Notes);
+    }
+
+    [Fact]
+    public void ToggleNotes_unfolds_and_folds_a_row_with_notes()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+        vm.EditNotes = "Rückruf zugesagt";
+        vm.SaveEditCommand.Execute(null);
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+        Assert.False(row.IsNotesExpanded);
+        Assert.Equal("Notiz einblenden", row.NotesToggleLabel);
+
+        row.ToggleNotesCommand.Execute(null);
+        Assert.True(row.IsNotesExpanded);
+        Assert.Equal("Notiz ausblenden", row.NotesToggleLabel);
+
+        row.ToggleNotesCommand.Execute(null);
+        Assert.False(row.IsNotesExpanded);
+    }
+
+    [Fact]
+    public void Saving_unchanged_text_and_blank_notes_sends_nothing_and_closes_the_panel()
+    {
+        var vm = NewVm(out var session);
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+        vm.EditNotes = "   ";
+        var changes = 0;
+        session.Changed += () => changes++;
+
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.Equal(0, changes);
+        Assert.False(vm.IsEditing);
+    }
+
+    [Fact]
+    public void An_unrelated_change_leaves_the_edit_panel_open()
+    {
+        var vm = NewVm(out var session);
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        row.BeginEditCommand.Execute(null);
+
+        session.AddJournalEntry(EtbDirection.Incoming, "Rückmeldung ILS");
+
+        Assert.Same(row, vm.EditingEntry);
+    }
+
+    [Fact]
+    public void Toggling_notes_announces_the_new_glyph_label()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+        vm.EditNotes = "Rückruf zugesagt";
+        vm.SaveEditCommand.Execute(null);
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        row.ToggleNotesCommand.Execute(null);
+
+        Assert.Contains(nameof(EtbEntryRow.IsNotesExpanded), raised);
+        Assert.Contains(nameof(EtbEntryRow.NotesToggleLabel), raised);
+    }
+
+    [Fact]
+    public void Notes_arriving_on_a_row_announce_themselves_and_enable_the_toggle()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        var canExecuteChanged = 0;
+        row.ToggleNotesCommand.CanExecuteChanged += (_, _) => canExecuteChanged++;
+
+        row.BeginEditCommand.Execute(null);
+        vm.EditNotes = "Rückruf zugesagt";
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.Contains(nameof(EtbEntryRow.Notes), raised);
+        Assert.Contains(nameof(EtbEntryRow.HasNotes), raised);
+        Assert.True(canExecuteChanged > 0);
+        Assert.True(row.ToggleNotesCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ToggleNotes_does_nothing_on_a_row_without_notes()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+
+        Assert.False(row.ToggleNotesCommand.CanExecute(null));
+        row.ToggleNotesCommand.Execute(null);
+
+        Assert.False(row.IsNotesExpanded);
+    }
+
+    [Fact]
+    public void Cancelling_the_edit_discards_typed_notes()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+        vm.EditNotes = "Verworfen";
+
+        vm.CancelEditCommand.Execute(null);
+
+        Assert.Equal(string.Empty, vm.EditNotes);
+        Assert.Null(vm.Entries[0].Notes);
+    }
+
+    [Fact]
     public void SaveEdit_names_the_emptied_entry_rather_than_going_grey()
     {
         var vm = NewVm();
@@ -808,6 +1047,19 @@ public class EtbViewModelTests
         var clock = new FixedClock(T0);
         return new EtbViewModel(
             NewSession(clock), clock, masterData, () => { }, createTask is null ? null : (text, _) => createTask(text), offerReminderReset);
+    }
+
+    private static EtbViewModel NewVm(out LocalIncidentSession session)
+    {
+        var clock = new FixedClock(T0);
+        session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        return new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
     }
 
     private static EtbViewModel NewVm()

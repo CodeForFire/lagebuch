@@ -16,6 +16,7 @@ namespace LageBuch.Sync;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(AddJournalEntryCommand), "addJournalEntry")]
 [JsonDerivedType(typeof(EditJournalEntryCommand), "editJournalEntry")]
+[JsonDerivedType(typeof(SetJournalEntryNotesCommand), "setJournalEntryNotes")]
 [JsonDerivedType(typeof(ToggleChecklistItemCommand), "toggleChecklistItem")]
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
 [JsonDerivedType(typeof(TransferRoleCommand), "transferRole")]
@@ -99,6 +100,9 @@ public sealed record AddJournalEntryCommand(
     OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To, Guid? EntryId = null) : SyncCommand;
 
 public sealed record EditJournalEntryCommand(OperatorDto Operator, Guid EntryId, string Text) : SyncCommand;
+
+/// <summary>Sets or clears (<c>null</c>) the notes of a user-written ETB entry (#973).</summary>
+public sealed record SetJournalEntryNotesCommand(OperatorDto Operator, Guid EntryId, string? Notes) : SyncCommand;
 
 /// <summary>A new Lagebuchführer takes over at the sending device (#469). Only the ETB line and
 /// the audit event need the host: every later command already carries the new operator.</summary>

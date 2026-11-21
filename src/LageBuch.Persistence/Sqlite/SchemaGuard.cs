@@ -99,6 +99,7 @@ internal static class SchemaGuard
         new("command_nodes", "fuehrungsfahrzeug", "TEXT", false, null),
         new("etb_entries", "from_party", "TEXT", false, null),
         new("etb_entries", "to_party", "TEXT", false, null),
+        new("etb_entries", "notes", "TEXT", false, null),
         new("force_unit_edits", "previous_zugfuehrer_count", "INTEGER", true, "0"),
         new("force_units", "call_sign", "TEXT", false, null),
         new("force_units", "status", "TEXT", false, null),

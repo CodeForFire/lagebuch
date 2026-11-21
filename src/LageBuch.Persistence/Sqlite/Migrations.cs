@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 45;
+    public const int CurrentVersion = 46;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -308,6 +308,11 @@ public static class Migrations
         if (version < 45)
         {
             ApplyV45(cn, tx);
+        }
+
+        if (version < 46)
+        {
+            ApplyV46(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1360,6 +1365,16 @@ public static class Migrations
     private static void ApplyV45(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_gases", "upper_alarm", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // The notes folded under a user-written ETB entry (#973). Additive and nullable: an entry
+    // from an older file has none, so it reads exactly as it did.
+    // Stryker disable all : SchemaGuard.Reconcile adds this same column on every open (see V26).
+    private static void ApplyV46(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entries", "notes", "TEXT");
 
         // Stryker restore all
     }

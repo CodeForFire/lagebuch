@@ -402,6 +402,94 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Setting_notes_on_an_entry_stores_them_and_appends_a_system_trace()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        clock.Now = T0.AddMinutes(5);
+
+        var noted = incident.SetJournalEntryNotes(clock, op, entry.Id, "Rückruf zugesagt");
+
+        Assert.Equal("Rückruf zugesagt", noted.Notes);
+        Assert.Equal(noted, incident.Journal.Single(e => e.Id == entry.Id));
+        var trace = incident.Journal[^1];
+        Assert.Equal(EtbDirection.System, trace.Direction);
+        Assert.Equal($"Notiz zu ETB-Eintrag {T0:HH:mm} geändert", trace.Text);
+        Assert.Equal(T0.AddMinutes(5), trace.Timestamp);
+    }
+
+    [Fact]
+    public void Setting_unchanged_notes_appends_no_system_trace()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        incident.SetJournalEntryNotes(clock, op, entry.Id, "Rückruf zugesagt");
+        var before = incident.Journal.Count;
+
+        incident.SetJournalEntryNotes(clock, op, entry.Id, "Rückruf zugesagt");
+
+        Assert.Equal(before, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Setting_notes_throws_on_a_System_entry()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.ResumeEditing(clock, op);
+        var systemEntry = incident.Journal.Single(e => e.Text == "Bearbeitung fortgesetzt");
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => incident.SetJournalEntryNotes(clock, op, systemEntry.Id, "Notiz"));
+        Assert.Equal("Automatisch erzeugte Einträge haben keine Notiz.", ex.Message);
+    }
+
+    [Fact]
+    public void Setting_notes_on_the_first_journal_entry_is_refused_as_app_written_not_as_missing()
+    {
+        // Journal[0] is "Einsatz begonnen": found at index 0, and refused because the app wrote it.
+        var incident = NewIncident(out var clock, out var op);
+
+        Assert.Throws<InvalidOperationException>(
+            () => incident.SetJournalEntryNotes(clock, op, incident.Journal[0].Id, "Notiz"));
+    }
+
+    [Fact]
+    public void Setting_notes_throws_on_a_Measurement_entry()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
+        var measurement = incident.Journal[^1];
+        Assert.Equal(EtbDirection.Measurement, measurement.Direction);
+
+        Assert.Throws<InvalidOperationException>(
+            () => incident.SetJournalEntryNotes(clock, op, measurement.Id, "Notiz"));
+    }
+
+    [Fact]
+    public void Setting_notes_throws_when_entry_not_found()
+    {
+        var incident = NewIncident(out var clock, out var op);
+
+        var id = Guid.NewGuid();
+
+        var ex = Assert.Throws<KeyNotFoundException>(
+            () => incident.SetJournalEntryNotes(clock, op, id, "Notiz"));
+        Assert.Equal($"ETB-Eintrag {id} nicht gefunden.", ex.Message);
+    }
+
+    [Fact]
+    public void Setting_notes_throws_when_incident_closed()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(
+            () => incident.SetJournalEntryNotes(clock, op, entry.Id, "Notiz"));
+    }
+
+    [Fact]
     public void Resume_editing_logs_etb_entry()
     {
         var incident = NewIncident(out var clock, out var op);

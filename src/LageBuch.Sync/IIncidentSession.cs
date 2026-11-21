@@ -62,6 +62,9 @@ public interface IIncidentSession
 
     void EditJournalEntry(Guid entryId, string text);
 
+    /// <summary>Sets the notes of a user-written ETB entry; <c>null</c> or blank clears them (#973).</summary>
+    void SetJournalEntryNotes(Guid entryId, string? notes);
+
     void ToggleChecklistItem(Guid itemId);
 
     void AssignRole(

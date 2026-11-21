@@ -53,6 +53,11 @@ public static class EtbSection
                     table.Cell().Element(BodyCell).Column(col =>
                     {
                         col.Item().Text(entry.Text);
+                        if (entry.Notes is { } notes)
+                        {
+                            col.Item().PaddingTop(1).Text($"Notiz: {notes}").FontSize(8).FontColor(Colors.Grey.Darken2);
+                        }
+
                         foreach (var edit in entry.Edits)
                         {
                             col.Item().Text($"bearbeitet {Formatting.Timestamp(edit.EditedAt)} von {edit.EditedBy}, zuvor: „{edit.PreviousText}“")

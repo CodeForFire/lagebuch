@@ -173,6 +173,7 @@ public class AutomationPropertiesTests
         var row = vm.Entries[0];
         row.BeginEditCommand.Execute(null);
         vm.EditText = "Lagemeldung (korrigiert)";
+        vm.EditNotes = "Rückruf zugesagt"; // and the fold glyph shows (#973)
         vm.SaveEditCommand.Execute(null);
 
         var view = new EtbView { DataContext = vm };
@@ -181,7 +182,7 @@ public class AutomationPropertiesTests
         Dispatcher.UIThread.RunJobs();
 
         var buttons = IconButtons(view);
-        Assert.Equal(3, buttons.Count); // Bearbeiten, Verlauf (bearbeitet), Aufgabe erstellen
+        Assert.Equal(4, buttons.Count); // Notiz einblenden, Bearbeiten, Verlauf (bearbeitet), Aufgabe erstellen
         foreach (var button in buttons)
         {
             var tip = ToolTip.GetTip(button) as string;
