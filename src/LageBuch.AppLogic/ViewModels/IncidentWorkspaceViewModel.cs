@@ -1117,7 +1117,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 .Select(street => street.Name.Trim())
                 .Where(name => name.Length > 0)
                 .Distinct(StringComparer.Ordinal)
-                .ToList());
+                .ToList(),
+            Etb.TextSnippets);
 
         EtbTabs = new EtbTabsViewModel(Etb, SituationReports, reopenEtbTab);
 
