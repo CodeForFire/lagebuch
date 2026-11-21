@@ -556,7 +556,38 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVehicleSelected))]
+    [NotifyPropertyChangedFor(nameof(SelectedVehicleOption))]
     private Vehicle? _selectedVehicle;
+
+    /// <summary>
+    /// What is typed into the FAHRZEUG box (#967), or the picked Fahrzeug's text. Text that matches
+    /// no Stammdaten vehicle selects nothing and fills nothing in, so a Fremdwehr is typed into
+    /// FEUERWEHR and FUNKRUFNAME as before; it is dropped with the form.
+    /// </summary>
+    [ObservableProperty]
+    private string? _vehicleText;
+
+    /// <summary>
+    /// The FAHRZEUG box's selection, as the row it shows. The box drops it as soon as its text no
+    /// longer names that row -- typed over, or the list closed with Esc -- and that drops what the
+    /// pick filled in as well, so the unlocked fields keep no other vehicle's identity. The text
+    /// being typed stays.
+    /// </summary>
+    public VehicleOption? SelectedVehicleOption
+    {
+        get => SelectedVehicle is { } vehicle ? VehicleOptions.FirstOrDefault(o => o.Vehicle == vehicle) : null;
+        set
+        {
+            if (value is not null)
+            {
+                SelectedVehicle = value.Vehicle;
+            }
+            else if (SelectedVehicle is not null)
+            {
+                DropVehiclePreset();
+            }
+        }
+    }
 
     /// <summary>
     /// The form's Fahrzeugtyp picker: none first, then the catalogue (#886), plus the picked
@@ -581,10 +612,16 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
 
     /// <summary>Drops back to blank manual entry (e.g. a wrong pick, or a Fremdwehr unit with no
     /// matching vehicle): everything the pick derived -- Feuerwehr, Funkrufname, Stärke, AGT -- goes
-    /// with it, so no stale vehicle identity is left in the unlocked fields. Status and Notizen
-    /// stay, since a pick never sets them.</summary>
+    /// with it, and so does the FAHRZEUG box's text, so no stale vehicle identity is left in the unlocked
+    /// fields. Status and Notizen stay, since a pick never sets them.</summary>
     [RelayCommand]
     private void ClearVehicle()
+    {
+        DropVehiclePreset();
+        VehicleText = null;
+    }
+
+    private void DropVehiclePreset()
     {
         // Lives here, not in OnSelectedVehicleChanged(null): that also fires on a hand-typed
         // Feuerwehr and after AddForce, neither of which may wipe a Funkrufname being typed.
@@ -627,7 +664,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
     /// by value, so "FFB 2/44/1" comes before "FFB 10/44/1"; the Stammdaten keep their own order.
     /// </summary>
     [ObservableProperty]
-    private IReadOnlyList<Vehicle> _vehicleOptions = Array.Empty<Vehicle>();
+    private IReadOnlyList<VehicleOption> _vehicleOptions = Array.Empty<VehicleOption>();
 
     private void RefreshVehicleOptions()
     {
@@ -640,6 +677,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
             .Where(v => !taken.Contains(v.CallSign.Trim()))
             .OrderBy(v => v.Wache.Trim(), CallSignOrder)
             .ThenBy(v => v.CallSign.Trim(), CallSignOrder)
+            .Select(v => new VehicleOption(v))
             .ToArray();
     }
 
@@ -832,6 +870,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         // it stays, and the view selects it on the way past. The vehicle goes -- it is taken now --
         // and that frees FEUERWEHR and FUNKRUFNAME for typing again.
         SelectedVehicle = null;
+        VehicleText = null;
         NewCallSign = null;
         NewZugfuehrerCount = null;
         NewOfficerCount = null;

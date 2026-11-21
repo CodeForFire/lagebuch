@@ -101,7 +101,7 @@ public class FocusEdgeTests
         var (window, view) = ShowForces();
         Control[] chain =
         [
-            view.GetControl<ComboBox>("VehicleBox"),
+            view.GetControl<AutoCompleteBox>("VehicleBox"),
             view.GetControl<TextBox>("BrigadeBox"),
             view.GetControl<TextBox>("CallSignBox"),
             view.GetControl<ComboBox>("VehicleTypeBox"),
@@ -154,7 +154,7 @@ public class FocusEdgeTests
         AssertEdge(window, railItem);
 
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
-        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions.Single(o => o.Vehicle.CallSign == "FFB 1/40/1").Vehicle;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         var grid = window.GetVisualDescendants().OfType<DataGrid>().Single(g => g.Name == "ForcesGrid");
