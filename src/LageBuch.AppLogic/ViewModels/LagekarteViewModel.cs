@@ -6,6 +6,7 @@ using LageBuch.AppLogic.Services.Map;
 using LageBuch.AppLogic.Services.Weather;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Map;
@@ -20,6 +21,8 @@ namespace LageBuch.AppLogic.ViewModels;
 /// survive another device's Kartenpaket -- the packs are only the backdrop, and every pack on
 /// the device is drawn as one map. The pack also brings
 /// the Hydranten drawn over the map and the addresses an Einsatzort can be found by, offline.
+/// The Bereitstellungsräume come from the Organisation (#966): the map keeps only where each one
+/// stands, and shows its name and opens its details from the node, so they are edited in one place.
 /// </summary>
 public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware, IDisposable
 {
@@ -38,6 +41,8 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     private readonly Action _onChanged;
     private readonly IRegionPackLibrary? _library;
     private readonly MapNightMode _nightMode;
+    private readonly Action<string, string, Action>? _requestConfirm;
+    private readonly Action<Guid>? _editCommandNode;
     private IReadOnlyList<InstalledRegionPack> _packs = [];
 
     // Screen coordinates stay independent of the view's UI toolkit.
@@ -62,12 +67,15 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         IFileDialogService? dialogs = null,
         Action<string, string, Action>? requestConfirm = null,
         IWeatherSource? weather = null,
-        IClock? clock = null)
+        IClock? clock = null,
+        Action<Guid>? editCommandNode = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
         _session = session;
         _onChanged = onChanged;
+        _requestConfirm = requestConfirm;
+        _editCommandNode = editCommandNode;
         IsReadOnly = session.IsReadOnly;
         _library = mapPacks;
         _nightMode = nightMode ?? new MapNightMode();
@@ -140,7 +148,12 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>Every unit of the Einsatz, by Funkrufname, each saying whether it is on the map.</summary>
     public ObservableCollection<LagekarteUnitRow> Units { get; } = new();
 
-    /// <summary>What the map draws over the tiles: the Einsatzort and each placed unit's pin.</summary>
+    /// <summary>The live Bereitstellungsräume of the Organisation, in its order, each saying whether it is on the map.</summary>
+    public ObservableCollection<LagekarteBereitstellungRow> Bereitstellungen { get; } = new();
+
+    public bool HasNoBereitstellungen => Bereitstellungen.Count == 0;
+
+    /// <summary>What the map draws over the tiles: the Einsatzort and each placed unit's and Bereitstellungsraum's pin.</summary>
     public ObservableCollection<LagekarteMarker> Markers { get; } = new();
 
     /// <summary>Where every pin stands, the Einsatzort's included: what a sign placed by the map keeps clear of.</summary>
@@ -436,7 +449,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     public string? PlacingHint => Placing is { } target ? $"Auf die Karte tippen: {target.Label} platzieren" : null;
 
     [RelayCommand]
-    private void PlaceEinsatzort() => Pick(new LagekarteTarget(null, "Einsatzort"));
+    private void PlaceEinsatzort() => Pick(LagekarteTarget.Einsatzort);
 
     [RelayCommand]
     private void PlaceUnit(LagekarteUnitRow? row)
@@ -444,6 +457,56 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         if (row is not null)
         {
             Pick(new LagekarteTarget(row.UnitId, row.Title));
+        }
+    }
+
+    [RelayCommand]
+    private void PlaceBereitstellung(LagekarteBereitstellungRow? row)
+    {
+        if (row is not null)
+        {
+            Pick(new LagekarteTarget(null, row.Title, row.NodeId));
+        }
+    }
+
+    /// <summary>Opens the Bereitstellungsraum's details, the same dialog the Organisation edits them in.</summary>
+    [RelayCommand]
+    private void EditBereitstellung(LagekarteBereitstellungRow? row)
+    {
+        if (row is not null)
+        {
+            _editCommandNode?.Invoke(row.NodeId);
+        }
+    }
+
+    /// <summary>Takes a Bereitstellungsraum off the map once confirmed; the Organisation keeps it.</summary>
+    [RelayCommand]
+    private void RemoveBereitstellung(LagekarteBereitstellungRow? row)
+    {
+        if (row is not { IsPlaced: true } || !CanEdit)
+        {
+            return;
+        }
+
+        void Remove() => Run(() => _session.PlaceCommandNode(row.NodeId, null));
+        if (_requestConfirm is null)
+        {
+            Remove();
+            return;
+        }
+
+        _requestConfirm(
+            "Bereitstellungsraum von der Karte nehmen?",
+            $"„{row.Title}“ von der Lagekarte nehmen? In der Organisation bleibt er bestehen.",
+            Remove);
+    }
+
+    [RelayCommand]
+    private void CenterOnBereitstellung(LagekarteBereitstellungRow? row)
+    {
+        if (row?.Position is { } position)
+        {
+            Map.ChangeViewCommand.Execute(new MapViewChange(position, Map.Zoom));
         }
     }
 
@@ -469,7 +532,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
 
         Placing = null;
-        Place(target.UnitId, point);
+        Place(target, point);
     }
 
     /// <summary>Places what was picked in the middle of the map, for a keyboard or a hand that cannot tap precisely.</summary>
@@ -479,7 +542,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         if (Placing is { } target)
         {
             Placing = null;
-            Place(target.UnitId, Map.Center);
+            Place(target, Map.Center);
         }
     }
 
@@ -531,8 +594,9 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             {
                 MoveMarker(marker, position);
             }
-            else if (MapTappedCommand.CanExecute(position))
+            else if (!OpenDetails(marker))
             {
+                // A tap on a Bereitstellungsraum opened its details; any other mark taps the map.
                 MapTappedCommand.Execute(position);
             }
         }
@@ -590,7 +654,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         {
             MoveLabel(marker, offset);
         }
-        else if (screenToGeo(at.X, at.Y) is { } position && MapTappedCommand.CanExecute(position))
+        else if (!OpenDetails(marker) && screenToGeo(at.X, at.Y) is { } position && MapTappedCommand.CanExecute(position))
         {
             MapTappedCommand.Execute(position);
         }
@@ -627,7 +691,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         ArgumentNullException.ThrowIfNull(position);
         if (CanEdit)
         {
-            Place(marker.UnitId, position);
+            Place(marker.Target, position);
         }
     }
 
@@ -636,10 +700,34 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     {
         ArgumentNullException.ThrowIfNull(marker);
         ArgumentNullException.ThrowIfNull(offset);
-        if (CanEdit && marker.UnitId is { } id)
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        if (marker.UnitId is { } id)
         {
             Run(() => _session.MoveForceUnitLabel(id, offset));
         }
+        else if (marker.NodeId is { } nodeId)
+        {
+            Run(() => _session.MoveCommandNodeLabel(nodeId, offset));
+        }
+    }
+
+    // A tap on a Bereitstellungsraum's pin or sign while nothing is picked to place opens its
+    // details, from the Organisation, instead of tapping the map there.
+    private bool OpenDetails(LagekarteMarker marker)
+    {
+        if (Placing is not null || marker.NodeId is not { } nodeId || _editCommandNode is null)
+        {
+            return false;
+        }
+
+        _editCommandNode(nodeId);
+
+        // Stryker disable once Boolean : the map tap it would let through has nothing picked to place; see EndMarkerDrag.
+        return true;
     }
 
     /// <summary>Puts every mark back where the incident has it, after a drag that was abandoned.</summary>
@@ -709,7 +797,7 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         if (CanEdit)
         {
             Placing = null;
-            if (!Place(null, row.Position))
+            if (!Place(LagekarteTarget.Einsatzort, row.Position))
             {
                 return;
             }
@@ -788,11 +876,14 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         }
     }
 
-    private bool Place(Guid? unitId, GeoPoint position)
+    private bool Place(LagekarteTarget target, GeoPoint position)
     {
-        return unitId is { } id
-            ? Run(() => _session.PlaceForceUnit(id, position))
-            : Run(() => _session.SetIncidentLocation(position));
+        return target switch
+        {
+            { UnitId: { } id } => Run(() => _session.PlaceForceUnit(id, position)),
+            { NodeId: { } nodeId } => Run(() => _session.PlaceCommandNode(nodeId, position)),
+            _ => Run(() => _session.SetIncidentLocation(position)),
+        };
     }
 
     private bool Run(Action command)
@@ -860,6 +951,20 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             Signs.Add(marker);
         }
 
+        // Built from the node on every change, so a rename in the Organisation is the map's at once.
+        var bereitstellungen = incident.CommandNodes.Where(n => n is { IsLive: true, Kind: CommandNodeKind.Bereitstellung }).ToList();
+        Bereitstellungen.Clear();
+        foreach (var node in bereitstellungen)
+        {
+            Bereitstellungen.Add(new LagekarteBereitstellungRow(node));
+            if (node.Position is not null)
+            {
+                var marker = LagekarteMarker.For(node);
+                Markers.Add(marker);
+                Signs.Add(marker);
+            }
+        }
+
         PinPositions = Markers.Select(m => m.Position).ToList();
         EinsatzortPosition = incident.Location;
         Terrain.Einsatzort = incident.Location;
@@ -872,9 +977,16 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
             Placing = null;
         }
 
+        // Nor a Bereitstellungsraum dissolved meanwhile.
+        if (Placing is { NodeId: { } pickedNode } && bereitstellungen.All(n => n.Id != pickedNode))
+        {
+            Placing = null;
+        }
+
         OnPropertyChanged(nameof(HasEinsatzort));
         OnPropertyChanged(nameof(EinsatzortLabel));
         OnPropertyChanged(nameof(HasNoUnits));
+        OnPropertyChanged(nameof(HasNoBereitstellungen));
     }
 
     private GeoPoint? FirstMark() =>
@@ -992,8 +1104,48 @@ public sealed class LagekarteAddressRow(AddressHit hit, string? packName)
     private static bool Same(string a, string b) => string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
 }
 
-/// <summary>What a tap on the map is about to place: a unit, or the Einsatzort when <see cref="UnitId"/> is null.</summary>
-public sealed record LagekarteTarget(Guid? UnitId, string Label);
+/// <summary>
+/// What a tap on the map is about to place: a unit, a Bereitstellungsraum by its <see cref="NodeId"/>,
+/// or the Einsatzort when neither is set.
+/// </summary>
+public sealed record LagekarteTarget(Guid? UnitId, string Label, Guid? NodeId = null)
+{
+    public static LagekarteTarget Einsatzort { get; } = new(null, "Einsatzort");
+}
+
+/// <summary>A Bereitstellungsraum of the Organisation in the list beside the map (#966).</summary>
+public sealed class LagekarteBereitstellungRow
+{
+    private readonly CommandNode _node;
+
+    public LagekarteBereitstellungRow(CommandNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        _node = node;
+    }
+
+    public Guid NodeId => _node.Id;
+
+    public string Title => _node.Name;
+
+    /// <summary>The Standort as the Organisation records it, and the Rufname; empty without either.</summary>
+    public string Detail => string.Join(" · ", new[] { _node.Standort, _node.Rufname }.OfType<string>());
+
+    public bool HasDetail => Detail.Length > 0;
+
+    public GeoPoint? Position => _node.Position;
+
+    public bool IsPlaced => Position is not null;
+
+    /// <summary>What the place button does, naming the Raum: the list holds several icons alike.</summary>
+    public string PlaceLabel => IsPlaced ? $"{Title} versetzen" : $"{Title} auf Karte setzen";
+
+    public string EditLabel => $"{Title}: Angaben bearbeiten";
+
+    public string CenterLabel => $"{Title} auf der Karte zeigen";
+
+    public string RemoveLabel => $"{Title} von der Karte nehmen";
+}
 
 /// <summary>A unit in the list beside the map.</summary>
 public sealed class LagekarteUnitRow
@@ -1026,12 +1178,16 @@ public sealed class LagekarteUnitRow
     public string PlaceLabel => IsPlaced ? "Versetzen" : "Auf Karte setzen";
 }
 
-/// <summary>A mark on the map: the Einsatzort, or a unit when <see cref="UnitId"/> is set.</summary>
+/// <summary>
+/// A mark on the map: a unit when <see cref="UnitId"/> is set, a Bereitstellungsraum when
+/// <see cref="NodeId"/> is, the Einsatzort otherwise.
+/// </summary>
 public sealed partial class LagekarteMarker : ObservableObject
 {
-    private LagekarteMarker(Guid? unitId, string title, GeoPoint position, string? vehicleType = null, LabelOffset? labelOffset = null)
+    private LagekarteMarker(Guid? unitId, string title, GeoPoint position, string? vehicleType = null, LabelOffset? labelOffset = null, Guid? nodeId = null)
     {
         UnitId = unitId;
+        NodeId = nodeId;
         Title = title;
         VehicleType = vehicleType;
         _position = position;
@@ -1040,7 +1196,15 @@ public sealed partial class LagekarteMarker : ObservableObject
 
     public Guid? UnitId { get; }
 
-    public bool IsEinsatzort => UnitId is null;
+    /// <summary>The Bereitstellungsraum's node in the Organisation; null for every other mark.</summary>
+    public Guid? NodeId { get; }
+
+    public bool IsEinsatzort => UnitId is null && NodeId is null;
+
+    /// <summary>Drawn with the Bereitstellungsraum's sign rather than a vehicle's.</summary>
+    public bool IsBereitstellung => NodeId is not null;
+
+    internal LagekarteTarget Target => new(UnitId, Title, NodeId);
 
     public string Title { get; }
 
@@ -1059,9 +1223,9 @@ public sealed partial class LagekarteMarker : ObservableObject
     [ObservableProperty]
     private LabelOffset? _labelOffset;
 
-    public string AutomationName => IsEinsatzort ? "Einsatzort" : $"{Title}: Standort";
+    public string AutomationName => IsEinsatzort ? "Einsatzort" : IsBereitstellung ? $"Bereitstellungsraum {Title}: Standort" : $"{Title}: Standort";
 
-    public string SignAutomationName => $"{Title}: taktisches Zeichen";
+    public string SignAutomationName => IsBereitstellung ? $"Bereitstellungsraum {Title}: taktisches Zeichen" : $"{Title}: taktisches Zeichen";
 
     public static LagekarteMarker Einsatzort(GeoPoint location) => new(null, "Einsatzort", location);
 
@@ -1070,5 +1234,12 @@ public sealed partial class LagekarteMarker : ObservableObject
         ArgumentNullException.ThrowIfNull(unit);
         var position = unit.Position ?? throw new ArgumentException("Die Einheit steht nicht auf der Karte.", nameof(unit));
         return new(unit.Id, unit.CallSign ?? unit.Brigade, position, unit.VehicleType, unit.LabelOffset);
+    }
+
+    public static LagekarteMarker For(CommandNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        var position = node.Position ?? throw new ArgumentException("Der Bereitstellungsraum steht nicht auf der Karte.", nameof(node));
+        return new(null, node.Name, position, labelOffset: node.LabelOffset, nodeId: node.Id);
     }
 }

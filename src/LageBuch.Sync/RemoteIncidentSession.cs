@@ -528,6 +528,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void MoveForceUnitLabel(Guid unitId, LabelOffset? offset) =>
         Send(new MoveForceUnitLabelCommand(Op(), unitId, offset?.Dx, offset?.Dy));
 
+    public void PlaceCommandNode(Guid nodeId, GeoPoint? position) =>
+        Send(new PlaceCommandNodeCommand(Op(), nodeId, position?.Latitude, position?.Longitude));
+
+    public void MoveCommandNodeLabel(Guid nodeId, LabelOffset? offset) =>
+        Send(new MoveCommandNodeLabelCommand(Op(), nodeId, offset?.Dx, offset?.Dy));
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) =>
         Send(new PlaceRoleAssignmentCommand(Op(), assignmentId, nodeId, slot));
 

@@ -1534,6 +1534,64 @@ public sealed class Incident
         return updated;
     }
 
+    /// <summary>
+    /// Puts a live Bereitstellungsraum on the Lagekarte at <paramref name="position"/>, or takes it
+    /// off with null (#966). Its name and details stay the Organisation's: the map shows them from
+    /// the node. Like a unit, the ETB records the first placement and the removal, not each drag.
+    /// </summary>
+    public CommandNode PlaceCommandNode(IClock clock, SessionOperator op, Guid nodeId, GeoPoint? position)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindCommandNodeIndex(nodeId);
+        var previous = _commandNodes[index];
+        if (previous.Kind != CommandNodeKind.Bereitstellung)
+        {
+            throw new InvalidOperationException("Nur ein Bereitstellungsraum steht auf der Lagekarte.");
+        }
+
+        if (!previous.IsLive)
+        {
+            throw new InvalidOperationException("Bereitstellungsraum ist aufgelöst.");
+        }
+
+        if (previous.Position == position)
+        {
+            return previous;
+        }
+
+        var updated = previous.WithPosition(position);
+        _commandNodes[index] = updated;
+        if (previous.Position is null)
+        {
+            AppendSystemEntry(clock, op, $"Bereitstellungsraum {updated.Name} auf der Lagekarte eingetragen");
+        }
+        else if (position is null)
+        {
+            AppendSystemEntry(clock, op, $"Bereitstellungsraum {updated.Name} von der Lagekarte genommen");
+        }
+
+        return updated;
+    }
+
+    /// <summary>
+    /// Moves a Bereitstellungsraum's sign relative to its pin, or back to the default place with
+    /// null. Only the picture changes, so like a unit's sign it writes nothing to the ETB.
+    /// </summary>
+    public CommandNode MoveCommandNodeLabel(IClock clock, SessionOperator op, Guid nodeId, LabelOffset? offset)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindCommandNodeIndex(nodeId);
+        var updated = _commandNodes[index].WithLabelOffset(offset);
+        _commandNodes[index] = updated;
+        return updated;
+    }
+
     private int FindCommandNodeIndex(Guid nodeId)
     {
         var index = _commandNodes.FindIndex(n => n.Id == nodeId);
