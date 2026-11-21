@@ -45,7 +45,7 @@ public class SituationReportsTabRenderTests
             "Blumenstraße 13",
             "Feuer unter Kontrolle",
             "Nachlöscharbeiten, Wärmebildkamera",
-            "FF Musterstadt (HLF 1) 0/1/8/9, FF Beispieldorf (LF 2) 0/1/5/6",
+            "HLF 1, LF 2",
             "1 RTW zur Bereitstellung");
         var vm = new IncidentWorkspaceViewModel(
             session,

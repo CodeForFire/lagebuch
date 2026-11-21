@@ -317,13 +317,15 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     }
 
     /// <summary>
-    /// The Kräfte as Eingesetzte Einheiten: each unit's name and Stärke, as the ETB names them.
-    /// Null when there are none, so the field stays empty rather than saying so.
+    /// The Kräfte as Eingesetzte Einheiten: each unit's Funkrufname, or its Wache when it has none.
+    /// A Lagemeldung is read out over the radio, so it leaves out the Wache beside a Funkrufname and
+    /// the Stärke the ETB names (#961). Null when there are none, so the field stays empty rather
+    /// than saying so.
     /// </summary>
     public static string? DescribeUnits(IEnumerable<ForceUnit> forces)
     {
         ArgumentNullException.ThrowIfNull(forces);
-        var text = string.Join(", ", forces.Select(u => $"{u.Label} {u.StrengthText}"));
+        var text = string.Join(", ", forces.Select(u => u.CallSign ?? u.Brigade));
         if (text.Length == 0)
         {
             return null;
@@ -334,7 +336,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         {
             var cut = text.LastIndexOf(", ", SituationReport.MaxFieldLength - 2, StringComparison.Ordinal);
 
-            // Stryker disable once Equality : a unit's label is never empty, so the text never starts with ", " and cut is never 0.
+            // Stryker disable once Equality : a unit's Funkrufname and Wache are never empty, so the text never starts with ", " and cut is never 0.
             text = (cut > 0 ? text[..cut] : text[..(SituationReport.MaxFieldLength - 2)]) + " …";
         }
 
