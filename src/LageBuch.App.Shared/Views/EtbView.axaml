@@ -97,7 +97,7 @@
        by TabIndex in the order it appears on screen. -->
   <DockPanel KeyboardNavigation.TabNavigation="Local">
     <!-- No EINSATZTAGEBUCH heading: the ETB's tab names it. A WrapPanel rather than fixed
-         columns, so on a phone the three controls take two lines instead of overflowing. -->
+         columns, so on a phone the four controls wrap onto more lines instead of overflowing. -->
     <WrapPanel DockPanel.Dock="Top" x:Name="EtbHeaderActions" Orientation="Horizontal" HorizontalAlignment="Right"
                ItemSpacing="12" LineSpacing="6" Margin="0,0,0,14"
                KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
@@ -110,6 +110,10 @@
       <CheckBox x:Name="OnlySituationReportsCheckBox"
                 Content="Nur Lagemeldungen"
                 IsChecked="{Binding ShowOnlySituationReports}" />
+      <!-- #972: the Gasmessung lines, hidden by default and independently of the System ones. -->
+      <CheckBox x:Name="HideMeasurementsCheckBox"
+                Content="Messwerte ausblenden"
+                IsChecked="{Binding HideMeasurementEntries}" />
       <CheckBox x:Name="HideSystemCheckBox"
                 Content="Systemmeldungen ausblenden"
                 IsChecked="{Binding HideSystemEntries}" />

@@ -61,7 +61,7 @@ public sealed class MapOverlaysViewModelTests : IDisposable
         Assert.True(item.IsVisible);
         Assert.Equal("Sperrgebiet Süd", Assert.Single(vm.VisibleShapes).Label);
         Assert.Null(vm.Error);
-        Assert.Equal(EtbDirection.Measurement, session.Incident.Journal[^1].Direction);
+        Assert.Equal(EtbDirection.System, session.Incident.Journal[^1].Direction);
         Assert.Equal(1, changes());
     }
 

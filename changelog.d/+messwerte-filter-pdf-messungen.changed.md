@@ -1,0 +1,1 @@
+The ETB hides Gasmessung lines behind a new "Messwerte ausblenden" checkbox, ticked by default, and the PDF report prints every measured value with its time and location in a Messungen section instead of the ETB section; Kartenebene lines now count as Systemmeldungen (#972).

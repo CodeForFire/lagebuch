@@ -22,6 +22,9 @@ public enum IncidentPdfSections
     SituationReports = 1 << 9,
     IssuedItems = 1 << 10,
     Fuehrungsorganisation = 1 << 11,
+
+    /// <summary>Every measured value in time order (#972), which the ETB section leaves out.</summary>
+    Measurements = 1 << 12,
     All = Checklist | Etb | Roles | Forces | Tasks | Atemschutz | CoMessprotokoll | Files | InvolvedParties
-        | SituationReports | IssuedItems | Fuehrungsorganisation,
+        | SituationReports | IssuedItems | Fuehrungsorganisation | Measurements,
 }
