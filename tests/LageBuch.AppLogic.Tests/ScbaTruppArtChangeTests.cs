@@ -95,7 +95,7 @@ public class ScbaTruppArtChangeTests
         Assert.Equal(6, trupp.PressureControlIntervalMinutes);
         var entry = session.Incident.Journal[^1];
         Assert.Equal(
-            "Trupp-Art von Florian Musterdorf 42/1 gewechselt: bisher Sicherheitstrupp, jetzt CSA-Trupp, Einsatzzeit 20 Min.",
+            "Trupp-Art von Florian Musterdorf 42/1 · Sicherheitstrupp gewechselt: jetzt CSA-Trupp, Einsatzzeit 20 Min.",
             entry.Text);
         Assert.Equal("Florian Musterdorf 42/1", entry.From);
         Assert.Equal("Florian Musterdorf 42/1 · CSA-Trupp", Row(vm, row.Id).DisplayName);
@@ -133,12 +133,12 @@ public class ScbaTruppArtChangeTests
         Change(vm, row.Id, "Angriffstrupp");
 
         Assert.Equal(
-            "Trupp-Art von Florian Musterdorf 42/1 gewechselt: bisher Sicherheitstrupp, jetzt Angriffstrupp",
+            "Trupp-Art von Florian Musterdorf 42/1 · Sicherheitstrupp gewechselt: jetzt Angriffstrupp",
             session.Incident.Journal[^1].Text);
     }
 
     [Fact]
-    public void A_trupp_under_air_keeps_its_einsatzzeit_and_is_named_by_number_without_a_funkrufname()
+    public void A_trupp_under_air_keeps_its_einsatzzeit_and_is_named_by_its_trupp_art_without_a_funkrufname()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -153,8 +153,60 @@ public class ScbaTruppArtChangeTests
         Assert.Equal(30, trupp.MaxDurationMinutes);
         Assert.Equal(10, trupp.PressureControlIntervalMinutes);
         Assert.Equal(
-            "Trupp-Art von Trupp 1 gewechselt: bisher Sicherheitstrupp, jetzt CSA-Trupp",
+            "Trupp-Art von Sicherheitstrupp gewechselt: jetzt CSA-Trupp",
             session.Incident.Journal[^1].Text);
+    }
+
+    // The issue's own repro (#968): an Angriffstrupp and a Sicherheitstrupp from the same Fahrzeug,
+    // then the Sicherheitstrupp to Angriffstrupp. The flyout no longer offers the Trupp-Art that
+    // would list "HLF 1 · Angriffstrupp" twice.
+    [Fact]
+    public void The_flyout_leaves_out_the_trupp_art_another_trupp_of_the_same_fahrzeug_already_has()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var angriff = Register(vm, "Angriffstrupp", "HLF 1");
+        var sicherheit = Register(vm, "Sicherheitstrupp", "HLF 1");
+        var other = Register(vm, "Sicherheitstrupp", "LF 2");
+
+        Assert.Equal(new[] { "Sicherheitstrupp", "CSA-Trupp" }, Row(vm, sicherheit.Id).TruppTypeChoices.Select(c => c.Name));
+        Assert.Equal(new[] { "Angriffstrupp", "CSA-Trupp" }, Row(vm, angriff.Id).TruppTypeChoices.Select(c => c.Name));
+        Assert.Equal(new[] { "Angriffstrupp", "Sicherheitstrupp", "CSA-Trupp" }, Row(vm, other.Id).TruppTypeChoices.Select(c => c.Name));
+    }
+
+    [Fact]
+    public void An_abgenommen_trupp_frees_its_trupp_art_for_the_flyout()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var angriff = Register(vm, "Angriffstrupp", "HLF 1");
+        var sicherheit = Register(vm, "Sicherheitstrupp", "HLF 1");
+        angriff.StartCommand.Execute(null);
+        angriff.WithdrawCommand.Execute(null);
+        angriff.MarkRemovedCommand.Execute(null);
+
+        Change(vm, sicherheit.Id, "Angriffstrupp");
+
+        Assert.Equal("HLF 1 · Angriffstrupp", Row(vm, sicherheit.Id).DisplayName);
+    }
+
+    // A flyout opened before another device took the name still holds the old entry. Picking it is
+    // refused quietly rather than crashing the Atemschutz tab mid-Einsatz.
+    [Fact]
+    public void A_stale_flyout_entry_for_a_trupp_art_taken_since_changes_nothing()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var sicherheit = Register(vm, "Sicherheitstrupp", "HLF 1");
+        var stale = Row(vm, sicherheit.Id).TruppTypeChoices.Single(c => c.Name == "Angriffstrupp");
+        Register(vm, "Angriffstrupp", "HLF 1");
+        var before = session.Incident.Journal.Count;
+
+        stale.SelectCommand.Execute(null);
+
+        Assert.Equal("Sicherheitstrupp", Trupp(session, sicherheit.Id).Designation);
+        Assert.Equal(before, session.Incident.Journal.Count);
     }
 
     [Fact]

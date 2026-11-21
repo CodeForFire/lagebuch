@@ -91,6 +91,10 @@ public sealed class AtemschutzTrupp
     public static string FormatDisplayName(string? callSign, string designation) =>
         string.IsNullOrWhiteSpace(callSign) ? designation : $"{callSign.Trim()} · {designation}";
 
+    /// <summary>Why a second Trupp of this name is refused (#968): the sentence the domain throws
+    /// and the registration form shows, so both say it the same way.</summary>
+    public static string AlreadyRegisteredMessage(string displayName) => $"„{displayName}“ ist bereits eingetragen.";
+
     /// <summary>
     /// The crew, in position order: between <see cref="StandardMemberCount"/> and
     /// <see cref="MaxMemberCount"/> people, as the Trupp-Typ in the Stammdaten calls for.

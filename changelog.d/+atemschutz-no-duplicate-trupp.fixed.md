@@ -1,0 +1,1 @@
+Atemschutz no longer lets the same Trupp be listed twice: a Trupp not yet abgenommen with the same Funkrufname and Trupp-Art is refused at Bereitstellung with a message naming it, the Trupp-Art flyout leaves out the choice that would collide, and the ETB line for a Trupp-Art change names the Trupp by its full name (#968).

@@ -475,6 +475,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     [NotifyPropertyChangedFor(nameof(NewZweiterTruppmannError))]
     [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     [NotifyPropertyChangedFor(nameof(RequiresThirdMember))]
+    [NotifyPropertyChangedFor(nameof(NewDuplicateTruppError))]
     private string _newDesignation = string.Empty;
 
     /// <summary>
@@ -510,6 +511,8 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     private string _newZweiterTruppmann = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewDuplicateTruppError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string? _newCallSign;
 
     /// <summary>
@@ -785,7 +788,17 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     /// <summary>Whether the Trupp-Art is still missing, once the operator has asked (#412).</summary>
     /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
     public string? ErrorSummary => ValidationMessages.Summarize(
-        NewDesignationError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError);
+        NewDesignationError, NewDuplicateTruppError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError);
+
+    /// <summary>
+    /// Whether the Funkrufname and Trupp-Art name a Trupp that is already in the Überwachung and
+    /// not yet abgenommen, once asked (#968). The domain refuses that registration, so the press
+    /// says which Trupp it would duplicate instead of throwing.
+    /// </summary>
+    public string? NewDuplicateTruppError =>
+        _errorsShown && _session.Incident.FindScbaTruppNamed(NewCallSign, NewDesignation) is { } holder
+            ? AtemschutzTrupp.AlreadyRegisteredMessage(holder.DisplayName)
+            : null;
 
     public string? NewDesignationError =>
         _errorsShown && string.IsNullOrWhiteSpace(NewDesignation) ? ValidationMessages.Required : null;
@@ -855,6 +868,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     {
         ShowErrors(true);
         return NewDesignationError is null
+               && NewDuplicateTruppError is null
                && NewTruppfuehrerError is null
                && NewTruppmannError is null
                && NewZweiterTruppmannError is null
@@ -867,6 +881,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         _errorsShown = shown;
         OnPropertyChanged(nameof(NewDesignationError));
         OnPropertyChanged(nameof(ErrorSummary));
+        OnPropertyChanged(nameof(NewDuplicateTruppError));
         OnPropertyChanged(nameof(NewTruppfuehrerError));
         OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTruppmannError));
@@ -952,9 +967,13 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId));
 
     /// <summary>The Trupp-Art flyout entries for one row (#835): today's Trupp-Arten, plus the
-    /// Trupp's own when the Stammdaten no longer list it, so the record is shown, never lost.</summary>
+    /// Trupp's own when the Stammdaten no longer list it, so the record is shown, never lost. A
+    /// Trupp-Art that would give the Trupp the name of another Trupp not yet abgenommen is left out
+    /// (#968): "HLF 1 · Angriffstrupp" twice is the one change the domain refuses.</summary>
     private List<TruppTypeChoice> TruppTypeChoicesFor(AtemschutzTrupp trupp) =>
         StammdatenCatalogue.Including(TruppTypeOptions, trupp.Designation)
+            .Where(name => _session.Incident.FindScbaTruppNamed(trupp.CallSign, name, trupp.Id) is null
+                           || string.Equals(name, trupp.Designation, StringComparison.Ordinal))
             .Select(name => new TruppTypeChoice(
                 name,
                 string.Equals(name, trupp.Designation, StringComparison.Ordinal),
@@ -1048,11 +1067,13 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     private void ChangeTruppType(Guid truppId, string designation)
     {
         // Inert rather than throwing, as AssignSafetyTrupp is: a programmatic Execute bypasses the
-        // hidden button, and re-choosing the Trupp-Art in force writes no line.
+        // hidden button, and re-choosing the Trupp-Art in force writes no line. A flyout opened
+        // before another device took the name holds an entry the domain would refuse (#968).
         var incident = _session.Incident;
         if (IsReadOnly
             || incident.FindScbaTruppOrDefault(truppId) is not { IsReturned: false } trupp
-            || string.Equals(trupp.Designation, designation, StringComparison.Ordinal))
+            || string.Equals(trupp.Designation, designation, StringComparison.Ordinal)
+            || incident.FindScbaTruppNamed(trupp.CallSign, designation, truppId) is not null)
         {
             return;
         }
@@ -1062,8 +1083,9 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         var interval = Math.Max(1, maxDuration / 3);
 
         // Read before mutating: the mutation raises Changed, which rebuilds every row.
-        var name = trupp.CallSign ?? $"Trupp {trupp.TruppNumber}";
-        var text = $"Trupp-Art von {name} gewechselt: bisher {trupp.Designation}, jetzt {designation}";
+        // The name as it read until now, which already carries the old Trupp-Art: the Funkrufname
+        // alone does not say which of a Fahrzeug's Trupps changed (#968).
+        var text = $"Trupp-Art von {trupp.DisplayName} gewechselt: jetzt {designation}";
         if (trupp.IsWaiting && maxDuration != trupp.MaxDurationMinutes)
         {
             text += $", Einsatzzeit {maxDuration} Min.";
@@ -1276,6 +1298,9 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             OnPropertyChanged(nameof(CallSignOptions));
         }
 
+        // A Trupp abgenommen or renamed elsewhere may have freed, or taken, the name on the form.
+        OnPropertyChanged(nameof(NewDuplicateTruppError));
+        OnPropertyChanged(nameof(ErrorSummary));
         RefreshHeader();
     }
 

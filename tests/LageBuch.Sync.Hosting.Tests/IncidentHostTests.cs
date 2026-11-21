@@ -321,6 +321,42 @@ public class IncidentHostTests
     }
 
     [Fact]
+    public async Task Host_rejects_a_trupp_art_change_that_would_list_the_same_trupp_twice_with_400()
+    {
+        // Two devices can each see a free Trupp-Art and pick the same one (#968). The host's domain
+        // guard decides, and the loser gets the German reason instead of a 500 or a crash.
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.lagebuch",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddScbaTrupp("Angriffstrupp", Domain.Atemschutz.TruppMember.Crew("Müller", "Schmidt"), 300, callSign: "HLF 1");
+        session.AddScbaTrupp("Sicherheitstrupp", Domain.Atemschutz.TruppMember.Crew("Huber", "Maier"), 290, callSign: "HLF 1");
+        var sicherheit = session.Incident.ScbaTrupps[^1];
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        var port = await TestHost.StartOnFreePortAsync(host);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        using var content = new StringContent(
+            SyncJson.Serialize<SyncCommand>(new ChangeScbaTruppTypeCommand(sicherheit.Id, "Angriffstrupp", 30, 10)),
+            Encoding.UTF8,
+            "application/json");
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(
+            "„HLF 1 · Angriffstrupp“ ist bereits eingetragen.",
+            System.Text.Json.JsonSerializer.Deserialize<string>(await response.Content.ReadAsStringAsync()));
+        Assert.Equal("Sicherheitstrupp", sicherheit.Designation);
+    }
+
+    [Fact]
     public async Task Host_rejects_a_command_against_a_closed_incident_with_400()
     {
         var clock = new FixedClock();
