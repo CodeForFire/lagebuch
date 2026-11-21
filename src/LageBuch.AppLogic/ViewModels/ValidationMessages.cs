@@ -40,6 +40,9 @@ public static class ValidationMessages
     /// <summary>A timer box emptied, or holding something that is not a count of minutes.</summary>
     public const string TimerMinutes = "Minuten eintragen (0 oder mehr)";
 
+    /// <summary>The time until an existing Aufgabe's reminder (#964): at least a minute, at most a day.</summary>
+    public const string ReminderMinutes = "Minuten bis zur Erinnerung eintragen (1 bis 1440)";
+
     /// <summary>A Beteiligte/r without a name, which nobody could look up again.</summary>
     public const string NameRequired = "Name eingeben";
 

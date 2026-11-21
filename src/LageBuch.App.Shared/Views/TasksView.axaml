@@ -209,13 +209,23 @@
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                              Text="{Binding EditAssignee}" />
           </HeaderedContentControl>
-          <!-- The timer is not a field here: +5 MIN acts at once and the countdown beside it
-               moves, so there is nothing to save and nothing to get wrong. -->
-          <HeaderedContentControl Classes="field" Header="TIMER">
+          <!-- The time until the reminder is typed in minutes from now (#964), shorter or longer
+               than before, and SETZEN applies it at once, as +5 MIN does; the countdown beside
+               them moves. SPEICHERN takes a typed time along too, so it never vanishes with the
+               panel. The box opens on the minutes left, and empty without a timer. -->
+          <HeaderedContentControl Classes="field" Header="TIMER (MIN)"
+                                    Classes.invalid="{Binding EditTimerMinutesError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBlock x:Name="EditRemaining" VerticalAlignment="Center" MinWidth="72"
                          Text="{Binding EditingTask.RemainingDisplay, FallbackValue=''}"
                          Classes.due="{Binding EditingTask.IsOverdue, FallbackValue=False}" />
+              <TextBox x:Name="EditTimerBox" Width="70" Text="{Binding EditTimerMinutes}" b:IntegerOnly.IsEnabled="True"
+                       AutomationProperties.Name="Erinnerung in Minuten"
+                       ToolTip.Tip="Minuten bis zur Erinnerung, ab jetzt"
+                       b:EnterSubmit.Command="{Binding SetEditingTimerCommand}" />
+              <Button x:Name="EditSetTimerButton" Content="SETZEN"
+                      ToolTip.Tip="Erinnerung in so vielen Minuten"
+                      Command="{Binding SetEditingTimerCommand}" />
               <Button x:Name="EditExtendTimerButton" Content="+5 MIN"
                       ToolTip.Tip="Timer um 5 Minuten verlängern"
                       Command="{Binding ExtendEditingTimerCommand}" />

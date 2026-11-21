@@ -308,6 +308,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void ExtendTaskTimer(Guid taskId, int minutes) =>
         Mutate(() => Incident.ExtendTaskTimer(taskId, minutes, _clock));
 
+    public void SetTaskTimer(Guid taskId, int minutes) =>
+        Mutate(() => Incident.SetTaskTimer(taskId, minutes, _clock));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

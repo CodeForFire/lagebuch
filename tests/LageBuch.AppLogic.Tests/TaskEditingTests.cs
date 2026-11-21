@@ -263,6 +263,189 @@ public class TaskEditingTests
     }
 
     [Fact]
+    public void The_panel_prefills_the_minutes_left_rounded_up()
+    {
+        var (_, clock, vm) = WithOneTask();
+        clock.Now = T0.AddMinutes(4).AddSeconds(30); // 10:30 left of 15
+        vm.Sync();
+
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+
+        Assert.Equal(11, vm.EditTimerMinutes);
+    }
+
+    [Fact]
+    public void The_panel_leaves_the_minutes_empty_for_a_task_without_a_timer_or_overdue()
+    {
+        var (session, clock) = NewSession();
+        session.AddTask("Ohne Timer", null, TaskImportance.Low, TaskUrgency.Low, 0);
+        session.AddTask("Überfällig", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        clock.Now = T0.AddMinutes(10);
+        using var vm = NewVm(session, clock);
+
+        vm.Rows.Single(r => r.Text == "Ohne Timer").BeginEditCommand.Execute(null);
+        Assert.Null(vm.EditTimerMinutes);
+
+        vm.Rows.Single(r => r.Text == "Überfällig").BeginEditCommand.Execute(null);
+        Assert.Null(vm.EditTimerMinutes);
+    }
+
+    [Fact]
+    public void Setzen_replaces_the_time_until_the_reminder_at_once()
+    {
+        var changes = 0;
+        var (session, clock, vm) = WithOneTask(() => changes++);
+        var row = vm.Rows.Single();
+        row.BeginEditCommand.Execute(null);
+        clock.Now = T0.AddMinutes(2);
+
+        vm.EditTimerMinutes = 3; // shorter than the 13 minutes left
+        vm.SetEditingTimerCommand.Execute(null);
+
+        Assert.Equal(clock.Now.AddMinutes(3), session.Incident.Tasks.Single().DueAt);
+        Assert.Equal("noch 03:00", row.RemainingDisplay);
+        Assert.Equal(1, changes);
+        Assert.True(vm.IsEditing); // an action like +5 MIN: the panel stays open
+
+        vm.EditTimerMinutes = 30; // and longer again
+        vm.SetEditingTimerCommand.Execute(null);
+
+        Assert.Equal(clock.Now.AddMinutes(30), session.Incident.Tasks.Single().DueAt);
+    }
+
+    [Fact]
+    public void Setzen_gives_a_task_without_a_timer_one()
+    {
+        var (session, clock) = NewSession();
+        session.AddTask("Ohne Timer", null, TaskImportance.Low, TaskUrgency.Low, 0);
+        using var vm = NewVm(session, clock);
+        var row = vm.Rows.Single();
+        row.BeginEditCommand.Execute(null);
+        Assert.True(vm.SetEditingTimerCommand.CanExecute(null));
+
+        vm.EditTimerMinutes = 10;
+        vm.SetEditingTimerCommand.Execute(null);
+
+        Assert.Equal(T0.AddMinutes(10), session.Incident.Tasks.Single().DueAt);
+        Assert.True(row.HasTimer);
+        Assert.True(vm.ExtendEditingTimerCommand.CanExecute(null)); // +5 MIN has something to extend now
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(IncidentTask.MaxTimerMinutes + 1)]
+    public void Setzen_with_no_usable_minutes_says_so_and_changes_nothing(int? minutes)
+    {
+        var changes = 0;
+        var (session, _, vm) = WithOneTask(() => changes++);
+        var dueBefore = session.Incident.Tasks.Single().DueAt;
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+        Assert.Null(vm.EditTimerMinutesError); // quiet until asked
+
+        vm.EditTimerMinutes = minutes;
+        vm.SetEditingTimerCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.ReminderMinutes, vm.EditTimerMinutesError);
+        Assert.Contains(ValidationMessages.ReminderMinutes, vm.EditErrorSummary, StringComparison.Ordinal);
+        Assert.Equal(dueBefore, session.Incident.Tasks.Single().DueAt);
+        Assert.Equal(0, changes);
+
+        vm.EditTimerMinutes = 20;
+        Assert.Null(vm.EditTimerMinutesError); // a usable value clears it as it is typed
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(IncidentTask.MaxTimerMinutes)]
+    public void Setzen_takes_the_ends_of_the_range(int minutes)
+    {
+        var (session, clock, vm) = WithOneTask();
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+
+        vm.EditTimerMinutes = minutes;
+        vm.SetEditingTimerCommand.Execute(null);
+
+        Assert.Null(vm.EditTimerMinutesError);
+        Assert.Equal(clock.Now.AddMinutes(minutes), session.Incident.Tasks.Single().DueAt);
+    }
+
+    [Fact]
+    public void The_panel_leaves_the_minutes_empty_at_the_moment_the_task_falls_due()
+    {
+        var (_, clock, vm) = WithOneTask();
+        clock.Now = T0.AddMinutes(15); // exactly due: nothing left to show
+        vm.Sync();
+
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+
+        Assert.Null(vm.EditTimerMinutes);
+    }
+
+    [Fact]
+    public void Speichern_also_applies_a_typed_reminder_time()
+    {
+        var (session, clock, vm) = WithOneTask();
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+
+        vm.EditTimerMinutes = 45;
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.False(vm.IsEditing);
+        Assert.Equal(clock.Now.AddMinutes(45), session.Incident.Tasks.Single().DueAt);
+    }
+
+    [Fact]
+    public void Speichern_leaves_the_timer_alone_when_the_minutes_were_not_touched()
+    {
+        var (session, clock, vm) = WithOneTask();
+        var dueBefore = session.Incident.Tasks.Single().DueAt;
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+        clock.Now = T0.AddMinutes(3); // the countdown ran on while the panel was open
+
+        vm.EditText = "Presse-Info vorbereiten (Text)";
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.Equal(dueBefore, session.Incident.Tasks.Single().DueAt);
+    }
+
+    [Fact]
+    public void Speichern_with_unusable_typed_minutes_keeps_the_panel_open()
+    {
+        var (session, _, vm) = WithOneTask();
+        var dueBefore = session.Incident.Tasks.Single().DueAt;
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+
+        vm.EditText = "Geändert";
+        vm.EditTimerMinutes = 0;
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.True(vm.IsEditing);
+        Assert.Equal(ValidationMessages.ReminderMinutes, vm.EditTimerMinutesError);
+        Assert.Equal("Presse-Info vorbereiten", session.Incident.Tasks.Single().Text);
+        Assert.Equal(dueBefore, session.Incident.Tasks.Single().DueAt);
+    }
+
+    [Fact]
+    public void Plus_five_in_the_panel_moves_the_minutes_field_along()
+    {
+        var (_, _, vm) = WithOneTask();
+        vm.Rows.Single().BeginEditCommand.Execute(null);
+        Assert.Equal(15, vm.EditTimerMinutes);
+
+        vm.ExtendEditingTimerCommand.Execute(null);
+
+        Assert.Equal(20, vm.EditTimerMinutes);
+    }
+
+    [Fact]
+    public void Setzen_is_off_while_no_aufgabe_is_being_edited()
+    {
+        var (_, _, vm) = WithOneTask();
+        Assert.False(vm.SetEditingTimerCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void Plus_five_in_the_due_bar_puts_the_task_off_from_now()
     {
         var changes = 0;

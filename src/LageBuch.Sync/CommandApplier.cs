@@ -306,6 +306,9 @@ public static class CommandApplier
             case ExtendTaskTimerCommand c:
                 incident.ExtendTaskTimer(c.TaskId, c.Minutes, clock);
                 break;
+            case SetTaskTimerCommand c:
+                incident.SetTaskTimer(c.TaskId, c.Minutes, clock);
+                break;
             case AddCoBuildingCommand c:
                 incident.AddCoBuilding(clock, Operator(c.Operator), c.Name, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount, c.ApartmentLabels, c.Gases?.OfType<GasDefinitionDto>().Select(g => g.ToDefinition()));
                 break;
