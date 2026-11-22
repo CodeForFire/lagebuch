@@ -66,12 +66,15 @@ For UI changes, provide a before/after pair. The render harness files are
 diagnostic-only and should not be committed unless they double as a real test.
 
 The README's screenshots and demo GIF come from one such test,
-`DemoFlowRenderTests` — regenerate them with `make screenshots` and
-`make demo-gif` whenever a view they show changes; `make samples` refreshes
-the fictional `docs/samples/uebung.lagebuch` after a schema change. Cutting a
-release re-renders them all anyway ([docs/releasing.md](docs/releasing.md#cutting-a-release)),
-so a pull request that forgets one is caught at the next tag rather than shipped
-for weeks.
+`DemoFlowRenderTests`, via `make screenshots` and `make demo-gif`;
+`make samples` refreshes the fictional `docs/samples/uebung.lagebuch`.
+**A feature pull request does not commit them**, even when it changes a view
+they show: its before/after pair lives in the PR body. Parallel UI branches
+would otherwise all rewrite the same PNGs and GIF, and binaries cannot be
+merged. The committed media is refreshed in one docs-only pull request per
+milestone, and cutting a release re-renders all of it
+([docs/releasing.md](docs/releasing.md#cutting-a-release)), so a README image
+showing the old view is expected until the next tag, not a review finding.
 
 ## Schema migrations
 
