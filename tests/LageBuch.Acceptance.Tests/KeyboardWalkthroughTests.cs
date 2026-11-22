@@ -38,7 +38,7 @@ public class KeyboardWalkthroughTests
             // form takes focus straight away.
             keys.Press(PhysicalKey.Digit4, RawInputModifiers.Control);
             Dispatcher.UIThread.RunJobs();
-            window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
+            window.AssertFocused(Named<AutoCompleteBox>(window, "VehicleBox"));
             keys.Tab();
             keys.Type("FF Nachbarort");
             keys.Tab();

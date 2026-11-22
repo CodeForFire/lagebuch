@@ -119,7 +119,7 @@ public class GlobalShortcutTests
         PressAndSettle(window, DigitKeys[position], RawInputModifiers.Control);
 
         Assert.Equal("FÜHRUNG", vm.SelectedNavItem?.Header);
-        window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
+        window.AssertFocused(Named<AutoCompleteBox>(window, "VehicleBox"));
     }
 
     [AvaloniaFact]
@@ -128,7 +128,7 @@ public class GlobalShortcutTests
         var (window, _, vm) = ShowShell(masterData: WorkspaceRenderHelper.MasterData() with { Navigation = ReorderedNavigation });
         vm.LeadershipTabs.SelectedTabIndex = LeadershipTabsViewModel.ForcesTab;
         PressAndSettle(window, PhysicalKey.Digit1, RawInputModifiers.Control);
-        window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
+        window.AssertFocused(Named<AutoCompleteBox>(window, "VehicleBox"));
 
         PressAndSettle(window, PhysicalKey.N, RawInputModifiers.Control);
 

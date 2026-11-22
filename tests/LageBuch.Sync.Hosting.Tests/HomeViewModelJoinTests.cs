@@ -119,8 +119,8 @@ public class HomeViewModelJoinTests
         Assert.NotNull(opened);
 
         // Pickers come from the host: the FAHRZEUG dropdown lists the host's Stammdaten vehicle.
-        Assert.Contains(opened!.Forces.VehicleOptions, v => v.Wache == "Host-Wache");
-        Assert.DoesNotContain(opened.Forces.VehicleOptions, v => v.Wache == "Client-Wache");
+        Assert.Contains(opened!.Forces.VehicleOptions, v => v.Vehicle.Wache == "Host-Wache");
+        Assert.DoesNotContain(opened.Forces.VehicleOptions, v => v.Vehicle.Wache == "Client-Wache");
 
         // And so does the safety-relevant Atemschutz setting: a Trupp registered from this client
         // is created with the host's Rückzugsdruck, not this device's (#183).

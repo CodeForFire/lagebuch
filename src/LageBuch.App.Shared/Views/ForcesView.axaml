@@ -30,8 +30,21 @@
     <Style Selector="TextBlock#TotalScbaText">
       <Setter Property="FontSize" Value="26" />
     </Style>
-    <Style Selector="ComboBox#VehicleBox">
-      <Setter Property="Width" Value="190" />
+    <!-- 20 wider than the ComboBox was: a pick now reads "Funkrufname · Wache" (#967), and the
+         box keeps 32 on the right for its chevron. -->
+    <Style Selector="AutoCompleteBox#VehicleBox">
+      <Setter Property="Width" Value="210" />
+    </Style>
+    <!-- A plain StackPanel, not the default VirtualizingStackPanel: that one measures only the
+         rows on screen, so the open list took the width of whichever Funkrufnamen were showing
+         and jumped when a long one scrolled in. The Stammdaten hold tens to a few hundred
+         vehicles, few enough to realize them all, as the Stammdaten editor's lists do. -->
+    <Style Selector="AutoCompleteBox#VehicleBox /template/ ListBox">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel />
+        </ItemsPanelTemplate>
+      </Setter>
     </Style>
     <Style Selector="TextBox#BrigadeBox">
       <Setter Property="Width" Value="160" />
@@ -67,10 +80,10 @@
     <Style Selector="Panel#WorkspaceRoot.narrow Border#ForcesCardPanel">
       <Setter Property="IsVisible" Value="True" />
     </Style>
-    <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, and this one
-         shares an inner row with the clear-selection button, so NaN leaves it the width of its
-         longest Funkrufname. 300 fills the line and leaves the button its place. -->
-    <Style Selector="Panel#WorkspaceRoot.narrow ComboBox#VehicleBox">
+    <!-- Explicit rather than NaN: this box shares an inner row with the clear-selection button,
+         a horizontal StackPanel that gives it no width to stretch into, so NaN leaves it the width
+         of its text. 300 fills the line and leaves the button its place. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#VehicleBox">
       <Setter Property="Width" Value="300" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow TextBox#BrigadeBox">
@@ -145,7 +158,9 @@
             Command="{Binding OpenComposerCommand}" />
 
     <!-- Input dock -->
-    <!-- Enter submits from every field, a closed FAHRZEUG included, so a vehicle is ↓ and Enter.
+    <!-- Enter submits from every field. In FAHRZEUG it first takes the row arrowed onto or the
+         Funkrufname completed inline (SuggestionBox.ClaimsEnter), so a vehicle is ↓ ↓ Enter Enter,
+         or part of its Funkrufname, Enter, Enter.
          Focus then goes back to FAHRZEUG; FEUERWEHR keeps its value for the next unit of the same
          Feuerwehr and is selected when Tab reaches it (#540). -->
     <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="2" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
@@ -180,28 +195,35 @@
                leert, was sie vorbelegt hat. -->
           <HeaderedContentControl Classes="field" Header="FAHRZEUG">
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <ComboBox x:Name="VehicleBox"
-                        ItemsSource="{Binding VehicleOptions}"
-                        SelectedItem="{Binding SelectedVehicle}">
-                <!-- A plain StackPanel, not the default VirtualizingStackPanel: that one measures
-                     only the rows on screen, so the open list took the width of whichever
-                     Funkrufnamen were showing and jumped when a long one scrolled in. The
-                     Stammdaten hold tens to a few hundred vehicles, few enough to realize them
-                     all, as the Stammdaten editor's lists do. -->
-                <ComboBox.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <StackPanel />
-                  </ItemsPanelTemplate>
-                </ComboBox.ItemsPanel>
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="md:Vehicle">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <TextBlock Text="{Binding CallSign}" />
-                      <TextBlock Text="{Binding Wache}" Classes="secondary" />
-                    </StackPanel>
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
+              <!-- Typed, it filters on Funkrufname and Wache like every other suggestion box (#967);
+                   picked, the row says both. Its field holds the X as well, so the box draws the
+                   suggestion chevron itself rather than through Classes="field suggest", which
+                   would put it at the field's edge, on top of the X: same glyph, inset and text
+                   padding as there (Theme/Styles.axaml, #259), as FunkgruppeSlotBox does. -->
+              <Grid>
+                <AutoCompleteBox x:Name="VehicleBox"
+                                 ItemsSource="{Binding VehicleOptions}"
+                                 SelectedItem="{Binding SelectedVehicleOption}"
+                                 Text="{Binding VehicleText}"
+                                 ValueMemberBinding="{Binding Text, DataType=vm:VehicleOption}"
+                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0" MaxLength="200"
+                                 Padding="11,7,32,7"
+                                 AutomationProperties.Name="Fahrzeug">
+                  <AutoCompleteBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VehicleOption">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="{Binding Vehicle.CallSign}" />
+                        <TextBlock Text="{Binding Vehicle.Wache}" Classes="secondary" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </AutoCompleteBox.ItemTemplate>
+                </AutoCompleteBox>
+                <PathIcon Width="12" Height="12"
+                          HorizontalAlignment="Right" VerticalAlignment="Center"
+                          Margin="0,0,10,0" IsHitTestVisible="False"
+                          Foreground="{DynamicResource ComboBoxDropDownGlyphForeground}"
+                          Data="M1939 486L2029 576L1024 1581L19 576L109 486L1024 1401L1939 486Z" />
+              </Grid>
               <Button x:Name="ClearVehicleButton" Classes="icon-btn" IsVisible="{Binding IsVehicleSelected}"
                       Command="{Binding ClearVehicleCommand}"
                       ToolTip.Tip="Fahrzeugauswahl aufheben" AutomationProperties.Name="Fahrzeugauswahl aufheben">

@@ -49,9 +49,9 @@ public class TabOrderTests
 
         // ClearVehicleButton is skipped: it stays IsVisible=false (no tab stop) until a vehicle
         // is selected, so it never appears in the reading order for a fresh, manual-entry dock.
-        view.GetControl<ComboBox>("VehicleBox").Focus();
+        view.GetControl<AutoCompleteBox>("VehicleBox").Focus();
         Dispatcher.UIThread.RunJobs();
-        Assert.True(view.GetControl<ComboBox>("VehicleBox").IsKeyboardFocusWithin);
+        Assert.True(view.GetControl<AutoCompleteBox>("VehicleBox").IsKeyboardFocusWithin);
 
         window.Tab();
         Assert.True(view.GetControl<TextBox>("BrigadeBox").IsKeyboardFocusWithin);
