@@ -269,12 +269,7 @@ internal static class GeoTiffFixtures
 
     private static byte[] Longs(IEnumerable<uint> values) => [.. values.SelectMany(U32)];
 
-    private static byte[] Doubles(params double[] values) => [.. values.SelectMany(v =>
-    {
-        var bytes = new byte[8];
-        BinaryPrimitives.WriteDoubleLittleEndian(bytes, v);
-        return bytes;
-    })];
+    private static byte[] Doubles(params double[] values) => [.. values.SelectMany(F64)];
 
     private static byte[] U16(ushort value)
     {
@@ -287,6 +282,13 @@ internal static class GeoTiffFixtures
     {
         var bytes = new byte[4];
         BinaryPrimitives.WriteUInt32LittleEndian(bytes, value);
+        return bytes;
+    }
+
+    private static byte[] F64(double value)
+    {
+        var bytes = new byte[8];
+        BinaryPrimitives.WriteDoubleLittleEndian(bytes, value);
         return bytes;
     }
 }

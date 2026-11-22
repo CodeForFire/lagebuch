@@ -44,8 +44,8 @@ public static class WindowsTitleBar
         }
 
         var attribute = AttributeFor(Environment.OSVersion.Version.Build);
-        var hwnd = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-        if (attribute is null || hwnd == IntPtr.Zero)
+        var hwnd = window.TryGetPlatformHandle()?.Handle ?? nint.Zero;
+        if (attribute is null || hwnd == nint.Zero)
         {
             return;
         }
@@ -58,5 +58,5 @@ public static class WindowsTitleBar
 
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+    private static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
 }

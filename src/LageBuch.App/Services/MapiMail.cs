@@ -73,7 +73,7 @@ internal static class MapiMail
                     FileCount = 1,
                     Files = files,
                 };
-                return (int)MAPISendMailW(IntPtr.Zero, IntPtr.Zero, ref message, MapiLogonUi | MapiDialog, 0);
+                return (int)MAPISendMailW(nint.Zero, nint.Zero, ref message, MapiLogonUi | MapiDialog, 0);
             }
             finally
             {
@@ -88,7 +88,7 @@ internal static class MapiMail
 
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [DllImport("mapi32.dll", CharSet = CharSet.Unicode)]
-    private static extern uint MAPISendMailW(IntPtr session, IntPtr uiParam, ref MapiMessageW message, uint flags, uint reserved);
+    private static extern uint MAPISendMailW(nint session, nint uiParam, ref MapiMessageW message, uint flags, uint reserved);
 
     // MapiMessageW and MapiFileDescW from mapi.h, field for field; ULONG is 32-bit on every Windows.
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -101,11 +101,11 @@ internal static class MapiMail
         public string? DateReceived;
         public string? ConversationId;
         public uint Flags;
-        public IntPtr Originator;
+        public nint Originator;
         public uint RecipientCount;
-        public IntPtr Recipients;
+        public nint Recipients;
         public uint FileCount;
-        public IntPtr Files;
+        public nint Files;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -116,6 +116,6 @@ internal static class MapiMail
         public uint Position;
         public string? PathName;
         public string? FileName;
-        public IntPtr FileType;
+        public nint FileType;
     }
 }

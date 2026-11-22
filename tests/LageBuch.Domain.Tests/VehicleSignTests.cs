@@ -56,7 +56,7 @@ public class VehicleSignTests
     }
 
     [Fact]
-    public void Loeschfahrzeuge_and_gerätewagen_stand_on_three_wheels_a_car_on_two()
+    public void Loeschfahrzeuge_and_geraetewagen_stand_on_three_wheels_a_car_on_two()
     {
         Assert.True(VehicleTypes.SignFor("HLF")?.MiddleWheel);
         Assert.True(VehicleTypes.SignFor("GW-A")?.MiddleWheel);

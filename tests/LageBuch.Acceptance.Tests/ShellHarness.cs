@@ -56,15 +56,15 @@ internal sealed record ShellHarness(Window Window, HomeViewModel Home, MainWindo
     // FakeDialogs, but the PDF save picker answers with a real path the export can write to.
     private sealed class PdfDialogs(string? pdfPath) : IFileDialogService
     {
-        public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
+        public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.lagebuch");
 
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
-        public Task<string?> PickExportPdfAsync(string s) => Task.FromResult(pdfPath);
+        public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(pdfPath);
 
         public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
 
-        public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+        public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 
         public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
 
@@ -85,7 +85,7 @@ internal sealed record ShellHarness(Window Window, HomeViewModel Home, MainWindo
     {
         public MasterDataSet Get() => set;
 
-        public void Save(MasterDataSet s)
+        public void Save(MasterDataSet set)
         {
         }
     }

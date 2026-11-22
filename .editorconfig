@@ -53,6 +53,28 @@ dotnet_diagnostic.SA1204.severity = none
 # dozens of one-line files for no benefit.
 dotnet_diagnostic.SA1402.severity = none
 
+# SA1114/SA1115/SA1117: parameter-list layout. StyleCop 1.3 started applying them to
+# positional records, which 1.2 skipped. The wire and Stammdaten records (IncidentSnapshot.cs,
+# SyncCommand.cs, MasterDataSet.cs, ForceUnit.cs, ...) deliberately keep several short fields
+# on one line, and put each appended, defaulted parameter after a blank line and a comment
+# saying which issue and protocol version added it and why the default keeps old payloads
+# reading. That comment is the record's history; forcing one bare parameter per line would
+# drop the blank-line grouping it relies on, for no change in behaviour.
+dotnet_diagnostic.SA1114.severity = none
+dotnet_diagnostic.SA1115.severity = none
+dotnet_diagnostic.SA1117.severity = none
+
+# SA1143 (new in StyleCop 1.3): wrapped conditional expressions. The codebase writes a
+# multi-way choice as a ternary chain with each `: condition ? value` on its own line, and a
+# long condition wrapped at its `&&`s ahead of `? value : null`. The rule rejects both shapes,
+# and its code fix joins them into single lines of 150-250 characters.
+dotnet_diagnostic.SA1143.severity = none
+
+# SA1504: all accessors single-line or all multi-line. Since StyleCop 1.3 it reports
+# `get => _x;` next to a block-bodied `set` that raises notifications, which 1.2 let pass. That pairing is the idiomatic shape for a view-model property;
+# the code fix only turns the getter into a four-line block that says the same thing.
+dotnet_diagnostic.SA1504.severity = none
+
 # SA1312: local variables must begin with a lower-case letter. Its walker doesn't recognize
 # `using var _ = ...` / `await using var _ = ...` as the discard idiom it is - the test suite
 # uses this pattern throughout for scope-based disposal without a named variable.

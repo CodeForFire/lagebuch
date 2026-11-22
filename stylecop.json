@@ -3,6 +3,12 @@
   "settings": {
     "orderingRules": {
       "usingDirectivesPlacement": "outsideNamespace"
+    },
+    "maintainabilityRules": {
+      "topLevelTypes": [
+        "class",
+        "interface"
+      ]
     }
   }
 }

@@ -276,16 +276,20 @@ public sealed partial class CommandNodeDialogViewModel : ObservableObject
     // The units already on the Einsatz are where a Führungsfahrzeug usually comes from, so they lead;
     // a roster person's Funkrufname is no vehicle and stays out.
     private static IReadOnlyList<string> FahrzeugeOf(IIncidentSession session, MasterDataSet masterData) =>
-        [.. session.Incident.Forces.Select(u => u.CallSign ?? string.Empty)
-            .Concat(masterData.Vehicles.Select(v => v.CallSign))
-            .Select(c => c.Trim())
-            .Where(c => c.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        [
+            .. session.Incident.Forces.Select(u => u.CallSign ?? string.Empty)
+                .Concat(masterData.Vehicles.Select(v => v.CallSign))
+                .Select(c => c.Trim())
+                .Where(c => c.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase),
+        ];
 
     // Each group with its Notiz, so the picker can say what a group is for; a blank Notiz is none.
     private static IReadOnlyList<FunkgruppeOption> OptionsOf(IEnumerable<TalkGroup> groups, Func<TalkGroup, string> text) =>
-        [.. TalkGroup.FavouritesFirst(groups, text)
-            .Select(g => new FunkgruppeOption(text(g), string.IsNullOrWhiteSpace(g.Note) ? null : g.Note.Trim()))];
+        [
+            .. TalkGroup.FavouritesFirst(groups, text)
+                .Select(g => new FunkgruppeOption(text(g), string.IsNullOrWhiteSpace(g.Note) ? null : g.Note.Trim())),
+        ];
 
     private static string[] TextsOf(IReadOnlyList<FunkgruppeOption> options) => [.. options.Select(o => o.Text)];
 

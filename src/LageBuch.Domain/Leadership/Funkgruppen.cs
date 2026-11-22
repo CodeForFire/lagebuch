@@ -74,11 +74,13 @@ public sealed record Funkgruppen
         groups.Count == 0 ? string.Empty : $"{kind} {string.Join(", ", groups)}";
 
     private static string[] Salvage(IEnumerable<string?>? groups) =>
-        [.. (groups ?? [])
-            .Select(g => g?.Trim() ?? string.Empty)
-            .Where(g => g.Length is > 0 and <= CommandNode.MaxTextLength)
-            .Distinct(StringComparer.Ordinal)
-            .Take(MaxPerKind)];
+        [
+            .. (groups ?? [])
+                .Select(g => g?.Trim() ?? string.Empty)
+                .Where(g => g.Length is > 0 and <= CommandNode.MaxTextLength)
+                .Distinct(StringComparer.Ordinal)
+                .Take(MaxPerKind),
+        ];
 
     private static string[] Clean(IReadOnlyList<string> groups, string kind)
     {
