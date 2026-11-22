@@ -99,7 +99,7 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
         {
             // Not cancellable; see the note on SND_ASYNC above. False when winmm could not play it,
             // e.g. no output device.
-            return PlaySound(bytes, IntPtr.Zero, SndMemory | SndNodefault);
+            return PlaySound(bytes, nint.Zero, SndMemory | SndNodefault);
         }
 
         var path = TempFileFor(sound, bytes);
@@ -223,5 +223,5 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
 
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [DllImport("winmm.dll", CharSet = CharSet.Auto)]
-    private static extern bool PlaySound(byte[]? data, IntPtr hModule, uint flags);
+    private static extern bool PlaySound(byte[]? data, nint hModule, uint flags);
 }

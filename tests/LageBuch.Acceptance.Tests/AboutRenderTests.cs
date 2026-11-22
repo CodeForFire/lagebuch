@@ -192,7 +192,7 @@ public class AboutRenderTests
     {
         public MasterDataSet Get() => set;
 
-        public void Save(MasterDataSet s)
+        public void Save(MasterDataSet set)
         {
         }
     }

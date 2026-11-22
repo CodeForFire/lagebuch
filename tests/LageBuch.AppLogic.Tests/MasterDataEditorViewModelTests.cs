@@ -43,11 +43,11 @@ public class MasterDataEditorViewModelTests
 
         public string? ExportPath { get; set; }
 
-        public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>(null);
+        public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>(null);
 
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
-        public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+        public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 
         /// <summary>When set, the pick faults instead of returning a path — the Android shape.</summary>
         public Exception? ImportFailure { get; set; }
@@ -56,7 +56,7 @@ public class MasterDataEditorViewModelTests
             ? Task.FromResult(ImportPath)
             : Task.FromException<string?>(ImportFailure);
 
-        public Task<string?> PickExportJsonAsync(string s) => Task.FromResult(ExportPath);
+        public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult(ExportPath);
 
         public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
 

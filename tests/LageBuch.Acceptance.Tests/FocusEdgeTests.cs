@@ -179,7 +179,7 @@ public class FocusEdgeTests
     {
         public MasterDataSet Get() => set;
 
-        public void Save(MasterDataSet s)
+        public void Save(MasterDataSet set)
         {
         }
     }

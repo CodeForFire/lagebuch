@@ -221,7 +221,8 @@ public sealed class GasmessungViewModelTests
         Assert.Superset(
             new HashSet<string?>([
                 nameof(cell.Worst), nameof(cell.GasValueRows), nameof(cell.CoDisplay), nameof(cell.CoCompact),
-                nameof(cell.IsCoElevated), nameof(cell.IsCoDangerous), nameof(cell.IsCoLethal), .. tooltip]),
+                nameof(cell.IsCoElevated), nameof(cell.IsCoDangerous), nameof(cell.IsCoLethal), .. tooltip,
+            ]),
             changed.ToHashSet());
 
         changed.Clear();

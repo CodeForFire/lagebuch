@@ -5,14 +5,14 @@ namespace LageBuch.App.Shared;
 
 public sealed class ViewLocator : IDataTemplate
 {
-    public Control Build(object? data)
+    public Control Build(object? param)
     {
-        if (data is null)
+        if (param is null)
         {
             return new TextBlock { Text = "—" };
         }
 
-        var shortName = data.GetType().Name.Replace("ViewModel", "View", StringComparison.Ordinal);
+        var shortName = param.GetType().Name.Replace("ViewModel", "View", StringComparison.Ordinal);
         var type = Type.GetType($"LageBuch.App.Shared.Views.{shortName}, LageBuch.App.Shared");
 
         return type is not null

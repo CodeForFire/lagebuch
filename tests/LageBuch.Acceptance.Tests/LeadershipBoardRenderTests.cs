@@ -1181,9 +1181,11 @@ public class LeadershipBoardRenderTests
         card.GetVisualDescendants().OfType<Border>().First(b => b.Name == "NodeIntoStrip" && ReferenceEquals(b.DataContext, card.DataContext));
 
     private static string[] TopLevelOrder(LocalIncidentSession session) =>
-        [.. session.Incident.CommandNodes
-            .Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, null))
-            .Select(n => n.Name)];
+        [
+            .. session.Incident.CommandNodes
+                .Where(n => n.IsLive && CommandNodeMoves.IsSiblingAt(n, null))
+                .Select(n => n.Name),
+        ];
 
     // The card's own SUMME, matched by its node so a lookup never strays into another card.
     private static TextBlock SumOf(Border card) =>

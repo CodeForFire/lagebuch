@@ -14,6 +14,10 @@ public sealed record IncidentFile
 
     public const long MaxSizeBytes = MaxSizeMegabytes * 1024 * 1024;
 
+    /// <summary>The generic fallback used where "unknown" should still mean a concrete, valid MIME
+    /// type rather than Android's wildcard intent type — see <see cref="GetMimeType"/>.</summary>
+    public const string DefaultMimeType = "application/octet-stream";
+
     /// <summary>
     /// The one wording for a file over <see cref="MaxSizeBytes"/> — shared by the domain guard, the
     /// view model's pre-read size check and the joined client's upload guard, so the user reads the
@@ -65,10 +69,6 @@ public sealed record IncidentFile
             [".jpeg"] = "image/jpeg",
             [".png"] = "image/png",
         };
-
-    /// <summary>The generic fallback used where "unknown" should still mean a concrete, valid MIME
-    /// type rather than Android's wildcard intent type — see <see cref="GetMimeType"/>.</summary>
-    public const string DefaultMimeType = "application/octet-stream";
 
     /// <summary>
     /// Maps a local file path's extension to the MIME type <see cref="MimeTypesByExtension"/>

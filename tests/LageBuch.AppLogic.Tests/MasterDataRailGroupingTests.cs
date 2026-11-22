@@ -33,15 +33,15 @@ public class MasterDataRailGroupingTests
 
     private sealed class Dialogs : IFileDialogService
     {
-        public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>(null);
+        public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>(null);
 
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
-        public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+        public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 
         public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
 
-        public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+        public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 
         public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
 

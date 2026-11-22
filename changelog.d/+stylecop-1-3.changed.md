@@ -1,0 +1,1 @@
+StyleCop.Analyzers moves from the 1.2 beta to its first stable release, 1.3.180, with the code brought in line with its new findings and the few rules that contradict the codebase's deliberate record and ternary-chain layout turned off.

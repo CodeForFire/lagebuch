@@ -17,7 +17,7 @@ namespace LageBuch.App.Android;
 [Application]
 public class MainApplication : AvaloniaAndroidApplication<SharedApp>
 {
-    public MainApplication(IntPtr handle, JniHandleOwnership ownership)
+    public MainApplication(nint handle, JniHandleOwnership ownership)
         : base(handle, ownership)
     {
     }
