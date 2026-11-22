@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// The Führung rail entry: the Führungsorganisation board, Funktionen, Kräfte and the Lagekarte as
+/// The Führung rail entry: Kräfte, Funktionen, the Führungsorganisation board and the Lagekarte as
 /// tabs of one module. They describe the same structure — who leads, who holds which post, which unit
 /// sits where — and as three rail entries they crowded the rail and the phone's bottom bar.
 /// </summary>
@@ -13,19 +13,22 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </remarks>
 public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowAware
 {
-    /// <summary>The ORGANISATION tab, which Führung opens on.</summary>
-    public const int OrganisationTab = 0;
+    // The order an Einsatz works through them (#970): who has arrived, who holds which post, how
+    // they are organised, where they stand.
+
+    /// <summary>The KRÄFTE tab, which Führung opens on.</summary>
+    public const int ForcesTab = 0;
 
     /// <summary>The FUNKTIONEN tab.</summary>
     public const int RolesTab = 1;
 
-    /// <summary>The KRÄFTE tab.</summary>
-    public const int ForcesTab = 2;
+    /// <summary>The ORGANISATION tab.</summary>
+    public const int OrganisationTab = 2;
 
     /// <summary>The LAGEKARTE tab.</summary>
     public const int MapTab = 3;
 
-    public LeadershipTabsViewModel(LeadershipViewModel board, RolesViewModel roles, ForcesViewModel forces, LagekarteViewModel map, int selectedTabIndex = OrganisationTab)
+    public LeadershipTabsViewModel(LeadershipViewModel board, RolesViewModel roles, ForcesViewModel forces, LagekarteViewModel map, int selectedTabIndex = ForcesTab)
     {
         ArgumentNullException.ThrowIfNull(board);
         ArgumentNullException.ThrowIfNull(roles);
@@ -36,7 +39,7 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
         Roles = roles;
         Forces = forces;
         Map = map;
-        _selectedTabIndex = selectedTabIndex is >= OrganisationTab and <= MapTab ? selectedTabIndex : OrganisationTab;
+        _selectedTabIndex = selectedTabIndex is >= ForcesTab and <= MapTab ? selectedTabIndex : ForcesTab;
     }
 
     public LeadershipViewModel Board { get; }
@@ -47,7 +50,7 @@ public sealed partial class LeadershipTabsViewModel : ObservableObject, INarrowA
 
     public LagekarteViewModel Map { get; }
 
-    /// <summary>The open tab, one of <see cref="OrganisationTab"/>, <see cref="RolesTab"/>, <see cref="ForcesTab"/> and <see cref="MapTab"/>.</summary>
+    /// <summary>The open tab, one of <see cref="ForcesTab"/>, <see cref="RolesTab"/>, <see cref="OrganisationTab"/> and <see cref="MapTab"/>.</summary>
     [ObservableProperty]
     private int _selectedTabIndex;
 

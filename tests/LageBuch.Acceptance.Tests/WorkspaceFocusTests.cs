@@ -193,6 +193,7 @@ public class WorkspaceFocusTests
     public void Clicking_the_kraefte_tab_inside_fuehrung_focuses_its_first_field()
     {
         var (window, _, vm) = ShowWorkspace();
+        ClickTab(window, "ORGANISATION");
 
         ClickTab(window, "KRÄFTE");
 
@@ -276,7 +277,7 @@ public class WorkspaceFocusTests
         // Headless tests cannot build a RemoteIncidentSession; closing runs the same rebuild a
         // synced read-only flip does (the sync side is WorkspaceCollaborationTests).
         var (window, _, vm) = ShowWorkspace();
-        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
+        WorkspaceRenderHelper.SelectTab(window, "ORGANISATION");
         FocusByTab(SelectedRailTab(window));
 
         vm.CloseIncidentCommand.Execute(null);
@@ -285,7 +286,7 @@ public class WorkspaceFocusTests
 
         Assert.True(vm.IsReadOnly);
         Assert.Same(vm.LeadershipTabs, vm.SelectedNavItem?.Content);
-        Assert.Equal(LeadershipTabsViewModel.ForcesTab, vm.LeadershipTabs.SelectedTabIndex);
+        Assert.Equal(LeadershipTabsViewModel.OrganisationTab, vm.LeadershipTabs.SelectedTabIndex);
         Assert.Equal("FÜHRUNG", ((WorkspaceNavItemViewModel)SelectedRailTab(window).DataContext!).Header);
         window.AssertFocused(SelectedRailTab(window));
     }

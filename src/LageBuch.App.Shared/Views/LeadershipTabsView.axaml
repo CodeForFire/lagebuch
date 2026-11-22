@@ -3,18 +3,19 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              x:Class="LageBuch.App.Shared.Views.LeadershipTabsView"
              x:DataType="vm:LeadershipTabsViewModel">
-  <!-- Führung: the board, Funktionen and Kräfte as one rail entry. The tab names what the
+  <!-- Führung: Kräfte, Funktionen, the board and the Lagekarte as one rail entry, in the order an
+       Einsatz works through them (#970): Führung opens on Kräfte, the first. The tab names what the
        heading inside each module used to say, so those headings are gone. The strip is the
        module-tabs style in Theme/Styles.axaml, not the rail's: it stays visible on a phone, where
        the bottom bar only says FÜHRUNG. -->
   <TabControl x:Name="LeadershipTabStrip" Classes="module-tabs" TabStripPlacement="Top"
               SelectedIndex="{Binding SelectedTabIndex}">
-    <TabItem x:Name="OrganisationTab" Header="ORGANISATION" AutomationProperties.Name="Organisation"
-             Content="{Binding Board}" />
-    <TabItem x:Name="RolesTab" Header="FUNKTIONEN" AutomationProperties.Name="Funktionen"
-             Content="{Binding Roles}" />
     <TabItem x:Name="ForcesTab" Header="KRÄFTE" AutomationProperties.Name="Kräfte"
              Content="{Binding Forces}" />
+    <TabItem x:Name="RolesTab" Header="FUNKTIONEN" AutomationProperties.Name="Funktionen"
+             Content="{Binding Roles}" />
+    <TabItem x:Name="OrganisationTab" Header="ORGANISATION" AutomationProperties.Name="Organisation"
+             Content="{Binding Board}" />
     <TabItem x:Name="MapTab" Header="LAGEKARTE" AutomationProperties.Name="Lagekarte"
              Content="{Binding Map}" />
   </TabControl>

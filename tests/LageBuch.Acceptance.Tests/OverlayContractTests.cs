@@ -343,7 +343,7 @@ public class OverlayContractTests
     private static Opened OpenWorkspaceCommandNodeDialog()
     {
         var (window, vm) = ShowWorkspace();
-        WorkspaceRenderHelper.SelectTab(window, "FÜHRUNG");
+        WorkspaceRenderHelper.SelectTab(window, "ORGANISATION");
         var opener = Named<Button>(window, "LeadershipAddAbschnittButton");
         Activate(opener);
         return new(window, opener, ViewOf<CommandNodeDialogView>(window), () => vm.PendingCommandNodeDialog is null, () => vm.PendingCommandNodeDialog?.CancelCommand.Execute(null));
@@ -353,7 +353,7 @@ public class OverlayContractTests
     private static Opened OpenWorkspaceDispatchChannelDialog()
     {
         var (window, vm) = ShowWorkspace();
-        WorkspaceRenderHelper.SelectTab(window, "FÜHRUNG");
+        WorkspaceRenderHelper.SelectTab(window, "ORGANISATION");
         var opener = Named<Button>(window, "DispatchCentreBadge");
         Activate(opener);
         return new(window, opener, ViewOf<DispatchChannelDialogView>(window), () => vm.PendingDispatchChannelDialog is null && vm.Leadership.DispatchCentreText == "ILS", () => vm.PendingDispatchChannelDialog?.CancelCommand.Execute(null));
@@ -362,7 +362,7 @@ public class OverlayContractTests
     private static Opened OpenWorkspaceLeadershipPersonDialog()
     {
         var (window, vm) = ShowWorkspace();
-        WorkspaceRenderHelper.SelectTab(window, "FÜHRUNG");
+        WorkspaceRenderHelper.SelectTab(window, "ORGANISATION");
         var opener = Named<Button>(window, "LeadershipSetElButton");
         Activate(opener);
         return new(window, opener, ViewOf<LeadershipPersonDialogView>(window), () => vm.PendingLeadershipPersonDialog is null, () => vm.PendingLeadershipPersonDialog?.CancelCommand.Execute(null));

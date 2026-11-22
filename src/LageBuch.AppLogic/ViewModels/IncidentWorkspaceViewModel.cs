@@ -1098,7 +1098,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var reopenEtbTab = EtbTabs is { } etbTabs ? etbTabs.SelectedTabIndex : EtbTabsViewModel.JournalTab;
 
         // The same goes for the tab Führung had open.
-        var reopenTab = LeadershipTabs is { } tabs ? tabs.SelectedTabIndex : LeadershipTabsViewModel.OrganisationTab;
+        var reopenTab = LeadershipTabs is { } tabs ? tabs.SelectedTabIndex : LeadershipTabsViewModel.ForcesTab;
 
         DisposeChildren();
 
