@@ -402,7 +402,7 @@
         "type": "Project",
         "dependencies": {
           "LageBuch.Domain": "[1.0.0, )",
-          "QuestPDF": "[2026.9.1, )"
+          "QuestPDF": "[2026.9.2, )"
         }
       },
       "lagebuch.domain": {
@@ -500,9 +500,9 @@
       },
       "QuestPDF": {
         "type": "CentralTransitive",
-        "requested": "[2026.9.1, )",
-        "resolved": "2026.9.1",
-        "contentHash": "i2BT/v+Ui6Hg9+BZbOci/VfsyvmtY8nlQqAOmFt8iOZ4Hm9aKZZRgZZ+LfrKWYXAHRb3l1EjDcMVfjRaZTt+Cw=="
+        "requested": "[2026.9.2, )",
+        "resolved": "2026.9.2",
+        "contentHash": "Nc7nvV/CmL/lonuw1mTQbiETfU7EZoM2kZ9YRgdbC5VivVjxsMHPJ18g4t5FMx/jUGh6XpJXFfW1rFWvAYOeTg=="
       },
       "SkiaSharp": {
         "type": "CentralTransitive",

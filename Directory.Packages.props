@@ -27,7 +27,7 @@
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageVersion Include="PdfPig" Version="0.1.16" />
-    <PackageVersion Include="QuestPDF" Version="2026.9.1" />
+    <PackageVersion Include="QuestPDF" Version="2026.9.2" />
     <!-- Already shipped by Avalonia.Skia; referenced directly so the map can ask a picture's codec its size before decoding (RasterOverlayCache). Keep on the version Avalonia.Skia resolves. -->
     <PackageVersion Include="SkiaSharp" Version="3.119.4" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
