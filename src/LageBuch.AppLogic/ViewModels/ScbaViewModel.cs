@@ -385,6 +385,10 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
     private bool _maxDurationUserEdited;
 
+    // A number typed for a numbered Trupp-Art (#995) survives a Trupp registered elsewhere; only
+    // the suggestion moves on.
+    private bool _typeNumberUserEdited;
+
     // Same idea for the Abfrage-Intervall, which otherwise defaults to a third of the Einsatzzeit
     // (#78) -- a hand-typed interval must survive a later Einsatzzeit change.
     private bool _controlIntervalUserEdited;
@@ -410,6 +414,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         _newReturnPressureBar = _settings.ReturnPressureBar;
         _newEntryPressure = 300;
         _newTruppNumber = session.Incident.NextFreeScbaTruppNumber();
+        _newTypeNumber = 1;
         IsReadOnly = session.IsReadOnly;
         _truppTypes = masterData.TruppTypes;
         TruppTypeOptions = masterData.TruppTypes.Select(t => t.Name).ToArray();
@@ -475,7 +480,47 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     [NotifyPropertyChangedFor(nameof(NewZweiterTruppmannError))]
     [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     [NotifyPropertyChangedFor(nameof(RequiresThirdMember))]
+    [NotifyPropertyChangedFor(nameof(IsNamedByNumber))]
+    [NotifyPropertyChangedFor(nameof(NewTypeNumberError))]
     private string _newDesignation = string.Empty;
+
+    /// <summary>
+    /// Whether the selected Trupp-Typ is called by a number rather than a Funkrufname (#995), per
+    /// its Stammdaten row. The form then shows NUMMER in place of FUNKRUFNAME and the Trupp is
+    /// registered as "CSA-Trupp 1". An unlisted designation is named by Funkrufname, as ever.
+    /// </summary>
+    public bool IsNamedByNumber =>
+        StammdatenCatalogue.Find(NewDesignation, _truppTypes)?.NamedByNumber == true;
+
+    /// <summary>
+    /// The number a numbered Trupp-Typ's Trupp is called by: suggested as the next one free for
+    /// that Trupp-Art in this Einsatz, and the Lagebuchführer's to overwrite (#995). Unlike
+    /// <see cref="NewTruppNumber"/> this is user-edited, so a taken number is refused with a
+    /// message rather than ever reaching the domain.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewTypeNumberError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
+    private int _newTypeNumber;
+
+    partial void OnNewTypeNumberChanged(int value)
+    {
+        if (!_applyingDefault)
+        {
+            _typeNumberUserEdited = true;
+        }
+    }
+
+    // Asked only for a numbered Trupp-Art: the TRUPP-ART ComboBox writes null into NewDesignation
+    // when its selection is cleared on reset, despite the property's type, and the query must
+    // never see that.
+    private void ApplyDefaultTypeNumber()
+    {
+        var previous = _applyingDefault;
+        _applyingDefault = true;
+        NewTypeNumber = IsNamedByNumber ? _session.Incident.NextFreeTypeNumber(NewDesignation) : 1;
+        _applyingDefault = previous;
+    }
 
     /// <summary>
     /// Whether the selected Trupp-Typ is crewed by three, according to the Stammdaten. Drives the
@@ -568,6 +613,11 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         {
             ApplyDefaultMaxDuration();
         }
+
+        // Another Trupp-Art counts its own numbers, so a number typed for the previous one means
+        // nothing for this one.
+        _typeNumberUserEdited = false;
+        ApplyDefaultTypeNumber();
     }
 
     private void ApplyDefaultMaxDuration()
@@ -785,10 +835,18 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     /// <summary>Whether the Trupp-Art is still missing, once the operator has asked (#412).</summary>
     /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
     public string? ErrorSummary => ValidationMessages.Summarize(
-        NewDesignationError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError);
+        NewDesignationError, NewTypeNumberError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError);
 
     public string? NewDesignationError =>
         _errorsShown && string.IsNullOrWhiteSpace(NewDesignation) ? ValidationMessages.Required : null;
+
+    /// <summary>A numbered Trupp-Art's number, missing or already given to another Trupp of that
+    /// Trupp-Art in this Einsatz (#995). Silent for every other Trupp-Art, which has no number box.</summary>
+    public string? NewTypeNumberError =>
+        !_errorsShown || !IsNamedByNumber ? null
+        : NewTypeNumber <= 0 ? ValidationMessages.Required
+        : _session.Incident.IsTypeNumberInUse(NewDesignation, NewTypeNumber) ? ValidationMessages.TypeNumberInUse
+        : null;
 
     /// <summary>Whether the Truppführer is still missing, once asked (#412).</summary>
     public string? NewTruppfuehrerError =>
@@ -855,6 +913,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     {
         ShowErrors(true);
         return NewDesignationError is null
+               && NewTypeNumberError is null
                && NewTruppfuehrerError is null
                && NewTruppmannError is null
                && NewZweiterTruppmannError is null
@@ -866,6 +925,8 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     {
         _errorsShown = shown;
         OnPropertyChanged(nameof(NewDesignationError));
+        OnPropertyChanged(nameof(ErrorSummary));
+        OnPropertyChanged(nameof(NewTypeNumberError));
         OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTruppfuehrerError));
         OnPropertyChanged(nameof(ErrorSummary));
@@ -894,7 +955,10 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         var crew = BuildCrew();
         var membersDisplay = string.Join(" / ", crew.Select(m => m.Name));
         var designation = NewDesignation;
-        var callSign = NewCallSign;
+
+        // A numbered Trupp-Art is called "CSA-Trupp 1" (#995). The name is copied into the
+        // Trupp's own Funkrufname here, so the record keeps it whatever the Stammdaten say later.
+        var callSign = IsNamedByNumber ? AtemschutzTrupp.NumberedCallSign(NewDesignation, NewTypeNumber) : NewCallSign;
         var truppNumber = NewTruppNumber;
         var entryPressure = NewEntryPressure;
         var displayName = AtemschutzTrupp.FormatDisplayName(callSign, designation);
@@ -916,6 +980,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
         _maxDurationUserEdited = false;
         _controlIntervalUserEdited = false;
+        _typeNumberUserEdited = false;
         NewDesignation = string.Empty;
         NewTruppfuehrer = string.Empty;
         NewTruppmann = string.Empty;
@@ -1266,6 +1331,13 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         // Another device may have just taken the suggested number -- re-suggest (#217: the number
         // is never user-edited, so there is nothing to clobber).
         NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber();
+
+        // The same for a numbered Trupp-Art's number (#995) -- but that one is user-edited, so a
+        // number somebody typed stays, and the press tells them if it has been taken meanwhile.
+        if (!_typeNumberUserEdited)
+        {
+            ApplyDefaultTypeNumber();
+        }
 
         // Replaced only when the list really differs: swapping an ItemsSource under an open
         // dropdown is what froze the Atemschutz picker in #408.

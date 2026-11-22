@@ -12,12 +12,13 @@ public sealed partial class TruppTypeRow : ObservableObject
 {
     private readonly Action _onChanged;
 
-    public TruppTypeRow(string name, int memberCount, int maxDurationMinutes, Action onChanged)
+    public TruppTypeRow(string name, int memberCount, int maxDurationMinutes, Action onChanged, bool namedByNumber = false)
     {
         _onChanged = onChanged;
         _name = name;
         _memberCount = memberCount;
         _maxDurationMinutes = maxDurationMinutes;
+        _namedByNumber = namedByNumber;
     }
 
     /// <summary>Lowest crew the view's NumericUpDown offers -- a Trupp is never one person.</summary>
@@ -42,9 +43,16 @@ public sealed partial class TruppTypeRow : ObservableObject
     [ObservableProperty]
     private int _maxDurationMinutes;
 
+    /// <summary>"Funkrufname aus Nummer" (#995): the Atemschutz form asks for a number instead of a
+    /// Funkrufname and names the Trupp after its type, "CSA-Trupp 1".</summary>
+    [ObservableProperty]
+    private bool _namedByNumber;
+
     partial void OnNameChanged(string value) => _onChanged();
 
     partial void OnMemberCountChanged(int value) => _onChanged();
 
     partial void OnMaxDurationMinutesChanged(int value) => _onChanged();
+
+    partial void OnNamedByNumberChanged(bool value) => _onChanged();
 }

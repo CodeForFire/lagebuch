@@ -1400,18 +1400,20 @@
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- A fixed trailing width matching the row template's icon-btn button, as in the
                        Fahrzeuge template above: "Auto" would size to this Grid's own empty content. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,150,32" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,150,90,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="TYP" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="STÄRKE" Classes="overline" FontSize="10"
                                ToolTip.Tip="Personen im Trupp: 2, oder 3 mit zweitem Truppmann" />
                     <TextBlock Grid.Column="2" Text="EINSATZZEIT" Classes="overline" FontSize="10"
                                ToolTip.Tip="Vorgeschlagene Einsatzzeit bei der Anmeldung" />
+                    <TextBlock Grid.Column="3" Text="NUMMER" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Funkrufname aus Nummer, z. B. „CSA-Trupp 1“" />
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TruppTypeRow">
-                          <Grid ColumnDefinitions="*,110,150,32" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,110,150,90,32" Margin="0,0,0,6">
                             <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="Angriffstrupp" />
                             <!-- Bounds are bound, not written in: a Trupp has as many positions as
@@ -1424,9 +1426,15 @@
                                            Maximum="{Binding MaxDurationLimitMinutes}"
                                            FormatString="0" Value="{Binding MaxDurationMinutes}"
                                            VerticalAlignment="Center" />
+                            <!-- #995: the Trupp is called by a number, "CSA-Trupp 1", rather than
+                                 by a vehicle's Funkrufname. -->
+                            <CheckBox Grid.Column="3" IsChecked="{Binding NamedByNumber}"
+                                      VerticalAlignment="Center"
+                                      ToolTip.Tip="Funkrufname aus Nummer, z. B. „CSA-Trupp 1“"
+                                      AutomationProperties.Name="Funkrufname aus Nummer" />
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
                                  $parent path cannot resolve here. -->
-                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
