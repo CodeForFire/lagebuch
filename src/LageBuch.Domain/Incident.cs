@@ -1,3 +1,4 @@
+using System.Globalization;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Equipment;
@@ -1727,6 +1728,26 @@ public sealed class Incident
         return _scbaTrupps.Any(t => string.Equals(t.CallSign, callSign, StringComparison.Ordinal));
     }
 
+    /// <summary>The trimmed <paramref name="callSign"/> when it has the shape
+    /// <see cref="AtemschutzTrupp.NumberedCallSign"/> gives for <paramref name="designation"/> and
+    /// a Trupp of this incident, running or abgenommen, already carries it; otherwise null. Any
+    /// other Funkrufname may repeat: a vehicle's is shared by every Trupp it brings.</summary>
+    private string? TakenNumberedCallSign(string designation, string? callSign)
+    {
+        if (string.IsNullOrWhiteSpace(callSign) || string.IsNullOrWhiteSpace(designation))
+        {
+            return null;
+        }
+
+        var name = callSign.Trim();
+        var prefix = designation.Trim() + " ";
+        return name.StartsWith(prefix, StringComparison.Ordinal)
+            && int.TryParse(name.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+            && IsTypeNumberInUse(designation, number)
+            ? name
+            : null;
+    }
+
     /// <summary>
     /// The running assignment holding <paramref name="role"/> in <paramref name="section"/>, or null
     /// when that slot is free. A pure query — it decides nothing and writes nothing, the same stance
@@ -1838,6 +1859,14 @@ public sealed class Incident
         if (_scbaTrupps.Any(t => t.TruppNumber == number))
         {
             throw new ArgumentException($"Truppnummer {number} ist bereits vergeben.", nameof(truppNumber));
+        }
+
+        // A numbered Funkrufname ("CSA-Trupp 1", #995) names one Trupp for the whole Einsatz, and
+        // this is where every client's Trupp lands: the form's own check cannot see a peer at 44
+        // typing it freely, or a second form choosing the same number at the same moment.
+        if (TakenNumberedCallSign(designation, callSign) is { } taken)
+        {
+            throw new ArgumentException($"{taken} ist bereits vergeben.", nameof(callSign));
         }
 
         var trupp = AtemschutzTrupp.Register(

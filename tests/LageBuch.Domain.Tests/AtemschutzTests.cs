@@ -742,6 +742,39 @@ public class AtemschutzTests
         Assert.Equal(2, incident.NextFreeTypeNumber("CSA-Trupp"));
     }
 
+    // The form refuses a taken number, but the host is where every client's Trupp lands: a
+    // protocol-44 peer types the Funkrufname freely, and two forms can pick the same number at
+    // once. The domain refuses the second "CSA-Trupp 1" itself, running or abgenommen alike.
+    [Fact]
+    public void A_numbered_call_sign_already_held_is_refused()
+    {
+        var incident = NewIncident(out var clock);
+        var first = incident.AddScbaTrupp(
+            clock, "CSA-Trupp", TruppMember.Crew("Maier", "Wagner", "Fischer"), entryPressure: 300, callSign: "CSA-Trupp 1");
+        first.Start(T0);
+        first.Withdraw(T0.AddMinutes(18));
+        first.MarkRemoved(T0.AddMinutes(20));
+
+        var ex = Assert.Throws<ArgumentException>(() => incident.AddScbaTrupp(
+            clock, "CSA-Trupp", TruppMember.Crew("Huber", "Bauer", "Koch"), entryPressure: 300, callSign: " CSA-Trupp 1 "));
+
+        Assert.Equal("callSign", ex.ParamName);
+        Assert.StartsWith("CSA-Trupp 1 ist bereits vergeben.", ex.Message, StringComparison.Ordinal);
+        Assert.Single(incident.ScbaTrupps);
+    }
+
+    // A vehicle's Funkrufname is shared by every Trupp it brings, so only the numbered shape is
+    // unique: two Angriffstrupps of one HLF stay allowed.
+    [Fact]
+    public void A_vehicle_call_sign_may_repeat()
+    {
+        var incident = NewIncident(out var clock);
+        incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300, callSign: "HLF 1");
+        incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Huber", "Bauer"), entryPressure: 300, callSign: "HLF 1");
+
+        Assert.Equal(2, incident.ScbaTrupps.Count);
+    }
+
     [Fact]
     public void FormatDisplayName_matches_the_instance_property()
     {

@@ -1400,41 +1400,56 @@
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- A fixed trailing width matching the row template's icon-btn button, as in the
                        Fahrzeuge template above: "Auto" would size to this Grid's own empty content. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,150,90,32" Margin="0,0,0,6">
+                  <!-- The Funkgruppen layout: on a phone the three fields drop under the name,
+                       which 350px of fixed columns would otherwise squeeze to nothing. The
+                       empty Auto column stands where Funkgruppen have their note. -->
+                  <Grid DockPanel.Dock="Top" Classes="pick-header" ColumnDefinitions="*,Auto,Auto,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="TYP" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="1" Text="STÄRKE" Classes="overline" FontSize="10"
-                               ToolTip.Tip="Personen im Trupp: 2, oder 3 mit zweitem Truppmann" />
-                    <TextBlock Grid.Column="2" Text="EINSATZZEIT" Classes="overline" FontSize="10"
-                               ToolTip.Tip="Vorgeschlagene Einsatzzeit bei der Anmeldung" />
-                    <TextBlock Grid.Column="3" Text="NUMMER" Classes="overline" FontSize="10"
-                               ToolTip.Tip="Funkrufname aus Nummer, z. B. „CSA-Trupp 1“" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                      <TextBlock Width="110" Text="STÄRKE" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Personen im Trupp: 2, oder 3 mit zweitem Truppmann" />
+                      <TextBlock Width="150" Text="EINSATZZEIT" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Vorgeschlagene Einsatzzeit bei der Anmeldung" />
+                      <TextBlock Width="90" Text="NUMMER" Classes="overline" FontSize="10"
+                                 ToolTip.Tip="Funkrufname aus Nummer, z. B. „CSA-Trupp 1“" />
+                    </StackPanel>
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TruppTypeRow">
-                          <Grid ColumnDefinitions="*,110,150,90,32" Margin="0,0,0,6">
-                            <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
+                          <Grid Classes="pick-row" ColumnDefinitions="*,Auto,Auto,32" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,0,0,6">
+                            <Border Grid.Row="3" Grid.ColumnSpan="4" Classes="row-rule" />
+                            <TextBox Grid.Column="0" Classes="row-name" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="Angriffstrupp" />
-                            <!-- Bounds are bound, not written in: a Trupp has as many positions as
-                                 TruppRole has, and the control must never drift from it. -->
-                            <NumericUpDown Grid.Column="1" Width="90" Increment="1" FormatString="0"
-                                           Minimum="{Binding MinMemberCount}"
-                                           Maximum="{Binding MaxMemberCount}"
-                                           Value="{Binding MemberCount}" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Column="2" Width="110" Minimum="1" Increment="1"
-                                           Maximum="{Binding MaxDurationLimitMinutes}"
-                                           FormatString="0" Value="{Binding MaxDurationMinutes}"
-                                           VerticalAlignment="Center" />
-                            <!-- #995: the Trupp is called by a number, "CSA-Trupp 1", rather than
-                                 by a vehicle's Funkrufname. -->
-                            <CheckBox Grid.Column="3" IsChecked="{Binding NamedByNumber}"
-                                      VerticalAlignment="Center"
-                                      ToolTip.Tip="Funkrufname aus Nummer, z. B. „CSA-Trupp 1“"
-                                      AutomationProperties.Name="Funkrufname aus Nummer" />
+                            <WrapPanel Classes="row-extras">
+                              <!-- Bounds are bound, not written in: a Trupp has as many positions as
+                                   TruppRole has, and the control must never drift from it. -->
+                              <StackPanel Width="110" VerticalAlignment="Center">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="STÄRKE" />
+                                <NumericUpDown Width="90" HorizontalAlignment="Left" Increment="1" FormatString="0"
+                                               Minimum="{Binding MinMemberCount}"
+                                               Maximum="{Binding MaxMemberCount}"
+                                               Value="{Binding MemberCount}" />
+                              </StackPanel>
+                              <StackPanel Width="150" VerticalAlignment="Center">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="EINSATZZEIT" />
+                                <NumericUpDown Width="110" HorizontalAlignment="Left" Minimum="1" Increment="1"
+                                               Maximum="{Binding MaxDurationLimitMinutes}"
+                                               FormatString="0" Value="{Binding MaxDurationMinutes}" />
+                              </StackPanel>
+                              <!-- #995: the Trupp is called by a number, "CSA-Trupp 1", rather than
+                                   by a vehicle's Funkrufname. -->
+                              <StackPanel Width="90" VerticalAlignment="Center">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="NUMMER" />
+                                <CheckBox IsChecked="{Binding NamedByNumber}"
+                                          ToolTip.Tip="Funkrufname aus Nummer, z. B. „CSA-Trupp 1“"
+                                          AutomationProperties.Name="Funkrufname aus Nummer" />
+                              </StackPanel>
+                            </WrapPanel>
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
                                  $parent path cannot resolve here. -->
-                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">

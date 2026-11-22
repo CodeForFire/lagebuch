@@ -143,6 +143,22 @@ public class ScbaNumberedTruppTests
         Assert.Equal(ValidationMessages.Required, vm.NewTypeNumberError);
     }
 
+    // An emptied NumericUpDown writes null. An int property could not take it, so the binding
+    // dropped the write and the suggested number registered from a box that showed nothing.
+    [Fact]
+    public void A_cleared_number_box_is_required_not_the_previous_number()
+    {
+        var clock = new FixedClock(T0);
+        using var vm = Vm(clock, NewSession(clock));
+        vm.NewDesignation = CsaTrupp;
+        vm.NewTypeNumber = null;
+        FillCrew(vm);
+        vm.AddTruppCommand.Execute(null);
+
+        Assert.Empty(vm.Trupps);
+        Assert.Equal(ValidationMessages.Required, vm.NewTypeNumberError);
+    }
+
     // A Trupp registered elsewhere -- a joined client, or the host while this form sits open --
     // moves the suggestion on, as long as nobody typed a number of their own.
     [Fact]

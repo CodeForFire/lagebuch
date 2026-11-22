@@ -496,14 +496,15 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     /// The number a numbered Trupp-Typ's Trupp is called by: suggested as the next one free for
     /// that Trupp-Art in this Einsatz, and the Lagebuchführer's to overwrite (#995). Unlike
     /// <see cref="NewTruppNumber"/> this is user-edited, so a taken number is refused with a
-    /// message rather than ever reaching the domain.
+    /// message rather than ever reaching the domain. Null is an emptied box: the NumericUpDown
+    /// writes null, which an int would drop, leaving the old number to register unseen.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewTypeNumberError))]
     [NotifyPropertyChangedFor(nameof(ErrorSummary))]
-    private int _newTypeNumber;
+    private int? _newTypeNumber;
 
-    partial void OnNewTypeNumberChanged(int value)
+    partial void OnNewTypeNumberChanged(int? value)
     {
         if (!_applyingDefault)
         {
@@ -844,8 +845,8 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     /// Trupp-Art in this Einsatz (#995). Silent for every other Trupp-Art, which has no number box.</summary>
     public string? NewTypeNumberError =>
         !_errorsShown || !IsNamedByNumber ? null
-        : NewTypeNumber <= 0 ? ValidationMessages.Required
-        : _session.Incident.IsTypeNumberInUse(NewDesignation, NewTypeNumber) ? ValidationMessages.TypeNumberInUse
+        : NewTypeNumber is not { } number || number <= 0 ? ValidationMessages.Required
+        : _session.Incident.IsTypeNumberInUse(NewDesignation, number) ? ValidationMessages.TypeNumberInUse
         : null;
 
     /// <summary>Whether the Truppführer is still missing, once asked (#412).</summary>
@@ -957,7 +958,10 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
         // A numbered Trupp-Art is called "CSA-Trupp 1" (#995). The name is copied into the
         // Trupp's own Funkrufname here, so the record keeps it whatever the Stammdaten say later.
-        var callSign = IsNamedByNumber ? AtemschutzTrupp.NumberedCallSign(NewDesignation, NewTypeNumber) : NewCallSign;
+        // Validate() has refused an empty number box, so the pattern always matches when numbered.
+        var callSign = IsNamedByNumber && NewTypeNumber is { } typeNumber
+            ? AtemschutzTrupp.NumberedCallSign(NewDesignation, typeNumber)
+            : NewCallSign;
         var truppNumber = NewTruppNumber;
         var entryPressure = NewEntryPressure;
         var displayName = AtemschutzTrupp.FormatDisplayName(callSign, designation);

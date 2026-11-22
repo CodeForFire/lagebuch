@@ -606,12 +606,13 @@ public class MasterDataEditorRenderTests
         Assert.Contains("mehrfach", labels);
     }
 
-    // Phone width (the app's narrow breakpoint is 640): the name field of a Funktion or a
-    // Funkgruppe must stay wide enough to read and type in.
+    // Phone width (the app's narrow breakpoint is 640): the name field of a Funktion, a
+    // Funkgruppe or a Trupp-Typ must stay wide enough to read and type in.
     [AvaloniaTheory]
     [InlineData("Rollen", "stammdaten-rollen-narrow.png")]
     [InlineData("Funkgruppen", "stammdaten-funkgruppen-narrow.png")]
-    public void Rollen_and_Funkgruppen_keep_a_usable_name_field_at_phone_width(string title, string file)
+    [InlineData("Trupp-Typen", "stammdaten-trupp-typen-narrow.png")]
+    public void Picker_rows_keep_a_usable_name_field_at_phone_width(string title, string file)
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         vm.SelectedSection = vm.Sections.Single(s => s.Title == title);

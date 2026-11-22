@@ -186,10 +186,11 @@
           <!-- #995: a Trupp-Art the Stammdaten mark "Funkrufname aus Nummer" is called by its
                number. Placed after TRUPP-ART, which is what makes it appear, so the Tab order
                reaches it next instead of having passed its slot already. The next free number is
-               suggested; a taken one is refused on the press. -->
+               suggested; a taken one is refused on the press. Maximum 999, not 99: a returned
+               Trupp keeps its number, so the suggestion can pass 99 in a long Einsatz. -->
           <HeaderedContentControl Classes="field required" Header="NUMMER" IsVisible="{Binding IsNamedByNumber}"
                                     Classes.invalid="{Binding NewTypeNumberError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <NumericUpDown x:Name="TypeNumberBox" Width="90" Minimum="1" Maximum="99" Increment="1"
+            <NumericUpDown x:Name="TypeNumberBox" Width="90" Minimum="1" Maximum="999" Increment="1"
                            FormatString="0" Value="{Binding NewTypeNumber}"
                            AutomationProperties.Name="Truppnummer" />
           </HeaderedContentControl>
