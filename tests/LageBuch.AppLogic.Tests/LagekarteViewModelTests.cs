@@ -348,6 +348,69 @@ public class LagekarteViewModelTests
         Assert.Null(session.Incident.Forces.Single().Position);
     }
 
+    // #965: a slip of the finger on the X must not take a Fahrzeug off the map during an Einsatz.
+    [Fact]
+    public void Taking_a_unit_off_the_map_asks_first_and_names_the_unit()
+    {
+        var asked = new List<(string Title, string Message, Action Confirm)>();
+        var (session, vm, _) = Open(units: ["LF 10/1"], requestConfirm: (title, message, confirm) => asked.Add((title, message, confirm)));
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+
+        vm.RemoveUnitCommand.Execute(vm.Units[0]);
+
+        var (title, message, _) = Assert.Single(asked);
+        Assert.Equal("Fahrzeug von der Karte nehmen?", title);
+        Assert.Equal("„LF 10/1“ wird von der Lagekarte genommen. Fortfahren?", message);
+        Assert.Equal(Marktplatz, session.Incident.Forces.Single().Position);
+        Assert.Single(vm.Markers);
+    }
+
+    [Fact]
+    public void Cancelling_the_question_keeps_the_unit_on_the_map()
+    {
+        var asked = 0;
+        var (session, vm, changes) = Open(units: ["LF 10/1"], requestConfirm: (_, _, _) => asked++);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+        var changesBefore = changes();
+
+        vm.RemoveUnitCommand.Execute(vm.Units[0]);
+
+        Assert.Equal(1, asked);
+        Assert.Equal(Marktplatz, session.Incident.Forces.Single().Position);
+        Assert.True(vm.Units[0].IsPlaced);
+        Assert.Equal(changesBefore, changes());
+    }
+
+    [Fact]
+    public void Confirming_the_question_takes_the_unit_off_the_map()
+    {
+        Action? confirm = null;
+        var (session, vm, _) = Open(units: ["LF 10/1"], requestConfirm: (_, _, onConfirmed) => confirm = onConfirmed);
+        vm.PlaceUnitCommand.Execute(vm.Units[0]);
+        vm.MapTappedCommand.Execute(Marktplatz);
+
+        vm.RemoveUnitCommand.Execute(vm.Units[0]);
+        Assert.NotNull(confirm);
+        confirm();
+
+        Assert.Null(session.Incident.Forces.Single().Position);
+        Assert.Empty(vm.Markers);
+        Assert.False(vm.Units[0].IsPlaced);
+    }
+
+    [Fact]
+    public void A_unit_that_is_not_on_the_map_is_not_asked_about()
+    {
+        var asked = 0;
+        var (_, vm, _) = Open(units: ["LF 10/1"], requestConfirm: (_, _, _) => asked++);
+
+        vm.RemoveUnitCommand.Execute(vm.Units[0]);
+
+        Assert.Equal(0, asked);
+    }
+
     [Fact]
     public void A_placed_unit_gets_a_pin_and_a_sign_that_are_one_marker()
     {
@@ -1177,7 +1240,8 @@ public class LagekarteViewModelTests
         return library;
     }
 
-    private static (LocalIncidentSession Session, LagekarteViewModel Vm, Func<int> Changes) Open(string[]? units = null)
+    private static (LocalIncidentSession Session, LagekarteViewModel Vm, Func<int> Changes) Open(
+        string[]? units = null, Action<string, string, Action>? requestConfirm = null)
     {
         var session = TestSession.StartNew(
             new FakeStore(),
@@ -1192,7 +1256,7 @@ public class LagekarteViewModelTests
         }
 
         var changes = 0;
-        var vm = new LagekarteViewModel(session, () => changes++);
+        var vm = new LagekarteViewModel(session, () => changes++, requestConfirm: requestConfirm);
         return (session, vm, () => changes);
     }
 }
