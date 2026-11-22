@@ -37,6 +37,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IRegionPackLibrary? _mapPacks;
     private readonly MapNightMode? _mapNightMode;
     private readonly IWeatherSource? _weather;
+    private readonly LdbvImageryClient? _luftbild;
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly ILastPdfExportStore? _lastPdfExportStore;
@@ -60,12 +61,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly Dictionary<Guid, ChecklistViewModel> _checklists = new();
     private bool _disposed;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null, IWeatherSource? weather = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null, IRegionPackLibrary? mapPacks = null, MapNightMode? mapNightMode = null, IWeatherSource? weather = null, LdbvImageryClient? luftbild = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _mapPacks = mapPacks;
         _mapNightMode = mapNightMode;
         _weather = weather;
+        _luftbild = luftbild;
         _session = session;
         _local = session as LocalIncidentSession;
         _clock = clock;
@@ -884,6 +886,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     public async ValueTask LeaveAsync()
     {
+        // A LUFTBILD LADEN under way would otherwise store into this session after it is gone,
+        // or surface its failure in the next workspace: cancel the download and wait for it.
+        if (Lagekarte is { } lagekarte)
+        {
+            await lagekarte.Overlays.StopLuftbildAsync();
+        }
+
         // The host controller is app-lifetime too (#463): left running, it would keep serving this
         // incident to its clients after the operator moved on, and a later share would come back
         // with the old PIN and the Stammdaten it serialized at the start.
@@ -1139,7 +1148,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OfferUndo,
             OpenDispatchChannelDialog);
 
-        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode, _dialogs, RequestConfirm, _weather, _clock);
+        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode, _dialogs, RequestConfirm, _weather, _clock, _luftbild);
 
         LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, Lagekarte, reopenTab);
 
@@ -1756,23 +1765,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             "Einsatz abschließen?",
             message,
             "ABSCHLIESSEN",
-            () =>
-            {
-                PerformClose();
-                if (dialog?.IsOptionChecked != true)
-                {
-                    return;
-                }
-
-                if (dialog.IsSubOptionChecked)
-                {
-                    OpenPdfExportOptions(RunExportAndMailAsync, "PDF ERSTELLEN & MAILEN");
-                }
-                else
-                {
-                    OpenPdfExportOptions(RunExportAsync);
-                }
-            },
+            () => _ = CloseThenOfferPdfAsync(dialog),
             CanExport ? "PDF exportieren" : null,
             CanMailPdf ? "und per E-Mail senden" : null);
 
@@ -1799,6 +1792,29 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var dialog = new SpellingHelperDialogViewModel();
         dialog.Closed += (_, _) => PendingSpellingHelper = null;
         PendingSpellingHelper = dialog;
+    }
+
+    // A LUFTBILD LADEN under way is cancelled and waited for first -- one already storing its two
+    // Ebenen finishes them -- so the closed Einsatz holds both or neither. Idle, the wait is no wait
+    // and the close happens at once, as it always did. The stop never throws: the command surfaces
+    // its own failures.
+    private async Task CloseThenOfferPdfAsync(ConfirmDialogViewModel? dialog)
+    {
+        await Lagekarte.Overlays.StopLuftbildAsync();
+        PerformClose();
+        if (dialog?.IsOptionChecked != true)
+        {
+            return;
+        }
+
+        if (dialog.IsSubOptionChecked)
+        {
+            OpenPdfExportOptions(RunExportAndMailAsync, "PDF ERSTELLEN & MAILEN");
+        }
+        else
+        {
+            OpenPdfExportOptions(RunExportAsync);
+        }
     }
 
     private void PerformClose()

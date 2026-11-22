@@ -199,6 +199,16 @@ dem Bediener ausgelöst:
    Ohne Antippen wird nichts abgefragt, auch nicht erneut. Die Werte bleiben auf
    dem Gerät; in den Einsatz gelangen sie nur, wenn sie mit INS ETB als Eintrag
    übernommen werden.
+7. **Luftbild auf der Lagekarte.** Erst wenn unter EBENEN LUFTBILD LADEN
+   angetippt wird, lädt Lagebuch bei der Bayerischen Vermessungsverwaltung
+   (`geoservices.bayern.de`) das Luftbild (DOP40) und die Flurstücksgrenzen des
+   gerade sichtbaren Kartenausschnitts, höchstens etwa 1,6 × 1,6 km. Dafür geht
+   dieser Ausschnitt an den Dienst; er sieht dabei die IP-Adresse des Geräts und
+   den Ausschnitt – also ungefähr, wo auf die Karte geschaut wird, aber keine
+   Adresse, keine Namen und keine weiteren Einsatzdaten. Ohne Antippen wird nichts
+   abgefragt. Die Bilder werden als zwei Kartenebenen im Einsatz gespeichert, mit
+   den übrigen Ebenen synchronisiert und danach ohne Netz aus der Einsatzdatei
+   gezeichnet. In den PDF-Bericht gelangen sie nicht.
 
 Nicht vorhanden sind: Nutzungsstatistiken, automatisch versandte Absturzberichte, Updateprüfungen,
 Werbe- oder Analysebibliotheken sowie Schriftarten oder Kartenkacheln, die während
@@ -319,7 +329,8 @@ ein Begleitgerät.
   Betriebssystem übergibt.
 - Nachvollziehbare Änderungshistorie: Korrekturen im ETB überschreiben nichts.
 - Keine Telemetrie, keine Protokolldateien. Fremde Dienste nur auf
-  ausdrückliches Antippen: Kartenpakete von GitHub, Wetter von Bright Sky.
+  ausdrückliches Antippen: Kartenpakete von GitHub, Wetter von Bright Sky,
+  Luftbilder von der Bayerischen Vermessungsverwaltung.
 - Überprüfbare Installationsdateien: zu jedem Release gehören SHA-256-Prüfsummen
   und ein Sigstore-Herkunftsnachweis, siehe
   [Downloads prüfen](../README.md#downloads-prüfen).

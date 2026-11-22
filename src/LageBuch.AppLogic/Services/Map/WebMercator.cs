@@ -48,5 +48,27 @@ public static class WebMercator
     public static GeoPoint CenterOfTiles(int zoom, int minX, int maxX, int minY, int maxY) =>
         ToGeo((minX + maxX + 1.0) * TileSizePixels / 2.0, (minY + maxY + 1.0) * TileSizePixels / 2.0, zoom);
 
+    /// <summary>The earth's radius EPSG:3857 projects with, in metres.</summary>
+    public const double EarthRadius = 6378137;
+
+    /// <summary>
+    /// <paramref name="point"/> in EPSG:3857 metres, x east and y north of the origin: the
+    /// coordinates a WMS GetMap request takes its box in.
+    /// </summary>
+    public static (double X, double Y) ToMetres(GeoPoint point)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        var latitude = Math.Clamp(point.Latitude, -MaxLatitude, MaxLatitude) * Math.PI / 180.0;
+        return (EarthRadius * point.Longitude * Math.PI / 180.0, EarthRadius * Math.Log(Math.Tan((Math.PI / 4) + (latitude / 2))));
+    }
+
+    /// <summary>The inverse of <see cref="ToMetres"/>, clamped onto the globe like <see cref="ToGeo"/>.</summary>
+    public static GeoPoint FromMetres(double x, double y)
+    {
+        var longitude = x / EarthRadius * 180.0 / Math.PI;
+        var latitude = ((2 * Math.Atan(Math.Exp(y / EarthRadius))) - (Math.PI / 2)) * 180.0 / Math.PI;
+        return new GeoPoint(Math.Clamp(latitude, -MaxLatitude, MaxLatitude), Math.Clamp(longitude, -180, 180));
+    }
+
     private static double WorldSize(int zoom) => TileSizePixels * Math.Pow(2, zoom);
 }

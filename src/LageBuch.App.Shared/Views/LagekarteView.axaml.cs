@@ -20,6 +20,15 @@ public partial class LagekarteView : UserControl
     private void OnTerrainPicked(object? sender, RoutedEventArgs e) =>
         Dispatcher.UIThread.Post(() => TerrainButton.Flyout?.Hide());
 
+    // LUFTBILD LADEN asks for what the map shows, which only the map control knows.
+    private void OnLoadLuftbild(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel?.Overlays.LoadLuftbildCommand is { } load && Map.VisibleBounds() is { } visible && load.CanExecute(visible))
+        {
+            load.Execute(visible);
+        }
+    }
+
     private void OnMarkerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Control { DataContext: LagekarteMarker marker } control

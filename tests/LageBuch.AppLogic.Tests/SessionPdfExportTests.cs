@@ -2,6 +2,8 @@ using LageBuch.AppLogic.Services;
 using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Map;
+using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -64,6 +66,39 @@ public class SessionPdfExportTests
 
         Assert.Equal(1, result.MissingAttachments);
         Assert.Equal(0x25, result.Pdf[0]); // %PDF -- the report itself still renders
+    }
+
+    [Fact]
+    public async Task A_Luftbild_s_pictures_stay_out_of_the_report()
+    {
+        var (host, _) = HostSession();
+        await host.AddFileAsync("foto.png", "image/png", TestImages.Png(10, 10));
+        await host.AddMapOverlayAsync(
+            "luftbild.jpg",
+            "image/jpeg",
+            TestImages.Jpeg(4096, 4096),
+            new MapOverlaySummary("Luftbild (LDBV)", 1, null, null, MapOverlayKind.Raster, new GeoBox(11.24, 48.17, 11.26, 48.18)));
+        var exporter = new HandedOverExporter();
+
+        var result = await SessionPdfExport.ExportAsync(host, exporter, new FixedClock(T0));
+
+        Assert.Equal(0, result.MissingAttachments);
+        var photo = host.Incident.Files.Single(f => f.FileName == "foto.png");
+        Assert.Equal([photo.Id], exporter.FileIds);
+    }
+
+    // Only records which files' bytes it was handed.
+    private sealed class HandedOverExporter : IIncidentPdfExporter
+    {
+        public List<Guid> FileIds { get; } = [];
+
+        public bool CanExport => true;
+
+        public byte[] Generate(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All)
+        {
+            FileIds.AddRange(fileBytes.Keys);
+            return [0x25];
+        }
     }
 
     // Records what the exporter was handed, and whether the PDF attachments it was pointed at were

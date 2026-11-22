@@ -882,7 +882,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     // The AddFileAsync split: metadata as a command, then the bytes as a PUT to the file id the
     // command registered.
-    public async Task AddMapOverlayAsync(
+    public async Task<Guid> AddMapOverlayAsync(
         string fileName, string contentType, byte[] bytes, MapOverlaySummary summary, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(bytes);
@@ -905,7 +905,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 summary.Name,
                 summary.FrameCount,
                 summary.FirstTime,
-                summary.LastTime),
+                summary.LastTime,
+                summary.Kind,
+                summary.Bounds?.West,
+                summary.Bounds?.South,
+                summary.Bounds?.East,
+                summary.Bounds?.North,
+                summary.Attribution),
             cancellationToken);
 
         try
@@ -922,6 +928,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             await TakeBackMapOverlayAsync(overlayId);
             throw;
         }
+
+        return overlayId;
     }
 
     // Best effort, and deliberately not cancellable: the import's own token may be what failed. If

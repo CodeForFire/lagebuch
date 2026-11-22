@@ -1,3 +1,5 @@
+using LageBuch.Domain.Map;
+
 namespace LageBuch.Domain.Files;
 
 public sealed record IncidentFile
@@ -52,6 +54,18 @@ public sealed record IncidentFile
             [".zip"] = "application/zip",
         };
 
+    /// <summary>
+    /// The file types a raster Kartenebene, a Luftbild or Flurstücksgrenzen, may be stored as. Its
+    /// own table, so a GeoJSON Ebene can never be handed an image and an image never a GeoJSON.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> MapOverlayRasterMimeTypesByExtension =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".jpg"] = "image/jpeg",
+            [".jpeg"] = "image/jpeg",
+            [".png"] = "image/png",
+        };
+
     /// <summary>The generic fallback used where "unknown" should still mean a concrete, valid MIME
     /// type rather than Android's wildcard intent type — see <see cref="GetMimeType"/>.</summary>
     public const string DefaultMimeType = "application/octet-stream";
@@ -98,11 +112,19 @@ public sealed record IncidentFile
 
     /// <summary>
     /// The file behind a Kartenebene: the same rules as <see cref="Create(Guid, string, string, long, DateTimeOffset, string)"/>,
-    /// checked against <see cref="MapOverlayMimeTypesByExtension"/> instead.
+    /// checked against <see cref="MapOverlayMimeTypesByExtension"/> instead, or for a raster Ebene
+    /// against <see cref="MapOverlayRasterMimeTypesByExtension"/>.
     /// </summary>
     public static IncidentFile CreateMapOverlay(
-        Guid id, string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy) =>
-        Create(id, fileName, contentType, sizeBytes, addedAt, addedBy, MapOverlayMimeTypesByExtension);
+        Guid id, string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy, MapOverlayKind kind = MapOverlayKind.Vector) =>
+        Create(
+            id,
+            fileName,
+            contentType,
+            sizeBytes,
+            addedAt,
+            addedBy,
+            kind == MapOverlayKind.Raster ? MapOverlayRasterMimeTypesByExtension : MapOverlayMimeTypesByExtension);
 
     private static IncidentFile Create(
         Guid id,

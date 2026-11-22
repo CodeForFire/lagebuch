@@ -62,7 +62,8 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         IFileDialogService? dialogs = null,
         Action<string, string, Action>? requestConfirm = null,
         IWeatherSource? weather = null,
-        IClock? clock = null)
+        IClock? clock = null,
+        LdbvImageryClient? luftbild = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -87,12 +88,17 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
                 RefreshProfile(newHeights: true);
             }
         };
-        Overlays = new MapOverlaysViewModel(session, onChanged, dialogs, requestConfirm, clock ?? new SystemClock(), ShowBounds);
+        Overlays = new MapOverlaysViewModel(session, onChanged, dialogs, requestConfirm, clock ?? new SystemClock(), ShowBounds, luftbild: luftbild);
         Overlays.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(MapOverlaysViewModel.VisibleShapes))
             {
                 OnPropertyChanged(nameof(MapShapes));
+            }
+
+            if (e.PropertyName is nameof(MapOverlaysViewModel.RasterAttribution))
+            {
+                OnPropertyChanged(nameof(MapAttribution));
             }
         };
         Weather = new WeatherOverlay(
@@ -111,6 +117,11 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
         _nightMode.Changed += OnNightModeChanged;
         Map.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName is nameof(MapViewport.Attribution))
+            {
+                OnPropertyChanged(nameof(MapAttribution));
+            }
+
             if (e.PropertyName is nameof(MapViewport.Zoom) or nameof(MapViewport.TileSource))
             {
                 OnPropertyChanged(nameof(ShowsWaterLegend));
@@ -131,8 +142,15 @@ public sealed partial class LagekarteViewModel : ObservableObject, INarrowAware,
     /// <summary>The GELÄNDE picker: the packs' DGM5 heights laid over the map.</summary>
     public TerrainOverlay Terrain { get; }
 
-    /// <summary>The Kartenebenen: imported GeoJSON, such as an Ausbreitungsprognose.</summary>
+    /// <summary>The Kartenebenen: imported GeoJSON, such as an Ausbreitungsprognose, and Luftbilder.</summary>
     public MapOverlaysViewModel Overlays { get; }
+
+    /// <summary>
+    /// The licence lines under the map: the packs' (OSM's ODbL), then those of the shown Luftbilder
+    /// (the LDBV's CC BY 4.0); null while neither is on screen.
+    /// </summary>
+    public string? MapAttribution =>
+        string.Join(" ", new[] { Map.Attribution, Overlays.RasterAttribution }.OfType<string>()) is { Length: > 0 } text ? text : null;
 
     /// <summary>WETTER: the DWD's reading at the Einsatzort, loaded on request.</summary>
     public WeatherOverlay Weather { get; }

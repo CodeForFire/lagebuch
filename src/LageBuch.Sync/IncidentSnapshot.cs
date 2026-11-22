@@ -3,6 +3,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
+using LageBuch.Domain.Map;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
@@ -106,7 +107,15 @@ public sealed record MapOverlayDto(
     string? ImportedBy,
     int FrameCount,
     DateTimeOffset? FirstTime,
-    DateTimeOffset? LastTime);
+    DateTimeOffset? LastTime,
+
+    // Protocol 44: a raster Ebene's kind, box and licence line; absent, the Ebene is GeoJSON.
+    MapOverlayKind Kind = MapOverlayKind.Vector,
+    double? West = null,
+    double? South = null,
+    double? East = null,
+    double? North = null,
+    string? Attribution = null);
 
 public sealed record TimerDto(
     string Key,

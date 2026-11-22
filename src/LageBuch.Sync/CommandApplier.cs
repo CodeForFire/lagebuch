@@ -239,7 +239,14 @@ public static class CommandApplier
                     c.FileName,
                     c.ContentType,
                     c.SizeBytes,
-                    new MapOverlaySummary(c.Name, c.FrameCount, c.FirstTime, c.LastTime));
+                    new MapOverlaySummary(
+                        c.Name,
+                        c.FrameCount,
+                        c.FirstTime,
+                        c.LastTime,
+                        c.Kind,
+                        GeoBox.TryCreate(c.West, c.South, c.East, c.North),
+                        c.Attribution));
                 return incident.Files.First(f => f.Id == c.FileId);
             case RemoveMapOverlayCommand c:
                 return incident.RemoveMapOverlay(clock, Operator(c.Operator), c.OverlayId);
