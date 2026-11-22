@@ -105,28 +105,106 @@ public class WaterPointsGeoJsonTests
         Assert.Equal(symbol, Assert.Single(Points(Feature(emergency, properties))).Symbol);
 
     [Theory]
-    [InlineData("1600", 1600)]
-    [InlineData("1600 l/min", 1600)]
-    [InlineData("1600l/min", 1600)]
-    [InlineData("96 m3/h", 1600)]
-    [InlineData("96 m³/h", 1600)]
-    [InlineData("48,5 m3/h", 808)]
-    public void A_flow_rate_is_read_in_litres_per_minute(string flowRate, int litresPerMinute) =>
-        Assert.Equal(litresPerMinute, Assert.Single(Points(Feature("fire_hydrant", $"\"flow_rate\": \"{flowRate}\""))).FlowLitresPerMinute);
-
-    [Theory]
+    [InlineData("1600 l/min")]
     [InlineData("1.600 l/min")]
     [InlineData("viel")]
-    [InlineData("0")]
-    [InlineData("999999")]
-    [InlineData("1600 bar")]
-    public void A_flow_rate_that_is_no_sure_figure_reads_as_unknown_and_stays_on_the_card(string flowRate)
-    {
-        var point = Assert.Single(Points(Feature("fire_hydrant", $"\"flow_rate\": \"{flowRate}\"")));
+    public void A_flow_rate_is_shown_on_the_card_as_OSM_spells_it(string flowRate) =>
+        Assert.Contains(new WaterPointDetail("Förderleistung", flowRate), Assert.Single(Points(Feature("fire_hydrant", $"\"flow_rate\": \"{flowRate}\""))).Details);
 
-        Assert.Null(point.FlowLitresPerMinute);
-        Assert.Contains(new WaterPointDetail("Förderleistung", flowRate), point.Details);
+    [Theory]
+    [InlineData("B;B;A", "A, 2×B")]
+    [InlineData("B;B;", "2×B")]
+    [InlineData("1A;2B", "A, 2×B")]
+    [InlineData("1A / 2B", "A, 2×B")]
+    [InlineData("C;C;B", "B, 2×C")]
+    [InlineData("75;52", "B, C")]
+    [InlineData("110;75;75", "A, 2×B")]
+    [InlineData("b; c", "B, C")]
+    public void The_outlets_are_counted_by_storz_size(string diameters, string outlets) =>
+        Assert.Equal(outlets, Assert.Single(Points(Feature("fire_hydrant", $"\"couplings:diameters\": \"{diameters}\""))).Outlets);
+
+    [Theory]
+    [InlineData("\"couplings:diameters\": \"2 x 3 Zoll\"", "2 x 3 Zoll")]
+    [InlineData("\"couplings\": \"2\"", "2 Abgänge")]
+    [InlineData("\"couplings\": \"1\"", "1 Abgang")]
+    [InlineData("\"couplings\": \"2\", \"couplings:diameters\": \"B;C\"", "B, C")]
+    public void Outlets_OSM_does_not_size_are_kept_as_written_or_counted(string properties, string outlets) =>
+        Assert.Equal(outlets, Assert.Single(Points(Feature("fire_hydrant", properties))).Outlets);
+
+    [Theory]
+    [InlineData("\"couplings\": \"150\"")]
+    [InlineData("\"couplings\": \"zwei\"")]
+    [InlineData("\"osm\": \"node/1\"")]
+    public void Without_a_plausible_outlet_count_there_are_no_outlets(string properties) =>
+        Assert.Null(Assert.Single(Points(Feature("fire_hydrant", properties))).Outlets);
+
+    [Theory]
+    [InlineData("lane", "Fahrbahn")]
+    [InlineData("street", "Fahrbahn")]
+    [InlineData("sidewalk", "Gehweg")]
+    [InlineData("green", "Grünfläche")]
+    [InlineData("parking_lot", "Parkplatz")]
+    public void A_well_known_lage_is_put_on_the_marker_in_german(string position, string lage) =>
+        Assert.Equal(lage, Assert.Single(Points(Feature("fire_hydrant", $"\"fire_hydrant:position\": \"{position}\""))).Lage);
+
+    [Fact]
+    public void A_lage_written_out_in_free_text_stays_off_the_marker_and_on_the_card()
+    {
+        var point = Assert.Single(Points(Feature("fire_hydrant", "\"fire_hydrant:position\": \"Fahrbahnrand\"")));
+
+        Assert.Null(point.Lage);
+        Assert.Contains(new WaterPointDetail("Lage", "Fahrbahnrand"), point.Details);
     }
+
+    [Theory]
+    [InlineData("250 m³", 250)]
+    [InlineData("300m³", 300)]
+    [InlineData("150 m3", 150)]
+    [InlineData("100", 100)]
+    [InlineData("100000", 100)]
+    [InlineData("20000", 20)]
+    public void A_tank_s_volume_is_read_in_cubic_metres_and_a_bare_figure_beyond_a_thousand_as_litres(string volume, int cubicMetres) =>
+        Assert.Equal(cubicMetres, Assert.Single(Points(Feature("water_tank", $"\"water_tank:volume\": \"{volume}\""))).VolumeCubicMetres);
+
+    [Theory]
+    [InlineData("groß")]
+    [InlineData("0")]
+    [InlineData("ca. 100")]
+    public void A_volume_that_is_no_sure_figure_reads_as_unknown_and_stays_on_the_card(string volume)
+    {
+        var point = Assert.Single(Points(Feature("water_tank", $"\"water_tank:volume\": \"{volume}\"")));
+
+        Assert.Null(point.VolumeCubicMetres);
+        Assert.Contains(new WaterPointDetail("Volumen", volume), point.Details);
+    }
+
+    [Theory]
+    [InlineData("private", true, "privat")]
+    [InlineData("no", true, "kein")]
+    [InlineData("customers", false, "Kunden")]
+    [InlineData("yes", false, null)]
+    [InlineData("permissive", false, null)]
+    public void Access_is_said_on_the_card_and_private_ground_marked(string access, bool isPrivate, string? row)
+    {
+        var point = Assert.Single(Points(Feature("fire_hydrant", $"\"access\": \"{access}\"")));
+
+        Assert.Equal(isPrivate, point.IsPrivate);
+        Assert.Equal(row, point.Details.SingleOrDefault(d => d.Label == "Zugang")?.Value);
+    }
+
+    [Theory]
+    [InlineData("\"survey:date\": \"2018-03-24\"", "2018-03-24")]
+    [InlineData("\"check_date\": \"2025-03-01\", \"survey:date\": \"2018-03-24\"", "2025-03-01")]
+    [InlineData("\"survey:date\": \"2.2.2018\"", "2.2.2018")]
+    public void The_card_says_when_a_mapper_last_checked_the_point(string properties, string date) =>
+        Assert.Contains(new WaterPointDetail("Zuletzt geprüft (OSM)", date), Assert.Single(Points(Feature("fire_hydrant", properties))).Details);
+
+    [Fact]
+    public void The_card_lists_the_outlets_after_the_couplings() =>
+        Assert.Equal(
+            [("Kupplungen", "3"), ("Abgänge", "A, 2×B")],
+            Assert.Single(Points(Feature("fire_hydrant", "\"couplings\": \"3\", \"couplings:diameters\": \"B;B;A\""))).Details
+                .Where(d => d.Label is "Kupplungen" or "Abgänge").Select(d => (d.Label, d.Value)));
 
     [Theory]
     [InlineData("100", 100)]
@@ -145,14 +223,8 @@ public class WaterPointsGeoJsonTests
         Assert.Null(Assert.Single(Points(Feature("fire_hydrant", $"\"fire_hydrant:diameter\": \"{diameter}\""))).NominalDiameter);
 
     [Fact]
-    public void A_packs_point_is_never_estimated_out_of_service_or_on_a_known_network()
-    {
-        var point = Assert.Single(Points(Hydrant));
-
-        Assert.False(point.IsEstimated);
-        Assert.False(point.IsOutOfService);
-        Assert.Null(point.Network);
-    }
+    public void A_packs_point_is_never_out_of_service() =>
+        Assert.False(Assert.Single(Points(Hydrant)).IsOutOfService);
 
     [Fact]
     public void A_label_part_longer_than_its_cap_is_cut()

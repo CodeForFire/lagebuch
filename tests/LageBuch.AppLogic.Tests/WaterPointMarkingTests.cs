@@ -8,52 +8,44 @@ public class WaterPointMarkingTests
     private static readonly WaterPoint Hydrant = new(new GeoPoint(48.1785, 11.2555), WaterPointKind.Hydrant, "UH 100");
 
     [Theory]
-    [InlineData(null, FlowClass.Unbekannt)]
-    [InlineData(0, FlowClass.Unter400)]
-    [InlineData(399, FlowClass.Unter400)]
-    [InlineData(400, FlowClass.Bis799)]
-    [InlineData(799, FlowClass.Bis799)]
-    [InlineData(800, FlowClass.Bis1599)]
-    [InlineData(1599, FlowClass.Bis1599)]
-    [InlineData(1600, FlowClass.Bis3199)]
-    [InlineData(3199, FlowClass.Bis3199)]
-    [InlineData(3200, FlowClass.Ab3200)]
-    [InlineData(12000, FlowClass.Ab3200)]
-    public void A_flow_falls_into_its_class_at_the_richtwerte(int? litresPerMinute, FlowClass expected) =>
-        Assert.Equal(expected, WaterPointMarking.Classify(litresPerMinute));
-
-    [Fact]
-    public void The_classes_run_from_weakest_to_strongest_which_is_the_drawing_order() =>
-        Assert.Equal(
-            [FlowClass.Unbekannt, FlowClass.Unter400, FlowClass.Bis799, FlowClass.Bis1599, FlowClass.Bis3199, FlowClass.Ab3200],
-            Enum.GetValues<FlowClass>().Order());
-
-    [Theory]
-    [InlineData(null, false, "?")]
-    [InlineData(null, true, "?")]
-    [InlineData(300, false, "300")]
-    [InlineData(1600, false, "1600")]
-    [InlineData(9999, false, "9999")]
-    [InlineData(10000, false, "10k")]
-    [InlineData(12999, false, "12k")]
-    [InlineData(1600, true, "(1600)")]
-    [InlineData(12000, true, "(12k)")]
-    public void The_flow_is_shown_short_with_brackets_for_an_estimate(int? litresPerMinute, bool estimated, string expected) =>
-        Assert.Equal(expected, WaterPointMarking.FlowText(Hydrant with { FlowLitresPerMinute = litresPerMinute, IsEstimated = estimated }));
-
-    [Theory]
     [InlineData(100, "DN 100")]
     [InlineData(null, "DN ?")]
-    public void The_diameter_line_says_dn_or_a_question_mark(int? dn, string expected) =>
-        Assert.Equal(expected, WaterPointMarking.DiameterText(Hydrant with { NominalDiameter = dn }));
+    public void A_hydrant_s_first_line_is_its_dn_or_a_question_mark(int? dn, string expected) =>
+        Assert.Equal(expected, WaterPointMarking.PrimaryText(Hydrant with { NominalDiameter = dn }));
 
     [Theory]
-    [InlineData(1600, 100, "1600")]
-    [InlineData(null, 100, "DN 100")]
-    [InlineData(null, null, "?")]
-    [InlineData(800, null, "800")]
-    public void A_medium_flag_shows_the_flow_or_without_one_the_dn(int? litresPerMinute, int? dn, string expected) =>
-        Assert.Equal(expected, WaterPointMarking.MediumText(Hydrant with { FlowLitresPerMinute = litresPerMinute, NominalDiameter = dn }));
+    [InlineData(100, "Z 3", "100 m³")]
+    [InlineData(null, "Z 3", "Z 3")]
+    [InlineData(null, "", "")]
+    public void A_tank_s_first_line_is_its_volume_or_else_its_label(int? volume, string label, string expected) =>
+        Assert.Equal(expected, WaterPointMarking.PrimaryText(Hydrant with { Kind = WaterPointKind.Loeschwasserbehaelter, Label = label, VolumeCubicMetres = volume }));
+
+    [Theory]
+    [InlineData(WaterPointKind.Saugstelle)]
+    [InlineData(WaterPointKind.Loeschteich)]
+    public void Open_water_s_first_line_is_its_label(WaterPointKind kind) =>
+        Assert.Equal("Amper", WaterPointMarking.PrimaryText(Hydrant with { Kind = kind, Label = "Amper", NominalDiameter = 100 }));
+
+    [Fact]
+    public void The_second_line_joins_lage_outlets_and_private_access() =>
+        Assert.Equal(
+            "Fahrbahn · A, 2×B · privat",
+            WaterPointMarking.SecondaryText(Hydrant with { Lage = "Fahrbahn", Outlets = "A, 2×B", IsPrivate = true }));
+
+    [Fact]
+    public void The_second_line_leaves_out_what_is_unknown_and_is_empty_without_anything()
+    {
+        Assert.Equal("Gehweg", WaterPointMarking.SecondaryText(Hydrant with { Lage = "Gehweg" }));
+        Assert.Equal(string.Empty, WaterPointMarking.SecondaryText(Hydrant));
+    }
+
+    [Theory]
+    [InlineData(WaterPointKind.Hydrant, false)]
+    [InlineData(WaterPointKind.Saugstelle, true)]
+    [InlineData(WaterPointKind.Loeschwasserbehaelter, true)]
+    [InlineData(WaterPointKind.Loeschteich, true)]
+    public void Only_a_hydrant_hangs_on_the_mains(WaterPointKind kind, bool independent) =>
+        Assert.Equal(independent, (Hydrant with { Kind = kind }).IsIndependent);
 
     [Theory]
     [InlineData(WaterPointKind.Hydrant, WaterPointSymbol.Unterflurhydrant)]

@@ -709,7 +709,7 @@
                 <Setter Property="Height" Value="16" />
                 <Setter Property="CornerRadius" Value="2" />
                 <Setter Property="Padding" Value="2" />
-                <Setter Property="Background" Value="{x:Static c:WaterPointMarkers.UnbekanntBrush}" />
+                <Setter Property="Background" Value="{x:Static c:WaterPointMarkers.MainsBrush}" />
               </Style>
               <Style Selector="Border.water-field > Path">
                 <Setter Property="Stroke" Value="White" />
@@ -718,21 +718,12 @@
                 <Setter Property="StrokeJoin" Value="Round" />
               </Style>
             </StackPanel.Styles>
-            <!-- What the colour says: the flow class, in l/min. -->
-            <WrapPanel x:Name="WaterFlowKey" IsVisible="{Binding ShowsWaterLegend}">
-              <TextBlock Text="l/min" FontWeight="SemiBold" />
+            <!-- What the colour says: whether the source hangs on the Trinkwassernetz. -->
+            <WrapPanel x:Name="WaterSourceKey" IsVisible="{Binding ShowsWaterLegend}">
               <Border Classes="water-field" />
-              <TextBlock Text="unbekannt" />
-              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Unter400Brush}" />
-              <TextBlock Text="&lt; 400" />
-              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Bis799Brush}" />
-              <TextBlock Text="400–799" />
-              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Bis1599Brush}" />
-              <TextBlock Text="800–1.599" />
-              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Bis3199Brush}" />
-              <TextBlock Text="1.600–3.199" />
-              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.Ab3200Brush}" />
-              <TextBlock Text="ab 3.200" />
+              <TextBlock Text="Hydrant (Trinkwassernetz)" />
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.IndependentBrush}" />
+              <TextBlock Text="unabhängig vom Netz" />
             </WrapPanel>
             <!-- What the glyph says: the kind of Entnahmestelle. -->
             <WrapPanel x:Name="WaterPointKey" IsVisible="{Binding ShowsWaterLegend}">
@@ -742,13 +733,13 @@
               <TextBlock Text="Überflurhydrant" />
               <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.WandhydrantGlyph}" /></Border>
               <TextBlock Text="Wandhydrant" />
-              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.SaugstelleGlyph}" /></Border>
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.IndependentBrush}"><Path Data="{x:Static c:WaterPointMarkers.SaugstelleGlyph}" /></Border>
               <TextBlock Text="Saugstelle" />
-              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.LoeschwasserbrunnenGlyph}" /></Border>
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.IndependentBrush}"><Path Data="{x:Static c:WaterPointMarkers.LoeschwasserbrunnenGlyph}" /></Border>
               <TextBlock Text="Brunnen" />
-              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.ZisterneGlyph}" /></Border>
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.IndependentBrush}"><Path Data="{x:Static c:WaterPointMarkers.ZisterneGlyph}" /></Border>
               <TextBlock Text="Zisterne" />
-              <Border Classes="water-field"><Path Data="{x:Static c:WaterPointMarkers.OffenesGewaesserGlyph}" /></Border>
+              <Border Classes="water-field" Background="{x:Static c:WaterPointMarkers.IndependentBrush}"><Path Data="{x:Static c:WaterPointMarkers.OffenesGewaesserGlyph}" /></Border>
               <TextBlock Text="Löschteich" />
             </WrapPanel>
             <!-- The terrain layer's key, coloured as TerrainShading paints it. -->

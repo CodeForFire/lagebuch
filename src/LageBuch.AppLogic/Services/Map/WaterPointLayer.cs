@@ -11,10 +11,10 @@ public static class WaterPointLayer
     /// <summary>Further out, a Landkreis' thousands of hydrants are a red carpet, not information.</summary>
     public const int MinZoom = 15;
 
-    /// <summary>From here a point is a flag with its flow, not a disc.</summary>
+    /// <summary>From here a point is a flag with its glyph and first line, not a disc.</summary>
     public const int MediumMinZoom = 16;
 
-    /// <summary>From here a flag also says the unit, the DN and Ring or Stich.</summary>
+    /// <summary>From here a flag also says the Lage, the outlets and whether it is on private ground.</summary>
     public const int FullMinZoom = 18;
 
     /// <summary>How far from a symbol's centre a tap still means it: about a fingertip.</summary>
@@ -27,7 +27,7 @@ public static class WaterPointLayer
     public static readonly WaterPointFlag MediumFlag = new(MastLength: 8, BodyHeight: 20, NominalWidth: 64);
 
     /// <summary>The flag at <see cref="WaterPointDetailLevel.Voll"/>.</summary>
-    public static readonly WaterPointFlag FullFlag = new(MastLength: 10, BodyHeight: 32, NominalWidth: 100);
+    public static readonly WaterPointFlag FullFlag = new(MastLength: 10, BodyHeight: 32, NominalWidth: 120);
 
     /// <summary>How much of a marker shows at <paramref name="zoom"/>; null below <see cref="MinZoom"/>, where none does.</summary>
     public static WaterPointDetailLevel? LevelAt(int zoom) => zoom switch
@@ -48,15 +48,21 @@ public static class WaterPointLayer
 
     /// <summary>
     /// Where <paramref name="point"/>'s marker lies in the stack, lowest first: the one whose card
-    /// is open, <paramref name="selected"/>, on top, the others by <see cref="FlowClass"/>, so a
-    /// strong source lies over a weak one. The map draws its markers in this order, and a tap on
-    /// markers that share a spot means the one on top.
+    /// is open, <paramref name="selected"/>, on top; under it an independent source, rarer and
+    /// still there when the mains fail; then the hydrants by DN, the larger over the smaller, one of
+    /// unknown DN lowest. The map draws its markers in this order, and a tap on markers that share
+    /// a spot means the one on top.
     /// </summary>
     public static int StackRank(WaterPoint point, WaterPoint? selected)
     {
         ArgumentNullException.ThrowIfNull(point);
-        var flowClass = (int)WaterPointMarking.Classify(point.FlowLitresPerMinute);
-        return ReferenceEquals(point, selected) ? (int)FlowClass.Ab3200 + 1 : flowClass;
+        const int independent = 10_000;
+        if (ReferenceEquals(point, selected))
+        {
+            return independent + 1;
+        }
+
+        return point.IsIndependent ? independent : Math.Clamp(point.NominalDiameter ?? 0, 0, independent - 1);
     }
 
     /// <summary>

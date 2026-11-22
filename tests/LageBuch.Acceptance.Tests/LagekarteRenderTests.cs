@@ -171,7 +171,7 @@ public sealed class LagekarteRenderTests : IDisposable
         Assert.Same(hydrant, vm.SelectedWaterPoint);
         Assert.Same(hydrant, map.SelectedWaterPoint);
         Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WaterPointCard").IsVisible);
-        Assert.Equal(3, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "WaterPointDetails").ItemCount);
+        Assert.Equal(4, view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "WaterPointDetails").ItemCount);
         Assert.True(view.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "WaterLegend").IsVisible);
         Assert.Null(session.Incident.Location);
 
