@@ -1,0 +1,115 @@
+{
+  "projectName": "lagebuch",
+  "projectOwner": "CodeForFire",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 80,
+  "contributorsPerLine": 6,
+  "commit": false,
+  "commitConvention": "none",
+  "linkToUsage": false,
+  "skipCi": true,
+  "types": {
+    "code": {
+      "symbol": "💻",
+      "description": "Code",
+      "link": "<%= options.repoHost %>/<%= options.projectOwner %>/<%= options.projectName %>/commits?author=<%= contributor.login %>"
+    },
+    "test": {
+      "symbol": "⚠️",
+      "description": "Tests",
+      "link": "<%= options.repoHost %>/<%= options.projectOwner %>/<%= options.projectName %>/commits?author=<%= contributor.login %>"
+    },
+    "doc": {
+      "symbol": "📖",
+      "description": "Doku",
+      "link": "<%= options.repoHost %>/<%= options.projectOwner %>/<%= options.projectName %>/commits?author=<%= contributor.login %>"
+    },
+    "bug": {
+      "symbol": "🐛",
+      "description": "Fehler gemeldet",
+      "link": "<%= options.repoHost %>/<%= options.projectOwner %>/<%= options.projectName %>/issues?q=author%3A<%= contributor.login %>"
+    },
+    "ideas": {
+      "symbol": "🤔",
+      "description": "Ideen und Feedback"
+    },
+    "userTesting": {
+      "symbol": "🧪",
+      "description": "Bei Übung oder Einsatz getestet"
+    },
+    "translation": {
+      "symbol": "🌍",
+      "description": "Übersetzung"
+    },
+    "maintenance": {
+      "symbol": "🚧",
+      "description": "Pflege"
+    }
+  },
+  "contributors": [
+    {
+      "login": "DeepDiver1975",
+      "name": "Thomas Müller",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1005065",
+      "profile": "https://github.com/DeepDiver1975",
+      "contributions": [
+        "code",
+        "doc",
+        "ideas",
+        "maintenance"
+      ]
+    },
+    {
+      "login": "ChrArlt",
+      "name": "Christian Arlt",
+      "avatar_url": "https://avatars.githubusercontent.com/u/77838277",
+      "profile": "https://github.com/ChrArlt",
+      "contributions": [
+        "bug",
+        "ideas"
+      ]
+    },
+    {
+      "login": "candavere",
+      "name": "candavere",
+      "avatar_url": "https://avatars.githubusercontent.com/u/304146049",
+      "profile": "https://github.com/candavere",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "sri-santhosh-tk",
+      "name": "Sri Santhosh Tiruppur Kanagaraj",
+      "avatar_url": "https://avatars.githubusercontent.com/u/291651187",
+      "profile": "https://github.com/sri-santhosh-tk",
+      "contributions": [
+        "code",
+        "test"
+      ]
+    },
+    {
+      "login": "berkcantmr",
+      "name": "Berkcan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/72012560",
+      "profile": "https://github.com/berkcantmr",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "illya228666",
+      "name": "illya228666",
+      "avatar_url": "https://avatars.githubusercontent.com/u/96683927",
+      "profile": "https://github.com/illya228666",
+      "contributions": [
+        "test"
+      ]
+    }
+  ]
+}
