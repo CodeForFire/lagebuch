@@ -43,16 +43,6 @@ public enum WaterPointSymbol
     OffenesGewaesser,
 }
 
-/// <summary>How the main a hydrant hangs on is fed.</summary>
-public enum WaterNetwork
-{
-    /// <summary>Ringleitung: fed from both sides.</summary>
-    Ring,
-
-    /// <summary>Stichleitung: a dead end.</summary>
-    Stich,
-}
-
 /// <summary>
 /// A Wasserentnahmestelle from a Kartenpaket's <c>water.geojson</c>, as OpenStreetMap has it.
 /// <see cref="Label"/> is the short text drawn beside it on a close map ("UH 100", a name, a
@@ -80,20 +70,26 @@ public sealed record WaterPoint(GeoPoint Position, WaterPointKind Kind, string L
         init => symbol = value;
     }
 
-    /// <summary>What it can deliver, in l/min; null when nobody says.</summary>
-    public int? FlowLitresPerMinute { get; init; }
-
     /// <summary>
-    /// <see cref="FlowLitresPerMinute"/> is an estimate (from the DN, a network model), not a
-    /// measurement. <c>water.geojson</c> has no such field, so a pack's points are never estimated.
+    /// Fed from somewhere other than the Trinkwassernetz: open water, a well or a tank, which a
+    /// burst main or a weak network does not take down with the hydrants.
     /// </summary>
-    public bool IsEstimated { get; init; }
+    public bool IsIndependent => Kind != WaterPointKind.Hydrant;
 
     /// <summary>The Nennweite of the main, DN; null when unknown.</summary>
     public int? NominalDiameter { get; init; }
 
-    /// <summary>Ring or Stich; null when unknown, as it always is from OSM, which has no tag for it.</summary>
-    public WaterNetwork? Network { get; init; }
+    /// <summary>A Löschwasserbehälter's volume in m³; null when unknown.</summary>
+    public int? VolumeCubicMetres { get; init; }
+
+    /// <summary>Where it sits, "Fahrbahn", "Gehweg", "Grünfläche" or "Parkplatz"; null for anything else.</summary>
+    public string? Lage { get; init; }
+
+    /// <summary>Its outlets by Storz size, "A, 2×B", or only how many, "2 Abgänge"; null when unknown.</summary>
+    public string? Outlets { get; init; }
+
+    /// <summary>On private ground: OSM says <c>access=private</c> or <c>no</c>.</summary>
+    public bool IsPrivate { get; init; }
 
     /// <summary>
     /// Außer Betrieb. A pack never holds one: its build drops every point OSM marks disused or

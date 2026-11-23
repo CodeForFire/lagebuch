@@ -33,41 +33,52 @@ public class WaterPointLayerTests
     }
 
     [Fact]
-    public void Of_two_points_on_the_same_spot_the_stronger_one_drawn_on_top_is_meant()
+    public void Of_two_hydrants_on_the_same_spot_the_larger_dn_drawn_on_top_is_meant()
     {
-        var weak = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 80") { FlowLitresPerMinute = 600 };
-        var strong = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "ÜH 150") { FlowLitresPerMinute = 3200 };
+        var small = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 80") { NominalDiameter = 80 };
+        var large = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "ÜH 150") { NominalDiameter = 150 };
 
-        Assert.Same(strong, WaterPointLayer.At([weak, strong], Marktplatz, 17));
-        Assert.Same(strong, WaterPointLayer.At([strong, weak], Marktplatz, 17));
+        Assert.Same(large, WaterPointLayer.At([small, large], Marktplatz, 17));
+        Assert.Same(large, WaterPointLayer.At([large, small], Marktplatz, 17));
+    }
+
+    [Fact]
+    public void An_independent_source_lies_over_a_hydrant_and_a_hydrant_of_unknown_dn_lies_lowest()
+    {
+        var unknown = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH");
+        var hydrant = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "ÜH 400") { NominalDiameter = 400 };
+        var tank = new WaterPoint(Marktplatz, WaterPointKind.Loeschwasserbehaelter, "Z 3");
+
+        Assert.True(WaterPointLayer.StackRank(unknown, null) < WaterPointLayer.StackRank(hydrant, null));
+        Assert.Same(tank, WaterPointLayer.At([tank, hydrant, unknown], Marktplatz, 17));
     }
 
     [Fact]
     public void Of_two_points_on_the_same_spot_the_open_one_drawn_on_top_is_meant()
     {
-        var weak = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 80") { FlowLitresPerMinute = 600 };
-        var strong = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "ÜH 150") { FlowLitresPerMinute = 3200 };
+        var small = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 80") { NominalDiameter = 80 };
+        var tank = new WaterPoint(Marktplatz, WaterPointKind.Loeschwasserbehaelter, "Z 3");
 
-        Assert.Same(weak, WaterPointLayer.At([weak, strong], Marktplatz, 17, selected: weak));
+        Assert.Same(small, WaterPointLayer.At([small, tank], Marktplatz, 17, selected: small));
     }
 
     [Fact]
     public void Of_two_equal_points_on_the_same_spot_the_later_one_drawn_over_the_other_is_meant()
     {
-        var first = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100") { FlowLitresPerMinute = 1600 };
-        var second = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100") { FlowLitresPerMinute = 1600 };
+        var first = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100") { NominalDiameter = 100 };
+        var second = new WaterPoint(Marktplatz, WaterPointKind.Hydrant, "UH 100") { NominalDiameter = 100 };
 
         Assert.Same(second, WaterPointLayer.At([first, second], Marktplatz, 17));
     }
 
-    // Each edge of the full flag's body (mast 10, body 32 high, 100 wide), a finger's spare of 4 px
+    // Each edge of the full flag's body (mast 10, body 32 high, 120 wide), a finger's spare of 4 px
     // beyond it: 2 px inside that reach still means the point, 2 px outside means none. Every tap is
     // further from the foot than a fingertip, so only the flag can catch it.
     [Theory]
     [InlineData(-2, -44, true)]
     [InlineData(-6, -44, false)]
-    [InlineData(102, -26, true)]
-    [InlineData(106, -26, false)]
+    [InlineData(122, -26, true)]
+    [InlineData(126, -26, false)]
     [InlineData(50, -44, true)]
     [InlineData(50, -48, false)]
     [InlineData(50, -8, true)]

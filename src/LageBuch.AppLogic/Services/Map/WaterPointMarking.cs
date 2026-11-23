@@ -2,91 +2,55 @@ using LageBuch.Domain;
 
 namespace LageBuch.AppLogic.Services.Map;
 
-/// <summary>
-/// The Leistungsklasse a water point's marker is coloured by, along the Richtwerte of the
-/// Löschwasserbedarf (48 / 96 / 192 m³/h). Ordered from weakest to strongest, which is also the
-/// order the markers are drawn in, so a strong source lies on top.
-/// </summary>
-public enum FlowClass
-{
-    /// <summary>Not recorded or not assessable.</summary>
-    Unbekannt,
-
-    /// <summary>Under 400 l/min: not enough for an attack on its own.</summary>
-    Unter400,
-
-    /// <summary>400–799 l/min: one line, plan a feed.</summary>
-    Bis799,
-
-    /// <summary>800–1.599 l/min: Grundschutz for housing, 48 m³/h.</summary>
-    Bis1599,
-
-    /// <summary>1.600–3.199 l/min: higher demand, commercial, 96 m³/h.</summary>
-    Bis3199,
-
-    /// <summary>From 3.200 l/min: large buildings, 192 m³/h.</summary>
-    Ab3200,
-}
-
 /// <summary>How much of a water point its map marker shows, by the map's zoom.</summary>
 public enum WaterPointDetailLevel
 {
-    /// <summary>A small dot in the class colour, in a ring filled by the class.</summary>
+    /// <summary>A small dot in the source's colour.</summary>
     Punkt,
 
-    /// <summary>A flag with the glyph and the flow.</summary>
+    /// <summary>A flag with the glyph and the first line.</summary>
     Mittel,
 
-    /// <summary>A flag with the flow and its unit, the DN and the Ring/Stich sign.</summary>
+    /// <summary>A flag with the first line and, below it, Lage, outlets and private access.</summary>
     Voll,
 }
 
 /// <summary>
-/// What a water point's map marker says, apart from how it is drawn: its class, its two lines of
-/// text and how much of it shows at a zoom.
+/// What a water point's map marker says, apart from how it is drawn: only what OpenStreetMap holds.
+/// OSM knows the DN of most hydrants and the flow of almost none, and has no tag for Ring or Stich,
+/// so a marker shows neither; the colour says only whether the point hangs on the Trinkwassernetz.
 /// </summary>
 public static class WaterPointMarking
 {
     /// <summary>The value shown where nothing is known.</summary>
     public const string Unknown = "?";
 
-    /// <summary>The class of <paramref name="litresPerMinute"/>; <see cref="FlowClass.Unbekannt"/> for null.</summary>
-    public static FlowClass Classify(int? litresPerMinute) => litresPerMinute switch
-    {
-        null => FlowClass.Unbekannt,
-        < 400 => FlowClass.Unter400,
-        < 800 => FlowClass.Bis799,
-        < 1600 => FlowClass.Bis1599,
-        < 3200 => FlowClass.Bis3199,
-        _ => FlowClass.Ab3200,
-    };
+    private const string Separator = " · ";
 
     /// <summary>
-    /// The flow as the marker shows it: "1600", without a thousands point so four digits stay
-    /// short; "12k" from 10.000; in brackets when it is an estimate; "?" when unknown.
+    /// The flag's first line: a hydrant's "DN 100", which the Hinweisschild says too, or "DN ?"; a
+    /// Löschwasserbehälter's volume, "100 m³", or else its Nummer or name; for open water its Nummer
+    /// or name. Empty when OSM says nothing worth showing.
     /// </summary>
-    public static string FlowText(WaterPoint point)
+    public static string PrimaryText(WaterPoint point)
     {
         ArgumentNullException.ThrowIfNull(point);
-        if (point.FlowLitresPerMinute is not { } flow)
+        return point.Kind switch
         {
-            return Unknown;
-        }
-
-        var text = flow >= 10_000 ? $"{Formatting.UngroupedNumber(flow / 1000)}k" : Formatting.UngroupedNumber(flow);
-        return point.IsEstimated ? $"({text})" : text;
+            WaterPointKind.Hydrant => DiameterText(point),
+            WaterPointKind.Loeschwasserbehaelter when point.VolumeCubicMetres is { } volume => $"{Formatting.UngroupedNumber(volume)} m³",
+            _ => point.Label,
+        };
     }
 
     /// <summary>
-    /// The one line a <see cref="WaterPointDetailLevel.Mittel"/> flag has room for: the flow, or,
-    /// where nobody recorded one, the DN rather than a "?". OpenStreetMap knows the DN of most
-    /// hydrants and the flow of almost none, and the DN is what the Hinweisschild says too. The
-    /// colour stays grey, so the DN is never mistaken for a flow.
+    /// The full flag's second line, "Fahrbahn · A, 2×B · privat": whatever of the three OSM holds,
+    /// empty when it holds none.
     /// </summary>
-    public static string MediumText(WaterPoint point)
+    public static string SecondaryText(WaterPoint point)
     {
         ArgumentNullException.ThrowIfNull(point);
-        return point.FlowLitresPerMinute is null && point.NominalDiameter is not null ? DiameterText(point) : FlowText(point);
+        return string.Join(Separator, new[] { point.Lage, point.Outlets, point.IsPrivate ? "privat" : null }.OfType<string>());
     }
 
     /// <summary>"DN 100", or "DN ?" when the Nennweite is unknown.</summary>

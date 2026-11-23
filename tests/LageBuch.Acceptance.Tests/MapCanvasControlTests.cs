@@ -25,7 +25,8 @@ public class MapCanvasControlTests
     private static readonly Color Water = Color.FromRgb(0xAA, 0xD3, 0xDF);
 
     // The 1.600–3.199 l/min class.
-    private static readonly Color Green = Color.FromRgb(0x2E, 0x7D, 0x46);
+    private static readonly Color Red = Color.FromRgb(0xC6, 0x28, 0x28);
+    private static readonly Color Blue = Color.FromRgb(0x15, 0x65, 0xC0);
 
     // A pixel inside a flag's coloured field at zoom 16, off its glyph: the body is 20 px high and
     // stands on an 8 px mast above the point at (200, 150).
@@ -190,30 +191,28 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void From_zoom_16_a_water_point_is_a_flag_whose_mast_foot_stands_on_it()
     {
-        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(1600));
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant());
 
         using var frame = window.CaptureRenderedFrame()!;
 
         // The mast narrows to the point; left of it and below it is the map.
-        AssertNear(Green, PixelAt(frame, 200, 147));
+        AssertNear(Red, PixelAt(frame, 200, 147));
         Assert.Equal(Land, PixelAt(frame, 194, 147));
         Assert.Equal(Land, PixelAt(frame, 200, 158));
 
         // The body is above and right of the point: the coloured field, then white.
-        AssertNear(Green, PixelAt(frame, MediumField.X, MediumField.Y));
+        AssertNear(Red, PixelAt(frame, MediumField.X, MediumField.Y));
         Assert.True(Has(frame, new PixelRect(220, 124, 30, 16), Colors.White));
     }
 
     [AvaloniaTheory]
-    [InlineData(null, 0x5F6B78)]
-    [InlineData(300, 0xB3261E)]
-    [InlineData(600, 0xD9731A)]
-    [InlineData(1200, 0xB8960F)]
-    [InlineData(1600, 0x2E7D46)]
-    [InlineData(3200, 0x0F5C6E)]
-    public void The_flow_class_colours_the_flag_s_field(int? litresPerMinute, uint rgb)
+    [InlineData(WaterPointKind.Hydrant, 0xC62828)]
+    [InlineData(WaterPointKind.Saugstelle, 0x1565C0)]
+    [InlineData(WaterPointKind.Loeschwasserbehaelter, 0x1565C0)]
+    [InlineData(WaterPointKind.Loeschteich, 0x1565C0)]
+    public void The_source_colours_the_flag_s_field_red_on_the_mains_and_blue_independent_of_it(WaterPointKind kind, uint rgb)
     {
-        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(litresPerMinute));
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant() with { Kind = kind, Label = "Amper" });
 
         using var frame = window.CaptureRenderedFrame()!;
 
@@ -221,51 +220,49 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
-    public void A_stronger_source_lies_over_a_weaker_one_on_the_same_spot()
+    public void An_independent_source_lies_over_a_hydrant_on_the_same_spot()
     {
-        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(3200), Hydrant(300));
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant() with { Kind = WaterPointKind.Loeschwasserbehaelter }, Hydrant());
 
         using var frame = window.CaptureRenderedFrame()!;
 
-        AssertNear(Color.FromRgb(0x0F, 0x5C, 0x6E), PixelAt(frame, MediumField.X, MediumField.Y));
+        AssertNear(Blue, PixelAt(frame, MediumField.X, MediumField.Y));
     }
 
     [AvaloniaFact]
-    public void At_zoom_15_a_water_point_is_a_disc_on_it_whose_ring_fills_with_its_class()
+    public void At_zoom_15_a_water_point_is_a_dot_in_its_source_s_colour()
     {
-        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MinZoom, Hydrant(1600));
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MinZoom, Hydrant());
 
         using var frame = window.CaptureRenderedFrame()!;
 
-        AssertNear(Green, PixelAt(frame, 200, 148));
-
-        // Four classes of five: from twelve o'clock clockwise past nine, the last fifth left grey.
-        AssertNear(Green, PixelAt(frame, 205, 150));
-        AssertNear(Green, PixelAt(frame, 194, 150));
-        AssertNear(Color.FromRgb(0xD5, 0xD9, 0xDD), PixelAt(frame, 197, 145));
+        AssertNear(Red, PixelAt(frame, 200, 150));
+        AssertNear(Red, PixelAt(frame, 203, 150));
+        AssertNear(Colors.White, PixelAt(frame, 205, 150));
 
         // No flag.
         Assert.Equal(Land, PixelAt(frame, 215, 125));
     }
 
     [AvaloniaFact]
-    public void A_four_digit_estimate_stays_inside_the_flag_s_frame()
+    public void The_full_flag_s_two_lines_stay_inside_its_frame()
     {
-        var (window, _, _) = ShowWaterPoints(WaterPointLayer.FullMinZoom, Hydrant(1600) with { IsEstimated = true, NominalDiameter = 100 });
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.FullMinZoom, Hydrant() with { Lage = "Fahrbahn", Outlets = "A, 2×B", IsPrivate = true });
 
         using var frame = window.CaptureRenderedFrame()!;
 
         // Body rows: the mast's 10 px above the point, then 32 px of body.
         var (top, bottom) = (150 - 10 - 32, 150 - 10);
-        var frameRight = Enumerable.Range(200, 200).Last(x => IsNear(Green, PixelAt(frame, x, (top + bottom) / 2)));
-        Assert.True(HasText(frame, new PixelRect(230, top, frameRight - 230, bottom - top)));
+        var frameRight = Enumerable.Range(200, 200).Last(x => IsNear(Red, PixelAt(frame, x, (top + bottom) / 2)));
+        Assert.True(HasText(frame, new PixelRect(230, top, frameRight - 230, (bottom - top) / 2)));
+        Assert.True(HasText(frame, new PixelRect(230, (top + bottom) / 2, frameRight - 230, (bottom - top) / 2)));
         Assert.False(HasText(frame, new PixelRect(frameRight + 1, top - 4, 399 - frameRight, bottom - top + 8)));
     }
 
     [AvaloniaFact]
     public void Out_of_service_the_flag_loses_its_colour_and_is_struck_through_red()
     {
-        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant(1600) with { IsOutOfService = true });
+        var (window, _, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, Hydrant() with { IsOutOfService = true });
 
         using var frame = window.CaptureRenderedFrame()!;
 
@@ -276,7 +273,7 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void The_water_point_whose_card_is_open_is_framed_dark()
     {
-        var hydrant = Hydrant(1600);
+        var hydrant = Hydrant();
         var (window, control, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, hydrant);
         var frameTop = new PixelRect(225, 119, 20, 6);
         using (var before = window.CaptureRenderedFrame()!)
@@ -294,7 +291,7 @@ public class MapCanvasControlTests
     [AvaloniaFact]
     public void On_the_night_map_the_open_card_s_flag_keeps_its_white_body_and_is_framed_light()
     {
-        var hydrant = Hydrant(1600);
+        var hydrant = Hydrant();
         var (window, control, _) = ShowWaterPoints(WaterPointLayer.MediumMinZoom, hydrant);
         control.IsNight = true;
         control.SelectedWaterPoint = hydrant;
@@ -550,8 +547,8 @@ public class MapCanvasControlTests
         return (window, control, viewport);
     }
 
-    private static WaterPoint Hydrant(int? litresPerMinute) =>
-        new(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100") { FlowLitresPerMinute = litresPerMinute };
+    private static WaterPoint Hydrant() =>
+        new(Fuerstenfeldbruck, WaterPointKind.Hydrant, "UH 100") { NominalDiameter = 100 };
 
     private static (Window Window, MapCanvasControl Control, MapViewport Viewport) ShowWaterPoints(int zoom, params WaterPoint[] points)
     {
