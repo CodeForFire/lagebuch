@@ -306,6 +306,20 @@ public app from managed Google Play like any other; nothing has to be set here.
 
 Do this once, before the first tag that should reach Play.
 
+The app has to exist in Play before CI can upload to it, and Play's API can do
+neither of the first two steps:
+
+1. Create the app in the Play Console (*Home → Create app*). Leave Managed
+   Google Play alone (see above).
+2. Upload its first signed bundle by hand: `make aab VERSION=<version>`, then
+   upload the `.aab` as described under *By hand, when CI cannot* below. Pick a
+   `<version>` the next tag is newer than — `de.codeforfire.lagebuch.app`
+   started with `0.10.0-beta.2` (versionCode 1000202) — because Play refuses a
+   `versionCode` it has seen once.
+
+The numbered steps below come after that; step 4 invites the service account
+to an app that must already exist.
+
 1. **Environment.** Under *Settings → Environments*, create `google-play`. Add
    yourself as a *required reviewer*. Under *Deployment branches and tags*, allow
    only the tag pattern `v*`.
