@@ -44,11 +44,11 @@ docker run --rm -v "$PWD":/src lagebuch-android-build \
 ```
 
 The APK lands at
-`src/LageBuch.App.Android/bin/Debug/net10.0-android/de.codeforfire.lagebuch-Signed.apk`.
+`src/LageBuch.App.Android/bin/Debug/net10.0-android/de.codeforfire.lagebuch.app-Signed.apk`.
 Install it to a running emulator or connected device with:
 
 ```bash
-adb install -r src/LageBuch.App.Android/bin/Debug/net10.0-android/de.codeforfire.lagebuch-Signed.apk
+adb install -r src/LageBuch.App.Android/bin/Debug/net10.0-android/de.codeforfire.lagebuch.app-Signed.apk
 ```
 
 ## Notes

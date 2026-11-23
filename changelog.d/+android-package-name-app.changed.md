@@ -1,0 +1,1 @@
+The Android app now uses the package name `de.codeforfire.lagebuch.app`, so it installs as a new app beside an older Lagebuch from a GitHub APK or the Play test and starts without its Einsatzdateien, Stammdaten, Kartenpakete or trusted hosts, which have to be exported and imported again before the old app is uninstalled.
