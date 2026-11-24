@@ -284,7 +284,7 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          # The SDK writes an unsigned de.codeforfire.lagebuch.aab beside the -Signed one, and
+          # The SDK writes an unsigned de.codeforfire.lagebuch.app.aab beside the -Signed one, and
           # `find | head` once picked the unsigned bundle, which Play refused (v0.9.3-rc.1).
           # Name the signed files exactly.
           apk=$(find publish-android -name "*-Signed.apk" | head -n1)
@@ -519,7 +519,7 @@ jobs:
       - uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJson: ${{ steps.auth.outputs.credentials_file_path }}
-          packageName: de.codeforfire.lagebuch
+          packageName: de.codeforfire.lagebuch.app
           releaseFiles: play/*.aab
           tracks: ${{ steps.track.outputs.track }}
           status: draft

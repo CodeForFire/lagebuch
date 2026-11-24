@@ -166,7 +166,7 @@ public class HomeOpenErrorTests
     [AvaloniaFact]
     public void The_crash_notice_on_a_device_that_shares_files_offers_teilen_beside_ausblenden()
     {
-        const string report = "/data/user/0/de.codeforfire.lagebuch/files/crashes/crash-20261018-093000123.txt";
+        const string report = "/data/user/0/de.codeforfire.lagebuch.app/files/crashes/crash-20261018-093000123.txt";
         var (window, vm) = ShowHome(triggerError: false, renderTo: "home-crash-notice-share-phone.png", width: 412, lastCrashReport: report, canShareFiles: true);
         var banner = window.GetVisualDescendants().OfType<Border>().First(b => b.Name == "CrashNoticeBanner");
         var share = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ShareCrashReportButton");

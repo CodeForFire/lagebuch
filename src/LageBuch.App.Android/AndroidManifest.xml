@@ -19,7 +19,7 @@
         <!-- Spelled out rather than built from ${applicationId}: AndroidFileDialogService derives
              the same authority as $"{PackageName}.fileprovider", and the two must agree. -->
         <provider android:name="androidx.core.content.FileProvider"
-                  android:authorities="de.codeforfire.lagebuch.fileprovider"
+                  android:authorities="de.codeforfire.lagebuch.app.fileprovider"
                   android:exported="false"
                   android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />

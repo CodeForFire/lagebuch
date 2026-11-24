@@ -291,12 +291,34 @@ project with one maintainer — but recovery is a support round-trip, not a
 convenience.
 
 Three things can never be changed after the first upload: the package name
-(`de.codeforfire.lagebuch`), the app signing key, and the account type. The
-package name already matches the sideloaded APK; keep it.
+(`de.codeforfire.lagebuch.app`), the app signing key, and the account type.
+The sideloaded APK uses the same package name; keep it.
+
+**Never add an organization under *Advanced settings → Managed Google Play*.**
+Doing so restricts the app to that organization for good: Google's
+documentation on private apps says it can never be made public again, and the
+Console offers no way back. That is how the original
+`de.codeforfire.lagebuch` was lost in November 2026 and why the package is
+`de.codeforfire.lagebuch.app`. A Feuerwehr that manages its devices installs the
+public app from managed Google Play like any other; nothing has to be set here.
 
 #### Handing the key and Play access to CI
 
 Do this once, before the first tag that should reach Play.
+
+The app has to exist in Play before CI can upload to it, and Play's API can do
+neither of the first two steps:
+
+1. Create the app in the Play Console (*Home → Create app*). Leave Managed
+   Google Play alone (see above).
+2. Upload its first signed bundle by hand: `make aab VERSION=<version>`, then
+   upload the `.aab` as described under *By hand, when CI cannot* below. Pick a
+   `<version>` the next tag is newer than — `de.codeforfire.lagebuch.app`
+   started with `0.10.0-beta.2` (versionCode 1000202) — because Play refuses a
+   `versionCode` it has seen once.
+
+The numbered steps below come after that; step 4 invites the service account
+to an app that must already exist.
 
 1. **Environment.** Under *Settings → Environments*, create `google-play`. Add
    yourself as a *required reviewer*. Under *Deployment branches and tags*, allow
@@ -374,7 +396,7 @@ The keystore path, password file and alias are overridable (`KEYSTORE=`,
 refuses to run without a keystore and a password file.
 
 Then, in the Play Console: pick the track → *Create new release* → upload
-`de.codeforfire.lagebuch-Signed.aab` → German release notes → roll out. Never
+`de.codeforfire.lagebuch.app-Signed.aab` → German release notes → roll out. Never
 upload by hand a version the workflow already uploaded: Play refuses the
 `versionCode` a second time.
 

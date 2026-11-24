@@ -5,7 +5,7 @@
     <!-- Without OutputType=Exe a net8.0-android project builds as a library (.aar); the app head
          must be Exe so publish packages a launchable .apk. -->
     <OutputType>Exe</OutputType>
-    <ApplicationId>de.codeforfire.lagebuch</ApplicationId>
+    <ApplicationId>de.codeforfire.lagebuch.app</ApplicationId>
     <!-- Placeholders for local builds only. The tag is the source of truth: release.yml passes
          -p:ApplicationVersion (versionCode), -p:ApplicationDisplayVersion (versionName) and
          -p:Version (assembly version, shown on the About screen). Never bump these by hand. -->
