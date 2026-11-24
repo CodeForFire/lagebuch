@@ -129,6 +129,26 @@ public class ScbaNumberedTruppTests
         Assert.Contains(ValidationMessages.TypeNumberInUse, vm.ErrorSummary, StringComparison.Ordinal);
     }
 
+    // The duplicate-name check (#968) reads the Funkrufname box, which a numbered Trupp is not
+    // called by: a stale "CSA-Trupp 1" there must not block registering "CSA-Trupp 2".
+    [Fact]
+    public void A_stale_call_sign_naming_a_running_trupp_does_not_block_the_next_number()
+    {
+        var clock = new FixedClock(T0);
+        using var vm = Vm(clock, NewSession(clock));
+        vm.NewDesignation = CsaTrupp;
+        FillCrew(vm);
+        vm.AddTruppCommand.Execute(null);
+
+        vm.NewDesignation = CsaTrupp;
+        vm.NewCallSign = "CSA-Trupp 1";
+        FillCrew(vm);
+        vm.AddTruppCommand.Execute(null);
+
+        Assert.Null(vm.NewDuplicateTruppError);
+        Assert.Equal(new[] { "CSA-Trupp 1", "CSA-Trupp 2" }, vm.Trupps.Select(t => t.DisplayName).Order(StringComparer.Ordinal));
+    }
+
     [Fact]
     public void Number_is_required()
     {

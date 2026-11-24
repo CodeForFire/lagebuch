@@ -74,7 +74,7 @@ public class TruppArtChangeTests
         var id = sicherheit.Id;
         var number = sicherheit.TruppNumber;
 
-        incident.ChangeScbaTruppType(sicherheit.Id, "Angriffstrupp", 30, 10);
+        incident.ChangeScbaTruppType(sicherheit.Id, "Wassertrupp", 30, 10);
 
         Assert.Equal(id, sicherheit.Id);
         Assert.Equal(number, sicherheit.TruppNumber);

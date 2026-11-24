@@ -1943,6 +1943,7 @@ public sealed class Incident
             throw new ArgumentException($"{taken} ist bereits vergeben.", nameof(callSign));
         }
 
+        EnsureScbaTruppNameFree(callSign, designation, exceptTruppId: null);
         var trupp = AtemschutzTrupp.Register(
             clock.Now,
             designation,
@@ -1999,14 +2000,53 @@ public sealed class Incident
     /// <see cref="AtemschutzTrupp.ChangeType"/>. The values come from the caller, who reads them
     /// off today's Stammdaten. Takes no clock, and the ETB line is written by the caller, like
     /// <see cref="SetScbaSafetyTrupp"/>.
+    /// <para>
+    /// A Trupp-Art that would give the Trupp the name of another Trupp not yet abgenommen is
+    /// refused (#968), see <see cref="FindScbaTruppNamed"/>. An abgenommen Trupp keeps its own
+    /// refusal, because it cannot change at all.
+    /// </para>
     /// </summary>
     public AtemschutzTrupp ChangeScbaTruppType(
         Guid truppId, string designation, int maxDurationMinutes, int pressureControlIntervalMinutes)
     {
         EnsureOpen();
         var trupp = FindScbaTrupp(truppId);
+        if (!trupp.IsReturned)
+        {
+            EnsureScbaTruppNameFree(trupp.CallSign, designation, trupp.Id);
+        }
+
         trupp.ChangeType(designation, maxDurationMinutes, pressureControlIntervalMinutes);
         return trupp;
+    }
+
+    /// <summary>
+    /// The Trupp not yet abgenommen that already goes by "{<paramref name="callSign"/>} ·
+    /// {<paramref name="designation"/>}", or null when that name is free (#968). Both parts are
+    /// compared trimmed and ignoring case, and a blank Funkrufname is no Funkrufname, so the
+    /// comparison sees what <see cref="AtemschutzTrupp.DisplayName"/> shows. An abgenommen Trupp
+    /// holds no name: a second round from the same Fahrzeug is an ordinary Einsatz. A pure query,
+    /// like <see cref="NextFreeScbaTruppNumber"/>, so the registration form and the Trupp-Art flyout
+    /// can ask before the domain refuses.
+    /// </summary>
+    public AtemschutzTrupp? FindScbaTruppNamed(string? callSign, string designation, Guid? exceptTruppId = null)
+    {
+        ArgumentNullException.ThrowIfNull(designation);
+        var wantedCallSign = callSign?.Trim() ?? string.Empty;
+        var wantedDesignation = designation.Trim();
+        return _scbaTrupps.Find(t =>
+            !t.IsReturned
+            && t.Id != exceptTruppId
+            && string.Equals(t.Designation.Trim(), wantedDesignation, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(t.CallSign?.Trim() ?? string.Empty, wantedCallSign, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void EnsureScbaTruppNameFree(string? callSign, string designation, Guid? exceptTruppId)
+    {
+        if (FindScbaTruppNamed(callSign, designation, exceptTruppId) is { } holder)
+        {
+            throw new InvalidOperationException(AtemschutzTrupp.AlreadyRegisteredMessage(holder.DisplayName));
+        }
     }
 
     /// <summary>
