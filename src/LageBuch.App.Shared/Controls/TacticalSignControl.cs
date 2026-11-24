@@ -18,8 +18,8 @@ namespace LageBuch.App.Shared.Controls;
 /// <see cref="SymbolCenter"/> it draws the Verbindungsstrich back to the unit's pin, which stands
 /// <see cref="MapMarkerPanel.ResolvedOffsetProperty"/> away (§1.5: a sign moved aside "mit Verbindungsstrichen zur jeweiligen
 /// Örtlichkeit"). The strich leaves the control's bounds on purpose; only the sign takes the pointer.
-/// A Bereitstellungsraum (#966) is drawn instead as the Grundzeichen "Stelle, Einrichtung", a red
-/// circle, marked "BR", around the same <see cref="SymbolCenter"/>.
+/// A Bereitstellungsraum (#966) is drawn instead as its DV 102 sign from the same set, a yellow
+/// circle holding a vehicle's outline, around the same <see cref="SymbolCenter"/>.
 /// </summary>
 public sealed class TacticalSignControl : Control
 {
@@ -27,9 +27,6 @@ public sealed class TacticalSignControl : Control
     public const double SymbolWidth = 48;
 
     public const double BodyHeight = 26;
-
-    /// <summary>What a Bereitstellungsraum's circle says inside.</summary>
-    public const string BereitstellungsraumCode = "BR";
 
     public static readonly StyledProperty<string?> VehicleTypeProperty =
         AvaloniaProperty.Register<TacticalSignControl, string?>(nameof(VehicleType));
@@ -45,7 +42,9 @@ public sealed class TacticalSignControl : Control
     private const double Gap = 4;
 
     // The Bereitstellungsraum's circle: a little taller than the vehicle's body, centred where it is.
+    // The set draws it with radius 64 around (128, 128) of its 256 units.
     private const double StelleRadius = (BodyHeight / 2) + 1;
+    private const double StelleScale = StelleRadius / 64;
 
     // The body's top edge sags towards the middle, as on the DV 102 Kraftfahrzeug sign.
     private const double Sag = 3.5;
@@ -59,6 +58,10 @@ public sealed class TacticalSignControl : Control
     private const double SmallCodeLeft = 1.8;
 
     private static readonly IBrush Red = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+    private static readonly IBrush Yellow = new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0x00));
+
+    // The set's 5-unit black line, at the Bereitstellungsraum's scale.
+    private static readonly IPen StelleLine = new ImmutablePen(Brushes.Black, 5 * StelleScale);
 
     // Twice the edge's width: clipped to the body, only its inner half shows, just inside the outline.
     private static readonly IPen InnerEdge = new ImmutablePen(Brushes.White, 3.2);
@@ -125,7 +128,7 @@ public sealed class TacticalSignControl : Control
 
         if (IsBereitstellungsraum)
         {
-            DrawStelle(context, layout);
+            DrawBereitstellungsraum(context, layout);
             return;
         }
 
@@ -175,25 +178,32 @@ public sealed class TacticalSignControl : Control
         }
     }
 
-    // The Grundzeichen "Stelle, Einrichtung" in Feuerwehr red, edged like the vehicle's body, with "BR" inside.
-    private static void DrawStelle(DrawingContext context, SignLayout layout)
+    // The DV 102 sign Bereitstellungsraum, traced from the set's Einrichtungen/Bereitstellungsraum:
+    // a yellow circle edged in black, holding the outline of a vehicle's body, unfilled.
+    private static void DrawBereitstellungsraum(DrawingContext context, SignLayout layout)
     {
         var circle = new EllipseGeometry(new Rect(
             SymbolCenter.X - StelleRadius, SymbolCenter.Y - StelleRadius, StelleRadius * 2, StelleRadius * 2));
-        context.DrawGeometry(Red, null, circle);
-        using (context.PushGeometryClip(circle))
+        context.DrawGeometry(Yellow, StelleLine, circle);
+
+        var vehicle = new StreamGeometry();
+        using (var g = vehicle.Open())
         {
-            context.DrawGeometry(null, InnerEdge, circle);
+            g.BeginFigure(InStelle(85, 105), isFilled: false);
+            g.LineTo(InStelle(85, 151));
+            g.LineTo(InStelle(171, 151));
+            g.LineTo(InStelle(171, 105));
+            g.QuadraticBezierTo(InStelle(128, 128), InStelle(85, 105));
+            g.EndFigure(isClosed: true);
         }
 
-        context.DrawGeometry(null, Outline, circle);
-        if (layout.Code is { } code)
-        {
-            context.DrawText(code, new Point(SymbolCenter.X - (code.Width / 2), SymbolCenter.Y - (code.Height / 2)));
-        }
-
+        context.DrawGeometry(null, StelleLine, vehicle);
         DrawLines(context, layout);
     }
+
+    // A point of the set's Bereitstellungsraum drawing, in this control's pixels.
+    private static Point InStelle(double x, double y) =>
+        new(SymbolCenter.X + ((x - 128) * StelleScale), SymbolCenter.Y + ((y - 128) * StelleScale));
 
     // The marks inside the body, traced from the set's SVGs in its 256-unit coordinates.
     private static void DrawMark(DrawingContext context, VehicleMark mark)
@@ -322,8 +332,7 @@ public sealed class TacticalSignControl : Control
         var bold = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.Bold);
         if (IsBereitstellungsraum)
         {
-            var brCode = new FormattedText(BereitstellungsraumCode, Culture, FlowDirection.LeftToRight, bold, 11, Brushes.White);
-            return WithTitle(brCode, codeIsSmall: false, SymbolCenter.X + StelleRadius + Gap + 2, bold);
+            return WithTitle(code: null, codeIsSmall: false, SymbolCenter.X + StelleRadius + Gap + 2, bold);
         }
 
         // Where the code goes depends on the mark: in the middle of a bare sign, small above the
