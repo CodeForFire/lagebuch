@@ -813,10 +813,7 @@ public class WorkspaceAcceptanceTests
 
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
-        using (var before = window.CaptureRenderedFrame()!)
-        {
-            before.SavePng(Path.Join(dir, "etb-search-before.png"));
-        }
+        SaveFrame(window, Path.Join(dir, "etb-search-before.png"));
 
         var search = view.GetControl<TextBox>("EtbSearchBox");
         var grid = view.GetControl<DataGrid>("EtbGrid");
@@ -827,27 +824,34 @@ public class WorkspaceAcceptanceTests
         window.Type("trupp nord");
 
         Assert.Equal("trupp nord", vm.Etb.FilterText);
-        Assert.Equal(2, grid.ItemsSource!.Cast<object>().Count());
+        Assert.Equal(2, Rows(grid).Count());
         Assert.True(view.GetControl<TextBlock>("EtbMatchCountText").IsEffectivelyVisible);
         Assert.Equal("Suche zurücksetzen", Avalonia.Automation.AutomationProperties.GetName(view.GetControl<Button>("ClearEtbSearchButton")));
-        using (var after = window.CaptureRenderedFrame()!)
-        {
-            after.SavePng(Path.Join(dir, "etb-search-after.png"));
-        }
+        SaveFrame(window, Path.Join(dir, "etb-search-after.png"));
 
         window.Type(" drehleiter");
 
-        Assert.Empty(grid.ItemsSource!.Cast<object>());
+        Assert.Empty(Rows(grid));
         Assert.True(noMatches.IsVisible);
-        using (var none = window.CaptureRenderedFrame()!)
-        {
-            none.SavePng(Path.Join(dir, "etb-search-none.png"));
-        }
+        SaveFrame(window, Path.Join(dir, "etb-search-none.png"));
 
         window.Press(Avalonia.Input.PhysicalKey.Escape);
 
         Assert.Equal(string.Empty, vm.Etb.FilterText);
-        Assert.Equal(3, grid.ItemsSource!.Cast<object>().Count());
+        Assert.Equal(3, Rows(grid).Count());
+
+        static void SaveFrame(Window window, string path)
+        {
+            var frame = window.CaptureRenderedFrame();
+            Assert.NotNull(frame);
+            using (frame)
+            {
+                frame.SavePng(path);
+            }
+        }
+
+        static IEnumerable<EtbEntryRow> Rows(DataGrid grid) =>
+            Assert.IsAssignableFrom<IEnumerable<EtbEntryRow>>(grid.ItemsSource);
     }
 
     // The Funktionen tab had no UI-level coverage at all before issue #17 widened it.

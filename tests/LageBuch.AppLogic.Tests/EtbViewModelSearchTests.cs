@@ -14,7 +14,7 @@ public class EtbViewModelSearchTests
     [Fact]
     public void Search_keeps_only_entries_containing_every_term()
     {
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         Add(vm, "Atemschutz Trupp Nord vor");
         Add(vm, "Wasserversorgung Nord steht");
         Add(vm, "Atemschutz Trupp Süd zurück");
@@ -28,7 +28,7 @@ public class EtbViewModelSearchTests
     [Fact]
     public void Search_matches_von_an_and_erfasst_von_case_insensitively()
     {
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         Add(vm, "Lagemeldung", from: "ILS Fürstenfeldbruck");
         Add(vm, "Nachalarmierung", to: "Kreisbrandinspektion");
         Add(vm, "Wasserversorgung steht");
@@ -47,7 +47,7 @@ public class EtbViewModelSearchTests
     [Fact]
     public void Search_combines_with_hide_system_entries()
     {
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         Add(vm, "Einsatz läuft");
 
         // "Einsatz begonnen" is a System entry and contains the term too.
@@ -61,7 +61,7 @@ public class EtbViewModelSearchTests
     [Fact]
     public void Entry_arriving_during_a_search_shows_only_if_it_matches()
     {
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         vm.FilterText = "drehleiter";
 
         Add(vm, "Wasserversorgung steht");
@@ -74,7 +74,8 @@ public class EtbViewModelSearchTests
     [Fact]
     public void Editing_an_entry_so_it_no_longer_matches_hides_it()
     {
-        var (session, vm) = NewVm();
+        var (session, created) = NewVm();
+        using var vm = created;
         Add(vm, "Drehleiter in Stellung");
         vm.FilterText = "drehleiter";
         var id = Assert.Single(vm.Entries).Id;
@@ -92,7 +93,7 @@ public class EtbViewModelSearchTests
     public void Clearing_the_search_restores_every_entry_in_place()
     {
         // A Reset takes the grid's selected row and focus with it (#542).
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         Add(vm, "Erste");
         Add(vm, "Zweite");
         var before = vm.Entries.ToList();
@@ -120,7 +121,7 @@ public class EtbViewModelSearchTests
     [Fact]
     public void Match_count_reads_visible_of_every_shown_entry()
     {
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         Add(vm, "Atemschutz Trupp 2 vor");
         Add(vm, "Wasserversorgung steht");
         Add(vm, "Atemschutz Trupp 1 zurück");
@@ -135,7 +136,7 @@ public class EtbViewModelSearchTests
     [Fact]
     public void Showing_systemmeldungen_during_a_search_updates_the_count_even_when_no_row_moves()
     {
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         Add(vm, "Wasserversorgung steht");
         vm.FilterText = "wasser";
         Assert.Equal("1 von 1", vm.MatchCountText);
@@ -187,9 +188,54 @@ public class EtbViewModelSearchTests
     }
 
     [Fact]
+    public void A_nonmatching_entry_arriving_during_a_search_still_counts_towards_the_total()
+    {
+        using var vm = NewVm().Vm;
+        Add(vm, "Wasserversorgung steht");
+        vm.FilterText = "wasser";
+        Assert.Equal("1 von 1", vm.MatchCountText);
+        var raised = 0;
+        vm.PropertyChanged += (_, e) => raised += e.PropertyName == nameof(EtbViewModel.MatchCountText) ? 1 : 0;
+
+        // Hidden by the search, so the list does not move; the whole it is counted against does.
+        Add(vm, "Drehleiter in Stellung");
+
+        Assert.Single(vm.Entries);
+        Assert.Equal("1 von 2", vm.MatchCountText);
+        Assert.True(raised > 0);
+    }
+
+    [Fact]
+    public void Without_a_search_a_new_entry_leaves_the_count_alone()
+    {
+        // Nothing shows the count then, and working it out is a pass over every row.
+        using var vm = NewVm().Vm;
+        var raised = 0;
+        vm.PropertyChanged += (_, e) => raised += e.PropertyName == nameof(EtbViewModel.MatchCountText) ? 1 : 0;
+
+        Add(vm, "Wasserversorgung steht");
+
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
+    public void A_search_that_empties_the_list_raises_show_no_matches()
+    {
+        using var vm = NewVm().Vm;
+        Add(vm, "Wasserversorgung steht");
+        var raised = 0;
+        vm.PropertyChanged += (_, e) => raised += e.PropertyName == nameof(EtbViewModel.ShowNoMatches) ? 1 : 0;
+
+        vm.FilterText = "drehleiter";
+
+        Assert.True(vm.ShowNoMatches);
+        Assert.True(raised > 0);
+    }
+
+    [Fact]
     public void No_matches_message_quotes_the_trimmed_search()
     {
-        var (_, vm) = NewVm();
+        using var vm = NewVm().Vm;
         Add(vm, "Wasserversorgung steht");
 
         vm.FilterText = "  Drehleiter ";

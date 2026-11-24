@@ -74,16 +74,6 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         Entries = new ObservableCollection<EtbEntryRow>();
         FilterChoices = new ObservableCollection<EtbSectionChoice>();
 
-        // A new entry arriving during a search moves the count. Not counted without a search: the
-        // count is a pass over every row, and nothing shows it then.
-        Entries.CollectionChanged += (_, _) =>
-        {
-            if (IsFiltered)
-            {
-                RaiseSearchResult();
-            }
-        };
-
         // Any change to the incident — from this tab, another tab, or (when joined) another device —
         // brings the journal up to date through the same path.
         _session.Changed += Sync;
@@ -127,7 +117,6 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             }
         }
 
-        var edited = false;
         foreach (var entry in journal)
         {
             if (!_byId.TryGetValue(entry.Id, out var current)
@@ -138,7 +127,6 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
             refiled |= current.SectionId != entry.SectionId;
             current.Update(entry);
-            edited = true;
 
             if (EditingEntry?.Id == entry.Id)
             {
@@ -160,8 +148,15 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             }
         }
 
-        // An edit can make a row match the search, or stop matching it.
-        if ((marked && ShowOnlySituationReports) || (edited && IsFiltered))
+        if (marked && ShowOnlySituationReports)
+        {
+            ReconcileVisible();
+        }
+
+        // During a search every change goes through the reconcile: an edit can move a row into the
+        // result or out of it, and an entry the search hides still grows the count's whole. One
+        // pass over the rows per change, and only while a search is typed.
+        if (IsFiltered)
         {
             ReconcileVisible();
         }
