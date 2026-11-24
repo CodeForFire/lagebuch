@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -15,7 +16,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// #971: the ETB's Einsatzabschnitt picker in the entry line, the quick filter above the grid and
+// #971: the ETB's Einsatzabschnitt picker among the dock's fields, the quick filter above the grid and
 // the Abschnitt badge on a filed row. With RENDER_OUT set it also writes the PR screenshots.
 public class EtbSectionStripTests
 {
@@ -60,6 +61,9 @@ public class EtbSectionStripTests
     private static List<Button> Chips(Window window, string strip) =>
         [.. Named<ItemsControl>(window, strip).GetVisualDescendants().OfType<Button>()];
 
+    private static HeaderedContentControl FieldOf(Control input) =>
+        input.FindAncestorOfType<HeaderedContentControl>() ?? throw new InvalidOperationException("not in a field");
+
     // Picks an Abschnitt in the entry line's dropdown, by label.
     private static void Pick(Window window, string label)
     {
@@ -82,7 +86,7 @@ public class EtbSectionStripTests
     {
         var (window, _, _) = ShowWorkspace(withAbschnitte: false);
 
-        Assert.False(Named<DockPanel>(window, "SectionEntryBar").IsEffectivelyVisible);
+        Assert.False(Named<HeaderedContentControl>(window, "SectionEntryField").IsEffectivelyVisible);
         Assert.False(Named<DockPanel>(window, "SectionFilterBar").IsEffectivelyVisible);
     }
 
@@ -93,6 +97,12 @@ public class EtbSectionStripTests
 
         var picker = Named<NodeChoicePicker>(window, "SectionEntryPicker");
         Assert.True(picker.IsEffectivelyVisible);
+
+        // Between AN and EINTRAG in the dock's row of fields.
+        var fields = Named<StackPanel>(window, "DockFields").Children;
+        var at = fields.IndexOf(Named<HeaderedContentControl>(window, "SectionEntryField"));
+        Assert.Equal(fields.IndexOf(FieldOf(Named<AutoCompleteBox>(window, "ToBox"))) + 1, at);
+        Assert.Equal(at + 1, fields.IndexOf(FieldOf(Named<TextBox>(window, "EtbTextBox"))));
         Assert.Equal(NodeChoices.UnplacedLabel, picker.Label);
         Assert.Equal(
             [NodeChoices.UnplacedLabel, "Nord", "Süd", "Süd / Tiefgarage"],

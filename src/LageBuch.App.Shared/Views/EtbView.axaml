@@ -77,6 +77,15 @@
     <Style Selector="AutoCompleteBox#ToBox">
       <Setter Property="Width" Value="150" />
     </Style>
+    <Style Selector="ctrl|NodeChoicePicker#SectionEntryPicker">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <!-- The picker's own button keeps a local padding and size, so the label is what lines up with
+         VON and AN: their 14px text, and room for the field's chevron on the right. -->
+    <Style Selector="ctrl|NodeChoicePicker#SectionEntryPicker Button#PickerButton > Panel > TextBlock">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Margin" Value="3,0,24,0" />
+    </Style>
     <Style Selector="TextBox#EtbTextBox">
       <Setter Property="Width" Value="320" />
     </Style>
@@ -104,6 +113,9 @@
       <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#ToBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ctrl|NodeChoicePicker#SectionEntryPicker">
       <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow TextBox#EtbTextBox">
@@ -210,16 +222,6 @@
                         Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
             </Button>
           </Grid>
-          <!-- The Abschnitt the next entry is filed under (#971), picked from the same dropdown as
-               the edit panel's. Sticky, unlike VON: radio traffic from one Abschnitt comes in runs,
-               and the closed picker names the one in force. "nicht zugeordnet" files the next
-               entry nowhere. -->
-          <DockPanel x:Name="SectionEntryBar" IsVisible="{Binding HasSectionChoices}" Margin="0,0,0,4">
-            <TextBlock DockPanel.Dock="Left" Text="ABSCHNITT" Classes="overline" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <ctrl:NodeChoicePicker x:Name="SectionEntryPicker" HorizontalAlignment="Left" Width="200"
-                                   Choices="{Binding NewSectionChoices}" Label="{Binding NewSectionLabel}"
-                                   PickerName="Abschnitt des neuen Eintrags wählen" />
-          </DockPanel>
           <StackPanel x:Name="DockFields" Spacing="8">
             <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
                  a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
@@ -235,6 +237,16 @@
                                ItemsSource="{Binding CallSignOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                Text="{Binding NewTo}" />
+            </HeaderedContentControl>
+            <!-- The Abschnitt the next entry is filed under (#971), the same picker as the edit
+                 panel's. Sticky, unlike VON: radio traffic from one Abschnitt comes in runs, and the
+                 closed picker names the one in force. "nicht zugeordnet" files the next entry
+                 nowhere. "suggest" lends it VON's and AN's chevron, which lets clicks through. -->
+            <HeaderedContentControl x:Name="SectionEntryField" Classes="field suggest" Header="ABSCHNITT"
+                                    IsVisible="{Binding HasSectionChoices}">
+              <ctrl:NodeChoicePicker x:Name="SectionEntryPicker"
+                                     Choices="{Binding NewSectionChoices}" Label="{Binding NewSectionLabel}"
+                                     PickerName="Abschnitt des neuen Eintrags wählen" />
             </HeaderedContentControl>
             <HeaderedContentControl Classes="field required" Header="EINTRAG"
                                       Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
