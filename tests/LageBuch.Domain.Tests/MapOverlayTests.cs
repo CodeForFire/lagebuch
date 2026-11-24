@@ -30,7 +30,7 @@ public class MapOverlayTests
             summary ?? new MapOverlaySummary("prognose", 8, First, Last));
 
     [Fact]
-    public void An_imported_forecast_is_recorded_with_its_times_in_local_time_and_stays_visible_with_system_lines_hidden()
+    public void An_imported_forecast_is_recorded_with_its_times_in_local_time_as_a_system_line()
     {
         var (incident, clock, op) = NewIncident();
 
@@ -40,7 +40,9 @@ public class MapOverlayTests
         Assert.True(overlay.IsTimeSeries);
         var entry = incident.Journal[^1];
         Assert.Equal("Kartenebene importiert: prognose (8 Zeitpunkte, 16:00–17:45 Uhr)", entry.Text);
-        Assert.Equal(EtbDirection.Measurement, entry.Direction);
+
+        // #972: bookkeeping, not a measured value, so "Messwerte ausblenden" leaves it alone.
+        Assert.Equal(EtbDirection.System, entry.Direction);
     }
 
     [Fact]
@@ -77,6 +79,7 @@ public class MapOverlayTests
         Assert.Empty(incident.MapOverlays);
         Assert.Empty(incident.Files);
         Assert.Equal("Kartenebene entfernt: prognose", incident.Journal[^1].Text);
+        Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
     }
 
     [Fact]
@@ -89,6 +92,7 @@ public class MapOverlayTests
 
         Assert.Empty(incident.MapOverlays);
         Assert.Equal("Kartenebene entfernt: prognose", incident.Journal[^1].Text);
+        Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
     }
 
     [Fact]

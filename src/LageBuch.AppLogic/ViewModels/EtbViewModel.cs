@@ -194,17 +194,25 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // should open on an empty-looking journal, not the "Einsatz begonnen" trace.
     //
     // Deliberately narrower than EtbDirections.IsAppWritten: EtbDirection.Measurement is
-    // app-written too, but it is a professional record of what a Trupp measured, not bookkeeping.
-    // Hiding CO readings behind a checkbox nobody knows about is exactly what made them look
-    // undocumented (#424), so this filter tests for System alone.
+    // app-written too, but it is a professional record of what a Trupp measured, not bookkeeping,
+    // so it has its own checkbox below rather than hiding behind this one (#424, #972).
     [ObservableProperty]
     private bool _hideSystemEntries = true;
+
+    // The Gasmessung lines (#972). On by default, reversing #424's always-visible choice: in
+    // practice the readings filled the journal, and the Gasmessprotokoll and the Bericht's
+    // Messungen section are where they are read. Its own checkbox, so unticking it is one click
+    // and never brings the bookkeeping back with it.
+    [ObservableProperty]
+    private bool _hideMeasurementEntries = true;
 
     /// <summary>Only the Lagemeldungen sent to the Leitstelle (#592), to find the last one quickly.</summary>
     [ObservableProperty]
     private bool _showOnlySituationReports;
 
     partial void OnHideSystemEntriesChanged(bool value) => ReconcileVisible();
+
+    partial void OnHideMeasurementEntriesChanged(bool value) => ReconcileVisible();
 
     partial void OnShowOnlySituationReportsChanged(bool value) => ReconcileVisible();
 
@@ -228,8 +236,11 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     }
 
     private bool IsVisible(EtbEntryRow row) =>
-        (!HideSystemEntries || row.DirectionValue != EtbDirection.System)
-        && (!ShowOnlySituationReports || row.SituationReportNumber is not null);
+        !IsHiddenByKind(row) && (!ShowOnlySituationReports || row.SituationReportNumber is not null);
+
+    // The two "ausblenden" checkboxes, each taking only its own kind of line (#972).
+    private bool IsHiddenByKind(EtbEntryRow row) =>
+        (HideSystemEntries && row.IsSystem) || (HideMeasurementEntries && row.IsMeasurement);
 
     // The dock and the edit panel below the grid are two separate forms, so each keeps its own
     // "the operator has asked" state: pressing one must not light up a field in the other (#412).
@@ -505,6 +516,8 @@ public sealed class EtbEntryRow : ObservableObject
         Text = entry.Text;
         EnteredBy = entry.EnteredBy;
         DirectionValue = entry.Direction;
+        IsSystem = EtbDirections.IsSystem(entry.Direction, entry.Text);
+        IsMeasurement = EtbDirections.IsMeasurement(entry.Direction, entry.Text);
         WasEdited = entry.Edits.Count > 0;
         Edits = entry.Edits;
         IsEditable = !EtbDirections.IsAppWritten(entry.Direction);
@@ -536,6 +549,14 @@ public sealed class EtbEntryRow : ObservableObject
     public string EnteredBy { get; }
 
     public EtbDirection DirectionValue { get; }
+
+    /// <summary>Hidden by "Systemmeldungen ausblenden", an older file's Kartenebene line included.
+    /// Fixed at construction, like <see cref="IsMeasurement"/>: both kinds are app-written and
+    /// never edited, so <see cref="Update"/> cannot move a row between them.</summary>
+    public bool IsSystem { get; }
+
+    /// <summary>Hidden by "Messwerte ausblenden" (#972).</summary>
+    public bool IsMeasurement { get; }
 
     public bool WasEdited { get; private set; }
 

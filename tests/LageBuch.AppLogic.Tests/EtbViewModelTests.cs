@@ -125,10 +125,95 @@ public class EtbViewModelTests
         Assert.Equal(new[] { "Wasserversorgung prüfen" }, created);
     }
 
-    // #424, the user-visible half: a CO reading must survive the default filter. Practitioners
-    // reported the change as "not documented" precisely because it did not.
+    // #972 reverses #424's always-visible default: measurement lines filled the journal, so the
+    // ETB opens with them hidden, behind their own checkbox rather than the System one.
     [Fact]
-    public void Measurement_entries_survive_the_default_system_filter()
+    public void Measurement_entries_are_hidden_by_default_and_shown_when_unchecked()
+    {
+        var (session, vm) = WithGasmessung();
+        Assert.True(vm.HideMeasurementEntries);
+        vm.NewText = "Lage erhalten";
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.DoesNotContain(Texts(vm), t => t.Contains("45 ppm", StringComparison.Ordinal));
+        Assert.Contains("Lage erhalten", Texts(vm));
+
+        vm.HideMeasurementEntries = false;
+
+        Assert.Contains(Texts(vm), t => t.Contains("45 ppm", StringComparison.Ordinal));
+        Assert.Equal(session.Incident.Journal.Count(e => e.Direction != EtbDirection.System), vm.Entries.Count);
+    }
+
+    // The two checkboxes are independent: each takes its own kind of line and leaves the other.
+    [Fact]
+    public void The_measurement_and_system_filters_hide_their_own_lines_independently()
+    {
+        var (_, vm) = WithGasmessung();
+
+        vm.HideMeasurementEntries = false;
+        Assert.Contains(Texts(vm), t => t.StartsWith("Gasmessung", StringComparison.Ordinal));
+        Assert.DoesNotContain(Texts(vm), t => t.Contains("Einsatz begonnen", StringComparison.Ordinal));
+
+        vm.HideMeasurementEntries = true;
+        vm.HideSystemEntries = false;
+        Assert.DoesNotContain(Texts(vm), t => t.StartsWith("Gasmessung", StringComparison.Ordinal));
+        Assert.Contains(Texts(vm), t => t.Contains("Einsatz begonnen", StringComparison.Ordinal));
+
+        vm.HideMeasurementEntries = false;
+        Assert.Contains(Texts(vm), t => t.StartsWith("Gasmessung", StringComparison.Ordinal));
+        Assert.Contains(Texts(vm), t => t.Contains("Einsatz begonnen", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_measurement_recorded_while_the_filter_is_on_stays_hidden()
+    {
+        var (session, vm) = WithGasmessung();
+
+        session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 2, 80);
+
+        Assert.DoesNotContain(Texts(vm), t => t.Contains("80 ppm", StringComparison.Ordinal));
+        vm.HideMeasurementEntries = false;
+        Assert.Contains(Texts(vm), t => t.Contains("80 ppm", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Nur_lagemeldungen_still_narrows_with_measurements_shown()
+    {
+        var (session, vm) = WithSentLagemeldung();
+        session.AddCoBuilding("Haus A", 2, 3);
+        session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 45);
+        vm.HideMeasurementEntries = false;
+
+        vm.ShowOnlySituationReports = true;
+
+        Assert.Equal("LM 1", Assert.Single(vm.Entries).SituationReportLabel);
+    }
+
+    // An older file wrote "Kartenebene importiert/entfernt" as a Measurement; it is bookkeeping,
+    // so it follows "Systemmeldungen ausblenden" and never "Messwerte ausblenden".
+    [Fact]
+    public void A_kartenebene_line_from_an_older_file_is_filtered_as_a_system_line()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var legacy = EtbEntry.Rehydrate(Guid.NewGuid(), T0, EtbDirection.Measurement, "Kartenebene importiert: prognose", "Müller", null, null);
+        var human = EtbEntry.Rehydrate(Guid.NewGuid(), T0.AddMinutes(1), EtbDirection.Internal, "Lage erhalten", "Müller", null, null);
+        var incident = Incident.Rehydrate(
+            Guid.NewGuid(), T0, IncidentState.Open, null, null, null, null, null, null, null, [], [legacy, human], [], [], [], [], [], [], [], [], [], []);
+        store.Save("/x.lagebuch", incident);
+        var session = LocalIncidentSession.Open(store, clock, "/x.lagebuch", new SessionOperator("Müller"));
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { HideMeasurementEntries = false };
+
+        Assert.DoesNotContain("Kartenebene importiert: prognose", Texts(vm));
+        Assert.Contains("Lage erhalten", Texts(vm));
+
+        vm.HideSystemEntries = false;
+        vm.HideMeasurementEntries = true;
+
+        Assert.Contains("Kartenebene importiert: prognose", Texts(vm));
+    }
+
+    private static (LocalIncidentSession Session, EtbViewModel Vm) WithGasmessung()
     {
         var clock = new FixedClock(T0);
         var session = TestSession.StartNew(
@@ -139,18 +224,12 @@ public class EtbViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
-        Assert.True(vm.HideSystemEntries);
-
         session.AddCoBuilding("Haus A", 2, 3);
         session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 45);
-
-        var texts = vm.Entries.Select(e => e.Text).ToList();
-        Assert.Contains(texts, t => t.Contains("45 ppm", StringComparison.Ordinal));
-
-        // ... while the bookkeeping around it stays hidden, which is what #223 asked for.
-        Assert.DoesNotContain(texts, t => t.Contains("Einsatz begonnen", StringComparison.Ordinal));
-        Assert.DoesNotContain(texts, t => t.Contains("Gasmessprotokoll eröffnet", StringComparison.Ordinal));
+        return (session, vm);
     }
+
+    private static List<string> Texts(EtbViewModel vm) => vm.Entries.Select(e => e.Text).ToList();
 
     [Fact]
     public void Measurement_entries_are_not_editable()
@@ -163,7 +242,7 @@ public class EtbViewModelTests
             "/x.lagebuch",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { HideMeasurementEntries = false };
 
         session.AddCoBuilding("Haus A", 2, 3);
         session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 45);
