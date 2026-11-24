@@ -54,7 +54,7 @@ public class MasterDataEditorRenderTests
             {
                 new TruppType("Angriffstrupp"),
                 new TruppType("Wassertrupp"),
-                new TruppType("CSA-Trupp", 3, 20),
+                new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true),
 
                 // Three people like the CSA-Trupp but the full 30 minutes (#418) -- the pair no
                 // rule keyed off a designation could ever have expressed.
@@ -382,6 +382,13 @@ public class MasterDataEditorRenderTests
         Assert.Contains(numbers, n => n.Value == 20);
         Assert.Contains(numbers, n => n.Value == 30);
 
+        // #995: one "Funkrufname aus Nummer" box per row, ticked for the CSA-Trupp alone.
+        var numbered = view.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Funkrufname aus Nummer")
+            .ToList();
+        Assert.Equal(4, numbered.Count);
+        Assert.Equal(1, numbered.Count(c => c.IsChecked == true));
+
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
@@ -599,12 +606,13 @@ public class MasterDataEditorRenderTests
         Assert.Contains("mehrfach", labels);
     }
 
-    // Phone width (the app's narrow breakpoint is 640): the name field of a Funktion or a
-    // Funkgruppe must stay wide enough to read and type in.
+    // Phone width (the app's narrow breakpoint is 640): the name field of a Funktion, a
+    // Funkgruppe or a Trupp-Typ must stay wide enough to read and type in.
     [AvaloniaTheory]
     [InlineData("Rollen", "stammdaten-rollen-narrow.png")]
     [InlineData("Funkgruppen", "stammdaten-funkgruppen-narrow.png")]
-    public void Rollen_and_Funkgruppen_keep_a_usable_name_field_at_phone_width(string title, string file)
+    [InlineData("Trupp-Typen", "stammdaten-trupp-typen-narrow.png")]
+    public void Picker_rows_keep_a_usable_name_field_at_phone_width(string title, string file)
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         vm.SelectedSection = vm.Sections.Single(s => s.Title == title);

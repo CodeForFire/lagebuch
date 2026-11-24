@@ -412,7 +412,17 @@ public class VersionHandshakeTests
         // 44 lets addMapOverlay carry a Luftbild: a JPEG or PNG with its box. A host at 43 refuses
         // the image type, and a peer at 43 would read the image as GeoJSON, so a 43 and a 44 must
         // not connect.
-        Assert.Equal(44, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 44, int.MaxValue);
+        Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
+    }
+
+    [Fact]
+    public void The_numbered_trupp_typ_raises_the_protocol_but_not_the_floor()
+    {
+        // 45 adds namedByNumber to a Trupp-Typ in /masterdata (#995). A peer at 44 drops the key and
+        // offers its free Funkrufname box, while the name itself travels in the existing callSign,
+        // so a 44 and a 45 still connect.
+        Assert.Equal(45, SyncProtocol.ProtocolVersion);
         Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
     }
 }

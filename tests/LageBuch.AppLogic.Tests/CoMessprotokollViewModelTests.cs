@@ -1420,7 +1420,19 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void ExtendTaskTimer(Guid taskId, int minutes) => _inner.ExtendTaskTimer(taskId, minutes);
 
-    public void AddScbaTrupp(
+    /// <summary>Thrown by the next registration without applying it: the host refused it, or it
+    /// never reached the host.</summary>
+    public Exception? RefuseNextScbaTrupp { get; set; }
+
+    /// <summary>Thrown by the next registration after applying it: the host took the Trupp, and
+    /// only its answer was lost.</summary>
+    public Exception? LoseNextScbaTruppAnswer { get; set; }
+
+    /// <summary>Run by the next registration before it is applied: what the Lagebuchführer does
+    /// while the press waits for the host.</summary>
+    public Action? WhileNextScbaTruppIsRegistering { get; set; }
+
+    public async Task AddScbaTruppAsync(
         string designation,
         IEnumerable<TruppMember> members,
         int entryPressure,
@@ -1429,8 +1441,22 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
-        _inner.AddScbaTrupp(
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        CancellationToken cancellationToken = default)
+    {
+        if (WhileNextScbaTruppIsRegistering is { } meanwhile)
+        {
+            WhileNextScbaTruppIsRegistering = null;
+            meanwhile();
+        }
+
+        if (RefuseNextScbaTrupp is { } refusal)
+        {
+            RefuseNextScbaTrupp = null;
+            throw refusal;
+        }
+
+        await _inner.AddScbaTruppAsync(
             designation,
             members,
             entryPressure,
@@ -1439,7 +1465,14 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
             task,
             maxDurationMinutes,
             returnPressureBar,
-            pressureControlIntervalMinutes);
+            pressureControlIntervalMinutes,
+            cancellationToken);
+        if (LoseNextScbaTruppAnswer is { } lost)
+        {
+            LoseNextScbaTruppAnswer = null;
+            throw lost;
+        }
+    }
 
     public void StartScbaTrupp(Guid truppId) => _inner.StartScbaTrupp(truppId);
 

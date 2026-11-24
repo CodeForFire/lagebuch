@@ -753,8 +753,14 @@ public sealed record Device(string Name, int Count)
 /// an ArgumentException escaping it would leak an open sync connection. Every entrance clamps
 /// instead; see <see cref="MasterDataJson"/> and the Stammdaten editor.
 /// </para>
+/// <para>
+/// <see cref="NamedByNumber"/> says the Trupp is called by a number rather than a vehicle's
+/// Funkrufname (#995): the Atemschutz form asks for that number and names the Trupp
+/// "CSA-Trupp 1". It is a setting on the row, not a check on the name, for the same reason the
+/// crew size is.
+/// </para>
 /// </summary>
-public sealed record TruppType(string Name, int MemberCount, int MaxDurationMinutes)
+public sealed record TruppType(string Name, int MemberCount, int MaxDurationMinutes, bool NamedByNumber = false)
 {
     /// <summary>An ordinary two-person Trupp on the standard Einsatzzeit -- the shape every type
     /// has until someone says otherwise. Keeps the many construction sites to just a name.</summary>
@@ -854,13 +860,21 @@ internal static class LegacyTruppTypeDefaults
         var trimmed = name?.Trim() ?? string.Empty;
         if (Matches(trimmed, ChemicalName))
         {
-            return new TruppType(trimmed, AtemschutzTrupp.MaxMemberCount, einsatzzeiten.Chemical);
+            // Numbered too (#995), as MasterDataStore's one-time flag migration numbers an
+            // existing CSA-Trupp, so both entrances still end up with identical rows.
+            return new TruppType(
+                trimmed, AtemschutzTrupp.MaxMemberCount, einsatzzeiten.Chemical, NamedByNumber: true);
         }
 
         return Matches(trimmed, LpaName)
             ? new TruppType(trimmed, AtemschutzTrupp.StandardMemberCount, einsatzzeiten.Lpa)
             : new TruppType(trimmed, AtemschutzTrupp.StandardMemberCount, einsatzzeiten.Agt);
     }
+
+    /// <summary>Whether <paramref name="name"/> is the CSA-Trupp the old rule recognised: trimmed,
+    /// ignoring case. Shared with the one-time #995 flag migration in <see cref="MasterDataStore"/>,
+    /// so that step compares the same way and adds no literal of its own.</summary>
+    public static bool IsChemical(string? name) => Matches(name?.Trim() ?? string.Empty, ChemicalName);
 
     private static bool Matches(string trimmed, string legacyName) =>
         string.Equals(trimmed, legacyName, StringComparison.OrdinalIgnoreCase);
@@ -1369,7 +1383,8 @@ public static class MasterDataJson
                 RequiredName(x, "Trupp-Typ"),
                 TruppType.ClampMemberCount(Int(x, "memberCount", AtemschutzTrupp.StandardMemberCount)),
                 TruppType.ClampMaxDurationMinutes(
-                    Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes))));
+                    Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes)),
+                x.TryGetProperty("namedByNumber", out var numbered) && numbered.ValueKind == JsonValueKind.True));
         }
 
         return result;
@@ -1669,6 +1684,7 @@ public static class MasterDataJson
                 name = t.Name,
                 memberCount = t.MemberCount,
                 maxDurationMinutes = t.MaxDurationMinutes,
+                namedByNumber = t.NamedByNumber,
             }),
             checklists = ChecklistsForExport(set),
             navigation = NavigationForExport(set),

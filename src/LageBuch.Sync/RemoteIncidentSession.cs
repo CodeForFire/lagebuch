@@ -636,7 +636,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void ExtendTaskTimer(Guid taskId, int minutes) =>
         Send(new ExtendTaskTimerCommand(taskId, minutes));
 
-    public void AddScbaTrupp(
+    // Awaited, under the same deadline the fire-and-forget commands get, so a host that goes silent
+    // ends in an exception the form can show instead of a Bereitstellen button that never comes back.
+    public async Task AddScbaTruppAsync(
         string designation,
         IEnumerable<TruppMember> members,
         int entryPressure,
@@ -645,17 +647,25 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
-        Send(new AddScbaTruppCommand(
-            designation,
-            members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
-            callSign,
-            task,
-            maxDurationMinutes,
-            returnPressureBar,
-            pressureControlIntervalMinutes,
-            entryPressure,
-            truppNumber));
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(members);
+        using var deadline = new CancellationTokenSource(SyncProtocol.CommandTimeout, _time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token, cancellationToken);
+        await SendAsync(
+            new AddScbaTruppCommand(
+                designation,
+                members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
+                callSign,
+                task,
+                maxDurationMinutes,
+                returnPressureBar,
+                pressureControlIntervalMinutes,
+                entryPressure,
+                truppNumber),
+            linked.Token);
+    }
 
     public void StartScbaTrupp(Guid truppId) => Send(new StartScbaTruppCommand(truppId));
 

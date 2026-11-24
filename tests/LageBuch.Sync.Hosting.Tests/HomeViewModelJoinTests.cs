@@ -82,7 +82,7 @@ public class HomeViewModelJoinTests
         // device's own clock the Trupp would not have started yet.
         var clock = new FixedClock { Now = TimeProvider.System.GetLocalNow() + TimeSpan.FromMinutes(3) };
         var hostSession = HostSession(clock);
-        hostSession.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        await hostSession.AddScbaTruppAsync("Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
         hostSession.StartScbaTrupp(hostSession.Incident.ScbaTrupps.Single().Id);
         var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
         await using var _ = host;

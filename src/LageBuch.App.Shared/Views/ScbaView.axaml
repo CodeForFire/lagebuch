@@ -168,7 +168,9 @@
           <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). This is the
                vehicle/unit the Trupp rides with, hence leading the form (#78). -->
-          <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
+          <!-- Hidden for a Trupp-Art named by its number (#995): that Trupp is called "CSA-Trupp 1",
+               and the NUMMER box after TRUPP-ART takes this one's place. -->
+          <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME" IsVisible="{Binding !IsNamedByNumber}">
             <AutoCompleteBox x:Name="CallSignBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                              ItemsSource="{Binding CallSignOptions}"
@@ -180,6 +182,17 @@
                                     Classes.invalid="{Binding NewDesignationError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <ComboBox x:Name="TruppTypeBox" ItemsSource="{Binding TruppTypeOptions}"
                       SelectedItem="{Binding NewDesignation}" />
+          </HeaderedContentControl>
+          <!-- #995: a Trupp-Art the Stammdaten mark "Funkrufname aus Nummer" is called by its
+               number. Placed after TRUPP-ART, which is what makes it appear, so the Tab order
+               reaches it next instead of having passed its slot already. The next free number is
+               suggested; a taken one is refused on the press. Maximum 999, not 99: a returned
+               Trupp keeps its number, so the suggestion can pass 99 in a long Einsatz. -->
+          <HeaderedContentControl Classes="field required" Header="NUMMER" IsVisible="{Binding IsNamedByNumber}"
+                                    Classes.invalid="{Binding NewTypeNumberError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <NumericUpDown x:Name="TypeNumberBox" Width="90" Minimum="1" Maximum="999" Increment="1"
+                           FormatString="0" Value="{Binding NewTypeNumber}"
+                           AutomationProperties.Name="Truppnummer" />
           </HeaderedContentControl>
           <!-- One box per position rather than a single free-text field: a Trupp is two people,
                or three where its Stammdaten-Eintrag says so, and the third box only appears when the

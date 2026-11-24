@@ -665,9 +665,9 @@ public class MasterDataStoreTests : IDisposable
             new[]
             {
                 new TruppType("Angriffstrupp", 2, 30),
-                new TruppType("CSA-Trupp", 3, 20),
+                new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true),
                 new TruppType("LPA-Trupp", 2, 60),
-                new TruppType(" csa-trupp ", 3, 20),
+                new TruppType(" csa-trupp ", 3, 20, NamedByNumber: true),
             },
             set.TruppTypes);
     }
@@ -680,7 +680,7 @@ public class MasterDataStoreTests : IDisposable
         // across every subsequent launch.
         WriteLegacyTruppTypes("CSA-Trupp");
         var migrated = MasterDataStore.GetOrCreate(_path);
-        Assert.Equal(new TruppType("CSA-Trupp", 3, 20), Assert.Single(migrated.TruppTypes));
+        Assert.Equal(new TruppType("CSA-Trupp", 3, 20, NamedByNumber: true), Assert.Single(migrated.TruppTypes));
 
         MasterDataStore.Save(_path, migrated with { TruppTypes = new[] { new TruppType("CSA-Trupp", 2, 45) } });
 
@@ -793,7 +793,7 @@ public class MasterDataStoreTests : IDisposable
             new[]
             {
                 new TruppType("Angriffstrupp", 2, 25),
-                new TruppType("CSA-Trupp", 3, 15),
+                new TruppType("CSA-Trupp", 3, 15, NamedByNumber: true),
                 new TruppType("LPA-Trupp", 2, 45),
             },
             set.TruppTypes);
@@ -871,6 +871,58 @@ public class MasterDataStoreTests : IDisposable
         SqliteConnection.ClearAllPools();
 
         Assert.Equal(new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo), Assert.Single(MasterDataStore.GetOrCreate(_path).TalkGroups));
+    }
+
+    // #995: a store from before the "Funkrufname aus Nummer" flag gets it on its CSA-Trupp once,
+    // so the brigade sees "CSA-Trupp 1" without touching the Stammdaten. Once only: a brigade that
+    // then switches it off keeps it off.
+    [Fact]
+    public void A_csa_trupp_from_before_the_numbering_flag_is_named_by_number_once()
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_trupp_types (
+                    value TEXT NOT NULL,
+                    member_count INTEGER NOT NULL DEFAULT 2,
+                    max_duration_minutes INTEGER NOT NULL DEFAULT 30);
+                INSERT INTO md_trupp_types (value, member_count, max_duration_minutes) VALUES
+                    ('Angriffstrupp', 2, 30),
+                    (' csa-trupp ', 3, 20);
+                CREATE TABLE md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                INSERT INTO md_settings (key, value) VALUES ('trupp_type_defaults_migrated', 1);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+        Assert.Equal(new[] { false, true }, set.TruppTypes.Select(t => t.NamedByNumber));
+
+        MasterDataStore.Save(_path, set with
+        {
+            TruppTypes = set.TruppTypes.Select(t => t with { NamedByNumber = false }).ToArray(),
+        });
+        SqliteConnection.ClearAllPools();
+
+        Assert.All(MasterDataStore.GetOrCreate(_path).TruppTypes, t => Assert.False(t.NamedByNumber));
+    }
+
+    [Fact]
+    public void The_numbering_flag_survives_a_save_and_a_reload()
+    {
+        var set = MasterDataStore.GetOrCreate(_path) with
+        {
+            TruppTypes = new[] { new TruppType("Dekon-Trupp", 2, 30, NamedByNumber: true), new TruppType("Angriffstrupp") },
+        };
+
+        MasterDataStore.Save(_path, set);
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(set.TruppTypes, MasterDataStore.GetOrCreate(_path).TruppTypes);
     }
 
     /// <summary>Writes a md_trupp_types in its pre-#398 shape: names only, no rules.</summary>

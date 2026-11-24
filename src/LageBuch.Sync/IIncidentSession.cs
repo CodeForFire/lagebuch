@@ -249,7 +249,13 @@ public interface IIncidentSession
     /// <summary>Adds minutes to a task's due time (#246 "+5" quick action).</summary>
     void ExtendTaskTimer(Guid taskId, int minutes);
 
-    void AddScbaTrupp(
+    /// <summary>
+    /// Registers a Trupp. Unlike the other mutations this one is awaited, because the host can refuse
+    /// it for a reason the sender's form cannot see — a Truppnummer or numbered Funkrufname a peer took
+    /// a moment earlier (#995) — and the caller logs "bereitgestellt" only once it has been accepted.
+    /// </summary>
+    /// <exception cref="CommandRejectedException">On a joined device: the host refused the registration.</exception>
+    Task AddScbaTruppAsync(
         string designation,
         IEnumerable<TruppMember> members,
         int entryPressure,
@@ -258,7 +264,8 @@ public interface IIncidentSession
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes);
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        CancellationToken cancellationToken = default);
 
     void StartScbaTrupp(Guid truppId);
 

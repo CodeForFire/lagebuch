@@ -80,17 +80,20 @@
     {
       "name": "Angriffstrupp",
       "memberCount": 2,
-      "maxDurationMinutes": 30
+      "maxDurationMinutes": 30,
+      "namedByNumber": false
     },
     {
       "name": "CSA-Trupp",
       "memberCount": 3,
-      "maxDurationMinutes": 20
+      "maxDurationMinutes": 20,
+      "namedByNumber": true
     },
     {
       "name": "Langzeit-Trupp",
       "memberCount": 2,
-      "maxDurationMinutes": 240
+      "maxDurationMinutes": 240,
+      "namedByNumber": false
     }
   ],
   "checklists": [

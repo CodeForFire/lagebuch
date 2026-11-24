@@ -275,11 +275,11 @@ public class WorkspaceNavItemsTests
     }
 
     [Fact]
-    public void Atemschutz_with_an_active_trupp_cannot_be_hidden_until_the_trupp_is_back()
+    public async Task Atemschutz_with_an_active_trupp_cannot_be_hidden_until_the_trupp_is_back()
     {
         var (vm, session) = Editable();
         Assert.True(Entry(vm, NavModules.Scba).CanHide);
-        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        await session.AddScbaTruppAsync("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
         var trupp = session.Incident.ScbaTrupps.Single().Id;
 
         session.StartScbaTrupp(trupp);
@@ -301,11 +301,11 @@ public class WorkspaceNavItemsTests
     // older file) brings it back until the work is done. A Stammdaten switch-off is left alone;
     // IncidentWorkspaceViewModelTests pins that.
     [Fact]
-    public void A_trupp_going_in_brings_back_an_atemschutz_hidden_in_this_einsatz_until_it_is_out()
+    public async Task A_trupp_going_in_brings_back_an_atemschutz_hidden_in_this_einsatz_until_it_is_out()
     {
         var (vm, session) = Editable();
         vm.HideNavItemCommand.Execute(Entry(vm, NavModules.Scba));
-        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        await session.AddScbaTruppAsync("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
         var trupp = session.Incident.ScbaTrupps.Single().Id;
 
         session.StartScbaTrupp(trupp);
@@ -755,10 +755,10 @@ public class WorkspaceNavItemsTests
     }
 
     [Fact]
-    public void The_hide_command_hears_when_a_trupp_starts()
+    public async Task The_hide_command_hears_when_a_trupp_starts()
     {
         var (vm, session) = Editable();
-        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        await session.AddScbaTruppAsync("Angriffstrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
         var raised = 0;
         vm.HideNavItemCommand.CanExecuteChanged += (_, _) => raised++;
 
