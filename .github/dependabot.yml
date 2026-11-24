@@ -68,6 +68,13 @@ updates:
     ignore:
       - dependency-name: "xunit.v3"
         update-types: ["version-update:semver-major"]
+      # SkiaSharp is referenced directly only for RasterOverlayCache and must
+      # stay on the version Avalonia.Skia resolves: Avalonia.Skia 12.2.0 still
+      # builds against SkiaSharp 3.119.4 and ships its 3.x native Linux assets,
+      # so a 4.x bump pairs managed 4.x with native 3.x (#1007). Drop this
+      # ignore once Avalonia.Skia depends on SkiaSharp 4.
+      - dependency-name: "SkiaSharp"
+        update-types: ["version-update:semver-major"]
 
   # The Android head has its own Directory.Packages.props and is not covered
   # by the root entry above.
