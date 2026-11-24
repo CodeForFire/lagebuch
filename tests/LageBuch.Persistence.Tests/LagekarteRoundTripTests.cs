@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.Sqlite;
@@ -106,6 +107,47 @@ public sealed class LagekarteRoundTripTests : IDisposable
 
         Assert.All(loaded.Forces, u => Assert.Null(u.VehicleType));
         Assert.Equal(2, loaded.Forces.Count);
+    }
+
+    [Fact]
+    public void A_Bereitstellungsraum_s_place_and_sign_offset_survive_save_and_load()
+    {
+        var (incident, _) = PlacedIncident();
+        var clock = new FixedTestClock();
+        var op = new SessionOperator("Muster", "FFB 12/1");
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR Nord");
+        var other = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR Süd");
+        incident.PlaceCommandNode(clock, op, node.Id, new GeoPoint(48.1801, 11.2533));
+        incident.MoveCommandNodeLabel(clock, op, node.Id, new LabelOffset(-30, 24.5));
+
+        IncidentRepository.Save(Path_, incident);
+        var loaded = IncidentRepository.Load(Path_);
+
+        var read = loaded.CommandNodes.Single(n => n.Id == node.Id);
+        Assert.Equal(new GeoPoint(48.1801, 11.2533), read.Position);
+        Assert.Equal(new LabelOffset(-30, 24.5), read.LabelOffset);
+        Assert.Null(loaded.CommandNodes.Single(n => n.Id == other.Id).Position);
+    }
+
+    [Theory]
+    [InlineData("'nord'", "11.2", "'links'", "4")]
+    [InlineData("95.0", "11.2", "1e9", "4")]
+    [InlineData("48.1", "NULL", "4", "NULL")]
+    public void A_Bereitstellungsraum_place_a_hostile_file_garbles_costs_the_mark_not_the_Einsatz(string lat, string lon, string dx, string dy)
+    {
+        var (incident, _) = PlacedIncident();
+        var clock = new FixedTestClock();
+        var op = new SessionOperator("Muster", "FFB 12/1");
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR Nord");
+        incident.PlaceCommandNode(clock, op, node.Id, new GeoPoint(48.1801, 11.2533));
+        IncidentRepository.Save(Path_, incident);
+        Tamper($"UPDATE command_nodes SET position_lat = {lat}, position_lon = {lon}, label_dx = {dx}, label_dy = {dy};");
+
+        var read = Assert.Single(IncidentRepository.Load(Path_).CommandNodes);
+
+        Assert.Null(read.Position);
+        Assert.Null(read.LabelOffset);
+        Assert.Equal("BR Nord", read.Name);
     }
 
     private static (Incident Incident, Guid UnitId) PlacedIncident()

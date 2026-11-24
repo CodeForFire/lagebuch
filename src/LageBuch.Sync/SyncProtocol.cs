@@ -272,15 +272,20 @@ public static class SyncProtocol
     /// 47: a client may send <c>setTaskTimer</c>, the time until an Aufgabe's reminder typed in
     /// minutes (#964). A host at 46 does not know it, so the floor rises to 47.
     /// </para>
+    /// <para>
+    /// 48: a Bereitstellungsraum on the Lagekarte (#966). A client may send <c>placeCommandNode</c>
+    /// and <c>moveCommandNodeLabel</c>, which a host at 47 does not know, so the floor rises to 48.
+    /// The snapshot's command nodes carry an optional position and sign offset.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 47;
+    public const int ProtocolVersion = 48;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 47;
+    public const int MinimumProtocolVersion = 48;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

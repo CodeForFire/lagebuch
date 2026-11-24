@@ -1149,7 +1149,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OfferUndo,
             OpenDispatchChannelDialog);
 
-        Lagekarte = new LagekarteViewModel(_session, OnChanged, _mapPacks, _mapNightMode, _dialogs, RequestConfirm, _weather, _clock, _luftbild);
+        // A Bereitstellungsraum's details open in the Organisation's dialog, so they are edited in one place (#966).
+        Lagekarte = new LagekarteViewModel(
+            _session,
+            OnChanged,
+            _mapPacks,
+            _mapNightMode,
+            _dialogs,
+            RequestConfirm,
+            _weather,
+            _clock,
+            _luftbild,
+            nodeId => OpenCommandNodeDialog(CommandNodeDialogViewModel.ForEdit(_session, _masterData, nodeId, OnChanged)));
 
         LeadershipTabs = new LeadershipTabsViewModel(Leadership, Roles, Forces, Lagekarte, reopenTab);
 
