@@ -5,7 +5,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
-// The ETB's Einsatzabschnitte (#971): the strip that files a new entry, the edit panel's picker
+// The ETB's Einsatzabschnitte (#971): the picker that files a new entry, the edit panel's picker
 // and the quick filter above the grid.
 public class EtbSectionViewModelTests
 {
@@ -39,14 +39,15 @@ public class EtbSectionViewModelTests
     }
 
     [Fact]
-    public void The_entry_strip_offers_the_live_abschnitte_but_no_bereitstellung()
+    public void The_entry_picker_offers_the_live_abschnitte_but_no_bereitstellung()
     {
         var (session, vm, nord, _) = WithAbschnitte();
         session.AddCommandNode(CommandNodeKind.Unterabschnitt, "Zugang", nord);
 
         Assert.True(vm.HasSectionChoices);
-        Assert.Equal(["Nord", "Nord / Zugang", "Süd"], vm.SectionChoices.Select(c => c.Label));
-        Assert.All(vm.SectionChoices, c => Assert.False(c.IsSelected));
+        Assert.Equal([NodeChoices.UnplacedLabel, "Nord", "Nord / Zugang", "Süd"], vm.NewSectionChoices.Select(c => c.Label));
+        Assert.True(vm.NewSectionChoices[0].IsCurrent); // nothing chosen at first
+        Assert.Equal(NodeChoices.UnplacedLabel, vm.NewSectionLabel);
     }
 
     [Fact]
@@ -62,48 +63,65 @@ public class EtbSectionViewModelTests
     }
 
     [Fact]
-    public void Choosing_an_abschnitt_files_the_new_entry_and_stays_chosen_for_the_next()
+    public void Picking_an_abschnitt_files_the_new_entry_and_stays_picked_for_the_next()
     {
         var (session, vm, nord, _) = WithAbschnitte();
 
-        vm.SectionChoices.Single(c => c.Label == "Nord").SelectCommand.Execute(null);
-        Assert.True(vm.SectionChoices.Single(c => c.Label == "Nord").IsSelected);
+        vm.NewSectionChoices.Single(c => c.Label == "Nord").SelectCommand.Execute(null);
+        Assert.True(vm.NewSectionChoices.Single(c => c.Label == "Nord").IsCurrent);
+        Assert.Equal("Nord", vm.NewSectionLabel);
         vm.NewText = "Lage Nord";
         vm.AddEntryCommand.Execute(null);
 
         Assert.Equal(nord, session.Incident.Journal.Single(e => e.Text == "Lage Nord").SectionId);
         Assert.Equal(nord, vm.NewSectionId); // sticky: the next message usually comes from the same Abschnitt
+        Assert.Equal("Nord", vm.NewSectionLabel);
         Assert.Equal("Nord", Row(vm, "Lage Nord").SectionName);
         Assert.True(Row(vm, "Lage Nord").HasSection);
     }
 
     [Fact]
-    public void Choosing_the_chosen_abschnitt_again_files_the_next_entry_nowhere()
+    public void Picking_nicht_zugeordnet_files_the_next_entry_nowhere()
     {
         var (session, vm, _, _) = WithAbschnitte();
-        var nord = vm.SectionChoices.Single(c => c.Label == "Nord");
 
-        nord.SelectCommand.Execute(null);
-        nord.SelectCommand.Execute(null);
+        vm.NewSectionChoices.Single(c => c.Label == "Nord").SelectCommand.Execute(null);
+        vm.NewSectionChoices[0].SelectCommand.Execute(null);
         vm.NewText = "Lage allgemein";
         vm.AddEntryCommand.Execute(null);
 
         Assert.Null(vm.NewSectionId);
-        Assert.False(nord.IsSelected);
+        Assert.True(vm.NewSectionChoices[0].IsCurrent);
+        Assert.Equal(NodeChoices.UnplacedLabel, vm.NewSectionLabel);
         Assert.Null(session.Incident.Journal[^1].SectionId);
         Assert.False(Row(vm, "Lage allgemein").HasSection);
     }
 
     [Fact]
-    public void A_dissolved_abschnitt_leaves_the_strip_and_the_choice()
+    public void A_dissolved_abschnitt_leaves_the_picker_and_the_choice()
     {
         var (session, vm, nord, _) = WithAbschnitte();
         vm.NewSectionId = nord;
 
         session.DissolveCommandNode(nord);
 
-        Assert.Equal(["Süd"], vm.SectionChoices.Select(c => c.Label));
+        Assert.Equal([NodeChoices.UnplacedLabel, "Süd"], vm.NewSectionChoices.Select(c => c.Label));
         Assert.Null(vm.NewSectionId);
+        Assert.Equal(NodeChoices.UnplacedLabel, vm.NewSectionLabel);
+    }
+
+    [Fact]
+    public void Setting_the_new_abschnitt_marks_it_in_the_picker()
+    {
+        var (_, vm, nord, _) = WithAbschnitte();
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.NewSectionId = nord;
+
+        Assert.True(vm.NewSectionChoices.Single(c => c.Label == "Nord").IsCurrent);
+        Assert.Contains(nameof(EtbViewModel.NewSectionChoices), raised);
+        Assert.Contains(nameof(EtbViewModel.NewSectionLabel), raised);
     }
 
     [Fact]

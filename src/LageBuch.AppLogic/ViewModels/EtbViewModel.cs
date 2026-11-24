@@ -71,7 +71,6 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         CallSignOptions = masterData.RadioCallSigns;
         TextSnippets = masterData.TextSnippets.Where(s => s.ForEtb).ToList();
         Entries = new ObservableCollection<EtbEntryRow>();
-        SectionChoices = new ObservableCollection<EtbSectionChoice>();
         FilterChoices = new ObservableCollection<EtbSectionChoice>();
 
         // Any change to the incident — from this tab, another tab, or (when joined) another device —
@@ -156,20 +155,21 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         SyncSections(refiled);
     }
 
-    // The strips follow the Organisation: a formed, renamed or dissolved Abschnitt shows up here on
-    // the next change. Rebuilt only when what they show moved, so a focused chip keeps its focus.
+    // The entry picker and the filter follow the Organisation: a formed, renamed or dissolved
+    // Abschnitt shows up here on the next change. Rebuilt only when what they show moved, so a
+    // focused chip keeps its focus and an open picker its list.
     private void SyncSections(bool refiled)
     {
         var live = NodeChoices.Einsatzabschnitte(_session.Incident);
-        if (!SameChoices(SectionChoices, live))
-        {
-            Replace(SectionChoices, live.Select(n => new EtbSectionChoice(n.Id, n.Label, ToggleNewSection)));
-            OnPropertyChanged(nameof(HasSectionChoices));
-        }
-
         if (NewSectionId is { } chosen && live.All(n => n.Id != chosen))
         {
+            _newSections = live;
             NewSectionId = null; // dissolved meanwhile: the next entry must not be refused for it
+        }
+        else if (!_newSections.SequenceEqual(live))
+        {
+            _newSections = live;
+            NewSectionChoices = BuildNewSectionChoices();
         }
 
         // The filter also keeps every Abschnitt an entry is filed under, under the name it was filed
@@ -207,9 +207,6 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     private static bool SameChoices(IEnumerable<EtbSectionChoice> shown, IEnumerable<(Guid? Id, string Label)> wanted) =>
         shown.Select(c => (c.NodeId, c.Label)).SequenceEqual(wanted);
 
-    private static bool SameChoices(IEnumerable<EtbSectionChoice> shown, IEnumerable<SectionOption> wanted) =>
-        SameChoices(shown, wanted.Select(Option));
-
     private static (Guid? Id, string Label) Option(SectionOption option) => (option.Id, option.Label);
 
     private static void Replace(ObservableCollection<EtbSectionChoice> target, IEnumerable<EtbSectionChoice> items)
@@ -223,11 +220,6 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
     private void MarkSelected()
     {
-        foreach (var choice in SectionChoices)
-        {
-            choice.IsSelected = choice.NodeId == NewSectionId;
-        }
-
         foreach (var choice in FilterChoices)
         {
             choice.IsSelected = choice.NodeId == SectionFilter;
@@ -277,27 +269,51 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     /// <summary>The quick filter's first button, which shows every entry again.</summary>
     public const string AllSectionsLabel = "Alle";
 
-    /// <summary>
-    /// The entry line's Abschnitt buttons (#971): one per live Abschnitt and Unterabschnitt, in the
-    /// Organisation's order. None is chosen at first, and a second tap on the chosen one clears it.
-    /// </summary>
-    public ObservableCollection<EtbSectionChoice> SectionChoices { get; }
+    // The live Abschnitte the entry picker was last built from.
+    private IReadOnlyList<SectionOption> _newSections = Array.Empty<SectionOption>();
 
-    /// <summary>Whether the incident has an Abschnitt to file an entry under; the strip hides otherwise.</summary>
-    public bool HasSectionChoices => SectionChoices.Count > 0;
+    /// <summary>
+    /// The entry line's Abschnitt picker (#971): "nicht zugeordnet", then every live Abschnitt and
+    /// Unterabschnitt in the Organisation's order. "nicht zugeordnet" is current at first.
+    /// </summary>
+    [ObservableProperty]
+    private IReadOnlyList<NodeChoice> _newSectionChoices = Array.Empty<NodeChoice>();
+
+    /// <summary>What the closed entry picker says: the chosen Abschnitt, or "nicht zugeordnet".</summary>
+    public string NewSectionLabel => CurrentLabel(NewSectionChoices);
+
+    /// <summary>Whether the incident has an Abschnitt to file an entry under; the picker hides otherwise.</summary>
+    public bool HasSectionChoices => NewSectionChoices.Count > 1;
+
+    partial void OnNewSectionChoicesChanged(IReadOnlyList<NodeChoice> value)
+    {
+        OnPropertyChanged(nameof(NewSectionLabel));
+        OnPropertyChanged(nameof(HasSectionChoices));
+    }
 
     /// <summary>
     /// The Abschnitt the next entry is filed under, or null for none. Sticky on purpose, unlike VON:
-    /// radio traffic from one Abschnitt comes in runs, and the chosen button stays lit right above
-    /// the field, so the choice is always in view; VON is cleared because a leftover sender would
-    /// put the next message under the wrong unit without any such sign.
+    /// radio traffic from one Abschnitt comes in runs, and the closed picker names the choice right
+    /// above the field, so it is always in view; VON is cleared because a leftover sender would put
+    /// the next message under the wrong unit without any such sign.
     /// </summary>
     [ObservableProperty]
     private Guid? _newSectionId;
 
-    partial void OnNewSectionIdChanged(Guid? value) => MarkSelected();
+    partial void OnNewSectionIdChanged(Guid? value) => NewSectionChoices = BuildNewSectionChoices();
 
-    private void ToggleNewSection(Guid? id) => NewSectionId = NewSectionId == id ? null : id;
+    private List<NodeChoice> BuildNewSectionChoices() =>
+        PickerChoices(_newSections.Select(Option), NewSectionId, id => NewSectionId = id);
+
+    // A picker's choices: "nicht zugeordnet" first, then the options, the current one marked.
+    private static List<NodeChoice> PickerChoices(IEnumerable<(Guid? Id, string Label)> options, Guid? current, Action<Guid?> pick) =>
+        options
+            .Prepend((null, NodeChoices.UnplacedLabel))
+            .Select(o => new NodeChoice(o.Id, o.Label, o.Id == current, new RelayCommand(() => pick(o.Id))))
+            .ToList();
+
+    private static string CurrentLabel(IReadOnlyList<NodeChoice> choices) =>
+        choices.FirstOrDefault(c => c.IsCurrent && c.NodeId is not null)?.Label ?? NodeChoices.UnplacedLabel;
 
     /// <summary>
     /// The quick filter above the grid: <see cref="AllSectionsLabel"/>, then every live Abschnitt,
@@ -545,8 +561,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     private IReadOnlyList<NodeChoice> _editSectionChoices = Array.Empty<NodeChoice>();
 
     /// <summary>What the closed picker says: the chosen Abschnitt, or "nicht zugeordnet".</summary>
-    public string EditSectionLabel =>
-        EditSectionChoices.FirstOrDefault(c => c.IsCurrent && c.NodeId is not null)?.Label ?? NodeChoices.UnplacedLabel;
+    public string EditSectionLabel => CurrentLabel(EditSectionChoices);
 
     /// <summary>Whether there is an Abschnitt to pick; "nicht zugeordnet" alone hides the picker.</summary>
     public bool HasEditSectionChoices => EditSectionChoices.Count > 1;
@@ -571,10 +586,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             options.Add((filed, row.SectionName ?? string.Empty));
         }
 
-        options.Insert(0, (null, NodeChoices.UnplacedLabel));
-        return options
-            .Select(o => new NodeChoice(o.Id, o.Label, o.Id == _editSectionId, new RelayCommand(() => PickEditSection(o.Id))))
-            .ToList();
+        return PickerChoices(options, _editSectionId, PickEditSection);
     }
 
     private void BeginEdit(EtbEntryRow row)
@@ -861,8 +873,8 @@ public sealed class EtbEntryRow : ObservableObject
 }
 
 /// <summary>
-/// One button of an ETB Abschnitt strip (#971): the entry line's, or the quick filter's. A command
-/// per button and not a selection, for the reason given on <see cref="NodeChoice"/>; the owner
+/// One button of the ETB's Abschnitt quick filter (#971). A command per button and not a
+/// selection, for the reason given on <see cref="NodeChoice"/>; the owner
 /// marks <see cref="IsSelected"/>, which the view shows as the lit button.
 /// </summary>
 public sealed partial class EtbSectionChoice : ObservableObject

@@ -15,7 +15,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// #971: the ETB's Einsatzabschnitt strip in the entry line, the quick filter above the grid and
+// #971: the ETB's Einsatzabschnitt picker in the entry line, the quick filter above the grid and
 // the Abschnitt badge on a filed row. With RENDER_OUT set it also writes the PR screenshots.
 public class EtbSectionStripTests
 {
@@ -60,6 +60,15 @@ public class EtbSectionStripTests
     private static List<Button> Chips(Window window, string strip) =>
         [.. Named<ItemsControl>(window, strip).GetVisualDescendants().OfType<Button>()];
 
+    // Picks an Abschnitt in the entry line's dropdown, by label.
+    private static void Pick(Window window, string label)
+    {
+        var picker = Named<NodeChoicePicker>(window, "SectionEntryPicker");
+        Assert.NotNull(picker.Choices);
+        picker.Choices.Single(c => c.Label == label).SelectCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     private static void Add(IncidentWorkspaceViewModel vm, string from, string text)
     {
         vm.Etb.NewFrom = from;
@@ -78,17 +87,21 @@ public class EtbSectionStripTests
     }
 
     [AvaloniaFact]
-    public void A_chip_in_the_entry_line_files_the_entry_and_the_row_shows_its_badge()
+    public void The_entry_line_dropdown_files_the_entry_and_the_row_shows_its_badge()
     {
         var (window, vm, session) = ShowWorkspace(withAbschnitte: true);
 
-        var chips = Chips(window, "SectionEntryStrip");
-        Assert.Equal(["Nord", "Süd", "Süd / Tiefgarage"], chips.Select(b => b.Content as string));
+        var picker = Named<NodeChoicePicker>(window, "SectionEntryPicker");
+        Assert.True(picker.IsEffectivelyVisible);
+        Assert.Equal(NodeChoices.UnplacedLabel, picker.Label);
+        Assert.Equal(
+            [NodeChoices.UnplacedLabel, "Nord", "Süd", "Süd / Tiefgarage"],
+            picker.Choices?.Select(c => c.Label));
         Assert.True(Named<DockPanel>(window, "SectionFilterBar").IsEffectivelyVisible);
 
-        chips[0].Command!.Execute(null);
-        Dispatcher.UIThread.RunJobs();
-        Assert.Contains("selected", chips[0].Classes);
+        Pick(window, "Nord");
+        Assert.Equal("Nord", picker.Label);
+        Capture(window, "etb-abschnitt-eingabe.png");
         Add(vm, AnonymizedExampleData.CallSign, "Riegelstellung zum Nachbargebäude aufgebaut");
 
         var filed = session.Incident.Journal[^1];
@@ -104,12 +117,11 @@ public class EtbSectionStripTests
     public void The_quick_filter_narrows_the_grid_to_one_abschnitt()
     {
         var (window, vm, _) = ShowWorkspace(withAbschnitte: true);
-        var entryChips = Chips(window, "SectionEntryStrip");
-        entryChips[0].Command!.Execute(null);
+        Pick(window, "Nord");
         Add(vm, AnonymizedExampleData.CallSign, "Riegelstellung zum Nachbargebäude aufgebaut");
-        entryChips[1].Command!.Execute(null);
+        Pick(window, "Süd");
         Add(vm, AnonymizedExampleData.SecondCallSign, "Brand in der Tiefgarage, Rauch im Treppenraum");
-        entryChips[1].Command!.Execute(null); // tapped again: the next entry belongs to no Abschnitt
+        Pick(window, NodeChoices.UnplacedLabel); // the next entry belongs to no Abschnitt
         Add(vm, AnonymizedExampleData.CallSign, "Wasserversorgung über zwei B-Leitungen sichergestellt");
 
         var filters = Chips(window, "SectionFilterStrip");
@@ -130,7 +142,7 @@ public class EtbSectionStripTests
     public void The_edit_panel_offers_the_abschnitt_picker()
     {
         var (window, vm, _) = ShowWorkspace(withAbschnitte: true);
-        Chips(window, "SectionEntryStrip")[0].Command!.Execute(null);
+        Pick(window, "Nord");
         Add(vm, AnonymizedExampleData.CallSign, "Riegelstellung zum Nachbargebäude aufgebaut");
 
         vm.Etb.Entries[0].BeginEditCommand.Execute(null);
