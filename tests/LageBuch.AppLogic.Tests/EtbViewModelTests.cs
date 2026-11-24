@@ -430,8 +430,27 @@ public class EtbViewModelTests
         Assert.Equal("Florian 1/44", Assert.Single(row.Edits).PreviousFrom);
         Assert.Contains(nameof(EtbEntryRow.From), changedProperties);
         Assert.Contains(nameof(EtbEntryRow.To), changedProperties);
+        Assert.Contains(nameof(EtbEntryRow.HistoryLines), changedProperties);
         Assert.Null(vm.EditFrom);
         Assert.Null(vm.EditTo);
+    }
+
+    [Fact]
+    public void Saving_an_entry_with_nothing_changed_still_closes_the_panel()
+    {
+        // An unchanged save writes no edit, so no Sync closes the panel for it: SaveEdit has to.
+        var vm = NewVm();
+        vm.NewFrom = "Florian 1/44";
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        row.BeginEditCommand.Execute(null);
+
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.False(vm.IsEditing);
+        Assert.Null(vm.EditFrom);
+        Assert.False(row.WasEdited);
     }
 
     [Fact]

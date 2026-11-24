@@ -196,8 +196,21 @@ public class EtbEntryTests
         var entry = EtbEntry.Create(At, EtbDirection.Incoming, "Lage", op);
         var tooLong = new string('x', EtbEntry.MaxPartyLength + 1);
 
-        Assert.Throws<ArgumentException>(() => entry.WithEdit("Lage", tooLong, null, op, At.AddMinutes(1)));
+        var fromError = Assert.Throws<ArgumentException>(() => entry.WithEdit("Lage", tooLong, null, op, At.AddMinutes(1)));
         Assert.Throws<ArgumentException>(() => entry.WithEdit("Lage", null, tooLong, op, At.AddMinutes(1)));
+        Assert.StartsWith($"Von/An ist länger als das Limit von {EtbEntry.MaxPartyLength} Zeichen.", fromError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WithEdit_accepts_a_from_at_exactly_the_limit()
+    {
+        var op = new SessionOperator("Müller");
+        var entry = EtbEntry.Create(At, EtbDirection.Incoming, "Lage", op);
+        var atLimit = new string('x', EtbEntry.MaxPartyLength);
+
+        var edited = entry.WithEdit("Lage", atLimit, null, op, At.AddMinutes(1));
+
+        Assert.Equal(atLimit, edited.From);
     }
 
     [Fact]
