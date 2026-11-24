@@ -1323,6 +1323,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void MoveForceUnitLabel(Guid unitId, LabelOffset? offset) => _inner.MoveForceUnitLabel(unitId, offset);
 
+    public void PlaceCommandNode(Guid nodeId, GeoPoint? position) => _inner.PlaceCommandNode(nodeId, position);
+
+    public void MoveCommandNodeLabel(Guid nodeId, LabelOffset? offset) => _inner.MoveCommandNodeLabel(nodeId, offset);
+
     public void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot) => _inner.PlaceRoleAssignment(assignmentId, nodeId, slot);
 
     public void EndRoleAssignment(Guid assignmentId) => _inner.EndRoleAssignment(assignmentId);

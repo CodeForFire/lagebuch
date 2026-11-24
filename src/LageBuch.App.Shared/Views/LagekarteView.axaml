@@ -301,6 +301,60 @@
           </ScrollViewer>
         </StackPanel>
 
+        <!-- #966: the Bereitstellungsräume the Organisation has, placed like a unit. What they are
+             called and where they are written down stays the Organisation's: the pencil opens the
+             same dialog, and a rename there renames the sign. -->
+        <TextBlock DockPanel.Dock="Top" Text="BEREITSTELLUNGSRÄUME" Classes="overline" FontSize="10" Margin="0,0,0,6" />
+        <TextBlock DockPanel.Dock="Top" x:Name="NoBereitstellungenHint" TextWrapping="Wrap" Margin="0,0,0,14"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="Keine. Unter ORGANISATION einrichten."
+                   IsVisible="{Binding HasNoBereitstellungen}" />
+        <ItemsControl DockPanel.Dock="Top" x:Name="BereitstellungList" ItemsSource="{Binding Bereitstellungen}"
+                      Margin="0,0,0,8" IsVisible="{Binding !HasNoBereitstellungen}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LagekarteBereitstellungRow">
+              <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="1" Text="{Binding Detail}" FontSize="12" IsVisible="{Binding HasDetail}"
+                           Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                <!-- ReflectionBinding: the commands live on the ItemsControl's DataContext,
+                     object-typed under compiled bindings. -->
+                <Button Grid.Column="1" Grid.RowSpan="2" x:Name="PlaceBereitstellungButton" Classes="icon-btn" Margin="6,0,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{Binding PlaceLabel}" AutomationProperties.Name="{Binding PlaceLabel}"
+                        IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.PlaceBereitstellungCommand}"
+                        CommandParameter="{Binding}">
+                  <PathIcon Data="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm4 8h-3v3h-2v-3H8V8h3V5h2v3h3v2z" />
+                </Button>
+                <Button Grid.Column="2" Grid.RowSpan="2" x:Name="EditBereitstellungButton" Classes="icon-btn" Margin="2,0,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="Angaben bearbeiten" AutomationProperties.Name="{Binding EditLabel}"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.EditBereitstellungCommand}"
+                        CommandParameter="{Binding}">
+                  <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                </Button>
+                <Button Grid.Column="3" Grid.RowSpan="2" Classes="icon-btn" Margin="2,0,0,0" VerticalAlignment="Center"
+                        ToolTip.Tip="Auf der Karte zeigen"
+                        AutomationProperties.Name="{Binding CenterLabel}" IsVisible="{Binding IsPlaced}"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.CenterOnBereitstellungCommand}"
+                        CommandParameter="{Binding}">
+                  <PathIcon Data="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />
+                </Button>
+                <Button Grid.Column="4" Grid.RowSpan="2" x:Name="RemoveBereitstellungButton" Classes="icon-btn" Margin="2,0,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="Von der Karte nehmen"
+                        AutomationProperties.Name="{Binding RemoveLabel}" IsVisible="{Binding IsPlaced}"
+                        IsEnabled="{ReflectionBinding $parent[ItemsControl].DataContext.CanEdit}"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveBereitstellungCommand}"
+                        CommandParameter="{Binding}">
+                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <TextBlock DockPanel.Dock="Top" Text="EINHEITEN" Classes="overline" FontSize="10" Margin="0,0,0,6" />
         <TextBlock DockPanel.Dock="Top" x:Name="NoUnitsHint" TextWrapping="Wrap"
                    Foreground="{StaticResource TextSecondaryBrush}"
@@ -429,6 +483,7 @@
             <DataTemplate x:DataType="vm:LagekarteMarker">
               <c:TacticalSignControl AutomationProperties.Name="{Binding SignAutomationName}"
                                      VehicleType="{Binding VehicleType}" Title="{Binding Title}"
+                                     IsBereitstellungsraum="{Binding IsBereitstellung}"
                                      PointerPressed="OnSignPressed" PointerMoved="OnSignMoved"
                                      PointerReleased="OnSignReleased" PointerCaptureLost="OnSignCaptureLost" />
             </DataTemplate>

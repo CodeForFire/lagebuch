@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 47;
+    public const int CurrentVersion = 48;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -318,6 +318,15 @@ public static class Migrations
         if (version < 47)
         {
             ApplyV47(cn, tx);
+        }
+
+        // Stryker disable all : V48 only adds nullable columns that SchemaGuard.Reconcile below
+        // adds identically on every open; see V26.
+        if (version < 48)
+        {
+            ApplyV48(cn, tx);
+
+            // Stryker restore all
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1398,6 +1407,19 @@ public static class Migrations
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entries", "section_id", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entries", "section_name", "TEXT");
+
+        // Stryker restore all
+    }
+
+    // Where a Bereitstellungsraum stands on the Lagekarte, and how far its sign was moved (#966), in
+    // the same columns force_units uses. Additive and nullable: an older file's nodes read back off the map.
+    // Stryker disable all : SchemaGuard.Reconcile adds these same columns on every open (see V26).
+    private static void ApplyV48(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "command_nodes", "position_lat", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "command_nodes", "position_lon", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "command_nodes", "label_dx", "REAL");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "command_nodes", "label_dy", "REAL");
 
         // Stryker restore all
     }

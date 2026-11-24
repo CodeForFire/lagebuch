@@ -1,4 +1,5 @@
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 
@@ -187,6 +188,90 @@ public class LagekarteSyncTests
         Assert.Null(copy.VehicleType);
         Assert.Null(copy.LabelOffset);
         Assert.Equal("Aich", copy.Brigade);
+    }
+
+    [Fact]
+    public void A_Bereitstellungsraum_placed_on_a_client_stands_there_on_the_host_and_is_attributed()
+    {
+        var (incident, clock) = NewIncident();
+        var node = incident.AddCommandNode(clock, new SessionOperator("Host", "FFB 1"), CommandNodeKind.Bereitstellung, "BR Nord");
+
+        ApplyOverWire(new PlaceCommandNodeCommand(Peer, node.Id, 48.1801, 11.2533), incident, clock);
+        Assert.Equal(new GeoPoint(48.1801, 11.2533), incident.FindCommandNode(node.Id)?.Position);
+        Assert.Equal("Bauer (FFB 3)", incident.Journal[^1].EnteredBy);
+
+        ApplyOverWire(new MoveCommandNodeLabelCommand(Peer, node.Id, -30, 24.5), incident, clock);
+        Assert.Equal(new LabelOffset(-30, 24.5), incident.FindCommandNode(node.Id)?.LabelOffset);
+
+        ApplyOverWire(new PlaceCommandNodeCommand(Peer, node.Id, null, null), incident, clock);
+        Assert.Null(incident.FindCommandNode(node.Id)?.Position);
+    }
+
+    [Theory]
+    [InlineData(48.1, null)]
+    [InlineData(double.NaN, 11.2)]
+    [InlineData(95.0, 11.2)]
+    public void A_Bereitstellungsraum_coordinate_that_is_no_position_is_refused_and_changes_nothing(double? lat, double? lon)
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Host", "FFB 1");
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR Nord");
+        incident.PlaceCommandNode(clock, op, node.Id, new GeoPoint(48.1785, 11.2555));
+        incident.MoveCommandNodeLabel(clock, op, node.Id, new LabelOffset(10, 10));
+        var entries = incident.Journal.Count;
+
+        Assert.Throws<ArgumentException>(() => CommandApplier.Apply(new PlaceCommandNodeCommand(Peer, node.Id, lat, lon), incident, clock));
+        Assert.Throws<ArgumentException>(() => CommandApplier.Apply(new MoveCommandNodeLabelCommand(Peer, node.Id, lat, 1e9), incident, clock));
+
+        Assert.Equal(new GeoPoint(48.1785, 11.2555), incident.FindCommandNode(node.Id)?.Position);
+        Assert.Equal(new LabelOffset(10, 10), incident.FindCommandNode(node.Id)?.LabelOffset);
+        Assert.Equal(entries, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void A_peer_cannot_put_an_Abschnitt_on_the_map()
+    {
+        var (incident, clock) = NewIncident();
+        var node = incident.AddCommandNode(clock, new SessionOperator("Host", "FFB 1"), CommandNodeKind.Abschnitt, "Nord");
+
+        Assert.Throws<InvalidOperationException>(() => CommandApplier.Apply(new PlaceCommandNodeCommand(Peer, node.Id, 48.1801, 11.2533), incident, clock));
+
+        Assert.Null(incident.FindCommandNode(node.Id)?.Position);
+    }
+
+    [Fact]
+    public void A_joining_client_sees_each_Bereitstellungsraum_on_the_map()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Host", "FFB 1");
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR Nord");
+        incident.AddCommandNode(clock, op, CommandNodeKind.Bereitstellung, "BR Süd");
+        incident.PlaceCommandNode(clock, op, node.Id, new GeoPoint(48.1801, 11.2533));
+        incident.MoveCommandNodeLabel(clock, op, node.Id, new LabelOffset(-30, 24.5));
+
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident));
+        var copy = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        var placed = copy.CommandNodes.Single(n => n.Id == node.Id);
+        Assert.Equal(new GeoPoint(48.1801, 11.2533), placed.Position);
+        Assert.Equal(new LabelOffset(-30, 24.5), placed.LabelOffset);
+        Assert.Null(copy.CommandNodes.Single(n => n.Id != node.Id).Position);
+    }
+
+    [Fact]
+    public void A_snapshot_from_a_hostile_host_with_a_bad_Bereitstellungsraum_place_costs_only_the_mark()
+    {
+        var (incident, clock) = NewIncident();
+        incident.AddCommandNode(clock, new SessionOperator("Host", "FFB 1"), CommandNodeKind.Bereitstellung, "BR Nord");
+        var snapshot = SnapshotMapper.ToSnapshot(incident);
+        var dto = snapshot.CommandNodes![0] with { PositionLatitude = 95, PositionLongitude = 11.2, LabelDx = double.NaN, LabelDy = 4 };
+        snapshot = snapshot with { CommandNodes = [dto] };
+
+        var copy = SnapshotMapper.FromSnapshot(snapshot).CommandNodes.Single();
+
+        Assert.Null(copy.Position);
+        Assert.Null(copy.LabelOffset);
+        Assert.Equal("BR Nord", copy.Name);
     }
 
     private static (Incident Incident, FixedClock Clock) NewIncident()

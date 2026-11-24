@@ -125,6 +125,12 @@ public static class CommandApplier
             case MoveForceUnitLabelCommand c:
                 incident.MoveForceUnitLabel(clock, Operator(c.Operator), c.UnitId, Offset(c.Dx, c.Dy));
                 break;
+            case PlaceCommandNodeCommand c:
+                incident.PlaceCommandNode(clock, Operator(c.Operator), c.NodeId, Position(c.Latitude, c.Longitude));
+                break;
+            case MoveCommandNodeLabelCommand c:
+                incident.MoveCommandNodeLabel(clock, Operator(c.Operator), c.NodeId, Offset(c.Dx, c.Dy));
+                break;
             case SetNavVisibilityCommand c:
                 incident.SetNavVisibility(c.Key, c.Visible);
                 break;

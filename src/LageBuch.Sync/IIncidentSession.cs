@@ -141,6 +141,12 @@ public interface IIncidentSession
     /// <summary>Moves a unit's sign relative to its pin; null puts it back at the default place. See <c>Incident.MoveForceUnitLabel</c>.</summary>
     void MoveForceUnitLabel(Guid unitId, LabelOffset? offset);
 
+    /// <summary>Puts a Bereitstellungsraum on the Lagekarte; null takes it off. See <c>Incident.PlaceCommandNode</c>.</summary>
+    void PlaceCommandNode(Guid nodeId, GeoPoint? position);
+
+    /// <summary>Moves a Bereitstellungsraum's sign relative to its pin; null puts it back. See <c>Incident.MoveCommandNodeLabel</c>.</summary>
+    void MoveCommandNodeLabel(Guid nodeId, LabelOffset? offset);
+
     /// <summary>Places a running Funktion in a node and board slot; a null <paramref name="nodeId"/> is the Einsatzleitung.</summary>
     void PlaceRoleAssignment(Guid assignmentId, Guid? nodeId, RoleSlot slot);
 

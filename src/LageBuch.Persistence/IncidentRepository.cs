@@ -521,7 +521,7 @@ public sealed class IncidentRepository
             var n = incident.CommandNodes[i];
             Run(
                 inserts,
-                "INSERT INTO command_nodes (id, ordinal, kind, name, parent_id, auftrag, standort, funkgruppe, rufname, telefon, dissolved_at, funkgruppen, fuehrungsfahrzeug) " + "VALUES ($id,$o,$kind,$name,$parent,$auftrag,$standort,$funk,$ruf,$tel,$dissolved,$funkgruppen,$fahrzeug);",
+                "INSERT INTO command_nodes (id, ordinal, kind, name, parent_id, auftrag, standort, funkgruppe, rufname, telefon, dissolved_at, funkgruppen, fuehrungsfahrzeug, position_lat, position_lon, label_dx, label_dy) " + "VALUES ($id,$o,$kind,$name,$parent,$auftrag,$standort,$funk,$ruf,$tel,$dissolved,$funkgruppen,$fahrzeug,$lat,$lon,$ldx,$ldy);",
                 p =>
                 {
                     p("$id", n.Id.ToString());
@@ -537,6 +537,10 @@ public sealed class IncidentRepository
                     p("$dissolved", (object?)n.DissolvedAt?.ToString(Iso) ?? DBNull.Value);
                     p("$funkgruppen", (object?)FunkgruppenJson.Write(n.Funkgruppen) ?? DBNull.Value);
                     p("$fahrzeug", (object?)n.Fuehrungsfahrzeug ?? DBNull.Value);
+                    p("$lat", (object?)n.Position?.Latitude ?? DBNull.Value);
+                    p("$lon", (object?)n.Position?.Longitude ?? DBNull.Value);
+                    p("$ldx", (object?)n.LabelOffset?.Dx ?? DBNull.Value);
+                    p("$ldy", (object?)n.LabelOffset?.Dy ?? DBNull.Value);
                 });
         }
     }
@@ -1047,7 +1051,7 @@ public sealed class IncidentRepository
 
         var commandNodes = ReadAll(
             cn,
-            "SELECT id, kind, name, parent_id, auftrag, standort, funkgruppe, rufname, telefon, dissolved_at, funkgruppen, fuehrungsfahrzeug FROM command_nodes ORDER BY ordinal;",
+            "SELECT id, kind, name, parent_id, auftrag, standort, funkgruppe, rufname, telefon, dissolved_at, funkgruppen, fuehrungsfahrzeug, position_lat, position_lon, label_dx, label_dy FROM command_nodes ORDER BY ordinal;",
             r => Domain.Leadership.CommandNode.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 LeadershipKeys.KindFrom(Str(r, 1)),
@@ -1060,7 +1064,9 @@ public sealed class IncidentRepository
                 Str(r, 8),
                 NullableDate(r, 9),
                 FunkgruppenJson.Read(Str(r, 10)),
-                Str(r, 11)));
+                Str(r, 11),
+                Domain.ValueObjects.GeoPoint.TryCreate(NullableDouble(r, 12), NullableDouble(r, 13)),
+                Domain.ValueObjects.LabelOffset.TryCreate(NullableDouble(r, 14), NullableDouble(r, 15))));
 
         // A row whose ids do not read is dropped rather than refused: losing one Ebene beats an
         // Einsatz that will not open.

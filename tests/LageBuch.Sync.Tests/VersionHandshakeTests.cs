@@ -440,7 +440,16 @@ public class VersionHandshakeTests
     {
         // 47 lets a client send setTaskTimer (#964), which a host at 46 does not know: a 46 and a
         // 47 must not connect.
-        Assert.Equal(47, SyncProtocol.ProtocolVersion);
-        Assert.Equal(47, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 47, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 47, int.MaxValue);
+    }
+
+    [Fact]
+    public void A_Bereitstellungsraum_on_the_Lagekarte_raises_the_protocol_and_the_floor_to_forty_eight()
+    {
+        // 48 lets a client send placeCommandNode and moveCommandNodeLabel (#966), which a host at 47
+        // does not know: a 47 and a 48 must not connect.
+        Assert.Equal(48, SyncProtocol.ProtocolVersion);
+        Assert.Equal(48, SyncProtocol.MinimumProtocolVersion);
     }
 }

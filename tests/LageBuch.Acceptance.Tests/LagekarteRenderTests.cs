@@ -585,6 +585,42 @@ public sealed class LagekarteRenderTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void A_Bereitstellungsraum_of_the_Organisation_stands_on_the_map_as_its_sign_and_follows_a_rename()
+    {
+        var (window, view, vm, session) = Show();
+        session.SetIncidentLocation(Marktplatz);
+        session.PlaceForceUnit(session.Incident.Forces[0].Id, new GeoPoint(48.1792, 11.2541));
+        session.AddCommandNode(Domain.Leadership.CommandNodeKind.Bereitstellung, "BR Nord", standort: "Parkplatz Sportplatz");
+        session.AddCommandNode(Domain.Leadership.CommandNodeKind.Bereitstellung, "BR Süd");
+        var nodeId = session.Incident.CommandNodes[0].Id;
+        session.PlaceCommandNode(nodeId, new GeoPoint(48.1801, 11.2533));
+        vm.CenterOnEinsatzortCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(3, Pins(view).Children.Count);
+        var list = view.GetVisualDescendants().OfType<ItemsControl>().Single(i => i.Name == "BereitstellungList");
+        Assert.Equal(2, list.ItemCount);
+        Assert.False(view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "NoBereitstellungenHint").IsVisible);
+        var sign = view.GetVisualDescendants().OfType<TacticalSignControl>().Single(s => s.IsBereitstellungsraum);
+        Assert.Equal("BR Nord", sign.Title);
+        Assert.Equal("Bereitstellungsraum BR Nord: taktisches Zeichen", Avalonia.Automation.AutomationProperties.GetName(sign));
+        Assert.Contains(
+            view.GetVisualDescendants().OfType<Button>(),
+            b => b.Name == "PlaceBereitstellungButton" && Avalonia.Automation.AutomationProperties.GetName(b) == "BR Süd auf Karte setzen");
+
+        // The PR screenshot.
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(Shots(), "lagekarte-bereitstellungsraum.png"));
+        }
+
+        session.UpdateCommandNode(nodeId, "BR Sportplatz", null, "Parkplatz Sportplatz", null, null, null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("BR Sportplatz", view.GetVisualDescendants().OfType<TacticalSignControl>().Single(s => s.IsBereitstellungsraum).Title);
+    }
+
+    [AvaloniaFact]
     public void The_unit_list_shows_the_type_strength_and_status_the_sign_leaves_out()
     {
         var (_, view, _, session) = Show();

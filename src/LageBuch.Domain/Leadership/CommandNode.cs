@@ -1,3 +1,5 @@
+using LageBuch.Domain.ValueObjects;
+
 namespace LageBuch.Domain.Leadership;
 
 /// <summary>
@@ -53,6 +55,15 @@ public sealed record CommandNode
 
     public DateTimeOffset? DissolvedAt { get; private init; }
 
+    /// <summary>
+    /// Where a Bereitstellungsraum stands on the Lagekarte (#966); null while it is not on the map,
+    /// and for every other kind. Kept when the node is dissolved, as history: the map shows live nodes only.
+    /// </summary>
+    public GeoPoint? Position { get; private init; }
+
+    /// <summary>How far its taktisches Zeichen was dragged from its pin; null for the place the map finds.</summary>
+    public LabelOffset? LabelOffset { get; private init; }
+
     public bool IsLive => DissolvedAt is null;
 
     public static CommandNode Create(CommandNodeKind kind, string name, Guid? parentId)
@@ -85,7 +96,9 @@ public sealed record CommandNode
         string? telefon,
         DateTimeOffset? dissolvedAt,
         Funkgruppen? funkgruppen = null,
-        string? fuehrungsfahrzeug = null)
+        string? fuehrungsfahrzeug = null,
+        GeoPoint? position = null,
+        LabelOffset? labelOffset = null)
         => new()
         {
             Id = id,
@@ -100,6 +113,8 @@ public sealed record CommandNode
             DissolvedAt = dissolvedAt,
             Funkgruppen = funkgruppen ?? Funkgruppen.Empty,
             Fuehrungsfahrzeug = fuehrungsfahrzeug,
+            Position = position,
+            LabelOffset = labelOffset,
         };
 
     /// <summary>
@@ -173,6 +188,13 @@ public sealed record CommandNode
         _ when parentId is null => this,
         _ => throw new InvalidOperationException("Nur ein Abschnitt liegt in einem Abschnitt."),
     };
+
+    /// <summary>Returns a copy at <paramref name="position"/> on the Lagekarte; off it with null, which forgets the sign's offset too.</summary>
+    public CommandNode WithPosition(GeoPoint? position) =>
+        this with { Position = position, LabelOffset = position is null ? null : LabelOffset };
+
+    /// <summary>Returns a copy whose sign stands at <paramref name="offset"/> from its pin; null for the default place.</summary>
+    public CommandNode WithLabelOffset(LabelOffset? offset) => this with { LabelOffset = offset };
 
     /// <summary>Returns a copy dissolved at <paramref name="at"/>; a node can be dissolved only once.</summary>
     public CommandNode DissolvedAtTime(DateTimeOffset at)
