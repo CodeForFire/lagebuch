@@ -391,6 +391,75 @@ public class EtbViewModelTests
     }
 
     [Fact]
+    public void BeginEdit_populates_EditFrom_and_EditTo_with_the_entrys_von_and_an()
+    {
+        var vm = NewVm();
+        vm.NewFrom = "Florian 1/44";
+        vm.NewTo = "ELW 1";
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+
+        vm.Entries[0].BeginEditCommand.Execute(null);
+
+        Assert.Equal("Florian 1/44", vm.EditFrom);
+        Assert.Equal("ELW 1", vm.EditTo);
+    }
+
+    [Fact]
+    public void SaveEdit_writes_the_edited_von_and_an_onto_the_same_row()
+    {
+        var vm = NewVm();
+        vm.NewFrom = "Florian 1/44";
+        vm.NewTo = "ELW 1";
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        var changedProperties = new List<string?>();
+        row.PropertyChanged += (_, e) => changedProperties.Add(e.PropertyName);
+        row.BeginEditCommand.Execute(null);
+        vm.EditFrom = "Florian 1/46";
+        vm.EditTo = string.Empty;
+
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.Same(row, Assert.Single(vm.Entries, e => e.Id == row.Id));
+        Assert.Equal("Florian 1/46", row.From);
+        Assert.Null(row.To);
+        Assert.Equal("Lagemeldung", row.Text);
+        Assert.True(row.WasEdited);
+        Assert.Equal("Florian 1/44", Assert.Single(row.Edits).PreviousFrom);
+        Assert.Contains(nameof(EtbEntryRow.From), changedProperties);
+        Assert.Contains(nameof(EtbEntryRow.To), changedProperties);
+        Assert.Null(vm.EditFrom);
+        Assert.Null(vm.EditTo);
+    }
+
+    [Fact]
+    public void The_verlauf_names_the_prior_von_and_an_of_an_edit_that_changed_them()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { })
+        {
+            NewFrom = "Florian 1/44",
+            NewText = "Lage",
+        };
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+
+        session.EditJournalEntry(row.Id, "Lage korrigiert", row.From, row.To);
+        session.EditJournalEntry(row.Id, "Lage korrigiert", "Florian 1/46", null);
+
+        var by = Assert.Single(row.Edits.Select(e => e.EditedBy).Distinct());
+        Assert.Equal(
+            [
+                $"{Formatting.Timestamp(T0)}: „Lage“ ({by})",
+                $"{Formatting.Timestamp(T0)}: Von Florian 1/44 an —, „Lage korrigiert“ ({by})",
+            ],
+            row.HistoryLines);
+    }
+
+    [Fact]
     public void Opening_and_closing_the_edit_panel_tells_the_Save_button_to_recheck()
     {
         // A bound button reads CanExecute once and then only on CanExecuteChanged, so a live
@@ -534,7 +603,7 @@ public class EtbViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var entry = session.Incident.AddJournalEntry(clock, session.Operator!, EtbDirection.Incoming, "Lagemeldung");
-        session.Incident.EditJournalEntry(clock, session.Operator!, entry.Id, "Lagemeldung korrigiert");
+        session.Incident.EditJournalEntry(clock, session.Operator!, entry.Id, "Lagemeldung korrigiert", entry.From, entry.To);
         session.Close();
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
 
@@ -755,7 +824,7 @@ public class EtbViewModelTests
         };
 
         // Straight through the session, as an edit from another device arrives: Changed -> Sync.
-        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert");
+        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert", row.From, row.To);
 
         Assert.Empty(nonAdds);
         Assert.Same(row, Assert.Single(vm.Entries, e => e.Id == row.Id));
@@ -774,10 +843,10 @@ public class EtbViewModelTests
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Lagemeldung" };
         vm.AddEntryCommand.Execute(null);
         var row = vm.Entries[0];
-        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert");
+        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert", row.From, row.To);
         row.ShowHistoryCommand.Execute(null);
 
-        session.EditJournalEntry(row.Id, "Lagemeldung nochmals korrigiert");
+        session.EditJournalEntry(row.Id, "Lagemeldung nochmals korrigiert", row.From, row.To);
 
         Assert.Same(row, vm.HistoryEntry);
         Assert.Equal(2, vm.HistoryEntry!.Edits.Count);
@@ -794,7 +863,7 @@ public class EtbViewModelTests
         row.BeginEditCommand.Execute(null);
         vm.EditText = "halb getippt";
 
-        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert"); // another device saved first
+        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert", row.From, row.To); // another device saved first
 
         Assert.False(vm.IsEditing);
         Assert.Equal(string.Empty, vm.EditText);
@@ -1034,9 +1103,10 @@ public class EtbViewModelTests
     public void The_marker_survives_a_correction_of_the_entry_text()
     {
         var (session, vm) = WithSentLagemeldung();
-        var entryId = vm.Entries.Single(e => e.SituationReportNumber is not null).Id;
+        var report = vm.Entries.Single(e => e.SituationReportNumber is not null);
+        var entryId = report.Id;
 
-        session.EditJournalEntry(entryId, "Lagemeldung, berichtigt");
+        session.EditJournalEntry(entryId, "Lagemeldung, berichtigt", report.From, report.To);
 
         Assert.Equal(1, vm.Entries.Single(e => e.Id == entryId).SituationReportNumber);
     }

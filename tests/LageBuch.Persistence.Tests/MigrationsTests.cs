@@ -651,4 +651,40 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(0) && r.IsDBNull(1));
         Assert.Equal("Lage", r.GetString(2));
     }
+
+    [Fact]
+    public void V47_database_upgrades_to_v48_and_its_etb_edits_carry_the_entrys_von_and_an()
+    {
+        // A V47 file: today's schema minus etb_entry_edits.previous_from/previous_to, with one
+        // edited entry. Von and An could not be edited before V48, so the edit's prior version
+        // carried the entry's own Von and An.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE etb_entry_edits DROP COLUMN previous_from;
+                ALTER TABLE etb_entry_edits DROP COLUMN previous_to;
+                INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by)
+                    VALUES ('e', 0, '2026-06-22T09:00:00+02:00', 1, 'Florian 1/44', NULL, 'Lage korrigiert', 'Muster');
+                INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at)
+                    VALUES ('x', 'e', 0, 'Lage', 'Muster', '2026-06-22T09:05:00+02:00');
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (47);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT previous_from, previous_to FROM etb_entry_edits WHERE id = 'x';";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.Equal("Florian 1/44", r.GetString(0));
+        Assert.True(r.IsDBNull(1));
+    }
 }

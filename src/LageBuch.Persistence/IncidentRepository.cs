@@ -158,7 +158,7 @@ public sealed class IncidentRepository
                 var edit = e.Edits[j];
                 Run(
                     inserts,
-                    "INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at) VALUES ($id,$eid,$o,$txt,$by,$at);",
+                    "INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at, previous_from, previous_to) VALUES ($id,$eid,$o,$txt,$by,$at,$pfrom,$pto);",
                     p =>
                     {
                         p("$id", Guid.NewGuid().ToString());
@@ -167,6 +167,8 @@ public sealed class IncidentRepository
                         p("$txt", edit.PreviousText);
                         p("$by", edit.EditedBy);
                         p("$at", edit.EditedAt.ToString(Iso));
+                        p("$pfrom", (object?)edit.PreviousFrom ?? DBNull.Value);
+                        p("$pto", (object?)edit.PreviousTo ?? DBNull.Value);
                     });
             }
         }
@@ -755,9 +757,9 @@ public sealed class IncidentRepository
 
         var editsByEntry = ReadAll(
             cn,
-            "SELECT entry_id, previous_text, edited_by, edited_at FROM etb_entry_edits ORDER BY ordinal;",
+            "SELECT entry_id, previous_text, edited_by, edited_at, previous_from, previous_to FROM etb_entry_edits ORDER BY ordinal;",
             r => (EntryId: Guid.Parse(r.GetString(0)),
-                  Edit: new Domain.Etb.EtbEntryEdit(r.GetString(1), r.GetString(2), ParseDate(r.GetString(3)))))
+                  Edit: new Domain.Etb.EtbEntryEdit(r.GetString(1), r.GetString(2), ParseDate(r.GetString(3)), Str(r, 4), Str(r, 5))))
             .GroupBy(x => x.EntryId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Edit).ToList());
 

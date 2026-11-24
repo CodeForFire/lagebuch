@@ -456,8 +456,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         return id;
     }
 
-    public void EditJournalEntry(Guid entryId, string text) =>
-        Send(new EditJournalEntryCommand(Op(), entryId, text));
+    public void EditJournalEntry(Guid entryId, string text, string? from, string? to) =>
+        Send(new EditJournalEntryCommand(Op(), entryId, text, from, to));
 
     public void AssignJournalEntrySection(Guid entryId, Guid? sectionId) =>
         Send(new AssignJournalEntrySectionCommand(Op(), entryId, sectionId));

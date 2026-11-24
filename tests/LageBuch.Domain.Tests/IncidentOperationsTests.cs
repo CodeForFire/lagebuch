@@ -334,7 +334,7 @@ public class IncidentOperationsTests
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
         clock.Now = T0.AddMinutes(5);
 
-        incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung korrigiert");
+        incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung korrigiert", entry.From, entry.To);
 
         var trace = Assert.Single(incident.Journal, e => e.Text.Contains("bearbeitet", StringComparison.Ordinal));
         Assert.Equal(EtbDirection.System, trace.Direction);
@@ -348,7 +348,7 @@ public class IncidentOperationsTests
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
         var before = incident.Journal.Count;
 
-        incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung");
+        incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung", entry.From, entry.To);
 
         Assert.Equal(before, incident.Journal.Count);
     }
@@ -361,7 +361,7 @@ public class IncidentOperationsTests
         clock.Now = T0.AddMinutes(5);
         var editor = new SessionOperator("Schmidt");
 
-        var edited = incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert");
+        var edited = incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert", entry.From, entry.To);
 
         Assert.Equal("Lagemeldung korrigiert", edited.Text);
         Assert.Equal(edited, incident.Journal.Single(e => e.Id == entry.Id));
@@ -372,6 +372,22 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Editing_only_von_of_an_entry_records_the_prior_von_and_appends_a_system_trace()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung", from: "Florian 1/44", to: "ELW 1");
+        clock.Now = T0.AddMinutes(5);
+
+        var edited = incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung", "Florian 1/46", "ELW 1");
+
+        Assert.Equal("Florian 1/46", edited.From);
+        Assert.Equal("ELW 1", edited.To);
+        var historyEntry = Assert.Single(edited.Edits);
+        Assert.Equal("Florian 1/44", historyEntry.PreviousFrom);
+        Assert.Single(incident.Journal, e => e.Text.Contains("bearbeitet", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Edit_journal_entry_throws_on_a_System_entry()
     {
         var incident = NewIncident(out var clock, out var op);
@@ -379,7 +395,7 @@ public class IncidentOperationsTests
         var systemEntry = incident.Journal.Single(e => e.Text == "Bearbeitung fortgesetzt");
 
         Assert.Throws<InvalidOperationException>(
-            () => incident.EditJournalEntry(clock, op, systemEntry.Id, "Manipuliert"));
+            () => incident.EditJournalEntry(clock, op, systemEntry.Id, "Manipuliert", systemEntry.From, systemEntry.To));
     }
 
     [Fact]
@@ -387,7 +403,7 @@ public class IncidentOperationsTests
     {
         var incident = NewIncident(out var clock, out var op);
         Assert.Throws<KeyNotFoundException>(
-            () => incident.EditJournalEntry(clock, op, Guid.NewGuid(), "Text"));
+            () => incident.EditJournalEntry(clock, op, Guid.NewGuid(), "Text", null, null));
     }
 
     [Fact]
@@ -398,7 +414,7 @@ public class IncidentOperationsTests
         incident.Close(clock, op);
 
         Assert.Throws<IncidentClosedException>(
-            () => incident.EditJournalEntry(clock, op, entry.Id, "Korrigiert"));
+            () => incident.EditJournalEntry(clock, op, entry.Id, "Korrigiert", entry.From, entry.To));
     }
 
     [Fact]

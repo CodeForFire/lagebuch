@@ -292,6 +292,34 @@ public class WorkspaceAcceptanceTests
         Assert.Equal("Einsatz begonnen", vm.Etb.Entries[1].Text);
     }
 
+    // VON and AN open pre-filled with the entry's own, so correcting one does not wipe the other.
+    [AvaloniaFact]
+    public void The_edit_panel_opens_with_the_entrys_von_and_an_and_saves_a_corrected_von()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung erhalten", from: "Florian 1/44", to: "ELW 1");
+        var view = new EtbView { DataContext = vm.Etb };
+        var window = new Window { Content = view, Width = 1000, Height = 700 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung erhalten");
+        row.BeginEditCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var fromBox = view.GetControl<AutoCompleteBox>("EditFromBox");
+        Assert.True(fromBox.IsEffectivelyVisible);
+        Assert.Equal("Florian 1/44", fromBox.Text);
+        Assert.Equal("ELW 1", view.GetControl<AutoCompleteBox>("EditToBox").Text);
+
+        fromBox.Text = "Florian 1/46";
+        view.GetControl<Button>("SaveEditButton").Command!.Execute(null);
+
+        Assert.Equal("Florian 1/46", row.From);
+        Assert.Equal("ELW 1", row.To);
+        Assert.Equal("Florian 1/44", Assert.Single(row.Edits).PreviousFrom);
+    }
+
     // #73: editing an existing manual ETB entry shows a "bearbeitet" tag on the row and the edit
     // panel below the grid. Doubles as the PR before/after screenshot capture.
     [AvaloniaFact]

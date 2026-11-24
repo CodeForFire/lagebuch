@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 47;
+    public const int CurrentVersion = 48;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -318,6 +318,11 @@ public static class Migrations
         if (version < 47)
         {
             ApplyV47(cn, tx);
+        }
+
+        if (version < 48)
+        {
+            ApplyV48(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -1400,6 +1405,29 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entries", "section_name", "TEXT");
 
         // Stryker restore all
+    }
+
+    // Von and An of an ETB entry become editable, so an edit records the pair it replaced next to
+    // the text. Every edit written before could only have changed the text, so its prior Von and
+    // An are the entry's own: the backfill is exact, not a guess.
+    // Only a table that gains the columns here is backfilled: one that already has them holds
+    // prior pairs a build at 48 wrote, and those must not be overwritten.
+    private static void ApplyV48(SqliteConnection cn, SqliteTransaction tx)
+    {
+        if (!SchemaHelpers.TableExists(cn, tx, "etb_entry_edits")
+            || !SchemaHelpers.TableExists(cn, tx, "etb_entries")
+            || SchemaHelpers.ColumnExists(cn, tx, "etb_entry_edits", "previous_from"))
+        {
+            return;
+        }
+
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entry_edits", "previous_from", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entry_edits", "previous_to", "TEXT");
+        Exec(cn, tx, """
+            UPDATE etb_entry_edits SET
+                previous_from = (SELECT from_party FROM etb_entries WHERE etb_entries.id = etb_entry_edits.entry_id),
+                previous_to = (SELECT to_party FROM etb_entries WHERE etb_entries.id = etb_entry_edits.entry_id);
+            """);
     }
 
     [SuppressMessage(

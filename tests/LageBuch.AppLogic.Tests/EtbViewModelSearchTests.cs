@@ -80,11 +80,11 @@ public class EtbViewModelSearchTests
         vm.FilterText = "drehleiter";
         var id = Assert.Single(vm.Entries).Id;
 
-        session.EditJournalEntry(id, "Hubrettungsfahrzeug in Stellung");
+        session.EditJournalEntry(id, "Hubrettungsfahrzeug in Stellung", null, null);
 
         Assert.Empty(vm.Entries);
 
-        session.EditJournalEntry(id, "Drehleiter wieder in Stellung");
+        session.EditJournalEntry(id, "Drehleiter wieder in Stellung", null, null);
 
         Assert.Equal(["Drehleiter wieder in Stellung"], vm.Entries.Select(r => r.Text));
     }

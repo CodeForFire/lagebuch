@@ -620,7 +620,7 @@ public sealed class Incident
     }
 
     /// <summary>
-    /// Corrects a manually-typed ETB entry's text, preserving the prior wording under
+    /// Corrects a manually-typed ETB entry's text, Von and An, preserving the prior version under
     /// <see cref="EtbEntry.Edits"/>. System-direction entries (Kräfte, Atemschutz,
     /// Einsatz-Lebenszyklus) are never editable — they are the app's own record of what happened,
     /// not something an operator wrote and could have mistyped. Any operator may edit any manual
@@ -631,7 +631,7 @@ public sealed class Incident
     /// record-changing mutation on this aggregate leaves, so a rewrite is visible in the grid and
     /// the PDF export even though the row itself now shows the corrected text.
     /// </summary>
-    public EtbEntry EditJournalEntry(IClock clock, SessionOperator op, Guid entryId, string text)
+    public EtbEntry EditJournalEntry(IClock clock, SessionOperator op, Guid entryId, string text, string? from, string? to)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -650,11 +650,11 @@ public sealed class Incident
                 "Automatisch erzeugte Einträge können nicht bearbeitet werden.");
         }
 
-        var edited = existing.WithEditedText(text, op, clock.Now);
+        var edited = existing.WithEdit(text, from, to, op, clock.Now);
         _journal[index] = edited;
 
-        // WithEditedText is a no-op (returns the same instance) when the text didn't actually
-        // change -- nothing to trace in that case.
+        // WithEdit is a no-op (returns the same instance) when nothing actually
+        // changed -- nothing to trace in that case.
         if (edited.Edits.Count > existing.Edits.Count)
         {
             AppendSystemEntry(clock, op, $"ETB-Eintrag {existing.Timestamp:HH:mm} bearbeitet");

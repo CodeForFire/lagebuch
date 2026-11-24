@@ -43,7 +43,7 @@ public static class CommandApplier
                 incident.AddJournalEntry(clock, Operator(c.Operator), c.Direction, c.Text, c.From, c.To, c.EntryId, c.SectionId);
                 break;
             case EditJournalEntryCommand c:
-                incident.EditJournalEntry(clock, Operator(c.Operator), c.EntryId, c.Text);
+                incident.EditJournalEntry(clock, Operator(c.Operator), c.EntryId, c.Text, c.From, c.To);
                 break;
             case AssignJournalEntrySectionCommand c:
                 incident.AssignJournalEntrySection(clock, Operator(c.Operator), c.EntryId, c.SectionId);

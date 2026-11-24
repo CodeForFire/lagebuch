@@ -144,7 +144,9 @@ public sealed record EtbEntryDto(
     Guid? SectionId = null,
     string? SectionName = null);
 
-public sealed record EtbEntryEditDto(string PreviousText, string EditedBy, DateTimeOffset EditedAt);
+// PreviousFrom/PreviousTo: the entry's Von and An before the edit (protocol 48).
+public sealed record EtbEntryEditDto(
+    string PreviousText, string EditedBy, DateTimeOffset EditedAt, string? PreviousFrom = null, string? PreviousTo = null);
 
 public sealed record RoleAssignmentDto(
     Guid Id,

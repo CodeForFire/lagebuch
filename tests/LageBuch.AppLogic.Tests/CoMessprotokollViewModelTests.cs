@@ -1258,7 +1258,7 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null, Guid? sectionId = null) =>
         _inner.AddJournalEntry(direction, text, from, to, sectionId);
 
-    public void EditJournalEntry(Guid entryId, string text) => _inner.EditJournalEntry(entryId, text);
+    public void EditJournalEntry(Guid entryId, string text, string? from, string? to) => _inner.EditJournalEntry(entryId, text, from, to);
 
     public void AssignJournalEntrySection(Guid entryId, Guid? sectionId) => _inner.AssignJournalEntrySection(entryId, sectionId);
 

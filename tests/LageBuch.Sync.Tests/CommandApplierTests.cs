@@ -336,20 +336,25 @@ public class CommandApplierTests
                 new OperatorDto("Client", "RUF 1"),
                 EtbDirection.Incoming,
                 "Lagemeldung",
-                null,
+                "Florian 1/44",
                 null),
             incident,
             clock);
         var entry = incident.Journal.Last();
 
         ApplyOverWire(
-            new EditJournalEntryCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Korrigiert"),
+            new EditJournalEntryCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Korrigiert", "Florian 1/46", "ELW 1"),
             incident,
             clock);
 
         var edited = incident.Journal.Single(e => e.Id == entry.Id);
         Assert.Equal("Korrigiert", edited.Text);
-        Assert.Equal("Editor (RUF 2)", Assert.Single(edited.Edits).EditedBy);
+        Assert.Equal("Florian 1/46", edited.From);
+        Assert.Equal("ELW 1", edited.To);
+        var edit = Assert.Single(edited.Edits);
+        Assert.Equal("Editor (RUF 2)", edit.EditedBy);
+        Assert.Equal("Florian 1/44", edit.PreviousFrom);
+        Assert.Null(edit.PreviousTo);
     }
 
     [Fact]
@@ -426,7 +431,7 @@ public class CommandApplierTests
 
         Assert.Throws<InvalidOperationException>(() =>
             ApplyOverWire(
-                new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert"),
+                new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert", null, null),
                 incident,
                 clock));
     }

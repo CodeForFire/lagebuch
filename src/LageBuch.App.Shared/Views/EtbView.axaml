@@ -71,10 +71,10 @@
     <Style Selector="StackPanel#EditFields">
       <Setter Property="Orientation" Value="Horizontal" />
     </Style>
-    <Style Selector="AutoCompleteBox#FromBox">
+    <Style Selector="AutoCompleteBox#FromBox, AutoCompleteBox#EditFromBox">
       <Setter Property="Width" Value="150" />
     </Style>
-    <Style Selector="AutoCompleteBox#ToBox">
+    <Style Selector="AutoCompleteBox#ToBox, AutoCompleteBox#EditToBox">
       <Setter Property="Width" Value="150" />
     </Style>
     <Style Selector="ctrl|NodeChoicePicker#SectionEntryPicker">
@@ -113,10 +113,10 @@
     </Style>
 
     <!-- The dock stacks. -->
-    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#FromBox">
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#FromBox, Panel#WorkspaceRoot.narrow AutoCompleteBox#EditFromBox">
       <Setter Property="Width" Value="NaN" />
     </Style>
-    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#ToBox">
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#ToBox, Panel#WorkspaceRoot.narrow AutoCompleteBox#EditToBox">
       <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow ctrl|NodeChoicePicker#SectionEntryPicker">
@@ -313,6 +313,28 @@
             b:Overlay.InitialFocus="{Binding #EditTextBox}" b:Overlay.FallbackFocus="{Binding #EtbTextBox}">
       <StackPanel Spacing="6">
         <StackPanel x:Name="EditFields" Spacing="8">
+          <!-- VON and AN correct a misheard Funkrufname; the same suggestion boxes as the dock's,
+               in the dock's order. Written with SPEICHERN, empty clears the field. -->
+          <HeaderedContentControl Classes="field suggest" Header="VON">
+            <AutoCompleteBox x:Name="EditFromBox" MaxLength="{x:Static etb:EtbEntry.MaxPartyLength}"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             Text="{Binding EditFrom}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field suggest" Header="AN">
+            <AutoCompleteBox x:Name="EditToBox" MaxLength="{x:Static etb:EtbEntry.MaxPartyLength}"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             Text="{Binding EditTo}" />
+          </HeaderedContentControl>
+          <!-- Set, change or remove the entry's Einsatzabschnitt (#971); written with SPEICHERN. -->
+          <HeaderedContentControl Classes="field" Header="ABSCHNITT" IsVisible="{Binding HasEditSectionChoices}">
+            <ctrl:NodeChoicePicker x:Name="EditSectionPicker" Width="200"
+                                   Choices="{Binding EditSectionChoices}" Label="{Binding EditSectionLabel}"
+                                   PickerName="Abschnitt des Eintrags wählen" />
+          </HeaderedContentControl>
           <HeaderedContentControl Classes="field required" Header="EINTRAG"
                                     Classes.invalid="{Binding EditTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
@@ -320,12 +342,6 @@
                  handling, so it saved the correction while the Textbaustein list still claimed Enter. -->
             <TextBox x:Name="EditTextBox" Text="{Binding EditText}" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
                      b:EnterSubmit.Command="{Binding SaveEditCommand}" />
-          </HeaderedContentControl>
-          <!-- Set, change or remove the entry's Einsatzabschnitt (#971); written with SPEICHERN. -->
-          <HeaderedContentControl Classes="field" Header="ABSCHNITT" IsVisible="{Binding HasEditSectionChoices}">
-            <ctrl:NodeChoicePicker x:Name="EditSectionPicker" Width="200"
-                                   Choices="{Binding EditSectionChoices}" Label="{Binding EditSectionLabel}"
-                                   PickerName="Abschnitt des Eintrags wählen" />
           </HeaderedContentControl>
           <Button x:Name="SaveEditButton" Classes="signal dock-action" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
@@ -354,24 +370,16 @@
           <TextBlock Grid.Column="0" Text="Verlauf" Classes="overline" VerticalAlignment="Center" />
           <Button Grid.Column="1" Content="SCHLIESSEN" Command="{Binding CloseHistoryCommand}" />
         </Grid>
-        <ItemsControl x:Name="HistoryList" ItemsSource="{Binding HistoryEntry.Edits}">
+        <ItemsControl x:Name="HistoryList" ItemsSource="{Binding HistoryEntry.HistoryLines}">
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="etb:EtbEntryEdit">
+            <DataTemplate x:DataType="x:String">
               <!-- No Foreground here (#438): "mono" already paints TextSecondary, and the inline
                    override these rows used to carry pushed them down to TextMuted — a
                    semi-transparent token (#65728580, ~40% alpha) meant for disabled text, which
                    over the panel's #0F141D lands at roughly 1,9:1 against WCAG AA's 4,5:1. These
                    rows are the audit trail this panel exists for: the previous wording, who
                    rewrote it and when. Same fix as the Übergabe heading in #436. -->
-              <TextBlock Classes="mono" Margin="0,2" TextWrapping="Wrap">
-                <TextBlock.Text>
-                  <MultiBinding StringFormat="{}{0}: „{1}“ ({2})">
-                    <Binding Path="EditedAt" />
-                    <Binding Path="PreviousText" />
-                    <Binding Path="EditedBy" />
-                  </MultiBinding>
-                </TextBlock.Text>
-              </TextBlock>
+              <TextBlock Classes="mono" Margin="0,2" TextWrapping="Wrap" Text="{Binding}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>

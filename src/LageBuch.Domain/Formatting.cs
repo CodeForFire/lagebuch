@@ -118,6 +118,21 @@ public static class Formatting
     public static string OrDash(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "—" : value;
 
+    /// <summary>
+    /// What the edit at <paramref name="index"/> replaced: "„Lage“", or, when it changed Von or
+    /// An, "Von Florian 1/44 an ELW 1, „Lage“". Shared by the Verlauf and the PDF so the two never
+    /// tell a rewrite differently.
+    /// </summary>
+    public static string EtbPriorVersion(Etb.EtbEntry entry, int index)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        var edit = entry.Edits[index];
+        var parties = entry.EditChangedParties(index)
+            ? $"Von {OrDash(edit.PreviousFrom)} an {OrDash(edit.PreviousTo)}, "
+            : string.Empty;
+        return $"{parties}„{edit.PreviousText}“";
+    }
+
     // "Straße Hausnr., Ortsteil, PLZ Ort" with blank parts dropped, in the order of a German
     // postal address; null when nothing is set. Shared by the workspace header and the PDF
     // header so the two never render the address differently.

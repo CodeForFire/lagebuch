@@ -363,7 +363,7 @@ public class CoMeasurementTests
         var measurement = incident.Journal.Last();
 
         Assert.Throws<InvalidOperationException>(() =>
-            incident.EditJournalEntry(clock, op, measurement.Id, "45 ppm war falsch"));
+            incident.EditJournalEntry(clock, op, measurement.Id, "45 ppm war falsch", measurement.From, measurement.To));
     }
 
     // Widening the enum must not widen what a forged synced command can push through: the

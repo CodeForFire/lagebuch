@@ -233,7 +233,7 @@ public class IncidentRoundTripTests : IDisposable
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung", from: "ILS");
         clock.Now = clock.Now.AddMinutes(5);
         var editor = new SessionOperator("Schmidt");
-        incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert");
+        incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert", entry.From, entry.To);
 
         IncidentRepository.Save(_path, incident);
         var loaded = IncidentRepository.Load(_path);
@@ -247,6 +247,26 @@ public class IncidentRoundTripTests : IDisposable
 
         // An entry with no edits still round-trips with an empty (not null) history.
         Assert.Empty(loaded.Journal.Single(e => e.Text == "Einsatz begonnen").Edits);
+    }
+
+    [Fact]
+    public void An_etb_entrys_edited_von_and_an_and_their_prior_values_survive_a_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lage", from: "Florian 1/44", to: "ELW 1");
+        incident.EditJournalEntry(clock, op, entry.Id, "Lage", "Florian 1/46", null);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var reloaded = loaded.Journal.Single(e => e.Id == entry.Id);
+        Assert.Equal("Florian 1/46", reloaded.From);
+        Assert.Null(reloaded.To);
+        var historyEntry = Assert.Single(reloaded.Edits);
+        Assert.Equal("Florian 1/44", historyEntry.PreviousFrom);
+        Assert.Equal("ELW 1", historyEntry.PreviousTo);
     }
 
     [Fact]
