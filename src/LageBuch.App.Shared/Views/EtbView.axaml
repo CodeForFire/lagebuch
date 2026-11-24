@@ -92,6 +92,10 @@
     <Style Selector="TextBox#EditTextBox">
       <Setter Property="Width" Value="420" />
     </Style>
+    <!-- Wide enough for "Atemschutz Trupp 2" plus the count, and still one line on a phone. -->
+    <Style Selector="TextBox#EtbSearchBox">
+      <Setter Property="Width" Value="300" />
+    </Style>
 
     <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#DockFields">
       <Setter Property="Orientation" Value="Vertical" />
@@ -140,10 +144,36 @@
        by TabIndex in the order it appears on screen. -->
   <DockPanel KeyboardNavigation.TabNavigation="Local">
     <!-- No EINSATZTAGEBUCH heading: the ETB's tab names it. A WrapPanel rather than fixed
-         columns, so on a phone the four controls wrap onto more lines instead of overflowing. -->
+         columns, so on a phone the five controls wrap onto more lines instead of overflowing. -->
     <WrapPanel DockPanel.Dock="Top" x:Name="EtbHeaderActions" Orientation="Horizontal" HorizontalAlignment="Right"
                ItemSpacing="12" LineSpacing="6" Margin="0,0,0,14"
                KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
+      <!-- The search, built like the Beteiligte one (#831): every typed word has to appear in the
+           Eintrag, Von, An, Abschnitt or Erfasst von. A long Einsatz runs to hundreds of entries, and this is
+           how one of them is found again while the next is being taken down. -->
+      <TextBox x:Name="EtbSearchBox" VerticalAlignment="Center"
+               Text="{Binding FilterText}"
+               PlaceholderText="Eintrag, Von, An, Abschnitt, Erfasst von"
+               AutomationProperties.Name="ETB durchsuchen">
+        <TextBox.InnerLeftContent>
+          <PathIcon Width="14" Height="14" Margin="10,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"
+                    Data="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+        </TextBox.InnerLeftContent>
+        <TextBox.InnerRightContent>
+          <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsFiltered}">
+            <TextBlock x:Name="EtbMatchCountText" Classes="mono" FontSize="12" VerticalAlignment="Center"
+                       Text="{Binding MatchCountText}" />
+            <Button x:Name="ClearEtbSearchButton" Classes="icon-btn" ToolTip.Tip="Suche zurücksetzen"
+                    AutomationProperties.Name="Suche zurücksetzen"
+                    Command="{Binding ClearFilterCommand}">
+              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </Button>
+          </StackPanel>
+        </TextBox.InnerRightContent>
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
       <!-- The Buchstabier-Helfer (#592), for a name that has to be spelled over the radio. Up here
            rather than in the dock: it is wanted while reading the journal too, and the dock's row
            is already as wide as a desktop window allows. -->
@@ -482,6 +512,14 @@
           </ItemsControl>
         </ScrollViewer>
       </Border>
+
+      <!-- Over both layouts, below the grid's header row: an empty list mid-keystroke has to say it
+           is the search that found nothing, not that the ETB is empty. -->
+      <TextBlock x:Name="EtbNoMatchesText" Text="{Binding NoMatchesMessage}"
+                 Margin="16,48,16,0" HorizontalAlignment="Center" VerticalAlignment="Top"
+                 TextWrapping="Wrap" IsHitTestVisible="False"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 IsVisible="{Binding ShowNoMatches}" />
     </Panel>
   </DockPanel>
 </UserControl>

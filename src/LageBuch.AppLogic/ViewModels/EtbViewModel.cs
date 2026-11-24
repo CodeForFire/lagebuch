@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -73,6 +74,16 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         Entries = new ObservableCollection<EtbEntryRow>();
         FilterChoices = new ObservableCollection<EtbSectionChoice>();
 
+        // A new entry arriving during a search moves the count. Not counted without a search: the
+        // count is a pass over every row, and nothing shows it then.
+        Entries.CollectionChanged += (_, _) =>
+        {
+            if (IsFiltered)
+            {
+                RaiseSearchResult();
+            }
+        };
+
         // Any change to the incident — from this tab, another tab, or (when joined) another device —
         // brings the journal up to date through the same path.
         _session.Changed += Sync;
@@ -116,6 +127,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             }
         }
 
+        var edited = false;
         foreach (var entry in journal)
         {
             if (!_byId.TryGetValue(entry.Id, out var current)
@@ -126,6 +138,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
             refiled |= current.SectionId != entry.SectionId;
             current.Update(entry);
+            edited = true;
 
             if (EditingEntry?.Id == entry.Id)
             {
@@ -147,7 +160,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             }
         }
 
-        if (marked && ShowOnlySituationReports)
+        // An edit can make a row match the search, or stop matching it.
+        if ((marked && ShowOnlySituationReports) || (edited && IsFiltered))
         {
             ReconcileVisible();
         }
@@ -361,9 +375,57 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 
     partial void OnShowOnlySituationReportsChanged(bool value) => ReconcileVisible();
 
+    /// <summary>
+    /// The ETB search: a row shows only when <em>every</em> whitespace-separated term appears in its
+    /// Eintrag, Von, An, Erfasst von or Abschnitt, ordinal and case-insensitive like the Beteiligte
+    /// search (#831). It narrows what the checkboxes and the Abschnitt filter already let through,
+    /// never widens it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFiltered))]
+    [NotifyPropertyChangedFor(nameof(NoMatchesMessage))]
+    private string _filterText = string.Empty;
+
+    // FilterText split once per keystroke, so Sync() does not split it again for every new row.
+    private string[] _terms = [];
+
+    public bool IsFiltered => _terms.Length > 0;
+
+    /// <summary>Shown in place of the list when the search left nothing, so it does not look empty.</summary>
+    public bool ShowNoMatches => IsFiltered && Entries.Count == 0;
+
+    public string NoMatchesMessage => $"Keine Einträge passen zu „{FilterText.Trim()}“.";
+
+    /// <summary>
+    /// "2 von 35": how far the search narrowed the list. The whole is what the checkboxes and the
+    /// Abschnitt filter let through, so hidden Systemmeldungen and Messwerte do not count towards it.
+    /// </summary>
+    public string MatchCountText =>
+        string.Create(CultureInfo.InvariantCulture, $"{Entries.Count} von {_all.Count(PassesFilters)}");
+
+    partial void OnFilterTextChanged(string value)
+    {
+        _terms = value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        ReconcileVisible();
+    }
+
+    private void RaiseSearchResult()
+    {
+        OnPropertyChanged(nameof(MatchCountText));
+        OnPropertyChanged(nameof(ShowNoMatches));
+    }
+
+    [RelayCommand]
+    private void ClearFilter() => FilterText = string.Empty;
+
     // In place, never Clear()+re-add: a Reset takes the grid's selected row and focus with it (#542).
-    private void ReconcileVisible() =>
+    // A checkbox can move the count's whole without moving a visible row, so the count is raised
+    // here too, not only when Entries changes.
+    private void ReconcileVisible()
+    {
         RowReconciler.Reconcile(Entries, VisibleNewestFirst(), r => r.Id, r => r.Id, r => r, (_, _) => { });
+        RaiseSearchResult();
+    }
 
     private List<EtbEntryRow> VisibleNewestFirst()
     {
@@ -380,7 +442,10 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         return visible;
     }
 
-    private bool IsVisible(EtbEntryRow row) =>
+    private bool IsVisible(EtbEntryRow row) => PassesFilters(row) && MatchesSearch(row);
+
+    // The checkboxes and the Abschnitt filter: what the search then narrows further.
+    private bool PassesFilters(EtbEntryRow row) =>
         !IsHiddenByKind(row)
         && (!ShowOnlySituationReports || row.SituationReportNumber is not null)
         && (SectionFilter is null || row.SectionId == SectionFilter);
@@ -388,6 +453,23 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // The two "ausblenden" checkboxes, each taking only its own kind of line (#972).
     private bool IsHiddenByKind(EtbEntryRow row) =>
         (HideSystemEntries && row.IsSystem) || (HideMeasurementEntries && row.IsMeasurement);
+
+    private bool MatchesSearch(EtbEntryRow row)
+    {
+        foreach (var term in _terms)
+        {
+            if (!Contains(row.Text, term) && !Contains(row.From, term) && !Contains(row.To, term)
+                && !Contains(row.EnteredBy, term) && !Contains(row.SectionName, term))
+            {
+                return false;
+            }
+        }
+
+        return true;
+
+        static bool Contains(string? field, string term) =>
+            field is not null && field.Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
 
     // The dock and the edit panel below the grid are two separate forms, so each keeps its own
     // "the operator has asked" state: pressing one must not light up a field in the other (#412).

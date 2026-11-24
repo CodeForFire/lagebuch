@@ -128,6 +128,10 @@ public class ReadingOrderTabTests
         window.Tab();
         window.AssertFocused(Named<TabItem>(content, "JournalTab"));
 
+        // The header reads left to right: the search first, then BUCHSTABIEREN.
+        window.Tab();
+        window.AssertFocused(Named<TextBox>(content, "EtbSearchBox"));
+
         window.Tab();
         window.AssertFocused(Named<Button>(content, "OpenSpellingHelperButton"));
     }
@@ -142,7 +146,8 @@ public class ReadingOrderTabTests
 
         // Shift+Tab used to resolve the rail to the very control it started on, and went nowhere.
         // The module's first control is now the ETB's own open tab (#592).
-        FocusByTab(Named<Button>(content, "OpenSpellingHelperButton"));
+        // The ETB's first control after its tabs is the search.
+        FocusByTab(Named<TextBox>(content, "EtbSearchBox"));
         window.ShiftTab();
         window.AssertFocused(Named<TabItem>(content, "JournalTab"));
 
