@@ -180,7 +180,8 @@ public class AutomationPropertiesTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var buttons = IconButtons(view);
+        // The grid only: the search's clear button is checked by the ETB search test.
+        var buttons = IconButtons(view.GetControl<DataGrid>("EtbGrid"));
         Assert.Equal(3, buttons.Count); // Bearbeiten, Verlauf (bearbeitet), Aufgabe erstellen
         foreach (var button in buttons)
         {

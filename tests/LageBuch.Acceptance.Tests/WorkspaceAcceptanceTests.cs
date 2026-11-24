@@ -797,6 +797,63 @@ public class WorkspaceAcceptanceTests
             f => string.Equals(f.Header as string, "RICHTUNG", StringComparison.Ordinal));
     }
 
+    // Typing into the ETB search narrows the rendered grid, and a search that finds nothing says
+    // so instead of leaving an empty list. Doubles as the PR before/after screenshot capture.
+    [AvaloniaFact]
+    public void Typing_into_the_etb_search_narrows_the_grid_and_names_an_empty_result()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.AddJournalEntry(EtbDirection.Incoming, "Atemschutz Trupp Nord vor", from: "Abschnitt Nord");
+        session.AddJournalEntry(EtbDirection.Incoming, "Wasserversorgung steht", from: "Wassertrupp");
+        session.AddJournalEntry(EtbDirection.Incoming, "Atemschutz Trupp Nord zurück", from: "Abschnitt Nord");
+        var view = new EtbView { DataContext = vm.Etb };
+        var window = new Window { Content = view, Width = 1280, Height = 700 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        SaveFrame(window, Path.Join(dir, "etb-search-before.png"));
+
+        var search = view.GetControl<TextBox>("EtbSearchBox");
+        var grid = view.GetControl<DataGrid>("EtbGrid");
+        var noMatches = view.GetControl<TextBlock>("EtbNoMatchesText");
+        Assert.False(noMatches.IsVisible);
+
+        search.Focus();
+        window.Type("trupp nord");
+
+        Assert.Equal("trupp nord", vm.Etb.FilterText);
+        Assert.Equal(2, Rows(grid).Count());
+        Assert.True(view.GetControl<TextBlock>("EtbMatchCountText").IsEffectivelyVisible);
+        Assert.Equal("Suche zurücksetzen", Avalonia.Automation.AutomationProperties.GetName(view.GetControl<Button>("ClearEtbSearchButton")));
+        SaveFrame(window, Path.Join(dir, "etb-search-after.png"));
+
+        window.Type(" drehleiter");
+
+        Assert.Empty(Rows(grid));
+        Assert.True(noMatches.IsVisible);
+        SaveFrame(window, Path.Join(dir, "etb-search-none.png"));
+
+        window.Press(Avalonia.Input.PhysicalKey.Escape);
+
+        Assert.Equal(string.Empty, vm.Etb.FilterText);
+        Assert.Equal(3, Rows(grid).Count());
+
+        static void SaveFrame(Window window, string path)
+        {
+            var frame = window.CaptureRenderedFrame();
+            Assert.NotNull(frame);
+            using (frame)
+            {
+                frame.SavePng(path);
+            }
+        }
+
+        static IEnumerable<EtbEntryRow> Rows(DataGrid grid) =>
+            Assert.IsAssignableFrom<IEnumerable<EtbEntryRow>>(grid.ItemsSource);
+    }
+
     // The Funktionen tab had no UI-level coverage at all before issue #17 widened it.
     [AvaloniaFact]
     public void Assigning_a_function_via_the_ui_fills_the_grid_and_stamps_von()
