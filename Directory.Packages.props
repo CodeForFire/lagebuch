@@ -29,7 +29,7 @@
     <PackageVersion Include="PdfPig" Version="0.1.16" />
     <PackageVersion Include="QuestPDF" Version="2026.9.2" />
     <!-- Already shipped by Avalonia.Skia; referenced directly so the map can ask a picture's codec its size before decoding (RasterOverlayCache). Keep on the version Avalonia.Skia resolves. -->
-    <PackageVersion Include="SkiaSharp" Version="3.119.4" />
+    <PackageVersion Include="SkiaSharp" Version="4.156.1" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.3.180" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
