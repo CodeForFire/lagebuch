@@ -77,4 +77,19 @@ public class LocalSessionTaskTests
         Assert.Equal(dueBefore.AddMinutes(5), session.Incident.Tasks[0].DueAt);
         Assert.True(changed);
     }
+
+    [Fact]
+    public void SetTaskTimer_applies_saves_and_raises_changed()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        var changed = false;
+        session.Changed += () => changed = true;
+
+        session.SetTaskTimer(session.Incident.Tasks[0].Id, 7);
+
+        Assert.Equal(T0.AddMinutes(7), session.Incident.Tasks[0].DueAt);
+        Assert.True(changed);
+    }
 }

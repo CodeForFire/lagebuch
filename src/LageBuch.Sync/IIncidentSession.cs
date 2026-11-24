@@ -252,6 +252,10 @@ public interface IIncidentSession
     /// <summary>Adds minutes to a task's due time (#246 "+5" quick action).</summary>
     void ExtendTaskTimer(Guid taskId, int minutes);
 
+    /// <summary>Sets the time until a task's reminder to minutes from now (#964): shorter or longer
+    /// than before, and on a task that had no timer too.</summary>
+    void SetTaskTimer(Guid taskId, int minutes);
+
     /// <summary>
     /// Registers a Trupp. Unlike the other mutations this one is awaited, because the host can refuse
     /// it for a reason the sender's form cannot see — a Truppnummer or numbered Funkrufname a peer took

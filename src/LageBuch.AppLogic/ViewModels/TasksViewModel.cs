@@ -310,7 +310,24 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
     [NotifyCanExecuteChangedFor(nameof(SaveEditCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExtendEditingTimerCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SetEditingTimerCommand))]
     private TaskRow? _editingTask;
+
+    // Quiet until SETZEN (or SPEICHERN with a typed time) is pressed, like the text.
+    private bool _editTimerErrorShown;
+
+    // What the minutes box was last filled with, so SPEICHERN applies only a time someone typed:
+    // the countdown runs on while the panel is open, and an untouched box must not reset it.
+    private int? _editTimerPrefill;
+
+    /// <summary>
+    /// The minutes until the reminder, typed into the panel (#964). Opens on the minutes left,
+    /// rounded up, and empty when there is no timer or it has already run out.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EditTimerMinutesError))]
+    [NotifyPropertyChangedFor(nameof(EditErrorSummary))]
+    private int? _editTimerMinutes;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EditTextError))]
@@ -333,7 +350,32 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         _editErrorsShown && string.IsNullOrWhiteSpace(EditText) ? ValidationMessages.Required : null;
 
     /// <summary>Everything the edit panel is still waiting on, on one line beneath its fields (#412).</summary>
-    public string? EditErrorSummary => ValidationMessages.Summarize(EditTextError);
+    public string? EditErrorSummary => ValidationMessages.Summarize(EditTextError, EditTimerMinutesError);
+
+    /// <summary>Whether the minutes box holds no usable time, once SETZEN has been pressed (#964).</summary>
+    public string? EditTimerMinutesError =>
+        _editTimerErrorShown && !IsUsableTimer(EditTimerMinutes) ? ValidationMessages.ReminderMinutes : null;
+
+    private static bool IsUsableTimer(int? minutes) => minutes is >= 1 and <= IncidentTask.MaxTimerMinutes;
+
+    // The minutes left on the task, rounded up so a box that says 11 never rings in ten and a half.
+    private int? RemainingMinutes(Guid taskId)
+    {
+        var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == taskId);
+        if (task is null || task.DueAt == DateTimeOffset.MaxValue)
+        {
+            return null;
+        }
+
+        var left = task.DueAt - _clock.Now;
+        return left > TimeSpan.Zero ? (int)Math.Ceiling(left.TotalMinutes) : null;
+    }
+
+    private void PrefillTimer(Guid taskId)
+    {
+        _editTimerPrefill = RemainingMinutes(taskId);
+        EditTimerMinutes = _editTimerPrefill;
+    }
 
     // A done task is history, as on the ETB: reopen it first.
     private bool CanEdit(TaskRow row) => !IsReadOnly && !row.IsDone;
@@ -344,6 +386,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         EditAssignee = string.IsNullOrEmpty(row.Assignee) ? null : row.Assignee;
         EditImportance = row.Importance;
         EditUrgency = row.Urgency;
+        PrefillTimer(row.Id);
         ShowEditErrors(false); // a freshly opened panel starts quiet
         EditingTask = row;
         SelectedTask = row; // the grid's selection marks the row the panel is about
@@ -354,8 +397,11 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     [RelayCommand(CanExecute = nameof(CanSaveEdit))]
     private void SaveEdit()
     {
-        ShowEditErrors(true);
-        if (EditTextError is not null || EditingTask is not { } row)
+        // A time typed but not yet SETZEN-ed goes with the save, rather than vanishing with the panel.
+        var timerTyped = EditTimerMinutes != _editTimerPrefill;
+        var timer = timerTyped ? EditTimerMinutes : null;
+        ShowEditErrors(true, showTimerError: timerTyped);
+        if (EditTextError is not null || EditTimerMinutesError is not null || EditingTask is not { } row)
         {
             return;
         }
@@ -375,6 +421,12 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
             _session.UpdateTask(row.Id, text, assignee, importance, urgency);
             _onChanged();
         }
+
+        if (timer is { } minutes)
+        {
+            _session.SetTaskTimer(row.Id, minutes);
+            _onChanged();
+        }
     }
 
     [RelayCommand]
@@ -383,10 +435,35 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         EditingTask = null;
         EditText = string.Empty;
         EditAssignee = null;
+        EditTimerMinutes = null;
+        _editTimerPrefill = null;
         ShowEditErrors(false);
     }
 
     private bool CanExtendEditingTimer => !IsReadOnly && EditingTask is { HasTimer: true, IsDone: false };
+
+    // Unlike +5 MIN this needs no timer to start from: typing one gives the task its first.
+    private bool CanSetEditingTimer => !IsReadOnly && EditingTask is { IsDone: false };
+
+    /// <summary>
+    /// The panel's SETZEN (#964): replaces the time until the reminder with the typed minutes,
+    /// counted from now, shorter or longer than before. An action like +5 MIN, so it applies at once
+    /// and leaves the panel open; a box with no usable time says so and changes nothing.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSetEditingTimer))]
+    private void SetEditingTimer()
+    {
+        ShowEditErrors(_editErrorsShown, showTimerError: true);
+        if (EditingTask is not { } row || EditTimerMinutes is not { } minutes || !IsUsableTimer(minutes))
+        {
+            return;
+        }
+
+        _session.SetTaskTimer(row.Id, minutes);
+        _onChanged();
+        _editTimerPrefill = minutes; // what the box says is now what is set
+        ShowEditErrors(_editErrorsShown, showTimerError: false);
+    }
 
     /// <summary>
     /// The panel's +5 MIN: an action rather than a field, so it applies at once and leaves the
@@ -402,12 +479,15 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
 
         _session.ExtendTaskTimer(row.Id, ExtendMinutes);
         _onChanged();
+        PrefillTimer(row.Id); // the box follows, so a SPEICHERN after it does not take the time back
     }
 
-    private void ShowEditErrors(bool shown)
+    private void ShowEditErrors(bool shown, bool showTimerError = false)
     {
         _editErrorsShown = shown;
+        _editTimerErrorShown = showTimerError;
         OnPropertyChanged(nameof(EditTextError));
+        OnPropertyChanged(nameof(EditTimerMinutesError));
         OnPropertyChanged(nameof(EditErrorSummary));
     }
 
@@ -649,6 +729,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         }
 
         ExtendEditingTimerCommand.NotifyCanExecuteChanged();
+        SetEditingTimerCommand.NotifyCanExecuteChanged();
         RefreshHeader();
     }
 
@@ -695,7 +776,7 @@ public sealed partial class TaskRow : ObservableObject
         CreatedDisplay = SourceOf(session, task) is { } source
             ? $"{Formatting.Timestamp(task.CreatedAt)} · {task.CreatedBy} · aus ETB {Formatting.TimeOfDay(source.Timestamp)}"
             : $"{Formatting.Timestamp(task.CreatedAt)} · {task.CreatedBy}";
-        HasTimer = task.DueAt != DateTimeOffset.MaxValue;
+        _hasTimer = task.DueAt != DateTimeOffset.MaxValue;
         _text = task.Text;
         _assignee = task.Assignee;
         _importance = task.Importance;
@@ -734,6 +815,7 @@ public sealed partial class TaskRow : ObservableObject
         Assignee = task.Assignee;
         Importance = task.Importance;
         Urgency = task.Urgency;
+        HasTimer = task.DueAt != DateTimeOffset.MaxValue; // SETZEN can give a task its first (#964)
         CompletedDisplay = CompletedDisplayOf(task);
         IsOverdue = IsOverdueAt(task, now);
         RemainingDisplay = ComputeRemaining(task, now);
@@ -760,7 +842,8 @@ public sealed partial class TaskRow : ObservableObject
     public string CreatedDisplay { get; }
 
     /// <summary>Whether the task runs on a timer at all; +5 MIN has nothing to extend otherwise.</summary>
-    public bool HasTimer { get; }
+    [ObservableProperty]
+    private bool _hasTimer;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ImportanceLabel))]

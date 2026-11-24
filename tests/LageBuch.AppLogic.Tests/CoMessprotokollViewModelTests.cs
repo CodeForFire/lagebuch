@@ -1422,6 +1422,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void ExtendTaskTimer(Guid taskId, int minutes) => _inner.ExtendTaskTimer(taskId, minutes);
 
+    public void SetTaskTimer(Guid taskId, int minutes) => _inner.SetTaskTimer(taskId, minutes);
+
     /// <summary>Thrown by the next registration without applying it: the host refused it, or it
     /// never reached the host.</summary>
     public Exception? RefuseNextScbaTrupp { get; set; }

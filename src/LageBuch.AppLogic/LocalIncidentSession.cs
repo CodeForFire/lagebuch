@@ -311,6 +311,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void ExtendTaskTimer(Guid taskId, int minutes) =>
         Mutate(() => Incident.ExtendTaskTimer(taskId, minutes, _clock));
 
+    public void SetTaskTimer(Guid taskId, int minutes) =>
+        Mutate(() => Incident.SetTaskTimer(taskId, minutes, _clock));
+
     // Synchronous underneath: a duplicate throws before the caller's await, exactly as it did when
     // this returned void, and nothing here waits on I/O the token could cancel.
     public Task AddScbaTruppAsync(
