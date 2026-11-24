@@ -1420,7 +1420,7 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void ExtendTaskTimer(Guid taskId, int minutes) => _inner.ExtendTaskTimer(taskId, minutes);
 
-    public void AddScbaTrupp(
+    public Task AddScbaTruppAsync(
         string designation,
         IEnumerable<TruppMember> members,
         int entryPressure,
@@ -1429,8 +1429,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
-        _inner.AddScbaTrupp(
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        CancellationToken cancellationToken = default) =>
+        _inner.AddScbaTruppAsync(
             designation,
             members,
             entryPressure,
@@ -1439,7 +1440,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
             task,
             maxDurationMinutes,
             returnPressureBar,
-            pressureControlIntervalMinutes);
+            pressureControlIntervalMinutes,
+            cancellationToken);
 
     public void StartScbaTrupp(Guid truppId) => _inner.StartScbaTrupp(truppId);
 

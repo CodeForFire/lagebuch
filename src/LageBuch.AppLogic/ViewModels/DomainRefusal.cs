@@ -9,7 +9,13 @@ namespace LageBuch.AppLogic.ViewModels;
 public static class DomainRefusal
 {
     /// <summary>"Nicht möglich: " and the refusal's own sentence.</summary>
-    public static string Message(Exception exception)
+    public static string Message(Exception exception) => $"Nicht möglich: {Reason(exception)}";
+
+    /// <summary>
+    /// The refusal's own sentence, without the runtime's suffix. The host answers a peer's refused
+    /// command with this, so a joined device reads what the local one would.
+    /// </summary>
+    public static string Reason(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
@@ -23,6 +29,6 @@ public static class DomainRefusal
             }
         }
 
-        return $"Nicht möglich: {message}";
+        return message;
     }
 }

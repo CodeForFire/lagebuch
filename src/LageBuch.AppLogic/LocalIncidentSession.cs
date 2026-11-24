@@ -308,7 +308,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void ExtendTaskTimer(Guid taskId, int minutes) =>
         Mutate(() => Incident.ExtendTaskTimer(taskId, minutes, _clock));
 
-    public void AddScbaTrupp(
+    // Synchronous underneath: a duplicate throws before the caller's await, exactly as it did when
+    // this returned void, and nothing here waits on I/O the token could cancel.
+    public Task AddScbaTruppAsync(
         string designation,
         IEnumerable<TruppMember> members,
         int entryPressure,
@@ -317,7 +319,9 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
-        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        CancellationToken cancellationToken = default)
+    {
         Mutate(() => Incident.AddScbaTrupp(
             _clock,
             designation,
@@ -329,6 +333,8 @@ public sealed class LocalIncidentSession : IIncidentSession
             maxDurationMinutes,
             returnPressureBar,
             pressureControlIntervalMinutes));
+        return Task.CompletedTask;
+    }
 
     public void StartScbaTrupp(Guid truppId) =>
         Mutate(() => Incident.StartScbaTrupp(_clock, truppId));

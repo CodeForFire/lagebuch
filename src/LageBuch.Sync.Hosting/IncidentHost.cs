@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json.Serialization;
 using LageBuch.AppLogic;
+using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Time;
@@ -365,8 +366,9 @@ public sealed class IncidentHost : IAsyncDisposable
             // id (KeyNotFoundException, e.g. EditJournalEntry/RenameFile/ToggleChecklistItem against
             // a stale or forged id) belongs here too, not just the argument/state guards. Its message
             // only echoes the id the peer sent, so it gets one fixed sentence instead (#602); the
-            // other guards' messages are the German sentences the local UI shows for the same edit.
-            return Results.BadRequest(ex is KeyNotFoundException ? UnknownIdReason : ex.Message);
+            // other guards' messages are the German sentences the local UI shows for the same edit,
+            // without the runtime's English " (Parameter 'x')".
+            return Results.BadRequest(ex is KeyNotFoundException ? UnknownIdReason : DomainRefusal.Reason(ex));
         }
     }
 

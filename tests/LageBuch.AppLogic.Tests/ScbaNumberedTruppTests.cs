@@ -162,7 +162,7 @@ public class ScbaNumberedTruppTests
     // A Trupp registered elsewhere -- a joined client, or the host while this form sits open --
     // moves the suggestion on, as long as nobody typed a number of their own.
     [Fact]
-    public void A_trupp_registered_meanwhile_moves_the_suggestion_on()
+    public async Task A_trupp_registered_meanwhile_moves_the_suggestion_on()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -170,7 +170,7 @@ public class ScbaNumberedTruppTests
         vm.NewDesignation = CsaTrupp;
         Assert.Equal(1, vm.NewTypeNumber);
 
-        session.AddScbaTrupp(
+        await session.AddScbaTruppAsync(
             CsaTrupp,
             TruppMember.Crew("Maier", "Wagner", "Fischer"),
             entryPressure: 300,
@@ -182,7 +182,7 @@ public class ScbaNumberedTruppTests
     // A number somebody typed is theirs: a Trupp registered elsewhere does not overwrite it. The
     // press tells them if it was taken meanwhile.
     [Fact]
-    public void A_number_typed_by_hand_survives_a_trupp_registered_meanwhile()
+    public async Task A_number_typed_by_hand_survives_a_trupp_registered_meanwhile()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -190,30 +190,30 @@ public class ScbaNumberedTruppTests
         vm.NewDesignation = CsaTrupp;
         vm.NewTypeNumber = 5;
 
-        RegisterElsewhere(session, 1);
+        await RegisterElsewhere(session, 1);
 
         Assert.Equal(5, vm.NewTypeNumber);
     }
 
     // The suggestion itself is not "typed by hand": once moved on, it keeps moving.
     [Fact]
-    public void A_suggestion_that_moved_on_keeps_moving()
+    public async Task A_suggestion_that_moved_on_keeps_moving()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
-        RegisterElsewhere(session, 1);
+        await RegisterElsewhere(session, 1);
         using var vm = Vm(clock, session);
         vm.NewDesignation = CsaTrupp;
         Assert.Equal(2, vm.NewTypeNumber);
 
-        RegisterElsewhere(session, 2);
+        await RegisterElsewhere(session, 2);
 
         Assert.Equal(3, vm.NewTypeNumber);
     }
 
     // Another Trupp-Art counts its own numbers, so a number typed for one is forgotten on switching.
     [Fact]
-    public void Switching_the_trupp_art_forgets_a_typed_number()
+    public async Task Switching_the_trupp_art_forgets_a_typed_number()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -224,13 +224,13 @@ public class ScbaNumberedTruppTests
         vm.NewDesignation = CsaTrupp;
         Assert.Equal(1, vm.NewTypeNumber);
 
-        RegisterElsewhere(session, 1);
+        await RegisterElsewhere(session, 1);
 
         Assert.Equal(2, vm.NewTypeNumber);
     }
 
     [Fact]
-    public void Pressing_announces_the_number_error()
+    public async Task Pressing_announces_the_number_error()
     {
         var clock = new FixedClock(T0);
         using var vm = Vm(clock, NewSession(clock));
@@ -243,8 +243,8 @@ public class ScbaNumberedTruppTests
         Assert.Contains(nameof(ScbaViewModel.NewTypeNumberError), raised);
     }
 
-    private static void RegisterElsewhere(LocalIncidentSession session, int number) =>
-        session.AddScbaTrupp(
+    private static Task RegisterElsewhere(LocalIncidentSession session, int number) =>
+        session.AddScbaTruppAsync(
             CsaTrupp,
             TruppMember.Crew("Maier", "Wagner", "Fischer"),
             entryPressure: 300,

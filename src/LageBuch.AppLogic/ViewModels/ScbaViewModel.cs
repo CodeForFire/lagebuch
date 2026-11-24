@@ -561,7 +561,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     /// <summary>
     /// Internally assigned, never user-edited (#217): a hand-typed duplicate crashed
     /// <see cref="Domain.Incident.AddScbaTrupp"/>, so only the constructor,
-    /// <see cref="AddTrupp"/>, and <see cref="RefreshTrupps"/> ever set it. The registration
+    /// <see cref="AddTruppAsync"/>, and <see cref="RefreshTrupps"/> ever set it. The registration
     /// dock does not show it at all (#416) -- a read-only TextBox still took focus and a tab
     /// stop while ignoring every keystroke. The number first becomes visible on the registered
     /// Trupp, through <see cref="Domain.Atemschutz.AtemschutzTrupp.FormatDisplayName"/>.
@@ -836,7 +836,15 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     /// <summary>Whether the Trupp-Art is still missing, once the operator has asked (#412).</summary>
     /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
     public string? ErrorSummary => ValidationMessages.Summarize(
-        NewDesignationError, NewTypeNumberError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError);
+        NewDesignationError, NewTypeNumberError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError, SubmitError);
+
+    /// <summary>
+    /// Why the host refused the last Bereitstellen, or that it never answered. Only a joined device
+    /// gets one: its form cannot see a Truppnummer or Funkrufname a peer took a moment earlier.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
+    private string? _submitError;
 
     public string? NewDesignationError =>
         _errorsShown && string.IsNullOrWhiteSpace(NewDesignation) ? ValidationMessages.Required : null;
@@ -922,8 +930,19 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
                && NewTruppNumber > 0;
     }
 
+    private void RejectSubmit(string reason)
+    {
+        SubmitError = reason;
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
+    }
+
     private void ShowErrors(bool shown)
     {
+        if (!shown)
+        {
+            SubmitError = null;
+        }
+
         _errorsShown = shown;
         OnPropertyChanged(nameof(NewDesignationError));
         OnPropertyChanged(nameof(ErrorSummary));
@@ -942,16 +961,17 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     public event EventHandler<EntrySubmittedEventArgs>? EntrySubmitted;
 
     [RelayCommand(CanExecute = nameof(CanAddTrupp))]
-    private void AddTrupp()
+    private async Task AddTruppAsync()
     {
+        SubmitError = null;
         if (!Validate())
         {
             EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
             return;
         }
 
-        // Compose the ETB line from the inputs, not from a return value — the mutation is
-        // fire-and-forget, and the row itself is rendered by RefreshTrupps on the Changed event.
+        // Compose the ETB line from the inputs, not from a return value; the row itself is rendered
+        // by RefreshTrupps on the Changed event.
         var crew = BuildCrew();
         var membersDisplay = string.Join(" / ", crew.Select(m => m.Name));
         var designation = NewDesignation;
@@ -965,16 +985,34 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         var truppNumber = NewTruppNumber;
         var entryPressure = NewEntryPressure;
         var displayName = AtemschutzTrupp.FormatDisplayName(callSign, designation);
-        _session.AddScbaTrupp(
-            designation,
-            crew,
-            entryPressure,
-            truppNumber,
-            callSign,
-            task: null,
-            maxDurationMinutes: NewMaxDurationMinutes,
-            returnPressureBar: NewReturnPressureBar,
-            pressureControlIntervalMinutes: NewControlIntervalMinutes);
+
+        // Awaited, so a Trupp the host refuses is never logged as bereitgestellt: the ETB is what the
+        // Einsatzbericht reads. The form keeps its input, so the name can be corrected and sent again.
+        try
+        {
+            await _session.AddScbaTruppAsync(
+                designation,
+                crew,
+                entryPressure,
+                truppNumber,
+                callSign,
+                task: null,
+                maxDurationMinutes: NewMaxDurationMinutes,
+                returnPressureBar: NewReturnPressureBar,
+                pressureControlIntervalMinutes: NewControlIntervalMinutes);
+        }
+        catch (CommandRejectedException ex)
+        {
+            RejectSubmit(ex.Message);
+            return;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        {
+            // No answer: the host may have taken the Trupp all the same, which the next Stand shows.
+            RejectSubmit(RemoteIncidentSession.CommandLostReason);
+            return;
+        }
+
         _session.AddJournalEntry(
             EtbDirection.System,
             $"{displayName} bereitgestellt: {membersDisplay}, Einstiegsdruck {entryPressure} bar",

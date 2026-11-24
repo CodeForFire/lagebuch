@@ -2,6 +2,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
@@ -359,6 +360,49 @@ public class WorkspaceCollaborationTests
         Assert.Equal(entry.Id, Assert.Single(hostSession.Incident.Tasks).SourceEntryId);
         Assert.Equal(entry.Id, Assert.Single(client.Incident.Tasks).SourceEntryId);
         Assert.Equal("1 Aufgabe · 1 offen", workspace.Etb.Entries.Single(r => r.Id == entry.Id).TaskBadge);
+    }
+
+    [Fact]
+    public async Task A_trupp_the_host_refuses_leaves_no_bereitgestellt_line_in_the_etb()
+    {
+        // The client's form cannot see the collision: the Funkrufname is free-typed, and only the
+        // host's guard knows "CSA-Trupp 1" is taken (#995).
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        await hostSession.AddScbaTruppAsync("CSA-Trupp", TruppMember.Crew("Anna Beispiel", "Ben Muster", null), 300, callSign: "CSA-Trupp 1");
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        using var workspace = Workspace(client, clock);
+        var form = workspace.Scba;
+        form.NewDesignation = "CSA-Trupp";
+        form.NewCallSign = "CSA-Trupp 1";
+        form.NewTruppfuehrer = "Clara Probe";
+        form.NewTruppmann = "Dana Test";
+
+        await form.AddTruppCommand.ExecuteAsync(null);
+
+        // Commands leave one at a time, in order: once this one is through, so is anything before it.
+        client.AddJournalEntry(EtbDirection.Outgoing, "Kontrolle", "ELW", null);
+        await WaitForClient(
+            client, () => client.Incident.Journal.Any(e => e.Text == "Kontrolle"), "the sentinel entry to reach the client");
+
+        Assert.Single(hostSession.Incident.ScbaTrupps);
+        Assert.DoesNotContain(hostSession.Incident.Journal, e => e.Text.Contains("bereitgestellt", StringComparison.Ordinal));
+        Assert.Equal("CSA-Trupp 1 ist bereits vergeben.", form.ErrorSummary);
+        Assert.Equal("Clara Probe", form.NewTruppfuehrer); // kept for the correction
+
+        form.NewCallSign = "CSA-Trupp 2";
+        await form.AddTruppCommand.ExecuteAsync(null);
+        await WaitForClient(
+            client,
+            () => client.Incident.Journal.Any(e => e.Text.StartsWith("CSA-Trupp 2 bereitgestellt", StringComparison.Ordinal)),
+            "the corrected Trupp's entry to reach the client");
+
+        Assert.Equal(2, hostSession.Incident.ScbaTrupps.Count);
+        Assert.Null(form.ErrorSummary);
     }
 
     [Fact]

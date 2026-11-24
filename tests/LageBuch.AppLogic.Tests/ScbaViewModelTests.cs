@@ -1205,7 +1205,7 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void NewTruppNumber_always_tracks_the_next_free_number_and_never_collides()
+    public async Task NewTruppNumber_always_tracks_the_next_free_number_and_never_collides()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -1214,7 +1214,7 @@ public class ScbaViewModelTests
         // Truppnummer is internal, not user-editable (#217): a hand-typed duplicate used to crash
         // Incident.AddScbaTrupp. Another device (or a different code path) registering a Trupp
         // must re-suggest the next free number rather than leave a stale, now-taken one behind.
-        session.AddScbaTrupp("Wassertrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+        await session.AddScbaTruppAsync("Wassertrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
 
         Assert.Equal(2, vm.NewTruppNumber);
         var row = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");

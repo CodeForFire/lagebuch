@@ -546,7 +546,7 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
-    public void Closing_with_a_trupp_under_air_and_a_geraet_out_names_both()
+    public async Task Closing_with_a_trupp_under_air_and_a_geraet_out_names_both()
     {
         var clock = new FixedClock(T0);
         var session = TestSession.StartNew(
@@ -556,7 +556,7 @@ public class IncidentWorkspaceViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        session.AddScbaTrupp("Angriffstrupp", TruppMember.Crew("Beispiel", "Muster"), entryPressure: 300);
+        await session.AddScbaTruppAsync("Angriffstrupp", TruppMember.Crew("Beispiel", "Muster"), entryPressure: 300);
         session.StartScbaTrupp(session.Incident.ScbaTrupps[0].Id);
         session.IssueItem("AED", "Max Beispiel", null, null, null);
         var vm = new IncidentWorkspaceViewModel(
