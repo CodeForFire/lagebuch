@@ -163,10 +163,12 @@
                   Command="{Binding SpellFieldCommand}" CommandParameter="{Binding Location}" />
         </Grid>
 
+        <!-- The four free-text fields offer the ETB's Textbausteine on "::" (#962); MELDENDER and
+             EINSATZSTELLE are suggest fields, and SnippetCompletion attaches to a TextBox only. -->
         <HeaderedContentControl Classes="field" Header="LAGE">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <TextBox Grid.Column="0" x:Name="SituationBox" Text="{Binding Situation}" IsReadOnly="{Binding !IsEditable}"
-                     TextWrapping="Wrap"
+                     TextWrapping="Wrap" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
                      MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
             <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Top"
                     ToolTip.Tip="Lage buchstabieren" AutomationProperties.Name="Lage buchstabieren"
@@ -177,7 +179,7 @@
         <HeaderedContentControl Classes="field" Header="DURCHGEFÜHRTE MASSNAHMEN">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <TextBox Grid.Column="0" x:Name="MeasuresBox" Text="{Binding Measures}" IsReadOnly="{Binding !IsEditable}"
-                     TextWrapping="Wrap"
+                     TextWrapping="Wrap" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
                      MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
             <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Top"
                     ToolTip.Tip="Maßnahmen buchstabieren" AutomationProperties.Name="Maßnahmen buchstabieren"
@@ -188,7 +190,7 @@
         <HeaderedContentControl Classes="field" Header="EINGESETZTE EINHEITEN">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <TextBox Grid.Column="0" x:Name="UnitsBox" Text="{Binding Units}" IsReadOnly="{Binding !IsEditable}"
-                     TextWrapping="Wrap"
+                     TextWrapping="Wrap" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
                      MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
             <Button Grid.Column="1" x:Name="RefreshUnitsButton" Classes="ghost" VerticalAlignment="Top"
                     IsVisible="{Binding IsEditable}"
@@ -203,7 +205,7 @@
 
         <HeaderedContentControl Classes="field" Header="NACHFORDERUNGEN">
           <TextBox x:Name="RequestsBox" Text="{Binding Requests}" IsReadOnly="{Binding !IsEditable}"
-                   TextWrapping="Wrap"
+                   TextWrapping="Wrap" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
                    MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
         </HeaderedContentControl>
 

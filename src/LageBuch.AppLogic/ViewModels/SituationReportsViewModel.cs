@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.Domain;
 using LageBuch.Domain.SituationReports;
+using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -45,13 +46,16 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
     /// them for VON and AN; none when omitted.</param>
     /// <param name="addresses">The Stammdaten Straßen, each written as an address, offered for the
     /// Einsatzstelle after the Einsatz's own address; none when omitted.</param>
+    /// <param name="textSnippets">The Textbausteine the free-text fields offer on <c>::</c>, the
+    /// ETB's; none when omitted.</param>
     public SituationReportsViewModel(
         IIncidentSession session,
         Action onChanged,
         string dispatchCentreName,
         Action<string, string, Action>? requestConfirm = null,
         IReadOnlyList<string>? callSigns = null,
-        IReadOnlyList<string>? addresses = null)
+        IReadOnlyList<string>? addresses = null,
+        IReadOnlyList<TextSnippet>? textSnippets = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
@@ -63,6 +67,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = callSigns ?? [];
         _addresses = addresses ?? [];
+        TextSnippets = textSnippets ?? [];
         Reports = new ObservableCollection<SituationReportRow>();
         RebuildRows();
 
@@ -86,6 +91,12 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
 
     /// <summary>The Funkrufnamen Meldender suggests; a name outside them can still be typed.</summary>
     public IReadOnlyList<string> CallSignOptions { get; }
+
+    /// <summary>
+    /// What Lage, Maßnahmen, Einheiten and Nachforderungen offer on <c>::</c>: the ETB's
+    /// Textbausteine, since a sent report becomes an ETB entry (#962).
+    /// </summary>
+    public IReadOnlyList<TextSnippet> TextSnippets { get; }
 
     /// <summary>
     /// What the Einsatzstelle suggests: the street in the Einsatzdaten first, as it stands now,
