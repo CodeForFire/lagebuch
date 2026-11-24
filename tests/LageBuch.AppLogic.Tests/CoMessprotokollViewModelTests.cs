@@ -1428,6 +1428,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     /// only its answer was lost.</summary>
     public Exception? LoseNextScbaTruppAnswer { get; set; }
 
+    /// <summary>Run by the next registration before it is applied: what the Lagebuchführer does
+    /// while the press waits for the host.</summary>
+    public Action? WhileNextScbaTruppIsRegistering { get; set; }
+
     public async Task AddScbaTruppAsync(
         string designation,
         IEnumerable<TruppMember> members,
@@ -1440,6 +1444,12 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
         CancellationToken cancellationToken = default)
     {
+        if (WhileNextScbaTruppIsRegistering is { } meanwhile)
+        {
+            WhileNextScbaTruppIsRegistering = null;
+            meanwhile();
+        }
+
         if (RefuseNextScbaTrupp is { } refusal)
         {
             RefuseNextScbaTrupp = null;

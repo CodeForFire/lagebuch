@@ -363,6 +363,10 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     // Intervall, so an id is removed once no longer due, letting the next crossing sound again.
     private readonly HashSet<Guid> _controlDueAnnounced = new();
 
+    // Bereitstellen presses whose answer never came (#995 review), each logged once a Stand shows
+    // its Trupp. A list: the form stays open after one, so a second crew can be lost the same way.
+    private readonly List<ScbaSubmission> _unanswered = new();
+
     // Rückzugsalarm speaks instead of sounding a looping siren (#81), repeating on this cadence
     // while unacknowledged so it stays insistent -- mirrors ReminderViewModel's ILS cue exactly,
     // just at 15s instead of 60s given the life-safety stakes. Reset to null by AcknowledgeAlarm
@@ -395,8 +399,6 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
     private bool _applyingDefault;
 
-    // A Bereitstellen whose answer never came (#995 review): logged once a Stand shows the Trupp.
-    private ScbaSubmission? _unanswered;
     private bool _registering;
 
     public ScbaViewModel(IIncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
@@ -1007,7 +1009,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         {
             // No answer: the host may have taken the Trupp all the same. It is logged the moment a
             // Stand shows it -- possibly one that already arrived during the wait -- and not before.
-            _unanswered = submission;
+            _unanswered.Add(submission);
             _registering = false;
             if (!TryConfirmUnanswered())
             {
@@ -1021,13 +1023,9 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             _registering = false;
         }
 
-        if (_unanswered is { } resent && submission.IsSameTruppAs(resent))
-        {
-            _unanswered = null; // sent again and taken now: logged below, not a second time later
-        }
+        _unanswered.RemoveAll(submission.IsSameTruppAs); // sent again and taken now: logged once, here
 
-        LogBereitgestellt(submission);
-        CompleteSubmit();
+        FinishLogged(submission);
     }
 
     /// <summary>
@@ -1065,22 +1063,54 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     {
         // While a press is on the wire its own Stand is not an answer to the earlier one: the press
         // itself decides once it returns.
-        if (_registering || _unanswered is not { } submission || !_session.Incident.ScbaTrupps.Any(submission.Matches))
+        if (_registering)
         {
             return false;
         }
 
-        _unanswered = null;
-        LogBereitgestellt(submission);
+        var confirmed = _unanswered.Where(s => _session.Incident.ScbaTrupps.Any(s.Matches)).ToList();
 
-        // The Lagebuchführer may have moved on to the next Trupp meanwhile; that input stays.
-        if (CurrentSubmission().IsSameTruppAs(submission))
+        // All out of the list before the first line is written: writing it raises Changed, which
+        // comes back here through RefreshTrupps, and must not find any of them still pending.
+        _unanswered.RemoveAll(confirmed.Contains);
+        foreach (var submission in confirmed)
+        {
+            FinishLogged(submission);
+        }
+
+        return confirmed.Count > 0;
+    }
+
+    /// <summary>
+    /// Writes the "bereitgestellt" line for a Trupp the host took, then clears the form if it still
+    /// holds that Trupp. Anything typed since -- during the wait, or the next crew -- stays.
+    /// </summary>
+    private void FinishLogged(ScbaSubmission submission)
+    {
+        LogBereitgestellt(submission);
+        if (FormHolds(submission))
         {
             CompleteSubmit();
         }
-
-        return true;
+        else
+        {
+            RefreshHeader();
+            _onChanged();
+        }
     }
+
+    // Read from the raw fields, not through BuildCrew: a field emptied meanwhile is a form that has
+    // moved on, not a crew to validate -- TruppMember.Create would throw on it inside Changed.
+    private bool FormHolds(ScbaSubmission submission)
+    {
+        var names = new[] { NewTruppfuehrer, NewTruppmann, RequiresThirdMember ? NewZweiterTruppmann : null }
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => Trimmed(n));
+        return string.Equals(Trimmed(NewDesignation), submission.Designation.Trim(), StringComparison.Ordinal)
+            && string.Equals(string.Join(" / ", names), submission.MembersDisplay, StringComparison.Ordinal);
+    }
+
+    private static string Trimmed(string? value) => value?.Trim() ?? string.Empty;
 
     private void LogBereitgestellt(ScbaSubmission submission) =>
         _session.AddJournalEntry(

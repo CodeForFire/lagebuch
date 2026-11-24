@@ -63,6 +63,7 @@ public class ScbaJoinedRegistrationTests
     public async Task A_refused_trupp_writes_no_etb_line_and_keeps_the_form()
     {
         var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
         joined.RefuseNextScbaTrupp = new CommandRejectedException("CSA-Trupp 1 ist bereits vergeben.");
 
         await vm.AddTruppCommand.ExecuteAsync(null);
@@ -77,6 +78,7 @@ public class ScbaJoinedRegistrationTests
     public async Task Closing_the_form_clears_the_hosts_refusal()
     {
         var (_, joined, vm) = Joined();
+        using var ownedVm = vm;
         joined.RefuseNextScbaTrupp = new CommandRejectedException("CSA-Trupp 1 ist bereits vergeben.");
         await vm.AddTruppCommand.ExecuteAsync(null);
 
@@ -90,6 +92,7 @@ public class ScbaJoinedRegistrationTests
     public async Task A_trupp_the_host_took_is_logged_once_although_its_answer_was_lost()
     {
         var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
         joined.LoseNextScbaTruppAnswer = new HttpRequestException("Verbindung abgebrochen");
 
         await vm.AddTruppCommand.ExecuteAsync(null);
@@ -105,6 +108,7 @@ public class ScbaJoinedRegistrationTests
     public async Task A_lost_answer_is_logged_once_a_stand_shows_the_trupp()
     {
         var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
         joined.RefuseNextScbaTrupp = new OperationCanceledException();
 
         await vm.AddTruppCommand.ExecuteAsync(null);
@@ -123,6 +127,7 @@ public class ScbaJoinedRegistrationTests
     public async Task A_trupp_resent_after_a_lost_answer_is_logged_once()
     {
         var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
         joined.RefuseNextScbaTrupp = new HttpRequestException("Verbindung abgebrochen");
         await vm.AddTruppCommand.ExecuteAsync(null);
 
@@ -137,6 +142,7 @@ public class ScbaJoinedRegistrationTests
     public async Task A_lost_answer_confirmed_later_leaves_the_next_trupp_in_the_form()
     {
         var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
         joined.RefuseNextScbaTrupp = new HttpRequestException("Verbindung abgebrochen");
         await vm.AddTruppCommand.ExecuteAsync(null);
 
@@ -145,5 +151,51 @@ public class ScbaJoinedRegistrationTests
 
         Assert.Single(BereitgestelltLines(host));
         Assert.Equal("Weber", vm.NewTruppfuehrer);
+    }
+
+    [Fact]
+    public async Task A_second_lost_press_does_not_drop_the_first_one()
+    {
+        var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
+        joined.RefuseNextScbaTrupp = new HttpRequestException("Verbindung abgebrochen");
+        await vm.AddTruppCommand.ExecuteAsync(null);
+        Fill(vm, "Weber", "Wagner", "Fischer"); // the next crew, which never reaches the host
+        joined.RefuseNextScbaTrupp = new HttpRequestException("Verbindung abgebrochen");
+        await vm.AddTruppCommand.ExecuteAsync(null);
+
+        await TakenByHost(host); // the first crew did get through
+
+        Assert.Contains("Müller / Schmidt / Huber", Assert.Single(BereitgestelltLines(host)), StringComparison.Ordinal);
+        Assert.Equal("Weber", vm.NewTruppfuehrer); // the second crew is still waiting in the form
+    }
+
+    [Fact]
+    public async Task A_crew_typed_while_the_host_answers_stays_in_the_form()
+    {
+        var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
+        joined.WhileNextScbaTruppIsRegistering = () => Fill(vm, "Weber", "Wagner", "Fischer");
+
+        await vm.AddTruppCommand.ExecuteAsync(null);
+
+        Assert.Single(BereitgestelltLines(host));
+        Assert.Equal("Weber", vm.NewTruppfuehrer);
+        Assert.Equal("Fischer", vm.NewZweiterTruppmann);
+    }
+
+    [Fact]
+    public async Task A_name_emptied_before_the_lost_answer_is_confirmed_neither_throws_nor_is_cleared()
+    {
+        var (host, joined, vm) = Joined();
+        using var ownedVm = vm;
+        joined.RefuseNextScbaTrupp = new HttpRequestException("Verbindung abgebrochen");
+        await vm.AddTruppCommand.ExecuteAsync(null);
+        vm.NewTruppmann = string.Empty;
+
+        await TakenByHost(host);
+
+        Assert.Single(BereitgestelltLines(host));
+        Assert.Equal("Müller", vm.NewTruppfuehrer);
     }
 }
