@@ -268,15 +268,19 @@ public static class SyncProtocol
     /// <c>sectionName</c>, the Einsatzabschnitt an entry is filed under (#971). A host at 45 would
     /// reject the command, and would file a joined device's entry nowhere, so the floor rises to 46.
     /// </para>
+    /// <para>
+    /// 47: a client may send <c>setTaskTimer</c>, the time until an Aufgabe's reminder typed in
+    /// minutes (#964). A host at 46 does not know it, so the floor rises to 47.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 46;
+    public const int ProtocolVersion = 47;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 46;
+    public const int MinimumProtocolVersion = 47;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

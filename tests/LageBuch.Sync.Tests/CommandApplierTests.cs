@@ -507,6 +507,35 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void SetTaskTimer_counts_the_minutes_from_the_hosts_clock()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", null);
+        ApplyOverWire(new AddTaskCommand(op, "X", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30), incident, clock);
+        var taskId = incident.Tasks[0].Id;
+
+        clock.Now = clock.Now.AddMinutes(3);
+        ApplyOverWire(new SetTaskTimerCommand(taskId, 2), incident, clock);
+
+        Assert.Equal(clock.Now.AddMinutes(2), incident.Tasks[0].DueAt);
+    }
+
+    [Fact]
+    public void SetTaskTimer_with_a_negative_minute_count_is_refused()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", null);
+        ApplyOverWire(new AddTaskCommand(op, "X", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30), incident, clock);
+        var task = incident.Tasks[0];
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => ApplyOverWire(new SetTaskTimerCommand(task.Id, -60), incident, clock));
+        Assert.Equal(task.DueAt, incident.Tasks[0].DueAt);
+    }
+
+    [Fact]
     public void Apply_AddCoBuilding_CreatesBuildingAndDwellings()
     {
         var clock = new FixedClock();

@@ -18,9 +18,10 @@ public enum TaskUrgency
 
 /// <summary>
 /// One operational to-do (#88). Immutable like every other aggregate child: completion produces a
-/// replacement via <see cref="WithCompletion"/> rather than mutating. The due time is fixed at
-/// creation (urgency drives the default, the operator may override) — un-checking never restarts
-/// it, so a long-done task re-opened late simply shows as overdue again. <see cref="CreatedBy"/>
+/// replacement via <see cref="WithCompletion"/> rather than mutating. The due time is set at
+/// creation (urgency drives the default, the operator may override) and moves only when someone
+/// moves it (+5 MIN, or a typed time since #964) — un-checking never restarts it, so a long-done
+/// task re-opened late simply shows as overdue again. <see cref="CreatedBy"/>
 /// may be "System" — reserved for machine-created tasks (the ILS reminder is expected to become
 /// one eventually).
 /// </summary>
@@ -29,6 +30,12 @@ public sealed record IncidentTask
     // No operational reason for a longer task line; keeps storage and snapshot footprint bounded
     // (same rationale as EtbEntry.MaxTextLength).
     public const int MaxTextLength = 1000;
+
+    /// <summary>
+    /// The longest time until the reminder that <see cref="WithTimer"/> accepts: a day. Further out
+    /// than that is a typo rather than a plan, and it bounds what a sync peer can send.
+    /// </summary>
+    public const int MaxTimerMinutes = 24 * 60;
 
     private IncidentTask()
     {
@@ -182,6 +189,28 @@ public sealed record IncidentTask
 
         var baseline = DueAt > now ? DueAt : now;
         return this with { DueAt = baseline.AddMinutes(minutes) };
+    }
+
+    /// <summary>Sets the time until the reminder to <paramref name="minutesFromNow"/> (#964), which
+    /// replaces the due time whether it ends up shorter or longer than before. A task without a timer
+    /// gets one. A done task is history, as in the edit panel, so it refuses.</summary>
+    public IncidentTask WithTimer(int minutesFromNow, DateTimeOffset now)
+    {
+        if (minutesFromNow is < 1 or > MaxTimerMinutes)
+        {
+            // German: a joined client reads the host's refusal verbatim.
+            throw new ArgumentOutOfRangeException(
+                nameof(minutesFromNow),
+                minutesFromNow,
+                $"Die Minuten bis zur Erinnerung müssen zwischen 1 und {MaxTimerMinutes} liegen.");
+        }
+
+        if (IsCompleted)
+        {
+            throw new InvalidOperationException("Eine erledigte Aufgabe hat keinen Timer mehr.");
+        }
+
+        return this with { DueAt = now.AddMinutes(minutesFromNow) };
     }
 
     /// <summary>Urgency-driven default for the creation UIs' TIMER (MIN) field (#88).</summary>

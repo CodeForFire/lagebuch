@@ -159,6 +159,33 @@ public class TasksTabRenderTests
         Capture(window, "aufgaben-bearbeiten-phone.png");
     }
 
+    // #964: the time until the reminder is typed into the panel, rather than reached by +5 MIN
+    // six times over, and Enter in the box sets it without closing the panel.
+    [AvaloniaFact]
+    public void Typing_thirty_minutes_in_the_edit_panel_sets_the_reminder()
+    {
+        var (window, vm, session, _, clock) = ShowWorkspace();
+        session.AddTask("Presse-Info vorbereiten", null, TaskImportance.Low, TaskUrgency.Medium, 15);
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        vm.Tasks.Rows.Single().BeginEditCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var box = Named<TextBox>(window, "EditTimerBox");
+        Assert.True(box.IsEffectivelyVisible);
+        Assert.Equal("15", box.Text);
+        Assert.True(Named<Button>(window, "EditSetTimerButton").IsEffectivelyVisible);
+        Assert.True(Named<Button>(window, "EditExtendTimerButton").IsEffectivelyVisible); // +5 MIN stays
+
+        box.Focus();
+        box.Text = string.Empty;
+        window.Type("30");
+        window.Press(Avalonia.Input.PhysicalKey.Enter);
+
+        Assert.Equal(clock.Now.AddMinutes(30), session.Incident.Tasks.Single().DueAt);
+        Assert.Equal("noch 30:00", Named<TextBlock>(window, "EditRemaining").Text);
+        Assert.True(vm.Tasks.IsEditing);
+    }
+
     // The triage scale stands in a row of 36dp fields with SPEICHERN bottom-aligned beside them; a
     // taller scale pushed both buttons below the fields' line. The recent-files ListBoxItem style
     // gives every item a 7dp bottom margin, which the segments must not inherit.

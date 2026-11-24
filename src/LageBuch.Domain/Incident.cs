@@ -2623,6 +2623,23 @@ public sealed class Incident
         return updated;
     }
 
+    /// <summary>Sets the time until a task's reminder to minutes from now (#964). Silent like
+    /// <see cref="ExtendTaskTimer"/>. Unknown ids throw so a replayed command fails loudly.</summary>
+    public IncidentTask SetTaskTimer(Guid taskId, int minutes, IClock clock)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        var index = _tasks.FindIndex(t => t.Id == taskId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Aufgabe {taskId} nicht gefunden.");
+        }
+
+        var updated = _tasks[index].WithTimer(minutes, clock.Now);
+        _tasks[index] = updated;
+        return updated;
+    }
+
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId)
             ?? throw new KeyNotFoundException($"Atemschutz-Trupp {truppId} not found.");

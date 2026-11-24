@@ -66,6 +66,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetTaskCompletedCommand), "setTaskCompleted")]
 [JsonDerivedType(typeof(UpdateTaskCommand), "updateTask")]
 [JsonDerivedType(typeof(ExtendTaskTimerCommand), "extendTaskTimer")]
+[JsonDerivedType(typeof(SetTaskTimerCommand), "setTaskTimer")]
 [JsonDerivedType(typeof(AddCoBuildingCommand), "addCoBuilding")]
 [JsonDerivedType(typeof(UpdateCoBuildingStructureCommand), "updateCoBuildingStructure")]
 [JsonDerivedType(typeof(RemoveCoBuildingCommand), "removeCoBuilding")]
@@ -390,6 +391,10 @@ public sealed record UpdateTaskCommand(
 
 // No operator (silent) -- the "+5" quick action.
 public sealed record ExtendTaskTimerCommand(Guid TaskId, int Minutes) : SyncCommand;
+
+// No operator (silent) -- the time until the reminder, typed (#964). Minutes rather than an
+// absolute DueAt, like AddTaskCommand's TimerMinutes: the host counts them from its own clock.
+public sealed record SetTaskTimerCommand(Guid TaskId, int Minutes) : SyncCommand;
 
 // UndergroundFloorCount defaults to 0 so a pre-#218 payload deserializes as "keine
 // Untergeschosse" instead of failing the contract (same convention as #76's OfficerCount).

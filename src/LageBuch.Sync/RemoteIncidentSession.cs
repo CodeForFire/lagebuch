@@ -641,6 +641,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void ExtendTaskTimer(Guid taskId, int minutes) =>
         Send(new ExtendTaskTimerCommand(taskId, minutes));
 
+    public void SetTaskTimer(Guid taskId, int minutes) =>
+        Send(new SetTaskTimerCommand(taskId, minutes));
+
     // Awaited, under the same deadline the fire-and-forget commands get, so a host that goes silent
     // ends in an exception the form can show instead of a Bereitstellen button that never comes back.
     public async Task AddScbaTruppAsync(
