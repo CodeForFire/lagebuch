@@ -50,6 +50,15 @@ public sealed class Incident
     /// </summary>
     public const string PartnerLeadsNoUnits = "Einsatzleitungen anderer Organisationen führen keine eigenen Einheiten.";
 
+    /// <summary>
+    /// Why an ETB entry cannot be assigned to a Bereitstellung or a partner's Einsatzleitung (#971),
+    /// in German: the ETB is filtered by Einsatzabschnitt, and neither of those is one.
+    /// </summary>
+    public const string OnlyEinsatzabschnitteForEntries = "Ein ETB-Eintrag kann nur einem Abschnitt oder Unterabschnitt zugeordnet werden.";
+
+    /// <summary>Why an app-written ETB line cannot be filed under an Einsatzabschnitt (#971), in German.</summary>
+    public const string AppWrittenEntriesHaveNoSection = "Automatisch erzeugte Einträge werden keinem Abschnitt zugeordnet.";
+
     private readonly Dictionary<string, bool> _navOverrides = new(StringComparer.Ordinal);
     private readonly List<ChecklistList> _checklists = new();
     private readonly List<EtbEntry> _journal = new();
@@ -522,7 +531,8 @@ public sealed class Incident
         string text,
         string? from = null,
         string? to = null,
-        Guid? id = null)
+        Guid? id = null,
+        Guid? sectionId = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -539,10 +549,74 @@ public sealed class Incident
             throw new ArgumentException("Ungültige Richtung für einen ETB-Eintrag.", nameof(direction));
         }
 
+        // The app's own lines say where they belong themselves; only what a person wrote is filed.
+        if (sectionId is not null && EtbDirections.IsAppWritten(direction))
+        {
+            throw new InvalidOperationException(AppWrittenEntriesHaveNoSection);
+        }
+
+        var sectionName = sectionId is { } section ? EntrySectionLabel(section) : null;
         var unused = id is { } given && given != Guid.Empty && _journal.All(e => e.Id != given) ? id : null;
-        var entry = EtbEntry.Create(clock.Now, direction, text, op, from, to, unused);
+        var entry = EtbEntry.Create(clock.Now, direction, text, op, from, to, unused).WithSection(sectionId, sectionName);
         _journal.Add(entry);
         return entry;
+    }
+
+    /// <summary>
+    /// Files a manually written ETB entry under a live Abschnitt or Unterabschnitt (#971), moves it
+    /// to another, or takes it out of any with null. The entry keeps the node's label as it reads
+    /// now, so it still reads the same after a rename. Moving it where it already is writes nothing;
+    /// every real change leaves a System line, like <see cref="EditJournalEntry"/>.
+    /// </summary>
+    public EtbEntry AssignJournalEntrySection(IClock clock, SessionOperator op, Guid entryId, Guid? sectionId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _journal.FindIndex(e => e.Id == entryId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"ETB-Eintrag {entryId} nicht gefunden.");
+        }
+
+        var existing = _journal[index];
+        if (EtbDirections.IsAppWritten(existing.Direction))
+        {
+            throw new InvalidOperationException(AppWrittenEntriesHaveNoSection);
+        }
+
+        var sectionName = sectionId is { } section ? EntrySectionLabel(section) : null;
+        if (existing.SectionId == sectionId)
+        {
+            return existing;
+        }
+
+        var assigned = existing.WithSection(sectionId, sectionName);
+        _journal[index] = assigned;
+        var text = sectionName is not null
+            ? $"ETB-Eintrag {existing.Timestamp:HH:mm} → {sectionName}"
+            : $"ETB-Eintrag {existing.Timestamp:HH:mm}: Abschnitt aufgehoben (vorher {existing.SectionName ?? "unbekannt"})";
+        AppendSystemEntry(clock, op, text);
+        return assigned;
+    }
+
+    // The label an entry filed under sectionId keeps, once the node has been checked to be a live
+    // Abschnitt or Unterabschnitt of this incident.
+    private string EntrySectionLabel(Guid sectionId)
+    {
+        var node = FindCommandNode(sectionId) ?? throw new KeyNotFoundException($"Abschnitt {sectionId} nicht gefunden.");
+        if (node.Kind is not (CommandNodeKind.Abschnitt or CommandNodeKind.Unterabschnitt))
+        {
+            throw new InvalidOperationException(OnlyEinsatzabschnitteForEntries);
+        }
+
+        if (!node.IsLive)
+        {
+            throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+        }
+
+        return NodeLabel(node.Id) ?? node.Name;
     }
 
     /// <summary>

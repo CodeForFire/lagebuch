@@ -353,6 +353,53 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void A_joined_entry_is_filed_under_its_abschnitt_and_can_be_moved_and_taken_out()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Host", null);
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var sued = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Süd");
+        var client = new OperatorDto("Client", "RUF 1");
+        var minted = Guid.NewGuid();
+
+        ApplyOverWire(new AddJournalEntryCommand(client, EtbDirection.Internal, "Lage Nord", null, null, minted, nord.Id), incident, clock);
+        Assert.Equal("Nord", incident.Journal.Single(e => e.Id == minted).SectionName);
+
+        ApplyOverWire(new AssignJournalEntrySectionCommand(client, minted, sued.Id), incident, clock);
+        Assert.Equal(sued.Id, incident.Journal.Single(e => e.Id == minted).SectionId);
+        Assert.Equal("Client (RUF 1)", incident.Journal[^1].EnteredBy);
+
+        ApplyOverWire(new AssignJournalEntrySectionCommand(client, minted, null), incident, clock);
+        Assert.Null(incident.Journal.Single(e => e.Id == minted).SectionId);
+    }
+
+    [Fact]
+    public void An_older_clients_entry_without_a_section_is_filed_nowhere()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", null), EtbDirection.Incoming, "Lage", "ILS", null), incident, clock);
+
+        Assert.Null(incident.Journal[^1].SectionId);
+        Assert.Null(incident.Journal[^1].SectionName);
+    }
+
+    [Fact]
+    public void Filing_a_system_entry_over_the_wire_is_refused()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var nord = incident.AddCommandNode(clock, new SessionOperator("Host", null), CommandNodeKind.Abschnitt, "Nord");
+        var systemEntry = incident.Journal[^1];
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ApplyOverWire(new AssignJournalEntrySectionCommand(new OperatorDto("Client", null), systemEntry.Id, nord.Id), incident, clock));
+        Assert.Null(incident.Journal.Single(e => e.Id == systemEntry.Id).SectionId);
+    }
+
+    [Fact]
     public void ChangeOperatorCommand_logs_the_handover_credited_to_the_new_operator()
     {
         var clock = new FixedClock();

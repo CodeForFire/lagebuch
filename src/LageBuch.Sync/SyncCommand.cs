@@ -17,6 +17,7 @@ namespace LageBuch.Sync;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(AddJournalEntryCommand), "addJournalEntry")]
 [JsonDerivedType(typeof(EditJournalEntryCommand), "editJournalEntry")]
+[JsonDerivedType(typeof(AssignJournalEntrySectionCommand), "assignJournalEntrySection")]
 [JsonDerivedType(typeof(ToggleChecklistItemCommand), "toggleChecklistItem")]
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
 [JsonDerivedType(typeof(TransferRoleCommand), "transferRole")]
@@ -96,10 +97,14 @@ public sealed record OperatorDto(string Name, string? CallSign);
 
 // EntryId is minted by the sending device so it can link an Aufgabe to the entry at once; the
 // host honours it unless it is taken. Defaulted, so a payload from an older client still reads.
+// SectionId (#971) is defaulted for the same reason: an older client's entry is filed nowhere.
 public sealed record AddJournalEntryCommand(
-    OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To, Guid? EntryId = null) : SyncCommand;
+    OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To, Guid? EntryId = null, Guid? SectionId = null) : SyncCommand;
 
 public sealed record EditJournalEntryCommand(OperatorDto Operator, Guid EntryId, string Text) : SyncCommand;
+
+/// <summary>Files an ETB entry under an Einsatzabschnitt, moves it, or takes it out of any with a null <paramref name="SectionId"/> (#971).</summary>
+public sealed record AssignJournalEntrySectionCommand(OperatorDto Operator, Guid EntryId, Guid? SectionId) : SyncCommand;
 
 /// <summary>A new Lagebuchführer takes over at the sending device (#469). Only the ETB line and
 /// the audit event need the host: every later command already carries the new operator.</summary>

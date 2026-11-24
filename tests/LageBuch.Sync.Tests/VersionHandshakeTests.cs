@@ -413,7 +413,7 @@ public class VersionHandshakeTests
         // the image type, and a peer at 43 would read the image as GeoJSON, so a 43 and a 44 must
         // not connect.
         Assert.InRange(SyncProtocol.ProtocolVersion, 44, int.MaxValue);
-        Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 44, int.MaxValue);
     }
 
     [Fact]
@@ -421,8 +421,17 @@ public class VersionHandshakeTests
     {
         // 45 adds namedByNumber to a Trupp-Typ in /masterdata (#995). A peer at 44 drops the key and
         // offers its free Funkrufname box, while the name itself travels in the existing callSign,
-        // so a 44 and a 45 still connect.
-        Assert.Equal(45, SyncProtocol.ProtocolVersion);
-        Assert.Equal(44, SyncProtocol.MinimumProtocolVersion);
+        // so a 44 and a 45 still connect. The floor has risen since, for the ETB Abschnitte (46).
+        Assert.InRange(SyncProtocol.ProtocolVersion, 45, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 44, int.MaxValue);
+    }
+
+    [Fact]
+    public void Filing_etb_entries_under_an_abschnitt_raises_the_protocol_and_the_floor_to_forty_six()
+    {
+        // 46 lets a client send assignJournalEntrySection (#971), which a host at 45 does not know:
+        // a 45 and a 46 must not connect.
+        Assert.Equal(46, SyncProtocol.ProtocolVersion);
+        Assert.Equal(46, SyncProtocol.MinimumProtocolVersion);
     }
 }

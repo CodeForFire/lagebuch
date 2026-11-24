@@ -56,6 +56,25 @@ public class EtbSectionTests
             "bearbeitet 22.06.2026 09:09 von Mayr, zuvor: „Zweit“ Huber");
     }
 
+    // #971: the Abschnitt prints as the entry was filed, even once it is renamed.
+    [Fact]
+    public void A_filed_entry_names_its_abschnitt_above_the_text_by_the_stored_name()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Huber");
+        var incident = Incident.Start(clock, op);
+        var nord = incident.AddCommandNode(clock, op, Domain.Leadership.CommandNodeKind.Abschnitt, "Nord");
+        clock.Now = Started.AddMinutes(5);
+        incident.AddJournalEntry(clock, op, EtbDirection.Internal, "Tür geöffnet", sectionId: nord.Id);
+        incident.AddJournalEntry(clock, op, EtbDirection.Internal, "Lage allgemein");
+        incident.UpdateCommandNode(clock, op, nord.Id, "Nordost", null, null, null, null, null);
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Etb);
+
+        PdfText.AssertInOrder(text, "22.06.2026 09:05 — — Abschnitt Nord Tür geöffnet Huber", "— — Lage allgemein Huber");
+        Assert.DoesNotContain("Abschnitt Nordost", text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Without_entries_the_section_says_so_instead_of_an_empty_table()
     {

@@ -1255,10 +1255,12 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void ChangeOperator(SessionOperator op) => _inner.ChangeOperator(op);
 
-    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
-        _inner.AddJournalEntry(direction, text, from, to);
+    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null, Guid? sectionId = null) =>
+        _inner.AddJournalEntry(direction, text, from, to, sectionId);
 
     public void EditJournalEntry(Guid entryId, string text) => _inner.EditJournalEntry(entryId, text);
+
+    public void AssignJournalEntrySection(Guid entryId, Guid? sectionId) => _inner.AssignJournalEntrySection(entryId, sectionId);
 
     public void ToggleChecklistItem(Guid itemId) => _inner.ToggleChecklistItem(itemId);
 
