@@ -230,7 +230,7 @@ public class ScbaNumberedTruppTests
     }
 
     [Fact]
-    public async Task Pressing_announces_the_number_error()
+    public void Pressing_announces_the_number_error()
     {
         var clock = new FixedClock(T0);
         using var vm = Vm(clock, NewSession(clock));

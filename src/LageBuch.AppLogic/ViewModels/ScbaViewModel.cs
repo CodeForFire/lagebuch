@@ -395,6 +395,10 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
 
     private bool _applyingDefault;
 
+    // A Bereitstellen whose answer never came (#995 review): logged once a Stand shows the Trupp.
+    private ScbaSubmission? _unanswered;
+    private bool _registering;
+
     public ScbaViewModel(IIncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -970,11 +974,70 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
             return;
         }
 
-        // Compose the ETB line from the inputs, not from a return value; the row itself is rendered
-        // by RefreshTrupps on the Changed event.
+        var submission = CurrentSubmission();
+
+        // Awaited, so a Trupp the host refuses is never logged as bereitgestellt: the ETB is what the
+        // Einsatzbericht reads. The form keeps its input, so the name can be corrected and sent again.
+        _registering = true;
+        try
+        {
+            await _session.AddScbaTruppAsync(
+                submission.Designation,
+                submission.Crew,
+                submission.EntryPressure,
+                submission.TruppNumber,
+                submission.CallSign,
+                task: null,
+                maxDurationMinutes: submission.MaxDurationMinutes,
+                returnPressureBar: submission.ReturnPressureBar,
+                pressureControlIntervalMinutes: submission.ControlIntervalMinutes);
+        }
+        catch (CommandRejectedException ex)
+        {
+            // A resend refused because the first press did get through: the Stand shows it now.
+            _registering = false;
+            if (!TryConfirmUnanswered())
+            {
+                RejectSubmit(ex.Message);
+            }
+
+            return;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
+        {
+            // No answer: the host may have taken the Trupp all the same. It is logged the moment a
+            // Stand shows it -- possibly one that already arrived during the wait -- and not before.
+            _unanswered = submission;
+            _registering = false;
+            if (!TryConfirmUnanswered())
+            {
+                RejectSubmit(RemoteIncidentSession.CommandLostReason);
+            }
+
+            return;
+        }
+        finally
+        {
+            _registering = false;
+        }
+
+        if (_unanswered is { } resent && submission.IsSameTruppAs(resent))
+        {
+            _unanswered = null; // sent again and taken now: logged below, not a second time later
+        }
+
+        LogBereitgestellt(submission);
+        CompleteSubmit();
+    }
+
+    /// <summary>
+    /// What one press of Bereitstellen sends, taken from the form before anything is awaited. The
+    /// ETB line is composed from it, not from a return value; the row itself is rendered by
+    /// RefreshTrupps on the Changed event.
+    /// </summary>
+    private ScbaSubmission CurrentSubmission()
+    {
         var crew = BuildCrew();
-        var membersDisplay = string.Join(" / ", crew.Select(m => m.Name));
-        var designation = NewDesignation;
 
         // A numbered Trupp-Art is called "CSA-Trupp 1" (#995). The name is copied into the
         // Trupp's own Funkrufname here, so the record keeps it whatever the Stammdaten say later.
@@ -982,43 +1045,52 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         var callSign = IsNamedByNumber && NewTypeNumber is { } typeNumber
             ? AtemschutzTrupp.NumberedCallSign(NewDesignation, typeNumber)
             : NewCallSign;
-        var truppNumber = NewTruppNumber;
-        var entryPressure = NewEntryPressure;
-        var displayName = AtemschutzTrupp.FormatDisplayName(callSign, designation);
+        return new ScbaSubmission(
+            NewTruppNumber,
+            NewDesignation,
+            callSign,
+            crew,
+            string.Join(" / ", crew.Select(m => m.Name)),
+            NewEntryPressure,
+            NewMaxDurationMinutes,
+            NewReturnPressureBar,
+            NewControlIntervalMinutes);
+    }
 
-        // Awaited, so a Trupp the host refuses is never logged as bereitgestellt: the ETB is what the
-        // Einsatzbericht reads. The form keeps its input, so the name can be corrected and sent again.
-        try
+    /// <summary>
+    /// Logs a registration that got no answer once the incident shows the host took it, and clears
+    /// the form if it still holds that Trupp. False while the Trupp is not (yet) there.
+    /// </summary>
+    private bool TryConfirmUnanswered()
+    {
+        // While a press is on the wire its own Stand is not an answer to the earlier one: the press
+        // itself decides once it returns.
+        if (_registering || _unanswered is not { } submission || !_session.Incident.ScbaTrupps.Any(submission.Matches))
         {
-            await _session.AddScbaTruppAsync(
-                designation,
-                crew,
-                entryPressure,
-                truppNumber,
-                callSign,
-                task: null,
-                maxDurationMinutes: NewMaxDurationMinutes,
-                returnPressureBar: NewReturnPressureBar,
-                pressureControlIntervalMinutes: NewControlIntervalMinutes);
-        }
-        catch (CommandRejectedException ex)
-        {
-            RejectSubmit(ex.Message);
-            return;
-        }
-        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
-        {
-            // No answer: the host may have taken the Trupp all the same, which the next Stand shows.
-            RejectSubmit(RemoteIncidentSession.CommandLostReason);
-            return;
+            return false;
         }
 
+        _unanswered = null;
+        LogBereitgestellt(submission);
+
+        // The Lagebuchführer may have moved on to the next Trupp meanwhile; that input stays.
+        if (CurrentSubmission().IsSameTruppAs(submission))
+        {
+            CompleteSubmit();
+        }
+
+        return true;
+    }
+
+    private void LogBereitgestellt(ScbaSubmission submission) =>
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"{displayName} bereitgestellt: {membersDisplay}, Einstiegsdruck {entryPressure} bar",
-            from: callSign,
+            $"{AtemschutzTrupp.FormatDisplayName(submission.CallSign, submission.Designation)} bereitgestellt: {submission.MembersDisplay}, Einstiegsdruck {submission.EntryPressure} bar",
+            from: submission.CallSign,
             to: null);
 
+    private void CompleteSubmit()
+    {
         _maxDurationUserEdited = false;
         _controlIntervalUserEdited = false;
 
@@ -1391,6 +1463,9 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         }
 
         RefreshHeader();
+
+        // A Stand that shows a Trupp whose answer was lost is the answer.
+        TryConfirmUnanswered();
     }
 
     private static string[] CallSignsOfForces(Domain.Incident incident) =>
@@ -1488,5 +1563,36 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
     {
         _session.Changed -= RefreshTrupps;
         _subscription?.Dispose();
+    }
+
+    /// <summary>One press of Bereitstellen, as sent, so a lost answer can be recognised later.</summary>
+    private sealed record ScbaSubmission(
+        int TruppNumber,
+        string Designation,
+        string? CallSign,
+        IReadOnlyList<TruppMember> Crew,
+        string MembersDisplay,
+        int EntryPressure,
+        int MaxDurationMinutes,
+        int ReturnPressureBar,
+        int ControlIntervalMinutes)
+    {
+        /// <summary>Whether <paramref name="trupp"/> is this registration, as the host stored it.</summary>
+        public bool Matches(AtemschutzTrupp trupp) =>
+            trupp.TruppNumber == TruppNumber && IsSameName(trupp.Designation, trupp.CallSign, trupp.MembersDisplay);
+
+        /// <summary>
+        /// The same Trupp in the form: its Trupp-Art and crew. Not the numbers or a numbered name,
+        /// which a refresh moves on to the next free one while the press waits for its answer.
+        /// </summary>
+        public bool IsSameTruppAs(ScbaSubmission other) =>
+            string.Equals(other.Designation.Trim(), Designation.Trim(), StringComparison.Ordinal)
+            && string.Equals(other.MembersDisplay, MembersDisplay, StringComparison.Ordinal);
+
+        // Compared the way AtemschutzTrupp.Register stores them: trimmed, a blank Funkrufname as none.
+        private bool IsSameName(string designation, string? callSign, string membersDisplay) =>
+            string.Equals(designation, Designation.Trim(), StringComparison.Ordinal)
+            && string.Equals(callSign, string.IsNullOrWhiteSpace(CallSign) ? null : CallSign.Trim(), StringComparison.Ordinal)
+            && string.Equals(membersDisplay, MembersDisplay, StringComparison.Ordinal);
     }
 }
