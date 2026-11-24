@@ -219,7 +219,8 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
 
     /// <summary>
     /// Starts a new draft, prefilled from the incident: Meldender from the Lagebuchführer's
-    /// Funkrufname, Einsatzstelle from the street, Eingesetzte Einheiten from the Kräfte.
+    /// Funkrufname, Einsatzstelle from the street. Eingesetzte Einheiten stays free text — what is
+    /// reported there ("2 Trupps unter PA") is not a list of the Kräfte.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private void NewReport()
@@ -232,7 +233,7 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
             Formatting.StreetAddress(incident),
             null,
             null,
-            DescribeUnits(incident.Forces),
+            null,
             null));
     }
 
@@ -254,16 +255,6 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         }
 
         NewReport();
-    }
-
-    private bool CanRefreshUnits => IsEditable;
-
-    /// <summary>Fills Eingesetzte Einheiten again from the Kräfte as they stand now.</summary>
-    [RelayCommand(CanExecute = nameof(CanRefreshUnits))]
-    private void RefreshUnits()
-    {
-        Units = DescribeUnits(_session.Incident.Forces);
-        CommitSelected();
     }
 
     [RelayCommand]
@@ -325,31 +316,6 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
             "Den Entwurf der Lagemeldung verwerfen?",
             "VERWERFEN",
             () => Write(() => _session.RemoveSituationReport(row.Id)));
-    }
-
-    /// <summary>
-    /// The Kräfte as Eingesetzte Einheiten: each unit's name and Stärke, as the ETB names them.
-    /// Null when there are none, so the field stays empty rather than saying so.
-    /// </summary>
-    public static string? DescribeUnits(IEnumerable<ForceUnit> forces)
-    {
-        ArgumentNullException.ThrowIfNull(forces);
-        var text = string.Join(", ", forces.Select(u => $"{u.Label} {u.StrengthText}"));
-        if (text.Length == 0)
-        {
-            return null;
-        }
-
-        // A large Einsatz can name more units than the field holds; cut at the last whole unit.
-        if (text.Length > SituationReport.MaxFieldLength)
-        {
-            var cut = text.LastIndexOf(", ", SituationReport.MaxFieldLength - 2, StringComparison.Ordinal);
-
-            // Stryker disable once Equality : a unit's label is never empty, so the text never starts with ", " and cut is never 0.
-            text = (cut > 0 ? text[..cut] : text[..(SituationReport.MaxFieldLength - 2)]) + " …";
-        }
-
-        return text;
     }
 
     private bool CommitSelected() => SelectedReport is not { } row || Commit(row.Id);
@@ -481,7 +447,6 @@ public sealed partial class SituationReportsViewModel : ObservableObject, INarro
         OnPropertyChanged(nameof(EditorHeader));
         SendCommand.NotifyCanExecuteChanged();
         DeleteDraftCommand.NotifyCanExecuteChanged();
-        RefreshUnitsCommand.NotifyCanExecuteChanged();
     }
 
     private static string? Moved(string? before, string? now, string? editing) =>
