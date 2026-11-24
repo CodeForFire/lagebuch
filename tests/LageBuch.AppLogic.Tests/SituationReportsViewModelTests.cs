@@ -27,7 +27,7 @@ public class SituationReportsViewModelTests
         new(session, () => { }, "ILS", requestConfirm);
 
     [Fact]
-    public void A_new_report_is_prefilled_from_the_funkrufname_the_street_and_the_kraefte()
+    public void A_new_report_is_prefilled_from_the_funkrufname_and_the_street_but_leaves_the_units_free()
     {
         var (session, _) = NewSession();
         session.SetAddress("Blumenstraße", "Nord", "13", "12345", "Musterstadt");
@@ -41,7 +41,7 @@ public class SituationReportsViewModelTests
         Assert.Same(vm.Reports[0], vm.SelectedReport);
         Assert.Equal("Florian Musterstadt 11/1", vm.Reporter);
         Assert.Equal("Blumenstraße 13", vm.Location);
-        Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9, FF Beispieldorf 0/1/5/6", vm.Units);
+        Assert.Null(vm.Units);
         Assert.Null(vm.Situation);
         Assert.True(vm.IsEditable);
     }
@@ -309,21 +309,6 @@ public class SituationReportsViewModelTests
     }
 
     [Fact]
-    public void RefreshUnits_takes_over_the_kraefte_as_they_stand_now()
-    {
-        var (session, _) = NewSession();
-        using var vm = NewVm(session);
-        vm.NewReportCommand.Execute(null);
-        Assert.Null(vm.Units);
-        session.AddForceUnit("FF Musterstadt", 9, callSign: "HLF 1", officerCount: 1);
-
-        vm.RefreshUnitsCommand.Execute(null);
-
-        Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9", vm.Units);
-        Assert.Equal("FF Musterstadt (HLF 1) 0/1/8/9", session.Incident.SituationReports[0].Units);
-    }
-
-    [Fact]
     public void Discarding_a_draft_asks_first_and_takes_it_out()
     {
         var (session, _) = NewSession();
@@ -397,18 +382,6 @@ public class SituationReportsViewModelTests
 
         Assert.True(vm.ShowHelper);
         Assert.StartsWith("Berta – Ludwig", vm.Helper.Spelled, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Units_longer_than_the_field_are_cut_at_the_last_whole_unit()
-    {
-        var forces = Enumerable.Range(1, 60).Select(i => ForceUnit.Create($"FF Musterstadt {i}", 9)).ToList();
-
-        var text = SituationReportsViewModel.DescribeUnits(forces);
-
-        Assert.NotNull(text);
-        Assert.True(text.Length <= SituationReportsViewModel.MaxFieldLength);
-        Assert.EndsWith("0/0/9/9 …", text, StringComparison.Ordinal);
     }
 
     // A draft with a Lage, saved, then opened read-only the way a closed Einsatz is reopened.
@@ -561,10 +534,8 @@ public class SituationReportsViewModelTests
         vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         var send = 0;
         var delete = 0;
-        var refresh = 0;
         vm.SendCommand.CanExecuteChanged += (_, _) => send++;
         vm.DeleteDraftCommand.CanExecuteChanged += (_, _) => delete++;
-        vm.RefreshUnitsCommand.CanExecuteChanged += (_, _) => refresh++;
 
         session.SendSituationReport(session.Incident.SituationReports[0].Id, "ILS");
 
@@ -576,7 +547,6 @@ public class SituationReportsViewModelTests
         Assert.Contains(nameof(SituationReportsViewModel.EditorHeader), changed);
         Assert.True(send > 0);
         Assert.True(delete > 0);
-        Assert.True(refresh > 0);
         Assert.False(vm.SendCommand.CanExecute(null));
     }
 
@@ -676,50 +646,6 @@ public class SituationReportsViewModelTests
         vm.CloseHelperCommand.Execute(null);
         Assert.False(vm.ShowHelper);
         Assert.True(vm.ShowHelperButton);
-    }
-
-    [Fact]
-    public void No_kraefte_means_no_eingesetzte_einheiten()
-    {
-        Assert.Null(SituationReportsViewModel.DescribeUnits([]));
-    }
-
-    [Fact]
-    public void Units_exactly_as_long_as_the_field_are_not_cut()
-    {
-        // 290 + " 0/0/9/9" + ", " + 292 + " 0/0/9/9" = 600 characters.
-        ForceUnit[] forces = [ForceUnit.Create(new string('A', 290), 9), ForceUnit.Create(new string('B', 292), 9)];
-
-        var text = SituationReportsViewModel.DescribeUnits(forces);
-
-        Assert.Equal(SituationReportsViewModel.MaxFieldLength, text?.Length);
-        Assert.EndsWith("B 0/0/9/9", text, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_cut_never_leaves_the_text_longer_than_the_field()
-    {
-        // The second separator sits at 599, just past where a cut may still start.
-        ForceUnit[] forces =
-        [
-            ForceUnit.Create(new string('A', 291), 9),
-            ForceUnit.Create(new string('B', 290), 9),
-            ForceUnit.Create("C", 9),
-        ];
-
-        var text = SituationReportsViewModel.DescribeUnits(forces);
-
-        Assert.NotNull(text);
-        Assert.True(text.Length <= SituationReportsViewModel.MaxFieldLength, $"{text.Length} characters");
-        Assert.Equal(new string('A', 291) + " 0/0/9/9 …", text);
-    }
-
-    [Fact]
-    public void A_single_unit_longer_than_the_field_is_cut_inside_its_name()
-    {
-        var text = SituationReportsViewModel.DescribeUnits([ForceUnit.Create(new string('A', 700), 9)]);
-
-        Assert.Equal(new string('A', SituationReportsViewModel.MaxFieldLength - 2) + " …", text);
     }
 
     [Fact]
