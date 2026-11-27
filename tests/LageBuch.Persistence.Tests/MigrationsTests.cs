@@ -687,4 +687,66 @@ public class MigrationsTests : IDisposable
         Assert.Equal("Florian 1/44", r.GetString(0));
         Assert.True(r.IsDBNull(1));
     }
+
+    [Fact]
+    public void A_file_stamped_48_without_the_etb_edit_columns_gets_them_backfilled_not_left_empty()
+    {
+        // A parallel branch's build stamped 48 but never added previous_from/previous_to. Left to
+        // SchemaGuard they would be NULL, and the Verlauf would claim the edit emptied Von.
+        SeedEditedEntryWithoutPriorParties(stampedVersion: 48, keepPreviousFrom: false);
+
+        var (from, to) = ReadPriorParties();
+        Assert.Equal("Florian 1/44", from);
+        Assert.Equal("ELW 1", to);
+    }
+
+    [Fact]
+    public void A_file_missing_only_previous_to_keeps_its_previous_from_and_backfills_previous_to()
+    {
+        SeedEditedEntryWithoutPriorParties(stampedVersion: 47, keepPreviousFrom: true);
+
+        var (from, to) = ReadPriorParties();
+        Assert.Equal("Florian 1/43", from);
+        Assert.Equal("ELW 1", to);
+    }
+
+    // Drops previous_to, and previous_from too unless keepPreviousFrom, which instead gives it a
+    // value of its own the migration must not overwrite.
+    private void SeedEditedEntryWithoutPriorParties(int stampedVersion, bool keepPreviousFrom)
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var seed = cn.CreateCommand();
+            seed.CommandText = """
+                INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by)
+                    VALUES ('e', 0, '2026-06-22T09:00:00+02:00', 1, 'Florian 1/44', 'ELW 1', 'Lage korrigiert', 'Muster');
+                INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at, previous_from)
+                    VALUES ('x', 'e', 0, 'Lage', 'Muster', '2026-06-22T09:05:00+02:00', 'Florian 1/43');
+                ALTER TABLE etb_entry_edits DROP COLUMN previous_to;
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES ($v);
+                """;
+            seed.Parameters.AddWithValue("$v", stampedVersion);
+            seed.ExecuteNonQuery();
+            if (!keepPreviousFrom)
+            {
+                using var drop = cn.CreateCommand();
+                drop.CommandText = "ALTER TABLE etb_entry_edits DROP COLUMN previous_from;";
+                drop.ExecuteNonQuery();
+            }
+        }
+
+        SqliteConnection.ClearAllPools();
+    }
+
+    private (string? From, string? To) ReadPriorParties()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        using var check = cn.CreateCommand();
+        check.CommandText = "SELECT previous_from, previous_to FROM etb_entry_edits WHERE id = 'x';";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        return (r.IsDBNull(0) ? null : r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1));
+    }
 }

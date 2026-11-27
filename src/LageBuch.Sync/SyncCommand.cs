@@ -102,8 +102,9 @@ public sealed record OperatorDto(string Name, string? CallSign);
 public sealed record AddJournalEntryCommand(
     OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To, Guid? EntryId = null, Guid? SectionId = null) : SyncCommand;
 
-// From and To are the entry's Von and An after the edit, not defaulted: a null clears the field, so
-// a payload that left them out would read as "cleared" (see SyncProtocol, 48).
+// From and To are the entry's Von and An after the edit, or null for "unchanged"; a blank one
+// clears the field. Null is what the editing device sends for a field the Lagebuchführer did not
+// touch, so a text correction cannot undo a Von or An another device changed meanwhile.
 public sealed record EditJournalEntryCommand(OperatorDto Operator, Guid EntryId, string Text, string? From, string? To) : SyncCommand;
 
 /// <summary>Files an ETB entry under an Einsatzabschnitt, moves it, or takes it out of any with a null <paramref name="SectionId"/> (#971).</summary>

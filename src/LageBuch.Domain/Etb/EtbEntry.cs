@@ -114,7 +114,9 @@ public sealed record EtbEntry
     /// <summary>
     /// Corrects this entry's text, Von and An, recording the version before under <see cref="Edits"/>
     /// so every prior version stays reachable — unlike <see cref="Files.IncidentFile.WithDisplayName"/>'s
-    /// silent overwrite, an ETB entry is part of the incident record. A blank Von or An clears it.
+    /// silent overwrite, an ETB entry is part of the incident record. A null Von or An leaves it as
+    /// it is and a blank one clears it, so a correction of the text alone cannot undo a change to
+    /// Von or An that another device made in the meantime.
     /// The System-direction guard (machine-generated entries are never editable) lives on
     /// <see cref="Incident.EditJournalEntry"/>, not here — this method only knows how to produce the
     /// edited copy.
@@ -138,8 +140,8 @@ public sealed record EtbEntry
         ArgumentNullException.ThrowIfNull(editor);
 
         var trimmed = newText.Trim();
-        var from = ChangedParty(newFrom, From, nameof(newFrom));
-        var to = ChangedParty(newTo, To, nameof(newTo));
+        var from = newFrom is null ? From : ChangedParty(newFrom, From, nameof(newFrom));
+        var to = newTo is null ? To : ChangedParty(newTo, To, nameof(newTo));
         if (string.Equals(trimmed, Text, StringComparison.Ordinal)
             && string.Equals(from, From, StringComparison.Ordinal)
             && string.Equals(to, To, StringComparison.Ordinal))

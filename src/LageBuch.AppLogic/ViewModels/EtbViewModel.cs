@@ -710,7 +710,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         var entry = EditingEntry!;
         var section = _editSectionId;
         var refiled = section != entry.SectionId;
-        _session.EditJournalEntry(entry.Id, EditText, EditFrom, EditTo); // Changed → Sync() renders it
+        _session.EditJournalEntry(entry.Id, EditText, Touched(EditFrom, entry.From), Touched(EditTo, entry.To)); // Changed → Sync() renders it
         if (refiled)
         {
             _session.AssignJournalEntrySection(entry.Id, section);
@@ -719,6 +719,13 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         ClearEditFields();
         _onChanged();
     }
+
+    // Null for a field left as the panel opened it, so the host keeps whatever Von or An it holds by
+    // now; blank for one the Lagebuchführer emptied, which clears it.
+    private static string? Touched(string? edited, string? opened) =>
+        string.Equals(edited?.Trim() ?? string.Empty, opened ?? string.Empty, StringComparison.Ordinal)
+            ? null
+            : edited ?? string.Empty;
 
     [RelayCommand]
     private void CancelEdit() => ClearEditFields();

@@ -274,9 +274,9 @@ public static class SyncProtocol
     /// </para>
     /// <para>
     /// 48: an ETB entry's Von and An can be edited. <c>editJournalEntry</c> carries <c>from</c> and
-    /// <c>to</c>, and the snapshot's edits carry <c>previousFrom</c> and <c>previousTo</c>. A client
-    /// at 47 would send no Von or An, which a host at 48 reads as "cleared" -- wiping them with
-    /// every text correction, the <c>setAddress</c> case of 8. The floor rises to 48.
+    /// <c>to</c> (null: unchanged, blank: cleared), and the snapshot's edits carry
+    /// <c>previousFrom</c> and <c>previousTo</c>. A host at 47 would drop the new fields and save
+    /// a Von or An correction as a text edit without saying so. The floor rises to 48.
     /// </para>
     /// </summary>
     public const int ProtocolVersion = 48;

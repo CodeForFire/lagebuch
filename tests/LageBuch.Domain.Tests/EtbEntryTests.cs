@@ -166,6 +166,18 @@ public class EtbEntryTests
     }
 
     [Fact]
+    public void WithEdit_keeps_a_null_von_or_an_as_it_is_and_clears_a_blank_one()
+    {
+        var op = new SessionOperator("Müller");
+        var entry = EtbEntry.Create(At, EtbDirection.Incoming, "Lage", op, from: "Florian 1/44", to: "ELW 1");
+
+        var edited = entry.WithEdit("Lage korrigiert", null, string.Empty, op, At.AddMinutes(1));
+
+        Assert.Equal("Florian 1/44", edited.From);
+        Assert.Null(edited.To);
+    }
+
+    [Fact]
     public void WithEdit_records_the_unchanged_from_and_to_alongside_a_text_correction()
     {
         var op = new SessionOperator("Müller");

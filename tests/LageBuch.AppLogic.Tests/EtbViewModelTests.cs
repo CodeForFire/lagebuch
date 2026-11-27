@@ -889,6 +889,42 @@ public class EtbViewModelTests
     }
 
     [Fact]
+    public void A_text_correction_keeps_a_von_another_device_changed_before_its_snapshot_arrived()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewFrom = "Florian 1/44", NewText = "Lage" };
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        row.BeginEditCommand.Execute(null);
+
+        // The host has applied another device's correction; this device has not seen it yet.
+        var op = Assert.IsType<SessionOperator>(session.Operator);
+        session.Incident.EditJournalEntry(clock, op, row.Id, "Lage", "Florian 1/46", null);
+        vm.EditText = "Lage korrigiert";
+        vm.SaveEditCommand.Execute(null);
+
+        var entry = session.Incident.Journal.Single(e => e.Id == row.Id);
+        Assert.Equal("Lage korrigiert", entry.Text);
+        Assert.Equal("Florian 1/46", entry.From);
+    }
+
+    [Fact]
+    public void Emptying_von_in_the_editor_clears_it()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewFrom = "Florian 1/44", NewText = "Lage" };
+        vm.AddEntryCommand.Execute(null);
+        vm.Entries[0].BeginEditCommand.Execute(null);
+
+        vm.EditFrom = null;
+        vm.SaveEditCommand.Execute(null);
+
+        Assert.Null(session.Incident.Journal.Single(e => e.Text == "Lage").From);
+    }
+
+    [Fact]
     public void A_batch_of_new_entries_lands_newest_first_and_in_order()
     {
         var clock = new FixedClock(T0);

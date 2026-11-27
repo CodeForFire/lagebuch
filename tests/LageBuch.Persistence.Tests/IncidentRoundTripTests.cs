@@ -256,7 +256,7 @@ public class IncidentRoundTripTests : IDisposable
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, "Brand");
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lage", from: "Florian 1/44", to: "ELW 1");
-        incident.EditJournalEntry(clock, op, entry.Id, "Lage", "Florian 1/46", null);
+        incident.EditJournalEntry(clock, op, entry.Id, "Lage", "Florian 1/46", string.Empty);
 
         IncidentRepository.Save(_path, incident);
         var loaded = IncidentRepository.Load(_path);

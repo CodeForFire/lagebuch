@@ -89,8 +89,10 @@
     <Style Selector="TextBox#EtbTextBox">
       <Setter Property="Width" Value="320" />
     </Style>
+    <!-- The dock's 320, not wider: the edit panel's row also carries VON, AN and ABSCHNITT, and
+         SPEICHERN and ABBRECHEN have to stay on a 1280px screen beside the nav rail. -->
     <Style Selector="TextBox#EditTextBox">
-      <Setter Property="Width" Value="420" />
+      <Setter Property="Width" Value="320" />
     </Style>
     <!-- Wide enough for "Atemschutz Trupp 2" plus the count, and still one line on a phone. -->
     <Style Selector="TextBox#EtbSearchBox">
@@ -257,13 +259,15 @@
                  a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
                  ComboBox, mirroring ForcesView's Brigade field. -->
             <HeaderedContentControl Classes="field suggest" Header="VON">
-              <AutoCompleteBox x:Name="FromBox" PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+              <AutoCompleteBox x:Name="FromBox" MaxLength="{x:Static etb:EtbEntry.MaxPartyLength}"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                                ItemsSource="{Binding CallSignOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                Text="{Binding NewFrom}" />
             </HeaderedContentControl>
             <HeaderedContentControl Classes="field suggest" Header="AN">
-              <AutoCompleteBox x:Name="ToBox" PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
+              <AutoCompleteBox x:Name="ToBox" MaxLength="{x:Static etb:EtbEntry.MaxPartyLength}"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                                ItemsSource="{Binding CallSignOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                Text="{Binding NewTo}" />
@@ -331,7 +335,7 @@
           </HeaderedContentControl>
           <!-- Set, change or remove the entry's Einsatzabschnitt (#971); written with SPEICHERN. -->
           <HeaderedContentControl Classes="field" Header="ABSCHNITT" IsVisible="{Binding HasEditSectionChoices}">
-            <ctrl:NodeChoicePicker x:Name="EditSectionPicker" Width="200"
+            <ctrl:NodeChoicePicker x:Name="EditSectionPicker" Width="150"
                                    Choices="{Binding EditSectionChoices}" Label="{Binding EditSectionLabel}"
                                    PickerName="Abschnitt des Eintrags wählen" />
           </HeaderedContentControl>

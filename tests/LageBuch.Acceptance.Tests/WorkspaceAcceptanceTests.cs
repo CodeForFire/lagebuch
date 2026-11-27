@@ -313,7 +313,7 @@ public class WorkspaceAcceptanceTests
         Assert.Equal("ELW 1", view.GetControl<AutoCompleteBox>("EditToBox").Text);
 
         fromBox.Text = "Florian 1/46";
-        view.GetControl<Button>("SaveEditButton").Command!.Execute(null);
+        Assert.IsAssignableFrom<System.Windows.Input.ICommand>(view.GetControl<Button>("SaveEditButton").Command).Execute(null);
 
         Assert.Equal("Florian 1/46", row.From);
         Assert.Equal("ELW 1", row.To);
