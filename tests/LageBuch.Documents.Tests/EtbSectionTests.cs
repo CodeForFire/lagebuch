@@ -44,9 +44,9 @@ public class EtbSectionTests
         var incident = Incident.Start(clock, op);
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erst");
         clock.Now = Started.AddMinutes(4);
-        incident.EditJournalEntry(clock, op, entry.Id, "Zweit");
+        incident.EditJournalEntry(clock, op, entry.Id, "Zweit", entry.From, entry.To);
         clock.Now = Started.AddMinutes(9);
-        incident.EditJournalEntry(clock, new SessionOperator("Mayr"), entry.Id, "Dritt");
+        incident.EditJournalEntry(clock, new SessionOperator("Mayr"), entry.Id, "Dritt", entry.From, entry.To);
 
         var text = PdfText.Of(incident, Started, IncidentPdfSections.Etb);
 
@@ -54,6 +54,25 @@ public class EtbSectionTests
             text,
             "Dritt bearbeitet 22.06.2026 09:04 von Huber, zuvor: „Erst“",
             "bearbeitet 22.06.2026 09:09 von Mayr, zuvor: „Zweit“ Huber");
+    }
+
+    // A corrected Von or An is as much a rewrite as corrected text, so the export names the pair it
+    // replaced -- and only on the edit that changed it, so a text correction reads as before.
+    [Fact]
+    public void An_edit_of_von_or_an_names_the_prior_pair_in_the_export()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Huber");
+        var incident = Incident.Start(clock, op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lage", from: "Florian 1/44", to: "ELW 1");
+        clock.Now = Started.AddMinutes(4);
+        incident.EditJournalEntry(clock, op, entry.Id, "Lage", "Florian 1/46", "ELW 1");
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Etb);
+
+        PdfText.AssertInOrder(
+            text,
+            "Florian 1/46 ELW 1 Lage bearbeitet 22.06.2026 09:04 von Huber, zuvor: Von Florian 1/44 an ELW 1, „Lage“");
     }
 
     // #971: the Abschnitt prints as the entry was filed, even once it is renamed.

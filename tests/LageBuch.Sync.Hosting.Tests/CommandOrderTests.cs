@@ -21,7 +21,7 @@ public class CommandOrderTests
 
         scripted.HoldCommands();
         var entryId = client.AddJournalEntry(EtbDirection.Incoming, "Lage erkundet");
-        client.EditJournalEntry(entryId, "Lage erkundet, keine Personen");
+        client.EditJournalEntry(entryId, "Lage erkundet, keine Personen", null, null);
 
         await scripted.WaitForHeldCommandAsync();
 

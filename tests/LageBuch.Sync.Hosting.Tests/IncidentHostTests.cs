@@ -255,7 +255,7 @@ public class IncidentHostTests
             "Leitstelle",
             "ELW");
 
-        var command = new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), entry.Id, "Lagemeldung korrigiert");
+        var command = new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), entry.Id, "Lagemeldung korrigiert", null, null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
         var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         response.EnsureSuccessStatusCode();
@@ -287,7 +287,7 @@ public class IncidentHostTests
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
         http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
-        var command = new EditJournalEntryCommand(new OperatorDto("Client", null), Guid.NewGuid(), "Text");
+        var command = new EditJournalEntryCommand(new OperatorDto("Client", null), Guid.NewGuid(), "Text", null, null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
         var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
 
@@ -1170,7 +1170,7 @@ public class IncidentHostTests
 
         // An unknown entry id is a 400 (KeyNotFoundException), so nothing was applied.
         using var content = new StringContent(
-            SyncJson.Serialize<SyncCommand>(new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), Guid.NewGuid(), "x")),
+            SyncJson.Serialize<SyncCommand>(new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), Guid.NewGuid(), "x", null, null)),
             Encoding.UTF8,
             "application/json");
         var rejected = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);

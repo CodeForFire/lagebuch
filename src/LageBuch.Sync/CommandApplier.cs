@@ -1,6 +1,7 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
+using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Map;
@@ -40,10 +41,11 @@ public static class CommandApplier
         switch (command)
         {
             case AddJournalEntryCommand c:
+                RequirePartiesWithinCap(c.Direction, c.From, c.To);
                 incident.AddJournalEntry(clock, Operator(c.Operator), c.Direction, c.Text, c.From, c.To, c.EntryId, c.SectionId);
                 break;
             case EditJournalEntryCommand c:
-                incident.EditJournalEntry(clock, Operator(c.Operator), c.EntryId, c.Text);
+                incident.EditJournalEntry(clock, Operator(c.Operator), c.EntryId, c.Text, c.From, c.To);
                 break;
             case AssignJournalEntrySectionCommand c:
                 incident.AssignJournalEntrySection(clock, Operator(c.Operator), c.EntryId, c.SectionId);
@@ -407,5 +409,28 @@ public static class CommandApplier
         }
 
         return result;
+    }
+
+    // Every edit of an entry keeps a copy of the Von and An it replaced, and WithEdit lets an
+    // unchanged pair through uncapped, so a peer's entry is capped when it arrives. A line the app
+    // wrote is exempt: it carries a Trupp call sign, which is not capped where it is entered, and it
+    // is never editable, so nothing copies it. The local dock caps the same fields in the view.
+    private static void RequirePartiesWithinCap(EtbDirection direction, string? from, string? to)
+    {
+        if (EtbDirections.IsAppWritten(direction))
+        {
+            return;
+        }
+
+        RequireWithinCap(from, nameof(from));
+        RequireWithinCap(to, nameof(to));
+
+        static void RequireWithinCap(string? party, string paramName)
+        {
+            if (party?.Trim().Length > EtbEntry.MaxPartyLength)
+            {
+                throw new ArgumentException($"Von/An ist länger als das Limit von {EtbEntry.MaxPartyLength} Zeichen.", paramName);
+            }
+        }
     }
 }

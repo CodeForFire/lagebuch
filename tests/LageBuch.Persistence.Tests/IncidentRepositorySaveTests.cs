@@ -54,8 +54,8 @@ public class IncidentRepositorySaveTests : IDisposable
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, "Brand");
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
-        incident.EditJournalEntry(clock, op, entry.Id, "Erste Korrektur");
-        incident.EditJournalEntry(clock, op, entry.Id, "Zweite Korrektur");
+        incident.EditJournalEntry(clock, op, entry.Id, "Erste Korrektur", entry.From, entry.To);
+        incident.EditJournalEntry(clock, op, entry.Id, "Zweite Korrektur", entry.From, entry.To);
 
         IncidentRepository.Save(_path, incident);
 

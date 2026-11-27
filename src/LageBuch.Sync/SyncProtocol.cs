@@ -272,15 +272,21 @@ public static class SyncProtocol
     /// 47: a client may send <c>setTaskTimer</c>, the time until an Aufgabe's reminder typed in
     /// minutes (#964). A host at 46 does not know it, so the floor rises to 47.
     /// </para>
+    /// <para>
+    /// 48: an ETB entry's Von and An can be edited. <c>editJournalEntry</c> carries <c>from</c> and
+    /// <c>to</c> (null: unchanged, blank: cleared), and the snapshot's edits carry
+    /// <c>previousFrom</c> and <c>previousTo</c>. A host at 47 would drop the new fields and save
+    /// a Von or An correction as a text edit without saying so. The floor rises to 48.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 47;
+    public const int ProtocolVersion = 48;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 47;
+    public const int MinimumProtocolVersion = 48;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

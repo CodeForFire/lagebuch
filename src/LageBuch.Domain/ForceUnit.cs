@@ -148,7 +148,7 @@ public sealed record ForceUnit(
     /// <summary>
     /// Corrects the three Stärke-Zahlen (Führungskraft / Mannschaft via Gesamt / AGT), retaining
     /// the prior values under <see cref="Edits"/> — same discipline as
-    /// <see cref="Etb.EtbEntry.WithEditedText"/>: an entered Stärke is part of the incident record,
+    /// <see cref="Etb.EtbEntry.WithEdit"/>: an entered Stärke is part of the incident record,
     /// so overwriting it silently is not an option. Resubmitting identical numbers returns this
     /// instance as-is rather than growing <see cref="Edits"/>, so retries and no-op writes cannot
     /// inflate the retained history. Validation mirrors <see cref="Create"/>.

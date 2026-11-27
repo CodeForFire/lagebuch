@@ -211,7 +211,7 @@ public class EtbSectionAssignmentTests
         var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Internal, "Lage", sectionId: nord.Id);
 
-        var edited = incident.EditJournalEntry(clock, op, entry.Id, "Lage korrigiert");
+        var edited = incident.EditJournalEntry(clock, op, entry.Id, "Lage korrigiert", entry.From, entry.To);
 
         Assert.Equal(nord.Id, edited.SectionId);
         Assert.Equal("Nord", edited.SectionName);

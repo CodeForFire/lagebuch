@@ -440,7 +440,16 @@ public class VersionHandshakeTests
     {
         // 47 lets a client send setTaskTimer (#964), which a host at 46 does not know: a 46 and a
         // 47 must not connect.
-        Assert.Equal(47, SyncProtocol.ProtocolVersion);
-        Assert.Equal(47, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 47, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 47, int.MaxValue);
+    }
+
+    [Fact]
+    public void Editing_von_and_an_raises_the_protocol_and_the_floor_to_forty_eight()
+    {
+        // 48's editJournalEntry carries the entry's Von and An; a client at 47 would send none,
+        // which a host at 48 reads as cleared: a 47 and a 48 must not connect.
+        Assert.Equal(48, SyncProtocol.ProtocolVersion);
+        Assert.Equal(48, SyncProtocol.MinimumProtocolVersion);
     }
 }

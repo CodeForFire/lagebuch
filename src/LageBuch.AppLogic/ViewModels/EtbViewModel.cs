@@ -623,6 +623,14 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     [NotifyPropertyChangedFor(nameof(EditErrorSummary))]
     private string _editText = string.Empty;
 
+    /// <summary>The edit panel's VON, written with SPEICHERN; blank clears it.</summary>
+    [ObservableProperty]
+    private string? _editFrom;
+
+    /// <summary>The edit panel's AN, written with SPEICHERN; blank clears it.</summary>
+    [ObservableProperty]
+    private string? _editTo;
+
     public bool IsEditing => EditingEntry is not null;
 
     private bool CanEdit(EtbEntryRow row) => !IsReadOnly && row.IsEditable;
@@ -670,6 +678,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     {
         EditingEntry = row;
         EditText = row.Text;
+        EditFrom = row.From;
+        EditTo = row.To;
         _editSectionId = row.SectionId;
         EditSectionChoices = BuildEditSectionChoices();
         ShowEditErrors(false); // a freshly opened panel starts quiet
@@ -700,23 +710,32 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         var entry = EditingEntry!;
         var section = _editSectionId;
         var refiled = section != entry.SectionId;
-        _session.EditJournalEntry(entry.Id, EditText); // Changed → Sync() renders it
+        _session.EditJournalEntry(entry.Id, EditText, Touched(EditFrom, entry.From), Touched(EditTo, entry.To)); // Changed → Sync() renders it
         if (refiled)
         {
             _session.AssignJournalEntrySection(entry.Id, section);
         }
 
-        EditingEntry = null;
-        EditText = string.Empty;
-        ShowEditErrors(false);
+        ClearEditFields();
         _onChanged();
     }
 
+    // Null for a field left as the panel opened it, so the host keeps whatever Von or An it holds by
+    // now; blank for one the Lagebuchführer emptied, which clears it.
+    private static string? Touched(string? edited, string? opened) =>
+        string.Equals(edited?.Trim() ?? string.Empty, opened ?? string.Empty, StringComparison.Ordinal)
+            ? null
+            : edited ?? string.Empty;
+
     [RelayCommand]
-    private void CancelEdit()
+    private void CancelEdit() => ClearEditFields();
+
+    private void ClearEditFields()
     {
         EditingEntry = null;
         EditText = string.Empty;
+        EditFrom = null;
+        EditTo = null;
         ShowEditErrors(false);
     }
 
@@ -798,6 +817,7 @@ public sealed class EtbEntryRow : ObservableObject
         IsMeasurement = EtbDirections.IsMeasurement(entry.Direction, entry.Text);
         WasEdited = entry.Edits.Count > 0;
         Edits = entry.Edits;
+        HistoryLines = HistoryOf(entry);
         _sectionId = entry.SectionId;
         _sectionName = entry.SectionName;
         IsEditable = !EtbDirections.IsAppWritten(entry.Direction);
@@ -820,9 +840,9 @@ public sealed class EtbEntryRow : ObservableObject
 
     public string Time { get; }
 
-    public string? From { get; }
+    public string? From { get; private set; }
 
-    public string? To { get; }
+    public string? To { get; private set; }
 
     public string Text { get; private set; }
 
@@ -841,6 +861,12 @@ public sealed class EtbEntryRow : ObservableObject
     public bool WasEdited { get; private set; }
 
     public IReadOnlyList<EtbEntryEdit> Edits { get; private set; }
+
+    /// <summary>
+    /// The Verlauf, one line per earlier version: when it was replaced, what it read (with Von and
+    /// An where that edit changed them) and who replaced it.
+    /// </summary>
+    public IReadOnlyList<string> HistoryLines { get; private set; }
 
     public bool IsEditable { get; }
 
@@ -918,7 +944,7 @@ public sealed class EtbEntryRow : ObservableObject
     /// <summary>
     /// Re-points this row at the current version of its entry, instead of the view model replacing
     /// the row object, which the grid sees as a different item and deselects. An edit changes only
-    /// the text and its history (<see cref="EtbEntry.WithEditedText"/>), and a re-filing the
+    /// the text, Von, An and history (<see cref="EtbEntry.WithEdit"/>), and a re-filing the
     /// Abschnitt (<see cref="EtbEntry.WithSection"/>), so nothing else is touched.
     /// </summary>
     public void Update(EtbEntry entry)
@@ -930,9 +956,15 @@ public sealed class EtbEntryRow : ObservableObject
         }
 
         Text = entry.Text;
+        From = entry.From;
+        To = entry.To;
         Edits = entry.Edits;
+        HistoryLines = HistoryOf(entry);
         WasEdited = entry.Edits.Count > 0;
         OnPropertyChanged(nameof(Text));
+        OnPropertyChanged(nameof(HistoryLines));
+        OnPropertyChanged(nameof(From));
+        OnPropertyChanged(nameof(To));
         OnPropertyChanged(nameof(Edits));
         OnPropertyChanged(nameof(WasEdited));
         if (_sectionId != entry.SectionId || !string.Equals(_sectionName, entry.SectionName, StringComparison.Ordinal))
@@ -947,6 +979,11 @@ public sealed class EtbEntryRow : ObservableObject
         // The first edit is what makes the history viewable at all.
         ShowHistoryCommand.NotifyCanExecuteChanged();
     }
+
+    private static string[] HistoryOf(EtbEntry entry) =>
+        entry.Edits
+            .Select((edit, i) => $"{Formatting.Timestamp(edit.EditedAt)}: {Formatting.EtbPriorVersion(entry, i)} ({edit.EditedBy})")
+            .ToArray();
 }
 
 /// <summary>

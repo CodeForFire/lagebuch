@@ -326,6 +326,48 @@ public class CommandApplierTests
                 clock));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AddJournalEntryCommand_with_an_oversized_von_or_an_is_rejected(bool oversizedFrom)
+    {
+        // Every edit keeps a copy of the prior Von and An, so an entry seeded with a huge one would
+        // grow the journal with each text correction a peer sends.
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var before = incident.Journal.Count;
+        var huge = new string('x', EtbEntry.MaxPartyLength + 1);
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(
+                new AddJournalEntryCommand(
+                    new OperatorDto("Client", null),
+                    EtbDirection.Incoming,
+                    "Lagemeldung",
+                    oversizedFrom ? huge : null,
+                    oversizedFrom ? null : huge),
+                incident,
+                clock));
+        Assert.Equal(before, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void AddJournalEntryCommand_for_an_app_written_line_keeps_a_long_von()
+    {
+        // A Trupp's call sign is not capped where it is entered, and a System line is never
+        // editable, so it cannot be copied into an edit.
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var callSign = new string('x', EtbEntry.MaxPartyLength + 1);
+
+        ApplyOverWire(
+            new AddJournalEntryCommand(new OperatorDto("Client", null), EtbDirection.System, "Trupp bereitgestellt", callSign, null),
+            incident,
+            clock);
+
+        Assert.Equal(callSign, incident.Journal.Last().From);
+    }
+
     [Fact]
     public void EditJournalEntryCommand_edits_the_entry_and_attributes_the_editor()
     {
@@ -336,20 +378,25 @@ public class CommandApplierTests
                 new OperatorDto("Client", "RUF 1"),
                 EtbDirection.Incoming,
                 "Lagemeldung",
-                null,
+                "Florian 1/44",
                 null),
             incident,
             clock);
         var entry = incident.Journal.Last();
 
         ApplyOverWire(
-            new EditJournalEntryCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Korrigiert"),
+            new EditJournalEntryCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Korrigiert", "Florian 1/46", "ELW 1"),
             incident,
             clock);
 
         var edited = incident.Journal.Single(e => e.Id == entry.Id);
         Assert.Equal("Korrigiert", edited.Text);
-        Assert.Equal("Editor (RUF 2)", Assert.Single(edited.Edits).EditedBy);
+        Assert.Equal("Florian 1/46", edited.From);
+        Assert.Equal("ELW 1", edited.To);
+        var edit = Assert.Single(edited.Edits);
+        Assert.Equal("Editor (RUF 2)", edit.EditedBy);
+        Assert.Equal("Florian 1/44", edit.PreviousFrom);
+        Assert.Null(edit.PreviousTo);
     }
 
     [Fact]
@@ -426,7 +473,7 @@ public class CommandApplierTests
 
         Assert.Throws<InvalidOperationException>(() =>
             ApplyOverWire(
-                new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert"),
+                new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert", null, null),
                 incident,
                 clock));
     }

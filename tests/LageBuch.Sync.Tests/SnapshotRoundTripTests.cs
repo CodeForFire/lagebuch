@@ -30,7 +30,7 @@ public class SnapshotRoundTripTests
 
         clock.Now = clock.Now.AddMinutes(1);
         var journalEntry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erstmeldung", from: "Leitstelle", to: "ELW");
-        incident.EditJournalEntry(clock, op, journalEntry.Id, "Erstmeldung korrigiert");
+        incident.EditJournalEntry(clock, op, journalEntry.Id, "Erstmeldung korrigiert", journalEntry.From, journalEntry.To);
         incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[0].Id);
         incident.AssignRole(clock, op, "EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
 

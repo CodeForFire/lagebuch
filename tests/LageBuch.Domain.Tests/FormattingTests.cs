@@ -1,3 +1,4 @@
+using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Domain.Tests;
@@ -202,5 +203,27 @@ public class FormattingTests
     {
         var covered = UrgencyLabels.Select(row => (TaskUrgency)row[0]);
         Assert.Equal(Enum.GetValues<TaskUrgency>().Order(), covered.Order());
+    }
+
+    [Fact]
+    public void EtbPriorVersion_of_a_text_correction_is_the_quoted_text_alone()
+    {
+        var op = new SessionOperator("Müller");
+        var at = new DateTimeOffset(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+        var entry = EtbEntry.Create(at, EtbDirection.Incoming, "Lage", op, from: "Florian 1/44")
+            .WithEdit("Lage korrigiert", "Florian 1/44", null, op, at.AddMinutes(1));
+
+        Assert.Equal("„Lage“", Formatting.EtbPriorVersion(entry, 0));
+    }
+
+    [Fact]
+    public void EtbPriorVersion_of_an_edit_of_von_names_the_prior_pair_with_a_dash_for_none()
+    {
+        var op = new SessionOperator("Müller");
+        var at = new DateTimeOffset(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+        var entry = EtbEntry.Create(at, EtbDirection.Incoming, "Lage", op, from: "Florian 1/44")
+            .WithEdit("Lage", "Florian 1/46", null, op, at.AddMinutes(1));
+
+        Assert.Equal("Von Florian 1/44 an —, „Lage“", Formatting.EtbPriorVersion(entry, 0));
     }
 }

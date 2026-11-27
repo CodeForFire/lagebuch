@@ -267,7 +267,8 @@ public class SituationReportsTabRenderTests
         var (_, vm, session) = ShowWorkspace();
         var entryId = session.Incident.SituationReports[0].EtbEntryId!.Value;
 
-        session.EditJournalEntry(entryId, "1. Lagemeldung (berichtigt)");
+        var sentEntry = session.Incident.Journal.Single(e => e.Id == entryId);
+        session.EditJournalEntry(entryId, "1. Lagemeldung (berichtigt)", sentEntry.From, sentEntry.To);
 
         Assert.Equal("LM 1", vm.Etb.Entries.Single(row => row.Id == entryId).SituationReportLabel);
     }

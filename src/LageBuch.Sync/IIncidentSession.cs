@@ -60,7 +60,11 @@ public interface IIncidentSession
     /// </returns>
     Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null, Guid? sectionId = null);
 
-    void EditJournalEntry(Guid entryId, string text);
+    /// <summary>
+    /// Corrects a manual ETB entry's text, Von and An. A null Von or An leaves it unchanged; a blank
+    /// one clears it.
+    /// </summary>
+    void EditJournalEntry(Guid entryId, string text, string? from, string? to);
 
     /// <summary>Files an ETB entry under an Einsatzabschnitt, or under none with null (#971).</summary>
     void AssignJournalEntrySection(Guid entryId, Guid? sectionId);

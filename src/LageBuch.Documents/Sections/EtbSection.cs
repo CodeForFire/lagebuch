@@ -65,9 +65,10 @@ public static class EtbSection
                         }
 
                         col.Item().Text(entry.Text);
-                        foreach (var edit in entry.Edits)
+                        for (var i = 0; i < entry.Edits.Count; i++)
                         {
-                            col.Item().Text($"bearbeitet {Formatting.Timestamp(edit.EditedAt)} von {edit.EditedBy}, zuvor: „{edit.PreviousText}“")
+                            var edit = entry.Edits[i];
+                            col.Item().Text($"bearbeitet {Formatting.Timestamp(edit.EditedAt)} von {edit.EditedBy}, zuvor: {Formatting.EtbPriorVersion(entry, i)}")
                                 .FontSize(8).Italic().FontColor(Colors.Grey.Medium);
                         }
                     });

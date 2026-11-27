@@ -132,8 +132,8 @@ public sealed class LocalIncidentSession : IIncidentSession
         return id;
     }
 
-    public void EditJournalEntry(Guid entryId, string text) =>
-        Mutate(() => Incident.EditJournalEntry(_clock, RequireOperator(), entryId, text));
+    public void EditJournalEntry(Guid entryId, string text, string? from, string? to) =>
+        Mutate(() => Incident.EditJournalEntry(_clock, RequireOperator(), entryId, text, from, to));
 
     public void AssignJournalEntrySection(Guid entryId, Guid? sectionId) =>
         Mutate(() => Incident.AssignJournalEntrySection(_clock, RequireOperator(), entryId, sectionId));

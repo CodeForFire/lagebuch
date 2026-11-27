@@ -13,7 +13,7 @@ public class CommandSerializationTests
     public static IEnumerable<object[]> AllCommands() => new SyncCommand[]
     {
         new AddJournalEntryCommand(Op, EtbDirection.Outgoing, "Text", "Von", "An"),
-        new EditJournalEntryCommand(Op, Guid.NewGuid(), "Korrigierter Text"),
+        new EditJournalEntryCommand(Op, Guid.NewGuid(), "Korrigierter Text", "Florian 1/46", "ELW 1"),
         new AddJournalEntryCommand(Op, EtbDirection.Internal, "Lage Nord", null, null, Guid.NewGuid(), Guid.NewGuid()),
         new AssignJournalEntrySectionCommand(Op, Guid.NewGuid(), Guid.NewGuid()),
         new AssignJournalEntrySectionCommand(Op, Guid.NewGuid(), null),

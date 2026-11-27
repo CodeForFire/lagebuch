@@ -189,7 +189,7 @@ public class WorkspaceCollaborationTests
         Assert.Contains(clientWs.Etb.Entries, e => e.Text == "Lage erkundet");
 
         var change = NextChange(client);
-        hostSession.EditJournalEntry(entry.Id, "Lage erkundet, Rückzug angeordnet");
+        hostSession.EditJournalEntry(entry.Id, "Lage erkundet, Rückzug angeordnet", entry.From, entry.To);
         await change;
 
         Assert.Contains(clientWs.Etb.Entries, e => e.Text == "Lage erkundet, Rückzug angeordnet");
@@ -721,7 +721,7 @@ public class WorkspaceCollaborationTests
             }
         };
 
-        client.EditJournalEntry(Guid.NewGuid(), "geht nicht");
+        client.EditJournalEntry(Guid.NewGuid(), "geht nicht", null, null);
         await shown.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         var shownReason = clientWs.CommandRejected;
@@ -763,7 +763,7 @@ public class WorkspaceCollaborationTests
             }
         };
 
-        client.EditJournalEntry(Guid.NewGuid(), "geht nicht");
+        client.EditJournalEntry(Guid.NewGuid(), "geht nicht", null, null);
         await shown.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.Null(clientWs.UndoNotice);

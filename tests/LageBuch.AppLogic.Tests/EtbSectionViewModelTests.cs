@@ -356,7 +356,7 @@ public class EtbSectionViewModelTests
         var raised = new List<string?>();
         row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
-        session.EditJournalEntry(row.Id, "Lage korrigiert");
+        session.EditJournalEntry(row.Id, "Lage korrigiert", row.From, row.To);
         Assert.DoesNotContain(nameof(EtbEntryRow.SectionName), raised);
 
         session.AssignJournalEntrySection(row.Id, nord);

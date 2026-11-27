@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 47;
+    public const int CurrentVersion = 48;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -319,6 +319,12 @@ public static class Migrations
         {
             ApplyV47(cn, tx);
         }
+
+        // Not behind `version < 48`: a parallel branch's build can stamp 48 on a file whose edits
+        // lack these columns, and SchemaGuard would add them as NULL -- which reads as "Von and An
+        // were empty" and puts a correction nobody made into the Verlauf and the Bericht. The step
+        // guards itself, so on a file that already has both columns it does nothing.
+        ApplyV48(cn, tx);
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
         // parallel branch numbers its own migrations too, so a file can carry a marker this lineage
@@ -1400,6 +1406,37 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entries", "section_name", "TEXT");
 
         // Stryker restore all
+    }
+
+    // Von and An of an ETB entry become editable, so an edit records the pair it replaced next to
+    // the text. Every edit written before could only have changed the text, so its prior Von and
+    // An are the entry's own: the backfill is exact, not a guess.
+    // Each column is backfilled only when it is added here: one that already exists holds prior
+    // values a build at 48 wrote, and those must not be overwritten.
+    private static void ApplyV48(SqliteConnection cn, SqliteTransaction tx)
+    {
+        if (!SchemaHelpers.TableExists(cn, tx, "etb_entry_edits") || !SchemaHelpers.TableExists(cn, tx, "etb_entries"))
+        {
+            return;
+        }
+
+        if (!SchemaHelpers.ColumnExists(cn, tx, "etb_entry_edits", "previous_from"))
+        {
+            SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entry_edits", "previous_from", "TEXT");
+            Exec(cn, tx, """
+                UPDATE etb_entry_edits SET
+                    previous_from = (SELECT from_party FROM etb_entries WHERE etb_entries.id = etb_entry_edits.entry_id);
+                """);
+        }
+
+        if (!SchemaHelpers.ColumnExists(cn, tx, "etb_entry_edits", "previous_to"))
+        {
+            SchemaHelpers.AddColumnIfMissing(cn, tx, "etb_entry_edits", "previous_to", "TEXT");
+            Exec(cn, tx, """
+                UPDATE etb_entry_edits SET
+                    previous_to = (SELECT to_party FROM etb_entries WHERE etb_entries.id = etb_entry_edits.entry_id);
+                """);
+        }
     }
 
     [SuppressMessage(
